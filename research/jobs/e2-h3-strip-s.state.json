@@ -5,7 +5,7 @@
   "out": "/content/work/runs/e2-h3-strip-s",
   "status": "running",
   "launched": 1791370508.0001202,
-  "updated": "2026-10-07 18:15:43",
+  "updated": "2026-10-07 18:24:05",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,21 +13,21 @@
       1791370531
     ],
     "train.log": [
-      68937,
-      1791371693
+      74234,
+      1791372202
     ],
     "metrics.jsonl": [
-      722,
-      1791371549
+      1201,
+      1791372116
     ],
     "train_progress.log": [
-      10366,
-      1791371693
+      15663,
+      1791372202
     ],
     "last.pt": [
       168970697,
-      1791371549
+      1791372115
     ]
   },
-  "tail": "kld=0.488 fgl=1.232 lr 1.00e-04 | 55.6 img/s data 0.001s crit 0.054s/it\n[11:14:10] ep 3 it 350/984 loss 19.001 mal=0.746 bbox=0.152 kld=0.263 fgl=1.349 lr 1.00e-04 | 55.6 img/s data 0.001s crit 0.054s/it\n[11:14:24] ep 3 it 400/984 loss 19.621 mal=0.841 bbox=0.188 kld=0.376 fgl=1.203 lr 1.00e-04 | 55.6 img/s data 0.001s crit 0.054s/it\n[11:14:39] ep 3 it 450/984 loss 19.865 mal=0.786 bbox=0.219 kld=0.355 fgl=1.174 lr 1.00e-04 | 55.7 img/s data 0.001s crit 0.054s/it\n[11:14:53] ep 3 it 500/984 loss 22.796 mal=1.189 bbox=0.250 kld=0.338 fgl=1.345 lr 1.00e-04 | 55.6 img/s data 0.001s crit 0.055s/it\n"
+  "tail": "kld=0.468 fgl=1.123 lr 1.00e-04 | 55.1 img/s data 0.004s crit 0.054s/it\n[11:22:39] ep 5 it 150/984 loss 17.536 mal=0.698 bbox=0.108 kld=0.267 fgl=1.277 lr 1.00e-04 | 55.5 img/s data 0.003s crit 0.054s/it\n[11:22:53] ep 5 it 200/984 loss 18.755 mal=0.808 bbox=0.110 kld=0.274 fgl=1.251 lr 1.00e-04 | 55.7 img/s data 0.002s crit 0.054s/it\n[11:23:08] ep 5 it 250/984 loss 19.584 mal=0.652 bbox=0.286 kld=0.529 fgl=1.136 lr 1.00e-04 | 55.4 img/s data 0.002s crit 0.055s/it\n[11:23:22] ep 5 it 300/984 loss 18.324 mal=0.643 bbox=0.197 kld=0.294 fgl=1.270 lr 1.00e-04 | 55.5 img/s data 0.001s crit 0.055s/it\n"
 }

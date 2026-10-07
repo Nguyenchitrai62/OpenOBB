@@ -64,6 +64,8 @@ def get_args(argv=None):
     ap.add_argument("--mosaic-p", type=float, default=0.0, help="H8: oriented mosaic prob")
     ap.add_argument("--context", action="store_true", help="H6: whole-image context tokens for each tile")
     ap.add_argument("--profile", type=int, default=0, help="profile N iterations after 10 warm-up ones, then exit")
+    ap.add_argument("--channels-last", action="store_true", help="NHWC convs/BN (profiling: BN was ~42% of GPU time)")
+    ap.add_argument("--compile", action="store_true", help="torch.compile backbone + encoder (falls back to eager)")
     ap.add_argument("--threads", type=int, default=0, help="torch CPU threads (0 = default)")
     return ap.parse_args(argv)
 
@@ -107,6 +109,15 @@ def main(argv=None):
     if not last.exists() and not a.no_pretrained:
         load_dfine_coco(model, a.size, class_names=classes, log=log)
     model.to(device)
+    if a.channels_last:
+        model.to(memory_format=torch.channels_last)
+    if a.compile and device.type == "cuda":
+        try:
+            model.backbone.forward = torch.compile(model.backbone.forward)
+            model.encoder.forward = torch.compile(model.encoder.forward, dynamic=False)
+            log("torch.compile enabled for backbone + encoder")
+        except Exception as e:  # noqa: BLE001
+            log(f"torch.compile unavailable, eager mode: {e}")
     crit = build_criterion(num_classes=len(classes), box_loss=a.box_loss)
     a.dense = a.dense or a.dense_queries
     dense_crit = DenseCriterion() if a.dense else None
@@ -165,6 +176,8 @@ def main(argv=None):
             for g, b in zip(opt.param_groups, base_lrs):
                 g["lr"] = b * f
             x, tg, ctx = to_device(imgs, targets, device)
+            if a.channels_last:
+                x = x.contiguous(memory_format=torch.channels_last)
             with torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=amp):
                 outputs = model(x, tg, ctx=ctx)
             t0 = time.time()
@@ -190,17 +203,18 @@ def main(argv=None):
                 continue
             opt.step()
             ema.update(model)
-            main = {k: float(v) for k, v in losses.items() if "_aux" not in k and "_dn" not in k and "_enc" not in k
+            # keep running sums on the GPU: a float() per loss term per step forced ~40 device syncs
+            main = {k: v.detach() for k, v in losses.items() if "_aux" not in k and "_dn" not in k and "_enc" not in k
                     and "_pre" not in k}
-            main["total"] = float(loss)
+            main["total"] = loss.detach()
             for k, v in main.items():
-                sums[k] = sums.get(k, 0.0) + v
+                sums[k] = sums[k] + v if k in sums else v.clone()
             n += 1
             it += 1
             if bi % a.log_every == 0:
                 el = time.time() - t_ep
                 log(f"ep {epoch} it {bi}/{iters_per_epoch} loss {float(loss):.3f} "
-                    + " ".join(f"{k[5:]}={v:.3f}" for k, v in main.items() if k.startswith("loss_"))
+                    + " ".join(f"{k[5:]}={float(v):.3f}" for k, v in main.items() if k.startswith("loss_"))
                     + f" lr {opt.param_groups[-1]['lr']:.2e} | {(bi + 1) * a.batch / max(el, 1e-9):.1f} img/s"
                     f" data {t_data / (bi + 1):.3f}s crit {t_loss / (bi + 1):.3f}s/it")
             tick = time.time()
@@ -209,7 +223,7 @@ def main(argv=None):
                "img_s": round(n * a.batch / max(dt, 1e-9), 1), "crit_s_per_it": round(t_loss / max(n, 1), 3),
                "data_s_per_it": round(t_data / max(n, 1), 3),
                "max_mem_gb": round(torch.cuda.max_memory_allocated() / 2**30, 1) if device.type == "cuda" else None}
-        rec.update({k: round(v / max(n, 1), 4) for k, v in sums.items()})
+        rec.update({k: round(float(v) / max(n, 1), 4) for k, v in sums.items()})
         torch.save({"model": model.state_dict(), "ema": ema.state_dict(), "opt": opt.state_dict(), "epoch": epoch,
                     "iter": it, "args": vars(a)}, out / "last.tmp")
         os.replace(out / "last.tmp", last)

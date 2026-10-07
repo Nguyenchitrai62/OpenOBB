@@ -5,21 +5,21 @@
   "out": "/content/work/runs/e2-h4c-dq-s",
   "status": "running",
   "launched": 1791371275.9095955,
-  "updated": "2026-10-07 18:16:02",
+  "updated": "2026-10-07 18:24:25",
   "fails": 0,
   "synced": {
     "train_progress.log": [
-      538,
-      1791371737
+      3814,
+      1791372260
     ],
     "setup.log": [
       1160,
       1791371296
     ],
     "train.log": [
-      82751,
-      1791371737
+      86027,
+      1791372260
     ]
   },
-  "tail": "sider using tensor.detach() first. (Triggered internally at /pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:836.)\n  main = {k: float(v) for k, v in losses.items() if \"_aux\" not in k and \"_dn\" not in k and \"_enc\" not in k\n[11:15:07] ep 0 it 0/984 loss 24.431 mal=0.212 bbox=1.397 kld=1.217 fgl=0.202 dense_cls=0.544 dense_box=0.226 dense_angle=0.114 lr 1.00e-07 | 0.5 img/s data 2.206s crit 0.421s/it\n[11:15:37] ep 0 it 50/984 loss 26.024 mal=0.284 bbox=1.687 kld=1.164 fgl=0.254 dense_cls=0.792 dense_box=0.352 dense_angle=0.148 lr 5.10e-06 | 13.7 img/s data 0.044s crit 0.189s/it\n"
+  "tail": "6 lr 8.01e-05 | 25.9 img/s data 0.003s crit 0.177s/it\n[11:23:21] ep 0 it 850/984 loss 22.005 mal=0.962 bbox=0.445 kld=0.554 fgl=1.228 dense_cls=0.326 dense_box=0.137 dense_angle=0.040 lr 8.51e-05 | 26.0 img/s data 0.003s crit 0.177s/it\n[11:23:50] ep 0 it 900/984 loss 21.356 mal=0.851 bbox=0.626 kld=0.586 fgl=1.090 dense_cls=0.263 dense_box=0.145 dense_angle=0.045 lr 9.01e-05 | 26.1 img/s data 0.003s crit 0.177s/it\n[11:24:20] ep 0 it 950/984 loss 21.500 mal=0.992 bbox=0.469 kld=0.624 fgl=1.000 dense_cls=0.278 dense_box=0.176 dense_angle=0.035 lr 9.51e-05 | 26.1 img/s data 0.003s crit 0.177s/it\n"
 }
