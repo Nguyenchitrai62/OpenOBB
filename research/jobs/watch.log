@@ -53,3 +53,6 @@
 [2026-10-07 17:23:26] watch: balance=479.75 rate=14.2/h active=['e1-vrdet-s-dota-24e'] ended=[]
 [2026-10-07 17:28:46] e1-vrdet-smoke2-t4: launching attempt 1 on T4 as session e1-vrdet-smoke2-t4-1
 [2026-10-07 17:29:15] e1-vrdet-smoke2-t4: running
+[2026-10-07 17:32:22] e1-vrdet-smoke2-t4: process gone without exit code; relaunching (attempt 2)
+[2026-10-07 17:32:27] e1-vrdet-smoke2-t4: launching attempt 2 on T4 as session e1-vrdet-smoke2-t4-2
+[2026-10-07 17:32:44] e1-vrdet-smoke2-t4: restoring 1 synced files (0 MB) for resume

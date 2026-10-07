@@ -63,6 +63,7 @@ def get_args(argv=None):
     ap.add_argument("--rotate-p", type=float, default=0.0, help="H8: arbitrary-angle rotation prob")
     ap.add_argument("--mosaic-p", type=float, default=0.0, help="H8: oriented mosaic prob")
     ap.add_argument("--context", action="store_true", help="H6: whole-image context tokens for each tile")
+    ap.add_argument("--profile", type=int, default=0, help="profile N iterations after 10 warm-up ones, then exit")
     ap.add_argument("--threads", type=int, default=0, help="torch CPU threads (0 = default)")
     return ap.parse_args(argv)
 
@@ -141,9 +142,23 @@ def main(argv=None):
         tick = time.time()
         if device.type == "cuda":
             torch.cuda.reset_peak_memory_stats()
+        prof = None
         for bi, (imgs, targets) in enumerate(dl):
             if bi >= iters_per_epoch:
                 break
+            if a.profile and bi == 10:
+                prof = torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU,
+                                                          torch.profiler.ProfilerActivity.CUDA], record_shapes=False)
+                prof.__enter__()
+                t_prof = time.time()
+            if prof is not None and bi == 10 + a.profile:
+                torch.cuda.synchronize()
+                dtp = (time.time() - t_prof) / a.profile
+                prof.__exit__(None, None, None)
+                log(f"[profile] {dtp:.3f} s/it over {a.profile} its (batch {a.batch}, {a.batch / dtp:.1f} img/s)")
+                for key in ("self_cuda_time_total", "cpu_time_total"):
+                    log(f"[profile] top ops by {key}\n" + prof.key_averages().table(sort_by=key, row_limit=30))
+                return
             t_data += time.time() - tick
             f = lr_factor(it, total_iters, a.warmup, a.flat, a.min_lr_ratio)
             for g, b in zip(opt.param_groups, base_lrs):

@@ -37,4 +37,4 @@ def make(root, n_train=64, n_val=16, S=384, seed=0):
 
 
 if __name__ == "__main__":
-    make(sys.argv[1], *(int(v) for v in sys.argv[2:4]))
+    make(sys.argv[1], *(int(v) for v in sys.argv[2:5]))

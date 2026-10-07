@@ -5,7 +5,7 @@
   "out": "/content/work/runs/e1-vrdet-s-dota-24e",
   "status": "running",
   "launched": 1791368057.1739,
-  "updated": "2026-10-07 17:23:26",
+  "updated": "2026-10-07 17:32:14",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,13 +13,21 @@
       1791368098
     ],
     "train.log": [
-      101045,
-      1791368599
+      106477,
+      1791369081
     ],
     "train_progress.log": [
-      2152,
-      1791368599
+      7584,
+      1791369081
+    ],
+    "metrics.jsonl": [
+      482,
+      1791368935
+    ],
+    "last.pt": [
+      165363061,
+      1791368935
     ]
   },
-  "tail": "kld=0.628 fgl=1.172 lr 5.01e-05 | 56.4 img/s data 0.001s crit 0.057s/it\n[10:22:39] ep 0 it 550/984 loss 25.389 mal=0.746 bbox=1.040 kld=0.729 fgl=1.039 lr 5.51e-05 | 56.7 img/s data 0.001s crit 0.057s/it\n[10:22:52] ep 0 it 600/984 loss 24.544 mal=0.847 bbox=0.756 kld=0.612 fgl=1.204 lr 6.01e-05 | 57.0 img/s data 0.001s crit 0.057s/it\n[10:23:05] ep 0 it 650/984 loss 25.882 mal=0.883 bbox=0.778 kld=0.657 fgl=0.991 lr 6.51e-05 | 57.3 img/s data 0.001s crit 0.057s/it\n[10:23:19] ep 0 it 700/984 loss 25.400 mal=1.037 bbox=0.759 kld=0.661 fgl=1.058 lr 7.01e-05 | 57.5 img/s data 0.001s crit 0.057s/it\n"
+  "tail": "kld=0.324 fgl=1.410 lr 1.00e-04 | 60.1 img/s data 0.001s crit 0.055s/it\n[10:30:41] ep 2 it 400/984 loss 22.071 mal=0.858 bbox=0.397 kld=0.391 fgl=1.347 lr 1.00e-04 | 60.2 img/s data 0.001s crit 0.055s/it\n[10:30:55] ep 2 it 450/984 loss 22.506 mal=0.804 bbox=0.448 kld=0.498 fgl=1.326 lr 1.00e-04 | 60.2 img/s data 0.001s crit 0.054s/it\n[10:31:08] ep 2 it 500/984 loss 20.507 mal=0.747 bbox=0.420 kld=0.520 fgl=1.038 lr 1.00e-04 | 60.2 img/s data 0.001s crit 0.055s/it\n[10:31:21] ep 2 it 550/984 loss 21.363 mal=0.934 bbox=0.217 kld=0.345 fgl=1.468 lr 1.00e-04 | 60.2 img/s data 0.001s crit 0.055s/it\n"
 }

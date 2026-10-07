@@ -1,9 +1,17 @@
 {
-  "attempts": 1,
+  "attempts": 2,
   "started": "2026-10-07 17:28:46",
-  "session": "e1-vrdet-smoke2-t4-1",
+  "session": "e1-vrdet-smoke2-t4-2",
   "out": "/content/work/runs/e1-vrdet-smoke2-t4",
   "status": "running",
-  "launched": 1791368932.1618898,
-  "updated": "2026-10-07 17:29:15"
+  "launched": 1791369153.4397814,
+  "updated": "2026-10-07 17:32:33",
+  "fails": 0,
+  "synced": {
+    "setup.log": [
+      186,
+      1791368954
+    ]
+  },
+  "tail": ""
 }
