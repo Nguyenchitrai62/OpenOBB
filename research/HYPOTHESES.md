@@ -91,6 +91,13 @@ Nhiễu giữa các run trên DOTA val khoảng ±0.3–0.5. Δ < 0.5 coi là ch
 - Phân rã khoảng cách tới YOLO26s: 5 class hiếm kém −8.4, 10 class phổ biến kém −2.9.
 | `e3-rfs-s` | `--rfs 0.1` | Repeat-factor sampling sửa điểm yếu class hiếm (HC, SBF, RA, BD, BC) | ≥ baseline + 0.5, class hiếm tăng |
 
+**Kết quả `e3-rfs-s`: 72.34 (+2.45), mAP50:95 48.17 (+2.04). XÁC NHẬN.**
+- HC +15.8, RA +7.7, SBF +7.6, BD +3.1, BC +3.0.
+- 5 class hiếm: 64.9 (baseline 58.3, YOLO 66.7). 10 class phổ biến: 76.1 (không đổi).
+- Khoảng cách tới YOLO26s (24 epoch): −4.9 → −2.4. RFS thành mặc định cho các run sau.
+
+| `e5-rfs-ctx-s` | `--rfs 0.1 --context --ctx-dropout 0.3` | Có RFS bảo vệ class hiếm, ngữ cảnh toàn ảnh sẽ cộng thêm phần ngữ nghĩa (SBF/RA/GTF/BD/BC/SP +2..5) mà không làm hỏng HC | ≥ RFS + 0.5 |
+
 ## E2 cũ (dự kiến ban đầu)
 - H4 dense: thêm head one-to-many dense (TAL xoay) trên P3–P5 của encoder, dùng làm giám sát phụ và nguồn query. Kỳ vọng tăng SV/PL/SP.
 - H1 loss: ProbIoU thay KLD (cost và loss).

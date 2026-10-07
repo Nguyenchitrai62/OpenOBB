@@ -5,5 +5,21 @@
   "out": "/content/work/runs/e5-yolo26x-dota-24e",
   "status": "running",
   "launched": 1791384843.1847994,
-  "updated": "2026-10-07 21:54:50"
+  "updated": "2026-10-07 21:57:39",
+  "fails": 0,
+  "synced": {
+    "setup.log": [
+      2675,
+      1791384885
+    ],
+    "train/args.yaml": [
+      1723,
+      1791385043
+    ],
+    "train.log": [
+      63560,
+      1791385049
+    ]
+  },
+  "tail": "ing https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26n.pt to 'weights/yolo26n.pt': 100% \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501 5.3MB 80.4MB/s 0.1s\n\u001b[34m\u001b[1mAMP: \u001b[0mchecks passed \u2705\n\u001b[34m\u001b[1mtrain: \u001b[0mFast image access \u2705 (ping: 0.0\u00b10.0 ms, read: 7025.1\u00b14853.7 MB/s, size: 264.5 KB)\n\n\u001b[K\u001b[34m\u001b[1mtrain: \u001b[0mScanning /content/datasets/dota1_1024/labels/train... 393 images, 80 backgrounds, 0 corrupt: 2% \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 393/15749 1.2Kit/s 0.1s<13.1s\n\u001b[K\u001b[34m\u001b[1mtrain: \u001b[0mScanning /content/datasets/dota1_1024/labels/train... 761 images, 108 backgrounds, 0 corrupt: 4% \u2578\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 761/15749 1.9Kit/s 0.2s<7.8s"
 }

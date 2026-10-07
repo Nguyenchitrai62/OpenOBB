@@ -62,9 +62,9 @@ def clip_to_window(polys, labels, S, iof_thr=0.7):
 class DotaPatches(Dataset):
     def __init__(self, root, split, size=1024, augment=False, filter_empty=False, min_size=2.0,
                  hsv=(0.015, 0.5, 0.3), rot90=True, flip=True, limit=None, keep_difficult=True, rotate_p=0.0,
-                 mosaic_p=0.0, context=False, thumb=512):
+                 mosaic_p=0.0, context=False, thumb=512, ctx_dropout=0.0):
         self.root, self.split, self.size = Path(root), split, size
-        self.context, self.thumb = context, thumb
+        self.context, self.thumb, self.ctx_dropout = context, thumb, ctx_dropout
         self.rotate_p, self.mosaic_p = rotate_p, mosaic_p
         self.augment, self.min_size, self.hsv, self.rot90, self.flip = augment, min_size, hsv, rot90, flip
         items = [json.loads(l) for l in open(self.root / "meta" / f"{split}.jsonl")]
@@ -205,6 +205,8 @@ class DotaPatches(Dataset):
             img, polys, labels = self._load(m)
             if self.context:
                 ctx = self._load_ctx(m)
+                if self.augment and self.ctx_dropout and random.random() < self.ctx_dropout:
+                    ctx["valid"] = False         # context dropout: do not let scene priors dominate rare classes
             if self.augment:
                 img, polys = self._augment(img, polys, ctx=ctx)
                 if self.rotate_p and random.random() < self.rotate_p:

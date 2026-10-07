@@ -68,6 +68,7 @@ def get_args(argv=None):
     ap.add_argument("--compile", action="store_true", help="torch.compile backbone + encoder (falls back to eager)")
     ap.add_argument("--rfs", type=float, default=0.0, help="repeat-factor sampling threshold t (0 = off)")
     ap.add_argument("--eval-only", action="store_true", help="evaluate EMA weights of {out}/last.pt, no training")
+    ap.add_argument("--ctx-dropout", type=float, default=0.0, help="H6: drop the context with this prob")
     ap.add_argument("--threads", type=int, default=0, help="torch CPU threads (0 = default)")
     return ap.parse_args(argv)
 
@@ -117,7 +118,7 @@ def main(argv=None):
     a.dense = a.dense or a.dense_queries
     dense_crit = DenseCriterion() if a.dense else None
     ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,
-                     rotate_p=a.rotate_p, mosaic_p=a.mosaic_p, context=a.context)
+                     rotate_p=a.rotate_p, mosaic_p=a.mosaic_p, context=a.context, ctx_dropout=a.ctx_dropout)
     sampler = None
     if a.rfs > 0:
         from vrdet.data.dota import repeat_factors
