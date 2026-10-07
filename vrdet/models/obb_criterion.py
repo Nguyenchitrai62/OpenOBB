@@ -17,17 +17,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 from scipy.optimize import linear_sum_assignment
 
-from vrdet.ops.obb_torch import rotated_iou
+from vrdet.ops.obb_torch import probiou, rotated_iou
 from .obb_utils import align_to, chamfer_matrix, kld, obb2distance
 
 N_DIST = 5
 
 
 class OBBHungarianMatcher(nn.Module):
-    def __init__(self, cost_class=2.0, cost_chamfer=5.0, cost_kld=2.0, alpha=0.25, gamma=2.0):
+    def __init__(self, cost_class=2.0, cost_chamfer=5.0, cost_kld=2.0, alpha=0.25, gamma=2.0, gauss="kld"):
         super().__init__()
         self.cost_class, self.cost_chamfer, self.cost_kld = cost_class, cost_chamfer, cost_kld
-        self.alpha, self.gamma = alpha, gamma
+        self.alpha, self.gamma, self.gauss = alpha, gamma, gauss
 
     @torch.no_grad()
     def forward(self, outputs, targets):
@@ -45,7 +45,9 @@ class OBBHungarianMatcher(nn.Module):
         pos = self.alpha * ((1 - p) ** self.gamma) * (-(p + 1e-8).log())
         C = self.cost_class * (pos - neg)
         C = C + self.cost_chamfer * chamfer_matrix(boxes, tgt_box)
-        C = C + self.cost_kld * kld(boxes[:, None, :], tgt_box[None, :, :])
+        g = kld(boxes[:, None, :], tgt_box[None, :, :]) if self.gauss == "kld" else \
+            1 - probiou(boxes[:, None, :], tgt_box[None, :, :])
+        C = C + self.cost_kld * g
         C = torch.nan_to_num(C.view(bs, nq, -1), nan=1.0).cpu()
         indices = [linear_sum_assignment(c[i]) for i, c in enumerate(C.split(sizes, -1))]
         return {'indices': [(torch.as_tensor(i, dtype=torch.int64), torch.as_tensor(j, dtype=torch.int64))
@@ -54,8 +56,9 @@ class OBBHungarianMatcher(nn.Module):
 
 class OBBCriterion(nn.Module):
     def __init__(self, matcher, weight_dict, losses=('mal', 'boxes', 'local'), num_classes=15, reg_max=32,
-                 gamma=1.5, mal_alpha=None, use_uni_set=True):
+                 gamma=1.5, mal_alpha=None, use_uni_set=True, gauss="kld"):
         super().__init__()
+        self.gauss = gauss
         self.matcher, self.weight_dict, self.losses = matcher, weight_dict, list(losses)
         self.num_classes, self.reg_max, self.gamma, self.mal_alpha = num_classes, reg_max, gamma, mal_alpha
         self.use_uni_set = use_uni_set
@@ -105,7 +108,8 @@ class OBBCriterion(nn.Module):
             return {'loss_bbox': z, 'loss_kld': z}
         tgt_al = align_to(tgt, src[:, 4].detach())
         l1 = (src[:, :4] - tgt_al[:, :4]).abs().sum(-1) + (src[:, 4] - tgt_al[:, 4]).abs() / math.pi
-        return {'loss_bbox': l1.sum() / num_boxes, 'loss_kld': kld(src, tgt).sum() / num_boxes}
+        g = kld(src, tgt) if self.gauss == "kld" else 1 - probiou(src, tgt)
+        return {'loss_bbox': l1.sum() / num_boxes, 'loss_kld': g.sum() / num_boxes}
 
     # ---------------------------------------------------------------- FGL + DDF (D-FINE)
     def loss_local(self, outputs, targets, indices, num_boxes, T=5):

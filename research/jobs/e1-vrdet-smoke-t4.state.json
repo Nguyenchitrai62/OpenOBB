@@ -3,8 +3,39 @@
   "started": "2026-10-07 16:55:01",
   "session": "e1-vrdet-smoke-t4-1",
   "out": "/content/work/runs/e1-vrdet-smoke-t4",
-  "status": "running",
+  "status": "done",
   "launched": 1791366906.8811078,
-  "updated": "2026-10-07 16:58:23",
-  "fails": 1
+  "updated": "2026-10-07 17:02:21",
+  "fails": 0,
+  "synced": {
+    "eval_val.json": [
+      2136,
+      1791367304
+    ],
+    "metrics.jsonl": [
+      7981,
+      1791367312
+    ],
+    "train_progress.log": [
+      17838,
+      1791367304
+    ],
+    "setup.log": [
+      317,
+      1791366936
+    ],
+    "exitcode": [
+      2,
+      1791367314
+    ],
+    "eval_val.txt": [
+      1013,
+      1791367304
+    ],
+    "train.log": [
+      21831,
+      1791367304
+    ]
+  },
+  "tail": "  0.00\nship                     34      173 100.00    95.76 100.00\ntennis-court              0       92   0.00     0.00   0.00\nbasketball-court          0      110   0.00     0.00   0.00\nstorage-tank             35     1296 100.00    93.35 100.00\nsoccer-ball-field         0      135   0.00     0.00   0.00\nroundabout                0      101   0.00     0.00   0.00\nharbor                    0      148   0.00     0.00   0.00\nswimming-pool             0      101   0.00     0.00   0.00\nhelicopter                0       53   0.00     0.00   0.00\nmAP                                  100.00    94.80\n"
 }

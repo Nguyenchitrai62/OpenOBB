@@ -36,9 +36,29 @@ CONFIGS = {
 COCO_TO_DOTA = {"plane": 4, "helicopter": 4, "small-vehicle": 2, "large-vehicle": 7, "ship": 8}
 
 
+class StripContext(nn.Module):
+    """Large anisotropic receptive field for long / large objects (bridge, harbor, fields): depthwise 1xk and kx1
+    strips + 3x3 + pointwise mix, residual, zero-initialised output so it starts as identity. Idea from strip /
+    large selective kernels (Strip R-CNN, LSKNet); implementation is VRDet's own."""
+
+    def __init__(self, c, k=11):
+        super().__init__()
+        self.h = nn.Conv2d(c, c, (1, k), padding=(0, k // 2), groups=c, bias=False)
+        self.v = nn.Conv2d(c, c, (k, 1), padding=(k // 2, 0), groups=c, bias=False)
+        self.sq = nn.Conv2d(c, c, 3, padding=1, groups=c, bias=False)
+        self.bn = nn.BatchNorm2d(c)
+        self.pw = nn.Conv2d(c, c, 1)
+        nn.init.zeros_(self.pw.weight)
+        nn.init.zeros_(self.pw.bias)
+
+    def forward(self, x):
+        y = self.bn(self.h(x) + self.v(x) + self.sq(x))
+        return x + self.pw(nn.functional.silu(y))
+
+
 class VRDet(nn.Module):
     def __init__(self, size="s", num_classes=15, num_queries=300, img_size=1024, rotate_sampling=True,
-                 num_denoising=100, dense=False, dense_width=128, **overrides):
+                 num_denoising=100, dense=False, dense_width=128, strip_k=0, ortho_heads=False, **overrides):
         super().__init__()
         cfg = copy.deepcopy(CONFIGS[size])
         for k, v in overrides.items():          # e.g. decoder=dict(num_layers=4)
@@ -48,12 +68,16 @@ class VRDet(nn.Module):
         self.encoder = HybridEncoder(**cfg["encoder"], eval_spatial_size=[img_size, img_size])
         self.decoder = OBBDFINETransformer(num_classes=num_classes, num_queries=num_queries,
                                            eval_spatial_size=[img_size, img_size], rotate_sampling=rotate_sampling,
-                                           num_denoising=num_denoising, **cfg["decoder"])
+                                           num_denoising=num_denoising, ortho_heads=ortho_heads, **cfg["decoder"])
+        hid = cfg["encoder"]["hidden_dim"]
+        self.context = nn.ModuleList([StripContext(hid, strip_k) for _ in range(3)]) if strip_k else None
         self.dense_head = DenseRotatedHead(cfg["encoder"]["hidden_dim"], num_classes, (8, 16, 32), dense_width,
                                            img_size) if dense else None
 
     def forward(self, x, targets=None):
         feats = self.encoder(self.backbone(x))
+        if self.context is not None:
+            feats = [m(f) for m, f in zip(self.context, feats)]
         out = self.decoder(feats, targets)
         if self.dense_head is not None:
             out.update(self.dense_head(feats))
@@ -61,9 +85,11 @@ class VRDet(nn.Module):
 
 
 def build_criterion(num_classes=15, reg_max=32, box_loss="kld", weights=None, cost=None):
+    """box_loss: 'kld' (O2-DETR / RiO-DETR) or 'probiou' (PP-YOLOE-R, YOLO26); used in both cost and loss."""
     cost = cost or dict(cost_class=2.0, cost_chamfer=5.0, cost_kld=2.0)
     weights = weights or {'loss_mal': 1, 'loss_bbox': 5, 'loss_kld': 2, 'loss_fgl': 0.15, 'loss_ddf': 1.5}
-    return OBBCriterion(OBBHungarianMatcher(**cost), weights, num_classes=num_classes, reg_max=reg_max)
+    return OBBCriterion(OBBHungarianMatcher(**cost, gauss=box_loss), weights, num_classes=num_classes,
+                        reg_max=reg_max, gauss=box_loss)
 
 
 def load_dfine_coco(model, ckpt_or_size, class_names=None, log=print):

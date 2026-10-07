@@ -56,6 +56,11 @@ def get_args(argv=None):
     ap.add_argument("--skip-final-eval", action="store_true")
     ap.add_argument("--dense", action="store_true", help="add the dense one-to-many rotated head (H4)")
     ap.add_argument("--dense-weight", type=float, default=1.0)
+    ap.add_argument("--box-loss", default="kld", choices=["kld", "probiou"], help="H1")
+    ap.add_argument("--ortho-heads", action="store_true", help="H2: half the heads sample at theta+90")
+    ap.add_argument("--strip-k", type=int, default=0, help="H3: strip-context kernel (0 = off)")
+    ap.add_argument("--rotate-p", type=float, default=0.0, help="H8: arbitrary-angle rotation prob")
+    ap.add_argument("--mosaic-p", type=float, default=0.0, help="H8: oriented mosaic prob")
     ap.add_argument("--threads", type=int, default=0, help="torch CPU threads (0 = default)")
     return ap.parse_args(argv)
 
@@ -91,14 +96,16 @@ def main(argv=None):
     torch.backends.cudnn.allow_tf32 = True
 
     model = VRDet(a.size, num_classes=len(DOTA1_CLASSES), num_queries=a.queries, img_size=a.img,
-                  rotate_sampling=not a.no_rotate_sampling, num_denoising=a.denoising, dense=a.dense)
+                  rotate_sampling=not a.no_rotate_sampling, num_denoising=a.denoising, dense=a.dense,
+                  strip_k=a.strip_k, ortho_heads=a.ortho_heads)
     last = out / "last.pt"
     if not last.exists() and not a.no_pretrained:
         load_dfine_coco(model, a.size, class_names=DOTA1_CLASSES, log=log)
     model.to(device)
-    crit = build_criterion(num_classes=len(DOTA1_CLASSES))
+    crit = build_criterion(num_classes=len(DOTA1_CLASSES), box_loss=a.box_loss)
     dense_crit = DenseCriterion() if a.dense else None
-    ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train)
+    ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,
+                     rotate_p=a.rotate_p, mosaic_p=a.mosaic_p)
     dl = DataLoader(ds, batch_size=a.batch, shuffle=True, num_workers=a.workers, collate_fn=collate,
                     pin_memory=True, drop_last=True, persistent_workers=a.workers > 0,
                     prefetch_factor=4 if a.workers > 0 else None)

@@ -11,10 +11,13 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import shapely
 import torch
 from torch.utils.data import Dataset
 
 cv2.setNumThreads(0)
+PAD_BGR = (104, 116, 124)
+SQUARE_CLASSES = (9, 11)     # storage-tank, roundabout: only 90-degree rotations (RTMDet-R / O2 practice)
 
 
 def polys_to_obb(polys):
@@ -30,10 +33,38 @@ def polys_to_obb(polys):
     return out
 
 
+def clip_to_window(polys, labels, S, iof_thr=0.7):
+    """Keep objects with area(obj & window)/area(obj) >= iof_thr; truncated ones become the min-area rectangle
+    of their visible part (same rule as colab/data/split_dota.py)."""
+    if len(polys) == 0:
+        return polys, labels
+    g = shapely.polygons(polys.reshape(-1, 4, 2).astype(np.float64))
+    bad = ~shapely.is_valid(g)
+    if bad.any():
+        g[bad] = shapely.convex_hull(g[bad])
+    area = shapely.area(g)
+    inter = shapely.intersection(g, shapely.box(0, 0, S, S))
+    iof = np.where(area > 0, shapely.area(inter) / np.maximum(area, 1e-9), 0)
+    out_p, out_l = [], []
+    for k in np.nonzero(iof >= iof_thr)[0]:
+        if iof[k] > 0.999:
+            q = polys[k]
+        else:
+            pts = np.asarray(shapely.get_coordinates(inter[k]), dtype=np.float32)
+            q = cv2.boxPoints(cv2.minAreaRect(pts)).reshape(-1)
+        out_p.append(np.clip(q, 0, S))
+        out_l.append(labels[k])
+    if not out_p:
+        return np.zeros((0, 8), np.float32), np.zeros(0, np.int64)
+    return np.array(out_p, np.float32), np.array(out_l, np.int64)
+
+
 class DotaPatches(Dataset):
     def __init__(self, root, split, size=1024, augment=False, filter_empty=False, min_size=2.0,
-                 hsv=(0.015, 0.5, 0.3), rot90=True, flip=True, limit=None, keep_difficult=True):
+                 hsv=(0.015, 0.5, 0.3), rot90=True, flip=True, limit=None, keep_difficult=True, rotate_p=0.0,
+                 mosaic_p=0.0):
         self.root, self.split, self.size = Path(root), split, size
+        self.rotate_p, self.mosaic_p = rotate_p, mosaic_p
         self.augment, self.min_size, self.hsv, self.rot90, self.flip = augment, min_size, hsv, rot90, flip
         items = [json.loads(l) for l in open(self.root / "meta" / f"{split}.jsonl")]
         items.sort(key=lambda m: m["name"])
@@ -54,7 +85,42 @@ class DotaPatches(Dataset):
         labels = np.array([o[0] for o in objs], dtype=np.int64)
         return img, polys, labels
 
-    def _augment(self, img, polys):
+    def _rotate(self, img, polys, labels):
+        """Arbitrary-angle rotation about the centre (images with square-like classes: 90-degree steps only)."""
+        S = img.shape[0]
+        if np.isin(labels, SQUARE_CLASSES).any():
+            ang = 90.0 * random.randint(0, 3)
+        else:
+            ang = random.uniform(-180, 180)
+        M = cv2.getRotationMatrix2D((S / 2, S / 2), ang, 1.0)
+        img = cv2.warpAffine(np.ascontiguousarray(img), M, (S, S), flags=cv2.INTER_LINEAR, borderValue=PAD_BGR)
+        if len(polys):
+            pts = polys.reshape(-1, 2) @ M[:, :2].T + M[:, 2]
+            polys, labels = clip_to_window(pts.reshape(-1, 8).astype(np.float32), labels, S)
+        return img, polys, labels
+
+    def _mosaic(self, i):
+        """Four patches at half scale, each with its own random flip/rot90 (oriented dense one-to-one, RiO-DETR)."""
+        S, h = self.size, self.size // 2
+        canvas = np.empty((S, S, 3), np.uint8)
+        canvas[:] = PAD_BGR
+        P, L = [], []
+        for q, j in enumerate([i] + [random.randrange(len(self.items)) for _ in range(3)]):
+            img, polys, labels = self._load(self.items[j])
+            img, polys = self._augment(img, polys, color=False)
+            ox, oy = (q % 2) * h, (q // 2) * h
+            canvas[oy:oy + h, ox:ox + h] = cv2.resize(np.ascontiguousarray(img), (h, h), interpolation=cv2.INTER_AREA)
+            if len(polys):
+                pp = polys * 0.5
+                pp[:, 0::2] += ox
+                pp[:, 1::2] += oy
+                P.append(pp)
+                L.append(labels)
+        polys = np.concatenate(P) if P else np.zeros((0, 8), np.float32)
+        labels = np.concatenate(L) if L else np.zeros(0, np.int64)
+        return canvas, polys, labels
+
+    def _augment(self, img, polys, color=True):
         S = img.shape[0]
         if self.flip and random.random() < 0.5:
             img = img[:, ::-1]
@@ -69,22 +135,33 @@ class DotaPatches(Dataset):
                 x = polys[:, 0::2].copy()
                 polys[:, 0::2] = polys[:, 1::2]
                 polys[:, 1::2] = S - x
-        if self.hsv and any(self.hsv):
-            r = np.random.uniform(-1, 1, 3) * self.hsv + 1
-            hue, sat, val = cv2.split(cv2.cvtColor(np.ascontiguousarray(img), cv2.COLOR_BGR2HSV))
-            x = np.arange(0, 256, dtype=r.dtype)
-            lut_hue = ((x * r[0]) % 180).astype(np.uint8)
-            lut_sat = np.clip(x * r[1], 0, 255).astype(np.uint8)
-            lut_val = np.clip(x * r[2], 0, 255).astype(np.uint8)
-            img = cv2.cvtColor(cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val))),
-                               cv2.COLOR_HSV2BGR)
+        if color:
+            img = self._hsv(img)
         return img, polys
+
+    def _hsv(self, img):
+        if not (self.hsv and any(self.hsv)):
+            return img
+        r = np.random.uniform(-1, 1, 3) * self.hsv + 1
+        hue, sat, val = cv2.split(cv2.cvtColor(np.ascontiguousarray(img), cv2.COLOR_BGR2HSV))
+        x = np.arange(0, 256, dtype=r.dtype)
+        lut_hue = ((x * r[0]) % 180).astype(np.uint8)
+        lut_sat = np.clip(x * r[1], 0, 255).astype(np.uint8)
+        lut_val = np.clip(x * r[2], 0, 255).astype(np.uint8)
+        return cv2.cvtColor(cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val))),
+                            cv2.COLOR_HSV2BGR)
 
     def __getitem__(self, i):
         m = self.items[i]
-        img, polys, labels = self._load(m)
-        if self.augment:
-            img, polys = self._augment(img, polys)
+        if self.augment and self.mosaic_p and random.random() < self.mosaic_p:
+            img, polys, labels = self._mosaic(i)
+            img = self._hsv(img)
+        else:
+            img, polys, labels = self._load(m)
+            if self.augment:
+                img, polys = self._augment(img, polys)
+                if self.rotate_p and random.random() < self.rotate_p:
+                    img, polys, labels = self._rotate(img, polys, labels)
         obb = polys_to_obb(polys)
         keep = (obb[:, 2] >= self.min_size) & (obb[:, 3] >= self.min_size) if len(obb) else np.zeros(0, bool)
         obb, labels = obb[keep], labels[keep]

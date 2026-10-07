@@ -197,6 +197,14 @@ def poll(jid):
     if rs["exitcode"] is not None:
         st["status"] = "done" if rs["exitcode"] == "0" else f"failed_rc{rs['exitcode']}"
     elif not rs["alive"]:
+        # process vanished without an exit code (never started, host OOM-kill, ...): resume on a fresh VM
+        if st["attempts"] <= sp.get("max_retries", 3):
+            log(f"{jid}: process gone without exit code; relaunching (attempt {st['attempts'] + 1})")
+            cx.stop(sess)
+            st["status"] = "resuming"
+            save_state(jid, st)
+            launch(jid)
+            return "running"
         st["status"] = "failed_died"
     elif hours > sp.get("max_hours", 12):
         st["status"] = "timeout"

@@ -37,3 +37,13 @@
 [2026-10-07 16:55:01] e1-vrdet-smoke-t4: launching attempt 1 on T4 as session e1-vrdet-smoke-t4-1
 [2026-10-07 16:55:39] e1-vrdet-smoke-t4: running
 [2026-10-07 16:58:23] e1-vrdet-smoke-t4: status failed #1 (session listed=True): Command '['C:\\Users\\HP\\.local\\bin\\colab.EXE', 'exec', '-s', 'e1-vrdet-smoke-t4-1']' timed out after 150 seconds
+[2026-10-07 16:58:52] watch: balance=488.43 rate=15.27/h active=['e1-vrdet-smoke-t4', 'e1-yolo26s-dota-24e'] ended=[]
+[2026-10-07 17:02:21] e1-vrdet-smoke-t4: finished with status done; stopping VM
+[2026-10-07 17:02:52] watch: balance=487.16 rate=15.27/h active=['e1-vrdet-smoke-t4', 'e1-yolo26s-dota-24e'] ended=[('e1-vrdet-smoke-t4', 'done')]
+[2026-10-07 17:02:55] e1-vrdet-s-dota-24e: launching attempt 1 on G4 as session e1-vrdet-s-dota-24e-1
+[2026-10-07 17:12:52] e1-vrdet-s-dota-24e: running
+[2026-10-07 17:13:34] e1-vrdet-s-dota-24e: finished with status failed_died; stopping VM
+[2026-10-07 17:14:07] watch: balance=483.36 rate=28.4/h active=['e1-vrdet-s-dota-24e', 'e1-yolo26s-dota-24e'] ended=[('e1-vrdet-s-dota-24e', 'failed_died')]
+[2026-10-07 17:14:11] e1-vrdet-s-dota-24e: launching attempt 2 on G4 as session e1-vrdet-s-dota-24e-2
+[2026-10-07 17:14:34] e1-vrdet-s-dota-24e: restoring 1 synced files (0 MB) for resume
+[2026-10-07 17:15:04] e1-vrdet-s-dota-24e: running

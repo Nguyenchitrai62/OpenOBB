@@ -75,3 +75,4 @@
 [2026-09-24 15:42:45] EVID: wall         AP50(HBB-proxy)=0.122 npred=72705 ngt=13584
 [2026-09-24 15:42:45] De nghi: so sanh VLMDet-small vs yolo11x cung dieu kien; neu cua hiem/junction hon >=2 diem -> CHOT D4 (base full 16k); nguoc lai -> D1/D2/D3 theo class loi nhat.
 [2026-10-07 15:51] e0-smoke(T4)+e0-smoke-g4(G4) status=done result=framework OK: sync, VM-death resume (metrics history kept), auto-stop cu=~4 next=E0 data+evaluator+YOLO26 baseline
+[2026-10-07 17:02] e1-vrdet-smoke-t4 status=done result=VRDet-S on synthetic rotated rectangles (256 train/32 val, 384px, 30ep, T4 fp32): val mAP50 1.000 mAP50:95 0.948 -> pipeline (rotated FDR, Chamfer/KLD matching, MAL, merge, eval) works on Linux/CUDA; CPU crash is a Windows torch-2.12 multithread issue only cu=~0.2 next=launch e1-vrdet-s-dota-24e (G4)

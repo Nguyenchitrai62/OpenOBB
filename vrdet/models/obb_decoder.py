@@ -44,8 +44,11 @@ class RotatedMSDeformableAttention(nn.Module):
     """Multi-scale deformable attention whose sampling offsets live in the (rotated) box frame."""
 
     def __init__(self, embed_dim=256, num_heads=8, num_levels=4, num_points=4, method='default',
-                 offset_scale=0.5, rotate=True):
+                 offset_scale=0.5, rotate=True, ortho_heads=False):
         super().__init__()
+        # ortho_heads: half of the heads sample in the frame turned by +90 deg (RiO-DETR's RROA idea)
+        turn = [0.0] * (num_heads - num_heads // 2) + [math.pi / 2 * float(ortho_heads)] * (num_heads // 2)
+        self.register_buffer('head_turn', torch.tensor(turn), persistent=False)
         self.embed_dim, self.num_heads, self.num_levels = embed_dim, num_heads, num_levels
         self.offset_scale, self.rotate = offset_scale, rotate
         num_points_list = num_points if isinstance(num_points, list) else [num_points] * num_levels
@@ -85,7 +88,8 @@ class RotatedMSDeformableAttention(nn.Module):
         ou = off[..., 0] * ref[..., 2]
         ov = off[..., 1] * ref[..., 3]
         if self.rotate:
-            c, s = torch.cos(ref[..., 4]), torch.sin(ref[..., 4])
+            th = ref[..., 4] + self.head_turn.to(ref.dtype)[None, None, :, None]
+            c, s = torch.cos(th), torch.sin(th)
             dx, dy = ou * c - ov * s, ou * s + ov * c
         else:
             dx, dy = ou, ov
@@ -112,13 +116,13 @@ class Gate(nn.Module):
 
 class TransformerDecoderLayer(nn.Module):
     def __init__(self, d_model=256, n_head=8, dim_feedforward=1024, dropout=0., activation='relu',
-                 n_levels=4, n_points=4, cross_attn_method='default', rotate_sampling=True):
+                 n_levels=4, n_points=4, cross_attn_method='default', rotate_sampling=True, ortho_heads=False):
         super().__init__()
         self.self_attn = nn.MultiheadAttention(d_model, n_head, dropout=dropout, batch_first=True)
         self.dropout1 = nn.Dropout(dropout)
         self.norm1 = nn.LayerNorm(d_model)
         self.cross_attn = RotatedMSDeformableAttention(d_model, n_head, n_levels, n_points, method=cross_attn_method,
-                                                       rotate=rotate_sampling)
+                                                       rotate=rotate_sampling, ortho_heads=ortho_heads)
         self.dropout2 = nn.Dropout(dropout)
         self.gateway = Gate(d_model)
         self.linear1 = nn.Linear(d_model, dim_feedforward)
@@ -297,7 +301,8 @@ class OBBDFINETransformer(nn.Module):
                  feat_strides=(8, 16, 32), num_levels=3, num_points=(3, 6, 3), nhead=8, num_layers=3,
                  dim_feedforward=1024, dropout=0., activation="relu", num_denoising=100, label_noise_ratio=0.5,
                  box_noise_scale=1.0, eval_spatial_size=None, eval_idx=-1, eps=1e-2, aux_loss=True,
-                 cross_attn_method='default', reg_max=32, reg_scale=4., mlp_act='relu', rotate_sampling=True):
+                 cross_attn_method='default', reg_max=32, reg_scale=4., mlp_act='relu', rotate_sampling=True,
+                 ortho_heads=False):
         super().__init__()
         feat_strides = list(feat_strides)
         for _ in range(num_levels - len(feat_strides)):
@@ -311,7 +316,7 @@ class OBBDFINETransformer(nn.Module):
         self.reg_scale = nn.Parameter(torch.tensor([reg_scale]), requires_grad=False)
         layer = TransformerDecoderLayer(hidden_dim, nhead, dim_feedforward, dropout, activation, num_levels,
                                         list(num_points), cross_attn_method=cross_attn_method,
-                                        rotate_sampling=rotate_sampling)
+                                        rotate_sampling=rotate_sampling, ortho_heads=ortho_heads)
         self.decoder = OBBTransformerDecoder(hidden_dim, layer, num_layers, nhead, reg_max, self.reg_scale, self.up,
                                              eval_idx, act=activation)
         self.num_denoising, self.label_noise_ratio, self.box_noise_scale = num_denoising, label_noise_ratio, box_noise_scale

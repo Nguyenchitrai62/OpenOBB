@@ -1,0 +1,17 @@
+{
+  "attempts": 2,
+  "started": "2026-10-07 17:02:55",
+  "session": "e1-vrdet-s-dota-24e-2",
+  "out": "/content/work/runs/e1-vrdet-s-dota-24e",
+  "status": "running",
+  "launched": 1791368057.1739,
+  "updated": "2026-10-07 17:14:17",
+  "fails": 0,
+  "synced": {
+    "setup.log": [
+      1372,
+      1791367415
+    ]
+  },
+  "tail": ""
+}
