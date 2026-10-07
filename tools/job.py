@@ -80,10 +80,13 @@ def _bundle(dirs, tag="x"):
 
 def _start_remote(sess, sp, out):
     """Ship code, run setup, push last.pt if we have one, start cmd detached."""
-    cx.exec_py(sess, f"import os,shutil;shutil.rmtree('{WORK}/code',ignore_errors=True);"
-                     f"os.makedirs('{WORK}/code',exist_ok=True);os.makedirs('{out}',exist_ok=True)")
+    # every step below is idempotent, so a hung `colab exec` is handled by a short timeout + retry
+    cx.exec_retry(sess, f"import os,shutil;shutil.rmtree('{WORK}/code',ignore_errors=True);"
+                        f"os.makedirs('{WORK}/code',exist_ok=True);os.makedirs('{out}',exist_ok=True);"
+                        f"print({cx.MARK!r}+'ok')")
     cx.put(sess, _bundle(sp["bundle"], sp["id"]), f"{WORK}/bundle.tar.gz")
-    cx.exec_py(sess, f"import tarfile;tarfile.open('{WORK}/bundle.tar.gz').extractall('{WORK}/code')")
+    cx.exec_retry(sess, f"import tarfile;tarfile.open('{WORK}/bundle.tar.gz').extractall('{WORK}/code');"
+                        f"print({cx.MARK!r}+'ok')")
     # restore everything already synced (last.pt, metrics.jsonl, logs...) so the
     # resumed run appends to its history instead of starting new files
     local_dir = RUNS / sp["id"]
@@ -99,21 +102,26 @@ def _start_remote(sess, sp, out):
         for p in restore:
             cx.put(sess, p, f"{out}/{p.relative_to(local_dir).as_posix()}")
     for step in sp.get("setup", []):
-        res = cx.exec_json(sess, f"""import subprocess
+        res = cx.retry(lambda step=step: cx.exec_json(sess, f"""import subprocess
 r=subprocess.run({step!r},shell=True,cwd='{WORK}/code',capture_output=True,text=True)
 open('{out}/setup.log','a').write('$ '+{step!r}+'\\n'+r.stdout[-20000:]+r.stderr[-20000:]+'\\n')
-print({cx.MARK!r}+str(r.returncode))""", timeout=7200)
+print({cx.MARK!r}+str(r.returncode))""", timeout=1200), tries=3, wait=10)
         if res != 0:
             raise cx.ColabError(f"setup step failed (rc={res}): {step}")
     cmd = sp["cmd"].format(out=out)
-    cx.exec_py(sess, f"""import subprocess,os
+    # idempotent start: if a previous (hung) attempt already started the job, do not start it twice
+    cx.exec_retry(sess, f"""import subprocess,os
 os.makedirs('{out}',exist_ok=True)
-for f in ('exitcode',):
-    p=os.path.join('{out}',f)
-    if os.path.exists(p): os.remove(p)
-sh="cd {WORK}/code && ( " + {cmd!r} + " ) >> {out}/train.log 2>&1; echo $? > {out}/exitcode"
-p=subprocess.Popen(['bash','-c',sh],start_new_session=True,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-open('{out}/pid','w').write(str(p.pid))""")
+pf=os.path.join('{out}','pid')
+alive=os.path.exists(pf) and os.path.exists('/proc/'+open(pf).read().strip())
+if not alive:
+    for f in ('exitcode',):
+        q=os.path.join('{out}',f)
+        if os.path.exists(q): os.remove(q)
+    sh="cd {WORK}/code && ( " + {cmd!r} + " ) >> {out}/train.log 2>&1; echo $? > {out}/exitcode"
+    p=subprocess.Popen(['bash','-c',sh],start_new_session=True,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    open(pf,'w').write(str(p.pid))
+print({cx.MARK!r}+'ok')""")
 
 
 def launch(jid):

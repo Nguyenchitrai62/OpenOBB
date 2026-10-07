@@ -3,7 +3,7 @@
   "started": "2026-10-07 22:06:19",
   "session": "e5-rfs-ctx-s-1",
   "out": "/content/work/runs/e5-rfs-ctx-s",
-  "status": "starting",
+  "status": "stopped",
   "launched": 1791385585.9373255,
   "updated": "2026-10-07 22:06:25"
 }
