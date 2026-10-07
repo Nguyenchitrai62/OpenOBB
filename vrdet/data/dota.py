@@ -80,7 +80,7 @@ class DotaPatches(Dataset):
         return len(self.items)
 
     def _load(self, m):
-        img = cv2.imread(str(self.root / "images" / self.split / f"{m['name']}.jpg"), cv2.IMREAD_COLOR)
+        img = cv2.imread(str(self.root / "images" / self.split / m.get("file", f"{m['name']}.jpg")), cv2.IMREAD_COLOR)
         objs = m["objs"] if self.keep_difficult else [o for o in m["objs"] if o[1] == 0]
         polys = np.array([o[3:] for o in objs], dtype=np.float32).reshape(-1, 8)
         labels = np.array([o[0] for o in objs], dtype=np.int64)
@@ -220,6 +220,13 @@ class DotaPatches(Dataset):
             tgt["tile"] = torch.from_numpy(np.asarray(ctx["tile"], np.float32))
             tgt["ctx_valid"] = bool(ctx["valid"])
         return torch.from_numpy(img), tgt
+
+
+def dataset_classes(root):
+    """Class names of a prepared split ({root}/classes.json), DOTA-v1.0 by default."""
+    from vrdet.eval.dota import DOTA1_CLASSES
+    p = Path(root) / "classes.json"
+    return tuple(json.loads(p.read_text())) if p.exists() else DOTA1_CLASSES
 
 
 def collate(batch):

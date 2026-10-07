@@ -159,6 +159,24 @@ Ngân sách: Colab Pro+, ~500 compute units (2026-10-07). G4 ≈ 8.9 CU/h. YOLO2
 
 **Vì sao vẫn tự chạy một baseline YOLO dù đã có số công bố:** số công bố dùng test server, train+val, MS và 100+ epoch. Ablation của ta dùng val, 24 epoch, SS. Cần một mốc cùng điều kiện để biết mỗi thay đổi kiến trúc thắng hay thua, và để kiểm chứng pipeline (split, evaluator). Claim cuối cùng sẽ so với số công bố bằng cách nộp test server.
 
+### 5.1 Benchmark CAD (E6): FloorPlanCAD (khảo sát 2026-10-07)
+
+- **Nguồn:** bộ SVG GT `gdown 1wsOQxIXjsqYzMlUpPNRjyQiMnwgVbtJG`, 132 MB, khoảng 11.6k bản vẽ, split train/val/test. Bộ gốc kèm PNG nằm trên Google Drive, khoảng 5 GB. License CC BY-NC (chỉ benchmark).
+- **Định dạng:**
+  - viewBox 140×140 (khối 10 m × 10 m).
+  - `<path>` gồm line/arc, cộng `<circle>`/`<ellipse>`.
+  - Mỗi phần tử có `semanticId` (1–35) và `instanceId`. Class 1–30 là "thing", 31–35 là "stuff" (tường, kính, lan can...).
+  - **Không có text**; layer chỉ còn màu nét.
+  - Trung bình khoảng 900 primitive, khoảng 15 object mỗi bản vẽ, tối đa 181.
+- **Nhãn OBB:** minAreaRect trên điểm lấy mẫu của mỗi (semanticId, instanceId), chỉ class 1–30. Raster tự vẽ bằng OpenCV, nét ≥ 1 px; không dùng renderer có license lạ.
+- **Mốc tham khảo:** paper gốc dùng HBB trên V1. AP50 0.60 (Faster R-CNN), 0.62 (FCOS), 0.64 (YOLOv3). Có nhiều symbol rất mảnh (cửa trượt ~20:1, cửa sổ 5:1), hợp để thử OBB và H3.
+- **SOTA symbol spotting** (metric PQ trên primitive, chỉ vector):
+  - VecFormer PQ 88.4 (Apache);
+  - CADSpotting 87.4;
+  - SymPoint 83.3 (NC);
+  - CADTransformer 68.9 (raster + vector, MIT).
+- **Thí nghiệm E6:** VRDet raster-only vs VRDet + vector tokens (H7), cùng điều kiện, đo mAP50 / mAP50-95 OBB theo class.
+
 ## 6. Tài liệu tham khảo chính
 
 - YOLO26-OBB benchmark: https://docs.ultralytics.com/tasks/obb/

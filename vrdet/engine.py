@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from vrdet.data.dota import DotaPatches, collate
+from vrdet.data.dota import DotaPatches, collate, dataset_classes
 from vrdet.eval.dota import DOTA1_CLASSES, evaluate, load_gt_dir, merge_patches, parse_patch_name
 from vrdet.models.vrdet import postprocess
 from vrdet.ops.obb import obb2poly
@@ -191,6 +191,7 @@ def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num
         ds.items = [m for m in ds.items if m["src"] in keep]
     preds = predict_patches(model, ds, device, batch, workers, num_top, img_size)
     t1 = time.time()
+    classes = dataset_classes(data_root)
     gts = load_gt_dir(f"{data_root}/gt/val", set(image_ids) if image_ids is not None else None)
     if save_preds_to:
         save_preds(preds, save_preds_to)
@@ -200,8 +201,8 @@ def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num
     results, primary_dets = {}, None
     for name, pd in sets.items():
         merged = merge_parallel(pd, 0.1, merge_workers)
-        dets = {DOTA1_CLASSES[c]: v for c, v in merged.items()}
-        results[name] = evaluate(dets, gts)
+        dets = {classes[c]: v for c, v in merged.items()}
+        results[name] = evaluate(dets, gts, classes)
         if name == "dec":
             primary_dets = dets
     res = results["dec"]

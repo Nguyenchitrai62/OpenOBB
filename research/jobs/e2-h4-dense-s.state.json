@@ -5,5 +5,21 @@
   "out": "/content/work/runs/e2-h4-dense-s",
   "status": "running",
   "launched": 1791371315.5973,
-  "updated": "2026-10-07 18:09:00"
+  "updated": "2026-10-07 18:15:52",
+  "fails": 0,
+  "synced": {
+    "profile_base/train_progress.log": [
+      372,
+      1791371639
+    ],
+    "setup.log": [
+      1162,
+      1791371336
+    ],
+    "train.log": [
+      74028,
+      1791371639
+    ]
+  },
+  "tail": "ted/python_variable_methods.cpp:836.)\n  main = {k: float(v) for k, v in losses.items() if \"_aux\" not in k and \"_dn\" not in k and \"_enc\" not in k\n[11:13:27] ep 0 it 0/984 loss 26.128 mal=0.728 bbox=0.988 kld=0.903 fgl=0.608 lr 1.00e-07 | 0.6 img/s data 2.386s crit 0.373s/it\n/usr/local/lib/python3.13/dist-packages/torch/profiler/profiler.py:224: UserWarning: Warning: Profiler clears events at the end of each cycle.Only events from the current cycle will be reported.To keep events across cycles, set acc_events=True.\n  _warn_once(\n[11:13:59] [profile] 0.775 s/it over 20 its (batch 16, 20.6 img/s)\n"
 }

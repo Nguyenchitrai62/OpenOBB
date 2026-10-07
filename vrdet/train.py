@@ -15,7 +15,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from vrdet.data.dota import DotaPatches, collate
+from vrdet.data.dota import DotaPatches, collate, dataset_classes
 from vrdet.engine import ModelEMA, eval_dota, lr_factor, param_groups, to_device
 from vrdet.eval.dota import DOTA1_CLASSES, format_table, write_task1
 from vrdet.models.dense_head import DenseCriterion
@@ -98,15 +98,16 @@ def main(argv=None):
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
 
-    model = VRDet(a.size, num_classes=len(DOTA1_CLASSES), num_queries=a.queries, img_size=a.img,
+    classes = dataset_classes(a.data)
+    model = VRDet(a.size, num_classes=len(classes), num_queries=a.queries, img_size=a.img,
                   rotate_sampling=not a.no_rotate_sampling, num_denoising=a.denoising, dense=a.dense,
                   strip_k=a.strip_k, ortho_heads=a.ortho_heads, context=a.context,
                   dense_queries=a.dense_queries)
     last = out / "last.pt"
     if not last.exists() and not a.no_pretrained:
-        load_dfine_coco(model, a.size, class_names=DOTA1_CLASSES, log=log)
+        load_dfine_coco(model, a.size, class_names=classes, log=log)
     model.to(device)
-    crit = build_criterion(num_classes=len(DOTA1_CLASSES), box_loss=a.box_loss)
+    crit = build_criterion(num_classes=len(classes), box_loss=a.box_loss)
     a.dense = a.dense or a.dense_queries
     dense_crit = DenseCriterion() if a.dense else None
     ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,
@@ -225,11 +226,11 @@ def main(argv=None):
     res, dets = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.num_top,
                           img_size=a.img, log=log, fusion=a.dense, variants=["dec", "dense"],
                           save_preds_to=(out / "val_preds.npz") if a.dense else None, context=a.context)
-    table = format_table(res)
+    table = format_table(res, classes)
     log("\n" + table)
     (out / "eval_val.txt").write_text(table + "\n")
     (out / "eval_val.json").write_text(json.dumps(res, indent=1))
-    write_task1(dets, out / "val_task1")
+    write_task1(dets, out / "val_task1", classes)
     lat = None
     if device.type == "cuda":
         m = ema.module.eval()
