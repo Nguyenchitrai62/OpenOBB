@@ -154,6 +154,10 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
   để sáng 2026-10-08 user kiểm tra, đánh giá rồi mới làm tiếp. Đã cài vào watcher: `JOB_NEW_RESERVE=120`, job trong hàng đợi
   chỉ chạy nếu số dư trừ `est_cu` của job vẫn ≥ 120.
 
+- (bổ sung 00:25, 2026-10-08) **Ngưỡng đổi thành 170 CU** (thay cho 120). User đi ngủ và giao nghiên cứu tự do qua đêm, sáng sẽ kiểm tra.
+  Watcher: job trong hàng đợi chỉ chạy nếu `số dư − est_cu − CU còn lại của các job đang chạy ≥ ngưỡng`. Ngưỡng đọc từ
+  `research/jobs/new_reserve.txt`, đổi không cần restart.
+
 Câu hỏi còn mở:
 - Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.
 

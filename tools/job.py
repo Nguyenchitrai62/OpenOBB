@@ -27,6 +27,7 @@ import fnmatch
 import io
 import json
 import os
+import re
 import sys
 import tarfile
 import time
@@ -263,9 +264,37 @@ def enqueue(jids):
 
 
 MAX_SESSIONS = int(os.environ.get("JOB_MAX_SESSIONS", "3"))
-# User 2026-10-07 23:35: keep ~120 CU for the morning review. A queued job starts only if balance - its estimated
-# cost (spec "est_cu") stays >= NEW_RESERVE; jobs already running still resume and finish (RESERVE_CU applies).
-NEW_RESERVE = float(os.environ.get("JOB_NEW_RESERVE", "120"))
+# User 2026-10-08 00:25: keep >= 170 CU (was 120). A queued job starts only if
+#   balance - its est_cu - remaining est_cu of running jobs >= new-job reserve,
+# so jobs already running can finish without pushing the balance below the reserve. The reserve is read from
+# research/jobs/new_reserve.txt on every check (change it without restarting the watcher), else JOB_NEW_RESERVE.
+RESERVE_FILE = JOBS / "new_reserve.txt"
+
+
+def new_reserve():
+    try:
+        return float(RESERVE_FILE.read_text().strip())
+    except (OSError, ValueError):
+        return float(os.environ.get("JOB_NEW_RESERVE", "170"))
+
+
+def remaining_cu(jid):
+    """est_cu x fraction of epochs still to train (from the synced metrics.jsonl)."""
+    sp = spec(jid)
+    est = float(sp.get("est_cu", 15))
+    m = re.search(r"--epochs (\d+)", sp.get("cmd", ""))
+    total = int(m.group(1)) if m else 24
+    done = 0
+    mf = RUNS / jid / "metrics.jsonl"
+    if mf.exists():
+        for line in mf.read_text(encoding="utf-8").splitlines():
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(d.get("epoch"), int):
+                done = max(done, d["epoch"] + 1)
+    return est * max(0.0, 1 - done / total)
 
 
 def drain_queue():
@@ -279,8 +308,10 @@ def drain_queue():
             return
         bal, _ = cx.balance()
         est = float(spec(jid).get("est_cu", 15))
-        if bal is None or bal - est < NEW_RESERVE:
-            log(f"queue: {jid} held: balance {bal} - est {est:.0f} CU < new-job reserve {NEW_RESERVE:.0f}")
+        running = sum(remaining_cu(j) for j in active())
+        reserve = new_reserve()
+        if bal is None or bal - est - running < reserve:
+            log(f"queue: {jid} held: balance {bal} - est {est:.0f} - running {running:.0f} CU < reserve {reserve:.0f}")
             return
         try:
             launch(jid)
