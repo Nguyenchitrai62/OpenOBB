@@ -137,3 +137,31 @@
 [2026-10-07 20:56:43] e3-rfs-s: restoring 5 synced files (157 MB) for resume
 [2026-10-07 20:59:22] e3-rfs-s: running
 [2026-10-07 20:59:35] e1-vrdet-s-seed1: launching attempt 3 on G4 as session e1-vrdet-s-seed1-3
+[2026-10-07 20:59:58] e1-vrdet-s-seed1: restoring 7 synced files (157 MB) for resume
+[2026-10-07 21:02:49] e1-vrdet-s-seed1: running
+[2026-10-07 21:02:51] e4-fpc-yolo26s-24e: launching attempt 1 on G4 as session e4-fpc-yolo26s-24e-1
+[2026-10-07 21:02:55] queue: e4-fpc-yolo26s-24e waits (no VM available)
+[2026-10-07 21:03:46] e2-h4-dense-s: status failed #1 (session listed=False): no result from exec on e2-h4-dense-s-1 (rc=1):
+[colab] Session 'e2-h4-dense-s-1' appears to be lost (404/401). Cleaning up.
+
+[2026-10-07 21:03:50] e2-h4-dense-s: launching attempt 2 on A100 as session e2-h4-dense-s-2
+[2026-10-07 21:04:21] e2-h4-dense-s: restoring 7 synced files (163 MB) for resume
+[2026-10-07 21:07:11] e2-h4-dense-s: start failed: colab upload -s e2-h4-dense-s-2 F:\Source_code\NEW_architecture\runs\e2-h4-dense-s\profile_base\train_progress.log /content/work/runs/e2-h4-dense-s/profile_base/train_progress.log -> rc=1
+[colab] Upload failed: 500 Server Error: Internal Server Error for url: https://8080-gpu-a100-s-kkb-ass1c2-3lmn8p7o1ssbu-c.asia-southeast1-2.prod.colab.dev/api/contents/content/work/runs/e2-h4-dense-s/profile_base/train_progress.log?authuser=0&colab-runtime-proxy-token=eyJhbGciOiJFUzI1NiIsImtpZCI6IndlSUpSZyJ9.eyJhdWQiOiJncHUtYTEwMC1zLWtrYi1hc3MxYzItM2xtbjhwN28xc3NidSIsImV4cCI6MTc5MTM4NTQzNiwicG9ydCI6ODA4MH0.MuEA0Vi4zsFIPq3HTTwngzgrkrzXMLxACNf2Ix5x4OHW_1CX8e2-S1ureRwFHObNVuQzdhByRTpIdytOO4Vk-g
+
+[2026-10-07 21:07:14] e2-h4-dense-s: poll error colab upload -s e2-h4-dense-s-2 F:\Source_code\NEW_architecture\runs\e2-h4-dense-s\profile_base\train_progress.log /content/work/runs/e2-h4-dense-s/profile_base/train_progress.log -> rc=1
+[colab] Upload failed: 500 Server Error: Internal Server Error for url: https://8080-gpu-a100-s-kkb-ass1c2-3lmn8p7o1ssbu-c.asia-southeast1-2.prod.colab.dev/api/contents/content/work/runs/e2-h4-dense-s/profile_base/train_progress.log?authuser=0&colab-runtime-proxy-token=eyJhbGciOiJFUzI1NiIsImtpZCI6IndlSUpSZyJ9.eyJhdWQiOiJncHUtYTEwMC1zLWtrYi1hc3MxYzItM2xtbjhwN28xc3NidSIsImV4cCI6MTc5MTM4NTQzNiwicG9ydCI6ODA4MH0.MuEA0Vi4zsFIPq3HTTwngzgrkrzXMLxACNf2Ix5x4OHW_1CX8e2-S1ureRwFHObNVuQzdhByRTpIdytOO4Vk-g
+
+[2026-10-07 21:07:18] e2-h4c-dq-s: status failed #1 (session listed=False): no result from exec on e2-h4c-dq-s-1 (rc=1):
+[colab] Session 'e2-h4c-dq-s-1' not found.
+
+[2026-10-07 21:07:22] e2-h4c-dq-s: launching attempt 2 on A100 as session e2-h4c-dq-s-2
+[2026-10-07 21:07:27] e2-h4-dense-s: launching attempt 3 on A100 as session e2-h4-dense-s-3
+[2026-10-07 21:07:38] e2-h4c-dq-s: start failed: sha mismatch after upload F:\Source_code\NEW_architecture\research\jobs\.bundle.tar.gz -> /content/work/bundle.tar.gz
+[2026-10-07 21:07:42] e2-h4c-dq-s: poll error sha mismatch after upload F:\Source_code\NEW_architecture\research\jobs\.bundle.tar.gz -> /content/work/bundle.tar.gz
+[2026-10-07 21:07:47] e2-h4-dense-s: restoring 7 synced files (163 MB) for resume
+[2026-10-07 21:09:01] watch: balance=368.24 rate=26.7/h active=['e1-vrdet-s-seed1', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e3-ctx-fix-s', 'e3-rfs-s'] ended=[]
+[2026-10-07 21:10:14] e2-h4-dense-s: running
+[2026-10-07 21:10:32] e2-h4c-dq-s: launching attempt 3 on A100 as session e2-h4c-dq-s-3
+[2026-10-07 21:10:50] e2-h4c-dq-s: restoring 5 synced files (161 MB) for resume
+[2026-10-07 21:13:05] e2-h4c-dq-s: running

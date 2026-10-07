@@ -66,14 +66,14 @@ def save_state(jid, st):
     (JOBS / f"{jid}.state.json").write_text(json.dumps(st, indent=2), encoding="utf-8")
 
 
-def _bundle(dirs):
+def _bundle(dirs, tag="x"):
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
         for d in dirs:
             for p in (ROOT / d).rglob("*"):
                 if p.is_file() and "__pycache__" not in p.parts and p.suffix not in {".pt", ".zip"}:
                     tar.add(p, arcname=str(p.relative_to(ROOT)).replace("\\", "/"))
-    path = JOBS / ".bundle.tar.gz"
+    path = JOBS / f".bundle-{tag}.tar.gz"     # per job: concurrent launches must not overwrite each other
     path.write_bytes(buf.getvalue())
     return path
 
@@ -82,7 +82,7 @@ def _start_remote(sess, sp, out):
     """Ship code, run setup, push last.pt if we have one, start cmd detached."""
     cx.exec_py(sess, f"import os,shutil;shutil.rmtree('{WORK}/code',ignore_errors=True);"
                      f"os.makedirs('{WORK}/code',exist_ok=True);os.makedirs('{out}',exist_ok=True)")
-    cx.put(sess, _bundle(sp["bundle"]), f"{WORK}/bundle.tar.gz")
+    cx.put(sess, _bundle(sp["bundle"], sp["id"]), f"{WORK}/bundle.tar.gz")
     cx.exec_py(sess, f"import tarfile;tarfile.open('{WORK}/bundle.tar.gz').extractall('{WORK}/code')")
     # restore everything already synced (last.pt, metrics.jsonl, logs...) so the
     # resumed run appends to its history instead of starting new files
@@ -93,6 +93,9 @@ def _start_remote(sess, sp, out):
     if restore:
         mb = sum(p.stat().st_size for p in restore) >> 20
         log(f"{sp['id']}: restoring {len(restore)} synced files ({mb} MB) for resume")
+        # the upload API fails (HTTP 500) when the parent directory does not exist yet
+        dirs = sorted({f"{out}/{p.relative_to(local_dir).parent.as_posix()}" for p in restore})
+        cx.exec_retry(sess, f"import os\nfor d in {dirs!r}: os.makedirs(d, exist_ok=True)\nprint({cx.MARK!r}+'ok')")
         for p in restore:
             cx.put(sess, p, f"{out}/{p.relative_to(local_dir).as_posix()}")
     for step in sp.get("setup", []):

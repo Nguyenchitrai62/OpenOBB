@@ -3,39 +3,39 @@
   "started": "2026-10-07 19:09:04",
   "session": "e1-vrdet-s-seed1-3",
   "out": "/content/work/runs/e1-vrdet-s-seed1",
-  "status": "starting",
+  "status": "running",
   "launched": 1791381580.8837633,
-  "updated": "2026-10-07 20:59:40",
+  "updated": "2026-10-07 21:03:42",
   "fails": 0,
   "synced": {
     "setup.log": [
-      1372,
-      1791374979
+      2744,
+      1791381764
     ],
     "train.log": [
-      177629,
-      1791379902
+      182046,
+      1791381781
     ],
     "metrics.jsonl": [
       6107,
-      1791379849
+      1791381720
     ],
     "train_progress.log": [
       72163,
-      1791379898
+      1791381743
     ],
     "last.pt": [
       165363381,
-      1791379849
+      1791381712
     ],
     "eval_val.json": [
       3030,
-      1791379898
+      1791381601
     ],
     "eval_val.txt": [
       1013,
-      1791379898
+      1791381608
     ]
   },
-  "tail": " 84.65\nship                   8861    70820  65.04    38.56  75.74\ntennis-court            739    37051  87.27    81.01  93.64\nbasketball-court        124    30499  50.42    39.30  66.94\nstorage-tank           1869    99749  84.90    54.38  94.01\nsoccer-ball-field        87    25470  41.39    28.08  72.41\nroundabout              164    36228  51.70    28.49  75.61\nharbor                 2065    81689  58.24    26.07  71.77\nswimming-pool           366    30734  42.29    17.21  74.04\nhelicopter               72    14079  26.82     9.61  83.33\nmAP                                   56.49    35.34\n"
+  "tail": "[00:10<03:37, 16.62it/s]\nFetching 3738 files:   4%|\u258e         | 132/3738 [00:10<03:46, 15.92it/s]\nFetching 3738 files:   4%|\u258e         | 134/3738 [00:10<03:36, 16.64it/s]\nFetching 3738 files:   4%|\u258e         | 137/3738 [00:10<03:21, 17.89it/s]\nFetching 3738 files:   4%|\u258e         | 140/3738 [00:10<03:05, 19.37it/s]\nFetching 3738 files:   4%|\u258d         | 142/3738 [00:11<03:28, 17.26it/s]\nFetching 3738 files:   4%|\u258d         | 144/3738 [00:11<03:42, 16.17it/s]\nFetching 3738 files:   4%|\u258d         | 147/3738 [00:11<03:33, 16.81it/s]\nFetching 3738 files:   4%|\u258d         | 150/3738 [00:11<03:02, 19.70it/s]"
 }
