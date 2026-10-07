@@ -25,7 +25,9 @@ Quy tắc:
 - Mục đích: mốc cùng điều kiện. Không có pass/fail.
 - Sanity: mAP50 val phải ở khoảng hợp lý (≥ 65). Nếu thấp bất thường thì kiểm lại split/evaluator, đừng kết luận gì.
 - Đo thêm latency PyTorch fp16 bs1 trên G4 (chỉ tham khảo, không phải số TensorRT).
-- Kết quả: (đang chạy)
+- **Kết quả (2026-10-07 17:22): val mAP50 74.77, mAP50:95 49.49.** Sanity OK: mức hợp lý so với 76.0 của paper YOLO26 (schedule dài).
+  - Theo class: PL 90.1, BD 75.2, **BR 52.2**, **GTF 67.3**, SV 74.7, LV 84.0, SH 89.1, TC 90.9, **BC 69.0**, ST 89.0, SBF 74.3, **RA 69.6**, HA 76.4, **SP 66.4**, **HC 53.4**.
+  - Train khoảng 0.6 h (185 ảnh/s, 42 GB). Latency PyTorch e2e (gồm pre/post) 8.9 ms/ảnh 1024 trên G4. Tốn khoảng 7 CU.
 
 ### E1b `e1-vrdet-s-dota-24e`: VRDet-S baseline
 - Cấu hình: D-FINE-S COCO (HGNetv2-B0, Apache) chuyển sang OBB, gồm:

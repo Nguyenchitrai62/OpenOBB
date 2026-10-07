@@ -16,7 +16,8 @@ def _targets():
 
 
 @pytest.mark.parametrize("kw,box_loss", [(dict(), "kld"),
-                                         (dict(dense=True, strip_k=11, ortho_heads=True), "probiou")])
+                                         (dict(dense=True, strip_k=11, ortho_heads=True), "probiou"),
+                                         (dict(dense_queries=True), "kld")])
 def test_variant_trains_one_step(kw, box_loss):
     torch.manual_seed(0)
     m = VRDet("s", img_size=256, **kw)
@@ -24,7 +25,7 @@ def test_variant_trains_one_step(kw, box_loss):
     t = _targets()
     out = m(torch.rand(2, 3, 256, 256), t)
     losses = crit(out, t)
-    if kw.get("dense"):
+    if kw.get("dense") or kw.get("dense_queries"):
         losses.update(DenseCriterion()(out, t))
     sum(losses.values()).backward()
     assert all(torch.isfinite(v) for v in losses.values())
@@ -33,5 +34,5 @@ def test_variant_trains_one_step(kw, box_loss):
     with torch.no_grad():
         o = m(torch.rand(1, 3, 256, 256))
     assert o["pred_boxes"].shape == (1, 300, 5)
-    if kw.get("dense"):
+    if kw.get("dense") or kw.get("dense_queries"):
         assert o["dense_logits"].shape[1] == 32 * 32 + 16 * 16 + 8 * 8

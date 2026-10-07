@@ -56,11 +56,13 @@ def get_args(argv=None):
     ap.add_argument("--skip-final-eval", action="store_true")
     ap.add_argument("--dense", action="store_true", help="add the dense one-to-many rotated head (H4)")
     ap.add_argument("--dense-weight", type=float, default=1.0)
+    ap.add_argument("--dense-queries", action="store_true", help="H4c: decoder queries from the dense head")
     ap.add_argument("--box-loss", default="kld", choices=["kld", "probiou"], help="H1")
     ap.add_argument("--ortho-heads", action="store_true", help="H2: half the heads sample at theta+90")
     ap.add_argument("--strip-k", type=int, default=0, help="H3: strip-context kernel (0 = off)")
     ap.add_argument("--rotate-p", type=float, default=0.0, help="H8: arbitrary-angle rotation prob")
     ap.add_argument("--mosaic-p", type=float, default=0.0, help="H8: oriented mosaic prob")
+    ap.add_argument("--context", action="store_true", help="H6: whole-image context tokens for each tile")
     ap.add_argument("--threads", type=int, default=0, help="torch CPU threads (0 = default)")
     return ap.parse_args(argv)
 
@@ -97,15 +99,17 @@ def main(argv=None):
 
     model = VRDet(a.size, num_classes=len(DOTA1_CLASSES), num_queries=a.queries, img_size=a.img,
                   rotate_sampling=not a.no_rotate_sampling, num_denoising=a.denoising, dense=a.dense,
-                  strip_k=a.strip_k, ortho_heads=a.ortho_heads)
+                  strip_k=a.strip_k, ortho_heads=a.ortho_heads, context=a.context,
+                  dense_queries=a.dense_queries)
     last = out / "last.pt"
     if not last.exists() and not a.no_pretrained:
         load_dfine_coco(model, a.size, class_names=DOTA1_CLASSES, log=log)
     model.to(device)
     crit = build_criterion(num_classes=len(DOTA1_CLASSES), box_loss=a.box_loss)
+    a.dense = a.dense or a.dense_queries
     dense_crit = DenseCriterion() if a.dense else None
     ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,
-                     rotate_p=a.rotate_p, mosaic_p=a.mosaic_p)
+                     rotate_p=a.rotate_p, mosaic_p=a.mosaic_p, context=a.context)
     dl = DataLoader(ds, batch_size=a.batch, shuffle=True, num_workers=a.workers, collate_fn=collate,
                     pin_memory=True, drop_last=True, persistent_workers=a.workers > 0,
                     prefetch_factor=4 if a.workers > 0 else None)
@@ -144,9 +148,9 @@ def main(argv=None):
             f = lr_factor(it, total_iters, a.warmup, a.flat, a.min_lr_ratio)
             for g, b in zip(opt.param_groups, base_lrs):
                 g["lr"] = b * f
-            x, tg = to_device(imgs, targets, device)
+            x, tg, ctx = to_device(imgs, targets, device)
             with torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=amp):
-                outputs = model(x, tg)
+                outputs = model(x, tg, ctx=ctx)
             t0 = time.time()
             losses = crit(outputs, tg)
             if dense_crit is not None:
@@ -190,7 +194,7 @@ def main(argv=None):
         os.replace(out / "last.tmp", last)
         if val_subset and ((epoch + 1) % a.eval_every == 0) and epoch + 1 < a.epochs:
             res, _ = eval_dota(ema.module, a.data, device, val_subset, batch=a.batch, workers=a.workers,
-                               num_top=a.num_top, img_size=a.img, log=log)
+                               num_top=a.num_top, img_size=a.img, log=log, context=a.context)
             rec["sub_mAP50"] = round(res["mAP50"], 4)
             rec["sub_mAP50_95"] = round(res["mAP50_95"], 4)
         jlog(rec)
@@ -199,7 +203,8 @@ def main(argv=None):
     if a.skip_final_eval:
         return
     res, dets = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.num_top,
-                          img_size=a.img, log=log, fusion=a.dense)
+                          img_size=a.img, log=log, fusion=a.dense, variants=["dec", "dense"],
+                          save_preds_to=(out / "val_preds.npz") if a.dense else None, context=a.context)
     table = format_table(res)
     log("\n" + table)
     (out / "eval_val.txt").write_text(table + "\n")

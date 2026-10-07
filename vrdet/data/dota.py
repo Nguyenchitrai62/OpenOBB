@@ -62,8 +62,9 @@ def clip_to_window(polys, labels, S, iof_thr=0.7):
 class DotaPatches(Dataset):
     def __init__(self, root, split, size=1024, augment=False, filter_empty=False, min_size=2.0,
                  hsv=(0.015, 0.5, 0.3), rot90=True, flip=True, limit=None, keep_difficult=True, rotate_p=0.0,
-                 mosaic_p=0.0):
+                 mosaic_p=0.0, context=False, thumb=512):
         self.root, self.split, self.size = Path(root), split, size
+        self.context, self.thumb = context, thumb
         self.rotate_p, self.mosaic_p = rotate_p, mosaic_p
         self.augment, self.min_size, self.hsv, self.rot90, self.flip = augment, min_size, hsv, rot90, flip
         items = [json.loads(l) for l in open(self.root / "meta" / f"{split}.jsonl")]
@@ -85,7 +86,29 @@ class DotaPatches(Dataset):
         labels = np.array([o[0] for o in objs], dtype=np.int64)
         return img, polys, labels
 
-    def _rotate(self, img, polys, labels):
+    def _load_ctx(self, m):
+        """Whole-image thumbnail on a THUMB x THUMB canvas + the tile's box on that canvas (global context, H6)."""
+        T = self.thumb
+        canvas = np.empty((T, T, 3), np.uint8)
+        canvas[:] = PAD_BGR
+        th = cv2.imread(str(self.root / "thumbs" / self.split / f"{m['src']}.jpg"), cv2.IMREAD_COLOR)
+        if th is None or "img_w" not in m:
+            return {"thumb": canvas, "tile": np.array([0, 0, T, T], np.float32), "valid": False}
+        h, w = th.shape[:2]
+        canvas[:min(h, T), :min(w, T)] = th[:T, :T]
+        ts = T / max(m["img_w"], m["img_h"])
+        r = m["rate"]
+        tile = np.array([m["x0"] / r, m["y0"] / r, (m["x0"] + self.size) / r, (m["y0"] + self.size) / r]) * ts
+        return {"thumb": canvas, "tile": tile.astype(np.float32), "valid": True}
+
+    @staticmethod
+    def _ctx_rot90(ctx):
+        T = ctx["thumb"].shape[0]
+        ctx["thumb"] = np.rot90(ctx["thumb"])
+        x0, y0, x1, y1 = ctx["tile"]
+        ctx["tile"] = np.array([y0, T - x1, y1, T - x0], np.float32)     # (x, y) -> (y, T - x)
+
+    def _rotate(self, img, polys, labels, ctx=None):
         """Arbitrary-angle rotation about the centre (images with square-like classes: 90-degree steps only)."""
         S = img.shape[0]
         if np.isin(labels, SQUARE_CLASSES).any():
@@ -94,6 +117,12 @@ class DotaPatches(Dataset):
             ang = random.uniform(-180, 180)
         M = cv2.getRotationMatrix2D((S / 2, S / 2), ang, 1.0)
         img = cv2.warpAffine(np.ascontiguousarray(img), M, (S, S), flags=cv2.INTER_LINEAR, borderValue=PAD_BGR)
+        if ctx is not None:                     # rotate the thumbnail about the tile centre: the tile stays aligned
+            T = ctx["thumb"].shape[0]
+            c = ((ctx["tile"][0] + ctx["tile"][2]) / 2, (ctx["tile"][1] + ctx["tile"][3]) / 2)
+            Mt = cv2.getRotationMatrix2D((float(c[0]), float(c[1])), ang, 1.0)
+            ctx["thumb"] = cv2.warpAffine(np.ascontiguousarray(ctx["thumb"]), Mt, (T, T), flags=cv2.INTER_LINEAR,
+                                          borderValue=PAD_BGR)
         if len(polys):
             pts = polys.reshape(-1, 2) @ M[:, :2].T + M[:, 2]
             polys, labels = clip_to_window(pts.reshape(-1, 8).astype(np.float32), labels, S)
@@ -120,14 +149,24 @@ class DotaPatches(Dataset):
         labels = np.concatenate(L) if L else np.zeros(0, np.int64)
         return canvas, polys, labels
 
-    def _augment(self, img, polys, color=True):
+    def _augment(self, img, polys, color=True, ctx=None):
+        """Flips / rot90 applied identically to the patch and (if given) to the context thumbnail + tile box."""
         S = img.shape[0]
+        T = ctx["thumb"].shape[0] if ctx is not None else 0
         if self.flip and random.random() < 0.5:
             img = img[:, ::-1]
             polys[:, 0::2] = S - polys[:, 0::2]
+            if ctx is not None:
+                ctx["thumb"] = ctx["thumb"][:, ::-1]
+                x0, y0, x1, y1 = ctx["tile"]
+                ctx["tile"] = np.array([T - x1, y0, T - x0, y1], np.float32)
         if self.flip and random.random() < 0.5:
             img = img[::-1]
             polys[:, 1::2] = S - polys[:, 1::2]
+            if ctx is not None:
+                ctx["thumb"] = ctx["thumb"][::-1]
+                x0, y0, x1, y1 = ctx["tile"]
+                ctx["tile"] = np.array([x0, T - y1, x1, T - y0], np.float32)
         if self.rot90:
             k = random.randint(0, 3)
             for _ in range(k):                      # 90 deg counter-clockwise: (x, y) -> (y, S - x)
@@ -135,6 +174,8 @@ class DotaPatches(Dataset):
                 x = polys[:, 0::2].copy()
                 polys[:, 0::2] = polys[:, 1::2]
                 polys[:, 1::2] = S - x
+                if ctx is not None:
+                    self._ctx_rot90(ctx)
         if color:
             img = self._hsv(img)
         return img, polys
@@ -153,21 +194,31 @@ class DotaPatches(Dataset):
 
     def __getitem__(self, i):
         m = self.items[i]
+        ctx = None
         if self.augment and self.mosaic_p and random.random() < self.mosaic_p:
             img, polys, labels = self._mosaic(i)
             img = self._hsv(img)
+            if self.context:                    # a mosaic has no single parent image: no context
+                ctx = self._load_ctx(m)
+                ctx["valid"] = False
         else:
             img, polys, labels = self._load(m)
+            if self.context:
+                ctx = self._load_ctx(m)
             if self.augment:
-                img, polys = self._augment(img, polys)
+                img, polys = self._augment(img, polys, ctx=ctx)
                 if self.rotate_p and random.random() < self.rotate_p:
-                    img, polys, labels = self._rotate(img, polys, labels)
+                    img, polys, labels = self._rotate(img, polys, labels, ctx=ctx)
         obb = polys_to_obb(polys)
         keep = (obb[:, 2] >= self.min_size) & (obb[:, 3] >= self.min_size) if len(obb) else np.zeros(0, bool)
         obb, labels = obb[keep], labels[keep]
         obb[:, :4] /= self.size
         img = np.ascontiguousarray(img[..., ::-1].transpose(2, 0, 1))      # BGR HWC -> RGB CHW
         tgt = {"labels": torch.from_numpy(labels), "boxes": torch.from_numpy(obb), "name": m["name"]}
+        if ctx is not None:
+            tgt["thumb"] = torch.from_numpy(np.ascontiguousarray(ctx["thumb"][..., ::-1].transpose(2, 0, 1)))
+            tgt["tile"] = torch.from_numpy(np.asarray(ctx["tile"], np.float32))
+            tgt["ctx_valid"] = bool(ctx["valid"])
         return torch.from_numpy(img), tgt
 
 

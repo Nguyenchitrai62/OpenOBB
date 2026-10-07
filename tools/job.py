@@ -124,7 +124,7 @@ def launch(jid):
     out = f"{WORK}/runs/{jid}"
     log(f"{jid}: launching attempt {st['attempts']} on {sp['gpu']} as session {sess}")
     cx.new(sess, sp.get("gpu"), sp.get("high_mem", False))
-    st.update(session=sess, out=out, status="running", launched=time.time())
+    st.update(session=sess, out=out, status="starting", launched=time.time())   # watcher skips it
     save_state(jid, st)
     try:
         _start_remote(sess, sp, out)
@@ -134,6 +134,8 @@ def launch(jid):
         save_state(jid, st)
         cx.stop(sess)
         raise
+    st["status"] = "running"
+    save_state(jid, st)
     log(f"{jid}: running")
 
 
@@ -290,7 +292,7 @@ def _lock():
 
 if __name__ == "__main__":
     cmd, args = sys.argv[1], sys.argv[2:]
-    if cmd != "status":
+    if cmd not in ("status", "launch"):     # launch only touches its own new session
         _lock()
     {"launch": lambda: launch(args[0]), "poll": lambda: print(poll(args[0])),
      "watch": lambda: watch(args or None), "stop": lambda: stop(args[0]),

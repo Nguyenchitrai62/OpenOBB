@@ -9,6 +9,7 @@ Output (per split):
   {out}/meta/{split}.jsonl                                 one line per patch: offsets, valid size and
                                                            pixel polygons with difficult/truncated flags
   {out}/gt/{split}/*.txt                                   copy of the original full-image labels (for eval)
+  {out}/thumbs/{split}/{img}.jpg                           whole image, long side THUMB px (global context, H6)
 
 Object -> patch rule: keep the object if area(obj ∩ patch) / area(obj) >= iof_thr (0.7).
 Fully contained objects keep their original polygon; truncated ones are replaced by the
@@ -31,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from vrdet.eval.dota import DOTA1_CLASSES, parse_dota_txt  # noqa: E402
 
 PAD_BGR = (104, 116, 124)       # ImageNet mean, so padding is ~0 after normalisation
+THUMB = 512                     # long side of the whole-image thumbnail used for global context
 
 
 def window_starts(length, size, step):
@@ -54,6 +56,10 @@ def split_image(item, out, split, size, gap, rates, iof_thr, classes, quality):
     objs0 = parse_dota_txt(lbl_path) if lbl_path and Path(lbl_path).exists() else []
     cls_idx = {c: i for i, c in enumerate(classes)}
     objs0 = [o for o in objs0 if o[1] in cls_idx]
+    H0, W0 = img0.shape[:2]
+    ts = THUMB / max(H0, W0)
+    thumb = cv2.resize(img0, (max(1, round(W0 * ts)), max(1, round(H0 * ts))), interpolation=cv2.INTER_AREA)
+    cv2.imwrite(str(out / "thumbs" / split / f"{name}.jpg"), thumb, [cv2.IMWRITE_JPEG_QUALITY, 92])
     metas = []
     for rate in rates:
         img = img0 if rate == 1 else cv2.resize(img0, None, fx=rate, fy=rate, interpolation=cv2.INTER_LINEAR)
@@ -100,7 +106,7 @@ def split_image(item, out, split, size, gap, rates, iof_thr, classes, quality):
                     for o in kept:
                         fh.write(f"{o[0]} " + " ".join(f"{v / size:.6f}" for v in o[3:]) + "\n")
                 metas.append({"name": pname, "src": name, "rate": rate, "x0": x0, "y0": y0, "w": pw, "h": ph,
-                              "objs": kept})
+                              "img_w": W0, "img_h": H0, "objs": kept})
     return metas, None
 
 
@@ -112,7 +118,7 @@ def split_set(src, out, split, size=1024, gap=200, rates=(1.0,), iof_thr=0.7, cl
         imgs = imgs[:limit]
     lbl_dir = src / split / "labelTxt"
     items = [(str(p), str(lbl_dir / f"{p.stem}.txt") if lbl_dir.exists() else None) for p in imgs]
-    for d in ("images", "labels"):
+    for d in ("images", "labels", "thumbs"):
         (out / d / split).mkdir(parents=True, exist_ok=True)
     (out / "meta").mkdir(parents=True, exist_ok=True)
     fn = partial(split_image, out=out, split=split, size=size, gap=gap, rates=tuple(rates),

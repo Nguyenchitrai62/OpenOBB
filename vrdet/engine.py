@@ -72,11 +72,20 @@ def param_groups(model, lr, backbone_mult=0.5, wd=1e-4):
             dict(params=groups["rest"], lr=lr, weight_decay=wd, name="rest")]
 
 
+def ctx_batch(targets, device):
+    """Global-context inputs (H6) gathered from the targets, or None when the dataset has no context."""
+    if not targets or "thumb" not in targets[0]:
+        return None
+    return {"thumb": torch.stack([d["thumb"] for d in targets]).to(device, non_blocking=True).float().div_(255.0),
+            "tile": torch.stack([d["tile"] for d in targets]).to(device, non_blocking=True),
+            "valid": torch.tensor([d["ctx_valid"] for d in targets], device=device)}
+
+
 def to_device(imgs, targets, device):
     x = imgs.to(device, non_blocking=True).float().div_(255.0)
     t = [{"labels": d["labels"].to(device, non_blocking=True), "boxes": d["boxes"].to(device, non_blocking=True)}
          for d in targets]
-    return x, t
+    return x, t, ctx_batch(targets, device)
 
 
 @torch.no_grad()
@@ -91,8 +100,9 @@ def predict_patches(model, ds, device, batch=32, workers=8, num_top=300, img_siz
         out["dense"] = []
     for imgs, tg in dl:
         x = imgs.to(device, non_blocking=True).float().div_(255.0)
+        ctx = ctx_batch(tg, device)
         with torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=amp and device.type == "cuda"):
-            o = model(x)
+            o = model(x, ctx=ctx) if ctx is not None else model(x)
         s, l, b = postprocess(o, num_top, img_size)
         s, l, b = s.cpu().numpy(), l.cpu().numpy(), b.cpu().numpy()
         for i, t in enumerate(tg):
@@ -146,19 +156,47 @@ def merge_parallel(patch_dets, iou_thr=0.1, workers=16):
     return merged
 
 
+def save_preds(preds, path):
+    """Compact npz of raw patch predictions (for offline fusion studies)."""
+    names = sorted({d[0] for v in preds.values() for d in v})
+    nid = {n: i for i, n in enumerate(names)}
+    arrs = {"names": np.array(names)}
+    for k, v in preds.items():
+        arrs[f"{k}_patch"] = np.array([nid[d[0]] for d in v], np.int32)
+        arrs[f"{k}_cls"] = np.array([d[1] for d in v], np.int8)
+        arrs[f"{k}_score"] = np.array([d[2] for d in v], np.float16)
+        arrs[f"{k}_poly"] = np.array([d[3] for d in v], np.float32).reshape(-1, 8).astype(np.float16)
+    np.savez_compressed(path, **arrs)
+
+
+def load_preds(path):
+    z = np.load(path)
+    names = z["names"]
+    out = {}
+    for k in ("dec", "dense"):
+        if f"{k}_patch" in z:
+            out[k] = [(str(names[i]), int(c), float(s), p.astype(np.float64)) for i, c, s, p in
+                      zip(z[f"{k}_patch"], z[f"{k}_cls"], z[f"{k}_score"], z[f"{k}_poly"])]
+    return out
+
+
 def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num_top=300, img_size=1024,
-              merge_workers=16, log=print, fusion=False):
+              merge_workers=16, log=print, fusion=False, variants=None, save_preds_to=None, context=False):
     """DOTA-protocol eval of the decoder output (primary). With fusion=True and a dense head, also scores
     the dense-only / union / size-routed variants (res["fusion"])."""
     t0 = time.time()
-    ds = DotaPatches(data_root, "val", augment=False)
+    ds = DotaPatches(data_root, "val", augment=False, context=context)
     if image_ids is not None:
         keep = set(image_ids)
         ds.items = [m for m in ds.items if m["src"] in keep]
     preds = predict_patches(model, ds, device, batch, workers, num_top, img_size)
     t1 = time.time()
     gts = load_gt_dir(f"{data_root}/gt/val", set(image_ids) if image_ids is not None else None)
+    if save_preds_to:
+        save_preds(preds, save_preds_to)
     sets = fusion_sets(preds) if fusion else {"dec": preds["dec"]}
+    if variants:
+        sets = {k: v for k, v in sets.items() if k in variants}
     results, primary_dets = {}, None
     for name, pd in sets.items():
         merged = merge_parallel(pd, 0.1, merge_workers)

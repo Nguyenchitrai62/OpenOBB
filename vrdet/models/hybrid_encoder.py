@@ -392,7 +392,8 @@ class HybridEncoder(nn.Module):
 
         return torch.concat([out_w.sin(), out_w.cos(), out_h.sin(), out_h.cos()], dim=1)[None, :, :]
 
-    def forward(self, feats):
+    def forward(self, feats, ctx_fn=None):
+        """ctx_fn (VRDet H6): optional callable(p5, pos_embed) -> p5 applied right after the AIFI layer."""
         assert len(feats) == len(self.in_channels)
         proj_feats = [self.input_proj[i](feat) for i, feat in enumerate(feats)]
 
@@ -410,6 +411,8 @@ class HybridEncoder(nn.Module):
 
                 memory :torch.Tensor = self.encoder[i](src_flatten, pos_embed=pos_embed)
                 proj_feats[enc_ind] = memory.permute(0, 2, 1).reshape(-1, self.hidden_dim, h, w).contiguous()
+                if ctx_fn is not None:
+                    proj_feats[enc_ind] = ctx_fn(proj_feats[enc_ind], pos_embed)
 
         # broadcasting and fusion
         inner_outs = [proj_feats[-1]]

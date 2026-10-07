@@ -131,7 +131,13 @@ Head dense được dùng theo ba cách, đo từ cùng một lần train:
 | H7 | Plug-in vector cho CAD | AI_Takeoff: FP và TP giống hệt nhau trên ảnh | FloorPlanCAD + data nội bộ |
 | H8 | Công thức train: xoay ngẫu nhiên, mosaic có rot90 mỗi ô (oriented dense O2O), multi-scale | xoay +4.0; RiO dense O2O +0.27; MS +2–4.5 | chỉ khi gộp cuối |
 
-Thứ tự: E1 baseline → H4 → H1 → H2/H3 → H8 khi gộp cuối → H5/H6 → H7.
+Thứ tự (cập nhật theo mục tiêu sản phẩm, "thông minh như VLM, nhanh như YOLO"): E1 baseline → H4 → H1 / H2 / **H3 line mảnh** → **H6 ngữ cảnh toàn ảnh lớn** → H8 khi gộp cuối → H5 → H7 CAD.
+
+Kiểm chứng đa dataset, sau khi thắng trên DOTA:
+- DIOR-R: 20 class, ảnh 800².
+- HRSC2016: tàu dài mảnh, sát với kiểu line.
+- FloorPlanCAD: CAD thật, có vector.
+- Sau cùng là data nội bộ của user (finetune).
 
 ### 4.3 Họ model
 

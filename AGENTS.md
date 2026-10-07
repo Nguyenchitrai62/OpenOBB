@@ -131,6 +131,14 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
   - Thử một hoặc vài dataset trước, khi kiến trúc ổn mới mở rộng.
   - Tối ưu cả thời gian lẫn CU. Dùng sub-agent để nghiên cứu song song, lấy cảm hứng từ sản phẩm có sẵn.
   - Được lấy **ý tưởng** từ cả kiến trúc public nhưng cấm thương mại, miễn là tự viết lại toàn bộ (không chép code, không dùng weights NC).
+- (bổ sung) **Mục tiêu sản phẩm, lời user:** "vừa thông minh như VLM vừa nhanh như YOLO".
+  - VLM-det hiểu cả hình học lẫn ngữ nghĩa trên ảnh lớn 2000×3000, nhưng cực chậm và không sinh box song song.
+  - YOLO nhanh nhưng gần như chỉ có hình học. Trong bản vẽ CAD, ngữ nghĩa nhiều khi quyết định object là gì.
+  - Chấp nhận chậm hơn YOLO một chút, đổi lại hiểu ngữ nghĩa ảnh lớn **cùng** chi tiết nhỏ tốt hơn hẳn.
+  - OBB phải chịu được object nhỏ và line mảnh.
+  - Phải kiểm chứng trên **nhiều dataset public**: DOTA trước, rồi DIOR-R, HRSC2016, FloorPlanCAD.
+  - Kiến trúc, code và weights lưu trong repo này, thuộc sở hữu của user, dùng thương mại được.
+  - Hệ quả: H6 (ngữ cảnh toàn ảnh xuyên tile) và H3 (line mảnh) được nâng ưu tiên, ngay sau H4.
 
 Câu hỏi còn mở:
 - Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.

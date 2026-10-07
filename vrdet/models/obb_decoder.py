@@ -19,8 +19,22 @@ import torch.nn.functional as F
 import torch.nn.init as init
 
 from .deim_utils import bias_init_with_prob, deformable_attention_core_func_v2, get_activation
+from vrdet.ops.obb_torch import probiou
 from .obb_utils import (angle_project, box_to_unact, distance2obb, inverse_sigmoid, pos_features,
                         unact_to_box, weighting_function)
+
+
+@torch.no_grad()
+def distinct_topk(scores, boxes, k, pre, thr=0.7):
+    """Top-k anchors after class-agnostic Fast-NMS on ProbIoU among the `pre` best (distinct queries, DDQ idea):
+    a one-to-many dense head fires many near-duplicates per large object; without this the query budget is
+    spent on duplicates and small objects starve."""
+    pre = min(pre, scores.shape[1])
+    s, idx = scores.topk(pre, dim=1)
+    b = boxes.gather(1, idx[..., None].expand(-1, -1, 5)).float()
+    iou = torch.triu(probiou(b[:, :, None, :], b[:, None, :, :]), diagonal=1)
+    s = s.masked_fill(iou.amax(1) > thr, -1.0)
+    return idx.gather(1, s.topk(min(k, pre), dim=1).indices)
 
 N_DIST = 5      # 4 rotated edges + 1 angle residual
 _DEBUG = bool(int(__import__('os').environ.get('VRDET_DEBUG', '0')))
@@ -406,13 +420,25 @@ class OBBDFINETransformer(nn.Module):
         anchors = torch.where(valid_mask, anchors, torch.inf)
         return anchors, valid_mask
 
-    def _get_decoder_input(self, memory, spatial_shapes, denoising_logits=None, denoising_unact=None):
+    def _get_decoder_input(self, memory, spatial_shapes, denoising_logits=None, denoising_unact=None, dense=None):
         if self.training or self.eval_spatial_size is None:
             anchors, valid_mask = self._generate_anchors(spatial_shapes, device=memory.device)
         else:
             anchors, valid_mask = self.anchors, self.valid_mask
         memory = valid_mask.to(memory.dtype) * memory
         output_memory = self.enc_output(memory)
+        if dense is not None:      # VRDet H4c: queries come from the dense one-to-many head (distinct top-k)
+            sc = dense["dense_logits"].detach().float().sigmoid().amax(-1) * valid_mask[..., 0].to(torch.float32)
+            topk_ind = distinct_topk(sc, dense["dense_boxes"].detach(), self.num_queries, 3 * self.num_queries)
+            topk_memory = output_memory.gather(1, topk_ind.unsqueeze(-1).repeat(1, 1, output_memory.shape[-1]))
+            b = dense["dense_boxes"].detach().float().gather(1, topk_ind.unsqueeze(-1).repeat(1, 1, 5))
+            b = torch.cat([b[..., :2].clamp(0.001, 0.999), b[..., 2:4].clamp(1e-4, 0.999), b[..., 4:]], -1)
+            enc_unact = box_to_unact(b)
+            content = topk_memory.detach()
+            if denoising_unact is not None:
+                enc_unact = torch.concat([denoising_unact, enc_unact], dim=1)
+                content = torch.concat([denoising_logits, content], dim=1)
+            return content, enc_unact, [], []
         enc_logits = self.enc_score_head(output_memory).float()
         _, topk_ind = torch.topk(enc_logits.max(-1).values, self.num_queries, dim=-1)
         topk_memory = output_memory.gather(1, topk_ind.unsqueeze(-1).repeat(1, 1, output_memory.shape[-1]))
@@ -431,7 +457,7 @@ class OBBDFINETransformer(nn.Module):
             content = torch.concat([denoising_logits, content], dim=1)
         return content, enc_unact, enc_boxes_list, enc_logits_list
 
-    def forward(self, feats, targets=None):
+    def forward(self, feats, targets=None, dense=None):
         memory, spatial_shapes = self._get_encoder_input(feats)
         if self.training and self.num_denoising > 0:
             dn_logits, dn_unact, attn_mask, dn_meta = obb_denoising_group(
@@ -441,7 +467,7 @@ class OBBDFINETransformer(nn.Module):
         else:
             dn_logits = dn_unact = attn_mask = dn_meta = None
         content, ref_unact, enc_boxes_list, enc_logits_list = self._get_decoder_input(
-            memory, spatial_shapes, dn_logits, dn_unact)
+            memory, spatial_shapes, dn_logits, dn_unact, dense=dense)
         out_boxes, out_logits, out_corners, out_refs, pre_boxes, pre_logits = self.decoder(
             content, ref_unact, memory, spatial_shapes, self.dec_bbox_head, self.dec_score_head,
             self.query_pos_head, self.pre_bbox_head, self.up, self.reg_scale, attn_mask=attn_mask)

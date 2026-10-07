@@ -12,6 +12,7 @@ import torch.nn as nn
 from .hgnetv2 import HGNetv2
 from .hybrid_encoder import HybridEncoder
 from .obb_criterion import OBBCriterion, OBBHungarianMatcher
+from .context import GlobalContext
 from .dense_head import DenseRotatedHead
 from .obb_decoder import OBBDFINETransformer
 
@@ -58,7 +59,8 @@ class StripContext(nn.Module):
 
 class VRDet(nn.Module):
     def __init__(self, size="s", num_classes=15, num_queries=300, img_size=1024, rotate_sampling=True,
-                 num_denoising=100, dense=False, dense_width=128, strip_k=0, ortho_heads=False, **overrides):
+                 num_denoising=100, dense=False, dense_width=128, strip_k=0, ortho_heads=False, context=False,
+                 dense_queries=False, **overrides):
         super().__init__()
         cfg = copy.deepcopy(CONFIGS[size])
         for k, v in overrides.items():          # e.g. decoder=dict(num_layers=4)
@@ -71,16 +73,24 @@ class VRDet(nn.Module):
                                            num_denoising=num_denoising, ortho_heads=ortho_heads, **cfg["decoder"])
         hid = cfg["encoder"]["hidden_dim"]
         self.context = nn.ModuleList([StripContext(hid, strip_k) for _ in range(3)]) if strip_k else None
+        self.global_ctx = GlobalContext(self.backbone, cfg["encoder"]["in_channels"][-1], hid,
+                                        p5_size=img_size // 32) if context else None
         self.dense_head = DenseRotatedHead(cfg["encoder"]["hidden_dim"], num_classes, (8, 16, 32), dense_width,
-                                           img_size) if dense else None
+                                           img_size) if (dense or dense_queries) else None
+        self.dense_queries = dense_queries
 
-    def forward(self, x, targets=None):
-        feats = self.encoder(self.backbone(x))
+    def forward(self, x, targets=None, ctx=None):
+        fn = None
+        if ctx is not None and self.global_ctx is not None:
+            def fn(p5, pos):
+                return self.global_ctx(p5, pos, ctx)
+        feats = self.encoder(self.backbone(x), ctx_fn=fn)
         if self.context is not None:
             feats = [m(f) for m, f in zip(self.context, feats)]
-        out = self.decoder(feats, targets)
-        if self.dense_head is not None:
-            out.update(self.dense_head(feats))
+        dense = self.dense_head(feats) if self.dense_head is not None else None
+        out = self.decoder(feats, targets, dense=dense if self.dense_queries else None)
+        if dense is not None:
+            out.update(dense)
         return out
 
 

@@ -47,3 +47,9 @@
 [2026-10-07 17:14:11] e1-vrdet-s-dota-24e: launching attempt 2 on G4 as session e1-vrdet-s-dota-24e-2
 [2026-10-07 17:14:34] e1-vrdet-s-dota-24e: restoring 1 synced files (0 MB) for resume
 [2026-10-07 17:15:04] e1-vrdet-s-dota-24e: running
+[2026-10-07 17:15:49] watch: balance=481.68 rate=23.1/h active=['e1-vrdet-s-dota-24e', 'e1-yolo26s-dota-24e'] ended=[]
+[2026-10-07 17:22:37] e1-yolo26s-dota-24e: finished with status done; stopping VM
+[2026-10-07 17:22:40] watch: balance=479.75 rate=23.1/h active=['e1-vrdet-s-dota-24e', 'e1-yolo26s-dota-24e'] ended=[('e1-yolo26s-dota-24e', 'done')]
+[2026-10-07 17:23:26] watch: balance=479.75 rate=14.2/h active=['e1-vrdet-s-dota-24e'] ended=[]
+[2026-10-07 17:28:46] e1-vrdet-smoke2-t4: launching attempt 1 on T4 as session e1-vrdet-smoke2-t4-1
+[2026-10-07 17:29:15] e1-vrdet-smoke2-t4: running
