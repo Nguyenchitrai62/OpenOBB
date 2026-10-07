@@ -82,6 +82,16 @@ def exec_py(name, code, timeout=900):
     return run(["exec", "-s", name], stdin=code, timeout=timeout, check=False)
 
 
+def exec_retry(name, code, timeout=180, tries=4):
+    """exec for short IDEMPOTENT snippets: the CLI sometimes hangs on exec, so use a short timeout and retry."""
+    def once():
+        rc, out = run(["exec", "-s", name], stdin=code, timeout=timeout, check=False)
+        if MARK + "ok" not in out:
+            raise ColabError(f"exec on {name} gave no ok marker (rc={rc}): {out[-500:]}")
+        return out
+    return retry(once, tries=tries, wait=5)
+
+
 def exec_json(name, code, timeout=900):
     """Run code that ends by printing MARK + json; return the decoded object."""
     rc, out = exec_py(name, code, timeout)
@@ -116,7 +126,7 @@ if os.path.exists(p):
     with open(p,'rb') as f:
         for b in iter(lambda:f.read(1<<20),b''): h.update(b)
 print({MARK!r}+repr(h.hexdigest() if os.path.exists(p) else None).replace("'",'"'))"""
-    return exec_json(name, code)
+    return exec_json(name, code, timeout=300)
 
 
 def put(name, local, remote):
@@ -136,17 +146,22 @@ def put(name, local, remote):
                 parts.append(part)
                 i += 1
         rdir = f"/content/.cxup/{local.name}"
-        exec_py(name, f"import os;os.makedirs({rdir!r},exist_ok=True)")
+        exec_retry(name, f"import os;os.makedirs({rdir!r},exist_ok=True);print({MARK!r}+'ok')")
         for part in parts:
             retry(lambda part=part: run(["upload", "-s", name, str(part), f"{rdir}/{part.name}"], timeout=600))
         shutil.rmtree(tmp, ignore_errors=True)
-        exec_py(name, f"""import os,shutil,glob
+        # idempotent re-assembly (safe to retry after a hung exec): build .part, rename, then drop the chunks
+        exec_retry(name, f"""import os,shutil,glob
 os.makedirs(os.path.dirname({remote!r}) or '.',exist_ok=True)
-with open({remote!r},'wb') as o:
-    for p in sorted(glob.glob({rdir!r}+'/p*')):
-        with open(p,'rb') as i: shutil.copyfileobj(i,o)
-shutil.rmtree({rdir!r})""")
-    if remote_sha(name, remote) != _sha(local):
+ps=sorted(glob.glob({rdir!r}+'/p*'))
+if len(ps)=={len(parts)}:
+    with open({remote!r}+'.part','wb') as o:
+        for p in ps:
+            with open(p,'rb') as i: shutil.copyfileobj(i,o)
+    os.replace({remote!r}+'.part',{remote!r})
+    shutil.rmtree({rdir!r},ignore_errors=True)
+print({MARK!r}+'ok')""", timeout=300)
+    if retry(lambda: remote_sha(name, remote), tries=3, wait=5) != _sha(local):
         raise ColabError(f"sha mismatch after upload {local} -> {remote}")
 
 

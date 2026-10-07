@@ -1,11 +1,11 @@
 {
-  "attempts": 1,
+  "attempts": 2,
   "started": "2026-10-07 19:57:47",
-  "session": "e3-ctx-fix-s-1",
+  "session": "e3-ctx-fix-s-2",
   "out": "/content/work/runs/e3-ctx-fix-s",
-  "status": "stopped",
-  "launched": 1791377873.1410356,
-  "updated": "2026-10-07 20:33:55",
+  "status": "starting",
+  "launched": 1791381196.7274275,
+  "updated": "2026-10-07 20:53:16",
   "fails": 0,
   "synced": {
     "setup.log": [
