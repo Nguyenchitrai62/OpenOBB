@@ -16,7 +16,8 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from vrdet.eval.dota import DOTA1_CLASSES, evaluate, format_table, load_gt_dir, merge_patches, write_task1  # noqa: E402
+from vrdet.data.dota import dataset_classes  # noqa: E402
+from vrdet.eval.dota import evaluate, format_table, load_gt_dir, merge_patches, write_task1  # noqa: E402
 
 
 def jlog(out, rec):
@@ -26,12 +27,12 @@ def jlog(out, rec):
 
 def make_yaml(data, out, n_val_mon):
     data = Path(data)
-    vals = sorted((data / "images" / "val").glob("*.jpg"))
+    vals = sorted(p for p in (data / "images" / "val").iterdir() if p.suffix in (".jpg", ".png"))
     random.Random(0).shuffle(vals)
     mon = Path(out) / "val_monitor.txt"            # small fixed subset: cheap per-epoch curve
     mon.write_text("\n".join(str(p) for p in sorted(vals[:n_val_mon])) + "\n")
     y = Path(out) / "data.yaml"
-    names = "\n".join(f"  {i}: {c}" for i, c in enumerate(DOTA1_CLASSES))
+    names = "\n".join(f"  {i}: {c}" for i, c in enumerate(dataset_classes(data)))
     y.write_text(f"path: {data}\ntrain: images/train\nval: {mon}\nnames:\n{names}\n")
     return y
 
@@ -83,7 +84,8 @@ def evaluate_val(a):
     w = out / "train" / "weights" / ("last.pt" if a.use_last else "best.pt")
     model = YOLO(str(w))
     data = Path(a.data)
-    vals = sorted((data / "images" / "val").glob("*.jpg"))
+    vals = sorted(p for p in (data / "images" / "val").iterdir() if p.suffix in (".jpg", ".png"))
+    classes = dataset_classes(data)
     t0 = time.time()
     pd = []
     for i in range(0, len(vals), a.pred_batch):
@@ -97,10 +99,10 @@ def evaluate_val(a):
                 pd.append((name, int(c), float(s), p))
     t_pred = time.time() - t0
     merged = merge_patches(pd, iou_thr=0.1)
-    dets = {DOTA1_CLASSES[c]: v for c, v in merged.items()}
-    write_task1(dets, out / "val_task1")
-    res = evaluate(dets, load_gt_dir(data / "gt" / "val"))
-    table = format_table(res)
+    dets = {classes[c]: v for c, v in merged.items()}
+    write_task1(dets, out / "val_task1", classes)
+    res = evaluate(dets, load_gt_dir(data / "gt" / "val"), classes)
+    table = format_table(res, classes)
     print(table, flush=True)
     (out / "eval_val.txt").write_text(table + "\n")
     (out / "eval_val.json").write_text(json.dumps(res, indent=1))

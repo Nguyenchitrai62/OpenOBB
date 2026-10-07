@@ -5,7 +5,7 @@
   "out": "/content/work/runs/e1-vrdet-s-seed1",
   "status": "running",
   "launched": 1791374950.4527454,
-  "updated": "2026-10-07 19:54:21",
+  "updated": "2026-10-07 20:09:05",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,21 +13,21 @@
       1791374979
     ],
     "train.log": [
-      136465,
-      1791377629
+      150805,
+      1791378515
     ],
     "metrics.jsonl": [
-      2689,
-      1791377452
+      4003,
+      1791378375
     ],
     "train_progress.log": [
-      35089,
-      1791377629
+      49429,
+      1791378515
     ],
     "last.pt": [
       165363381,
-      1791377635
+      1791378375
     ]
   },
-  "tail": "0.305 fgl=1.226 lr 1.00e-04 | 86.1 img/s data 0.001s crit 0.054s/it\n[12:53:21] ep 11 it 800/984 loss 18.324 mal=0.694 bbox=0.187 kld=0.365 fgl=1.229 lr 1.00e-04 | 85.7 img/s data 0.001s crit 0.054s/it\n[12:53:30] ep 11 it 850/984 loss 18.442 mal=0.722 bbox=0.190 kld=0.322 fgl=1.262 lr 1.00e-04 | 85.7 img/s data 0.000s crit 0.054s/it\n[12:53:40] ep 11 it 900/984 loss 18.668 mal=0.671 bbox=0.280 kld=0.301 fgl=1.270 lr 1.00e-04 | 85.7 img/s data 0.000s crit 0.054s/it\n[12:53:49] ep 11 it 950/984 loss 17.668 mal=0.617 bbox=0.167 kld=0.277 fgl=1.247 lr 1.00e-04 | 85.9 img/s data 0.000s crit 0.054s/it\n"
+  "tail": "0.238 fgl=1.340 lr 7.16e-05 | 85.2 img/s data 0.001s crit 0.055s/it\n[13:08:08] ep 16 it 600/984 loss 17.535 mal=0.710 bbox=0.164 kld=0.321 fgl=1.203 lr 7.10e-05 | 85.3 img/s data 0.001s crit 0.055s/it\n[13:08:17] ep 16 it 650/984 loss 17.659 mal=0.734 bbox=0.150 kld=0.278 fgl=1.313 lr 7.05e-05 | 85.4 img/s data 0.001s crit 0.055s/it\n[13:08:26] ep 16 it 700/984 loss 17.813 mal=0.701 bbox=0.119 kld=0.302 fgl=1.341 lr 6.99e-05 | 85.4 img/s data 0.001s crit 0.055s/it\n[13:08:35] ep 16 it 750/984 loss 17.384 mal=0.521 bbox=0.169 kld=0.344 fgl=1.260 lr 6.93e-05 | 85.4 img/s data 0.001s crit 0.055s/it\n"
 }

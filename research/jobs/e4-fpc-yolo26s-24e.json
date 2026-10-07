@@ -1,0 +1,10 @@
+{
+  "id": "e4-fpc-yolo26s-24e",
+  "gpu": "G4",
+  "bundle": ["vrdet", "colab"],
+  "setup": ["pip install -q -U ultralytics gdown shapely"],
+  "cmd": "python -u colab/data/floorplancad.py --root /content/datasets && python -u colab/baselines/yolo_obb.py --data /content/datasets/floorplancad_1024 --out {out} --model yolo26s-obb.yaml --weights yolo26s.pt --epochs 24 --imgsz 1024 --batch 32",
+  "sync": ["last.pt", "metrics.jsonl", "*.log", "eval_val.json", "eval_val.txt", "results.csv", "args.yaml", "train_done"],
+  "max_hours": 4,
+  "max_retries": 3
+}

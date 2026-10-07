@@ -115,3 +115,9 @@
 [2026-10-07 19:57:18] e2-h6-ctx-s: finished with status done; stopping VM
 [2026-10-07 19:57:22] watch: balance=400.4 rate=37.3/h active=['e1-vrdet-s-seed1', 'e2-h3-strip-s', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e2-h6-ctx-s'] ended=[('e2-h3-strip-s', 'done'), ('e2-h6-ctx-s', 'done')]
 [2026-10-07 19:57:47] e3-ctx-fix-s: launching attempt 1 on G4 as session e3-ctx-fix-s-1
+[2026-10-07 19:58:31] e3-ctx-fix-s: running
+[2026-10-07 19:58:34] e3-rfs-s: launching attempt 1 on G4 as session e3-rfs-s-1
+[2026-10-07 19:59:28] e3-rfs-s: running
+[2026-10-07 20:00:34] watch: balance=397.33 rate=37.3/h active=['e1-vrdet-s-seed1', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e3-ctx-fix-s', 'e3-rfs-s'] ended=[]
+[2026-10-07 20:12:16] watch: balance=392.16 rate=37.3/h active=['e1-vrdet-s-seed1', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e3-ctx-fix-s', 'e3-rfs-s'] ended=[]
+[2026-10-07 20:13:50] queue: ['e4-fpc-yolo26s-24e', 'e4-fpc-vrdet-s-24e']
