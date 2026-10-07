@@ -66,6 +66,7 @@ def get_args(argv=None):
     ap.add_argument("--profile", type=int, default=0, help="profile N iterations after 10 warm-up ones, then exit")
     ap.add_argument("--channels-last", action="store_true", help="NHWC convs/BN (profiling: BN was ~42% of GPU time)")
     ap.add_argument("--compile", action="store_true", help="torch.compile backbone + encoder (falls back to eager)")
+    ap.add_argument("--rfs", type=float, default=0.0, help="repeat-factor sampling threshold t (0 = off)")
     ap.add_argument("--threads", type=int, default=0, help="torch CPU threads (0 = default)")
     return ap.parse_args(argv)
 
@@ -123,7 +124,14 @@ def main(argv=None):
     dense_crit = DenseCriterion() if a.dense else None
     ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,
                      rotate_p=a.rotate_p, mosaic_p=a.mosaic_p, context=a.context)
-    dl = DataLoader(ds, batch_size=a.batch, shuffle=True, num_workers=a.workers, collate_fn=collate,
+    sampler = None
+    if a.rfs > 0:
+        from vrdet.data.dota import repeat_factors
+        w, f, r = repeat_factors(ds.items, len(classes), a.rfs)
+        sampler = torch.utils.data.WeightedRandomSampler(torch.as_tensor(w, dtype=torch.double), len(ds), replacement=True)
+        log("RFS repeat factors: " + " ".join(f"{c[:6]}={x:.1f}" for c, x in zip(classes, r)))
+    dl = DataLoader(ds, batch_size=a.batch, shuffle=sampler is None, sampler=sampler, num_workers=a.workers,
+                    collate_fn=collate,
                     pin_memory=True, drop_last=True, persistent_workers=a.workers > 0,
                     prefetch_factor=4 if a.workers > 0 else None)
     iters_per_epoch = len(dl) if a.max_iters is None else min(len(dl), a.max_iters)

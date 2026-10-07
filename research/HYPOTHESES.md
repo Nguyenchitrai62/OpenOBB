@@ -37,7 +37,15 @@ Quy tắc:
   - loss: MAL (IoU xoay chính xác) + L1 (căn góc) 5 + KLD 2 + FGL 0.15 + DDF 1.5;
   - oriented CDN; 300 query; aug flip + rot90 + HSV.
 - Pass (để đi tiếp E2): mAP50 ≥ E1a − 2. Fail: tìm bug trước (matching, góc, merge), không thêm module mới.
-- Kết quả: (chưa chạy)
+- **Kết quả (19:20): val mAP50 69.89, mAP50:95 46.13. FAIL (−4.9 so với YOLO26s).** Latency PyTorch fp16 bs1 9.4 ms (YOLO e2e 8.9).
+  - Ngang YOLO: PL 90.2, LV 83.8, TC 90.6, ST 88.6, HA 76.2. Hơn YOLO: GTF 68.7 (+1.4).
+  - Thua YOLO:
+    - class hiếm: HC −15.9 (72 GT), SBF −13.9 (87), RA −9.6 (164), BD −7.3 (209), BC −6.3 (124);
+    - vật nhỏ dày: SV −4.3, SP −9.1, BR −5.8.
+  - Không phải bug: class phổ biến ngang YOLO.
+  - Ở class hiếm, recall gần bằng YOLO (BD 86/85, GTF 92/85, SBF 90/95, HC 79/82) nhưng AP thấp, nên lỗi nằm ở **xếp hạng điểm / nhầm class**. Matching one-to-one cho 1 mẫu dương/object/layer, còn TAL của YOLO cho khoảng 10. Lịch 24 epoch làm class hiếm thiếu giám sát.
+  - SV recall 88 so với 94 là do trần 300 query/patch.
+  - → Đúng các điểm H4 (dense one-to-many: nhiều mẫu dương, nhiều slot) nhắm tới. Quyết định: không đổi baseline, chờ E2; thêm 1 seed để đo nhiễu.
 
 ## E2: ablation lõi kiến trúc (mỗi run đổi đúng 1 biến so với E1b, cùng 24 epoch / 1024 SS / train→val)
 

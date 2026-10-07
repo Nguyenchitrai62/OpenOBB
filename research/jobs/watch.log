@@ -94,3 +94,10 @@
 [2026-10-07 18:09:00] e2-h4-dense-s: running
 [2026-10-07 18:16:39] watch: balance=462.35 rate=42.6/h active=['e1-vrdet-s-dota-24e', 'e2-h3-strip-s', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e2-h6-ctx-s'] ended=[]
 [2026-10-07 18:25:02] watch: balance=455.72 rate=37.3/h active=['e1-vrdet-s-dota-24e', 'e2-h3-strip-s', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e2-h6-ctx-s'] ended=[]
+[2026-10-07 18:33:44] watch: balance=449.5 rate=37.3/h active=['e1-vrdet-s-dota-24e', 'e2-h3-strip-s', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e2-h6-ctx-s'] ended=[]
+[2026-10-07 18:43:05] watch: balance=446.37 rate=37.3/h active=['e1-vrdet-s-dota-24e', 'e2-h3-strip-s', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e2-h6-ctx-s'] ended=[]
+[2026-10-07 18:52:12] watch: balance=440.16 rate=37.3/h active=['e1-vrdet-s-dota-24e', 'e2-h3-strip-s', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e2-h6-ctx-s'] ended=[]
+[2026-10-07 19:01:25] watch: balance=433.97 rate=37.3/h active=['e1-vrdet-s-dota-24e', 'e2-h3-strip-s', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e2-h6-ctx-s'] ended=[]
+[2026-10-07 19:08:41] e1-vrdet-s-dota-24e: finished with status done; stopping VM
+[2026-10-07 19:09:04] e1-vrdet-s-seed1: launching attempt 1 on G4 as session e1-vrdet-s-seed1-1
+[2026-10-07 19:09:43] e1-vrdet-s-seed1: running

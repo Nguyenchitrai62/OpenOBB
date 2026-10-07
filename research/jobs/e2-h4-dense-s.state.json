@@ -5,7 +5,7 @@
   "out": "/content/work/runs/e2-h4-dense-s",
   "status": "running",
   "launched": 1791371315.5973,
-  "updated": "2026-10-07 18:24:17",
+  "updated": "2026-10-07 19:09:56",
   "fails": 0,
   "synced": {
     "profile_base/train_progress.log": [
@@ -17,17 +17,25 @@
       1791371336
     ],
     "train.log": [
-      105128,
-      1791372229
+      123099,
+      1791374937
     ],
     "train_progress.log": [
-      357,
-      1791372229
+      18328,
+      1791374937
     ],
     "profile_dense/train_progress.log": [
       14108,
       1791372184
+    ],
+    "metrics.jsonl": [
+      1281,
+      1791374603
+    ],
+    "last.pt": [
+      170879973,
+      1791374602
     ]
   },
-  "tail": "lf.check_worker_number_rationality()\n/content/work/code/vrdet/train.py:192: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.\nConsider using tensor.detach() first. (Triggered internally at /pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:836.)\n  main = {k: float(v) for k, v in losses.items() if \"_aux\" not in k and \"_dn\" not in k and \"_enc\" not in k\n[11:23:49] ep 0 it 0/984 loss 29.805 mal=0.381 bbox=1.927 kld=0.946 fgl=0.407 dense_cls=0.544 dense_box=0.225 dense_angle=0.114 lr 1.00e-07 | 0.7 img/s data 1.954s crit 0.358s/it\n"
+  "tail": "8 lr 1.00e-04 | 26.2 img/s data 0.004s crit 0.192s/it\n[12:07:57] ep 4 it 450/984 loss 22.748 mal=0.950 bbox=0.425 kld=0.533 fgl=1.167 dense_cls=0.204 dense_box=0.160 dense_angle=0.075 lr 1.00e-04 | 26.3 img/s data 0.003s crit 0.191s/it\n[12:08:27] ep 4 it 500/984 loss 20.026 mal=0.729 bbox=0.295 kld=0.382 fgl=1.198 dense_cls=0.189 dense_box=0.089 dense_angle=0.033 lr 1.00e-04 | 26.4 img/s data 0.003s crit 0.191s/it\n[12:08:57] ep 4 it 550/984 loss 23.891 mal=1.042 bbox=0.373 kld=0.478 fgl=1.257 dense_cls=0.291 dense_box=0.184 dense_angle=0.073 lr 1.00e-04 | 26.4 img/s data 0.003s crit 0.192s/it\n"
 }

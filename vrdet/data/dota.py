@@ -222,6 +222,18 @@ class DotaPatches(Dataset):
         return torch.from_numpy(img), tgt
 
 
+def repeat_factors(items, num_classes, t):
+    """Repeat-factor sampling (LVIS, Gupta et al. 2019): r_c = max(1, sqrt(t / f_c)), f_c = fraction of patches
+    containing class c; a patch is drawn with weight max_c r_c over its classes (1 for empty patches)."""
+    import numpy as np
+    n = max(len(items), 1)
+    has = [set(o[0] for o in m["objs"]) for m in items]
+    f = np.array([sum(c in h for h in has) / n for c in range(num_classes)])
+    r = np.where(f > 0, np.maximum(1.0, np.sqrt(t / np.maximum(f, 1e-12))), 1.0)
+    w = np.array([max([r[c] for c in h], default=1.0) for h in has])
+    return w, f, r
+
+
 def dataset_classes(root):
     """Class names of a prepared split ({root}/classes.json), DOTA-v1.0 by default."""
     from vrdet.eval.dota import DOTA1_CLASSES
