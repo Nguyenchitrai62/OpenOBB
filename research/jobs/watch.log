@@ -239,3 +239,15 @@
 [2026-10-07 23:11:04] watch: balance=313.21 rate=8.9/h active=['e2-h4-dense-s', 'e5-rfs-ctx-s', 'e5-rfs-dense-s', 'e5-yolo26x-dota-24e'] ended=[('e2-h4-dense-s', 'failed_vm')]
 [2026-10-07 23:13:00] queue: ['e6-vrdet-x-dota-24e']
 [2026-10-07 23:13:07] queue: e6-vrdet-x-dota-24e waits (3 live sessions, cap 3)
+[2026-10-07 23:16:25] watch: balance=311.92 rate=26.7/h active=['e5-rfs-ctx-s', 'e5-rfs-dense-s', 'e5-yolo26x-dota-24e'] ended=[]
+[2026-10-07 23:24:28] queue: e6-vrdet-x-dota-24e waits (3 live sessions, cap 3)
+[2026-10-07 23:28:03] queue: ['e6-vrdet-x-dota-24e', 'e7-fpc-vec-s-24e']
+[2026-10-07 23:31:01] watch: balance=307.48 rate=26.7/h active=['e5-rfs-ctx-s', 'e5-rfs-dense-s', 'e5-yolo26x-dota-24e'] ended=[]
+[2026-10-07 23:34:05] queue: e6-vrdet-x-dota-24e waits (3 live sessions, cap 3)
+[2026-10-07 23:40:28] watch: balance=303.05 rate=26.7/h active=['e5-rfs-ctx-s', 'e5-rfs-dense-s', 'e5-yolo26x-dota-24e'] ended=[]
+[2026-10-07 23:48:32] queue: e6-vrdet-x-dota-24e waits (3 live sessions, cap 3)
+[2026-10-07 23:54:53] watch: balance=296.36 rate=26.7/h active=['e5-rfs-ctx-s', 'e5-rfs-dense-s', 'e5-yolo26x-dota-24e'] ended=[]
+[2026-10-08 00:02:56] queue: e6-vrdet-x-dota-24e waits (3 live sessions, cap 3)
+[2026-10-08 00:09:17] watch: balance=289.69 rate=26.7/h active=['e5-rfs-ctx-s', 'e5-rfs-dense-s', 'e5-yolo26x-dota-24e'] ended=[]
+[2026-10-08 00:17:19] queue: e6-vrdet-x-dota-24e waits (3 live sessions, cap 3)
+[2026-10-08 00:18:59] e5-rfs-ctx-s: finished with status done; stopping VM

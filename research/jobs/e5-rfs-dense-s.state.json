@@ -5,21 +5,29 @@
   "out": "/content/work/runs/e5-rfs-dense-s",
   "status": "running",
   "launched": 1791389093.30707,
-  "updated": "2026-10-07 23:09:27",
+  "updated": "2026-10-08 00:05:53",
   "fails": 0,
   "synced": {
     "train_progress.log": [
-      449,
-      1791389294
+      60201,
+      1791392665
     ],
     "setup.log": [
       1372,
       1791389132
     ],
     "train.log": [
-      59127,
-      1791389294
+      119226,
+      1791392665
+    ],
+    "metrics.jsonl": [
+      4598,
+      1791392466
+    ],
+    "last.pt": [
+      170880357,
+      1791392466
     ]
   },
-  "tail": "ownloading: \"https://github.com/Peterande/storage/releases/download/dfinev1.0/dfine_s_coco.pth\" to /root/.cache/torch/hub/checkpoints/dfine_s_coco.pth\n[16:08:04] [init] D-FINE COCO: 770 full, 22 partial, 156 new tensors\n[16:08:05] RFS repeat factors: plane=1.0 baseba=2.1 bridge=1.0 ground=2.0 small-=1.0 large-=1.0 ship=1.0 tennis=1.5 basket=2.3 storag=1.6 soccer=2.1 rounda=1.7 harbor=1.0 swimmi=1.7 helico=3.7\n[16:08:14] torch.compile enabled for backbone + encoder (training model only)\n[16:08:14] VRDet-s 10.60M params | train patches 15749 | 984 it/epoch x 24 | batch 16 | device cuda amp=True\n"
+  "tail": "r 8.87e-05 | 72.2 img/s data 0.001s crit 0.075s/it\n[17:04:03] ep 14 it 800/984 loss 17.051 mal=0.698 bbox=0.138 kld=0.289 fgl=1.210 dense_cls=0.133 dense_box=0.039 dense_angle=0.012 lr 8.83e-05 | 72.3 img/s data 0.001s crit 0.075s/it\n[17:04:14] ep 14 it 850/984 loss 17.195 mal=0.692 bbox=0.175 kld=0.299 fgl=1.164 dense_cls=0.111 dense_box=0.050 dense_angle=0.016 lr 8.79e-05 | 72.3 img/s data 0.001s crit 0.075s/it\n[17:04:25] ep 14 it 900/984 loss 18.691 mal=0.692 bbox=0.248 kld=0.440 fgl=1.126 dense_cls=0.151 dense_box=0.041 dense_angle=0.030 lr 8.75e-05 | 72.4 img/s data 0.001s crit 0.075s/it\n"
 }

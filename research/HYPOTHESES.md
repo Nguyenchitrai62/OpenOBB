@@ -99,6 +99,11 @@ Nhiễu giữa các run trên DOTA val khoảng ±0.3–0.5. Δ < 0.5 coi là ch
 | `e5-rfs-ctx-s` | `--rfs 0.1 --context --ctx-dropout 0.3` | Có RFS bảo vệ class hiếm, ngữ cảnh toàn ảnh sẽ cộng thêm phần ngữ nghĩa (SBF/RA/GTF/BD/BC/SP +2..5) mà không làm hỏng HC | ≥ RFS + 0.5 |
 | `e5-rfs-dense-s` | `--rfs 0.1 --dense` | Head dense O2M (kiểu YOLO) cho encoder thêm tín hiệu dương, tăng recall object nhỏ/dày | ≥ RFS + 0.5 (decoder hoặc fusion) |
 
+**Kết quả `e5-rfs-ctx-s`: 68.47 (−3.88 so với RFS), mAP50:95 44.22 (−3.96).**
+- HC −26.7, RA −9.3, HA −7.9, BR −5.8, SBF −5.7. Chỉ SV +2.9, BC +2.8.
+- **H6 (ngữ cảnh thumbnail) BÁC BỎ**: hai lần đều âm, ctx-dropout không cứu được HC. Không đưa vào bản X.
+- Suy luận toàn bản vẽ cho CAD chuyển sang nhánh vector (H7).
+
 `e2-h4-dense-s` (không RFS, A100) mất VM 4 lần, dừng ở epoch 15. Sub-eval (100 ảnh) so với E1b: e6 63.3 vs 61.2, e12 65.6 vs 65.2. Lợi ích nhỏ, trong khi train chậm ×3 (criterion 0.19 s/it so với 0.06). Thay bằng `e5-rfs-dense-s` trên G4.
 
 ## E6: so cùng cỡ lớn nhất (VRDet-X vs YOLO26x, 24 epoch, cùng điều kiện)

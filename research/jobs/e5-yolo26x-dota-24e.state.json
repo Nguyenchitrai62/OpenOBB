@@ -5,21 +5,33 @@
   "out": "/content/work/runs/e5-yolo26x-dota-24e",
   "status": "running",
   "launched": 1791389382.0410268,
-  "updated": "2026-10-07 23:11:04",
+  "updated": "2026-10-08 00:09:17",
   "fails": 0,
   "synced": {
     "setup.log": [
-      2675,
-      1791384885
+      8025,
+      1791389459
     ],
     "train/args.yaml": [
       1723,
-      1791385043
+      1791389616
     ],
     "train.log": [
-      63560,
-      1791385049
+      1891465,
+      1791392757
+    ],
+    "metrics.jsonl": [
+      5375,
+      1791392600
+    ],
+    "train/weights/last.pt": [
+      502699809,
+      1791392600
+    ],
+    "train/results.csv": [
+      1619,
+      1791392599
     ]
   },
-  "tail": "ing https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26n.pt to 'weights/yolo26n.pt': 100% \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501 5.3MB 80.4MB/s 0.1s\n\u001b[34m\u001b[1mAMP: \u001b[0mchecks passed \u2705\n\u001b[34m\u001b[1mtrain: \u001b[0mFast image access \u2705 (ping: 0.0\u00b10.0 ms, read: 7025.1\u00b14853.7 MB/s, size: 264.5 KB)\n\n\u001b[K\u001b[34m\u001b[1mtrain: \u001b[0mScanning /content/datasets/dota1_1024/labels/train... 393 images, 80 backgrounds, 0 corrupt: 2% \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 393/15749 1.2Kit/s 0.1s<13.1s\n\u001b[K\u001b[34m\u001b[1mtrain: \u001b[0mScanning /content/datasets/dota1_1024/labels/train... 761 images, 108 backgrounds, 0 corrupt: 4% \u2578\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 761/15749 1.9Kit/s 0.2s<7.8s"
+  "tail": "4       1024: 53% \u2501\u2501\u2501\u2501\u2501\u2501\u2500\u2500\u2500\u2500\u2500\u2500 530/985 3.4it/s 2:36<2:14\n\u001b[K      11/24      49.6G     0.8278     0.6067    0.01532    0.01961        152       1024: 53% \u2501\u2501\u2501\u2501\u2501\u2501\u2500\u2500\u2500\u2500\u2500\u2500 531/985 3.4it/s 2:36<2:13\n\u001b[K      11/24      49.6G      0.828      0.607    0.01531    0.01961         75       1024: 54% \u2501\u2501\u2501\u2501\u2501\u2501\u2500\u2500\u2500\u2500\u2500\u2500 532/985 3.4it/s 2:36<2:11\n\u001b[K      11/24      49.6G     0.8285     0.6082    0.01531    0.01961        172       1024: 54% \u2501\u2501\u2501\u2501\u2501\u2501\u2500\u2500\u2500\u2500\u2500\u2500 533/985 3.4it/s 2:37<2:11\n\u001b[K      11/24      49.6G     0.8283     0.6081    0.01532    0.01959        215       1024: 54% \u2501\u2501\u2501\u2501\u2501\u2501\u2578\u2500\u2500\u2500\u2500\u2500 534/985 3.5it/s 2:37<2:11"
 }

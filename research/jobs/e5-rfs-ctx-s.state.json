@@ -3,31 +3,47 @@
   "started": "2026-10-07 22:06:19",
   "session": "e5-rfs-ctx-s-3",
   "out": "/content/work/runs/e5-rfs-ctx-s",
-  "status": "running",
+  "status": "done",
   "launched": 1791389161.551145,
-  "updated": "2026-10-07 23:09:13",
+  "updated": "2026-10-08 00:18:59",
   "fails": 0,
   "synced": {
     "train_progress.log": [
-      26433,
-      1791388286
+      75839,
+      1791392749
     ],
     "setup.log": [
-      1371,
-      1791386280
+      2742,
+      1791389348
     ],
     "train.log": [
-      95977,
-      1791388286
+      205315,
+      1791392749
     ],
     "metrics.jsonl": [
-      1965,
-      1791388119
+      6664,
+      1791392754
     ],
     "last.pt": [
-      174867993,
-      1791388119
+      174868057,
+      1791392713
+    ],
+    "eval_val.json": [
+      3028,
+      1791392749
+    ],
+    "exitcode": [
+      2,
+      1791392759
+    ],
+    "eval_val.txt": [
+      1013,
+      1791392749
+    ],
+    "train_done": [
+      2,
+      1791392754
     ]
   },
-  "tail": "kld=0.372 fgl=1.273 lr 1.00e-04 | 81.6 img/s data 0.001s crit 0.061s/it\n[15:50:57] ep 8 it 700/984 loss 17.711 mal=0.786 bbox=0.122 kld=0.227 fgl=1.310 lr 1.00e-04 | 81.6 img/s data 0.001s crit 0.061s/it\n[15:51:07] ep 8 it 750/984 loss 19.195 mal=0.714 bbox=0.195 kld=0.358 fgl=1.255 lr 1.00e-04 | 81.7 img/s data 0.001s crit 0.061s/it\n[15:51:16] ep 8 it 800/984 loss 19.874 mal=0.795 bbox=0.189 kld=0.366 fgl=1.362 lr 1.00e-04 | 81.8 img/s data 0.001s crit 0.061s/it\n[15:51:26] ep 8 it 850/984 loss 18.546 mal=0.653 bbox=0.235 kld=0.345 fgl=1.262 lr 1.00e-04 | 81.8 img/s data 0.001s crit 0.061s/it\n"
+  "tail": " 94.34\nship                   8861    60271  88.12    55.34  93.47\ntennis-court            739    34075  90.51    84.59  94.86\nbasketball-court        124    29294  68.53    50.70  87.90\nstorage-tank           1869    83568  87.53    58.80  95.18\nsoccer-ball-field        87    31101  62.24    48.64  86.21\nroundabout              164    35739  58.44    35.11  81.10\nharbor                 2065    50067  66.96    30.59  79.61\nswimming-pool           366    26469  57.18    24.48  82.79\nhelicopter               72    14592  26.59    13.44  83.33\nmAP                                   68.46    44.22\n"
 }
