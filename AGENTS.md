@@ -126,6 +126,11 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
 - Dataset public chỉ dùng cho nghiên cứu/benchmark, nên license NC/học thuật (DOTA, FloorPlanCAD) dùng được. Backbone pretrained ImageNet cũng được.
 - Ưu tiên: **độ chính xác trước**, tốc độ sau (kỳ vọng gần YOLO, chậm hơn chút được).
 - → Benchmark chính: **DOTA-v1.0** (giống YOLO-OBB). Chi tiết: [docs/RESEARCH_PLAN.md](docs/RESEARCH_PLAN.md).
+- (bổ sung, cùng ngày) **Agent có toàn quyền chọn kiến trúc. Chưa đạt mục tiêu "kiến trúc mới hơn hẳn các kiến trúc hiện có" thì không dừng.**
+  - Dataset học thuật được dùng thoải mái để pretrain và benchmark; user có dataset chuyên biệt để finetune khi dùng thật.
+  - Thử một hoặc vài dataset trước, khi kiến trúc ổn mới mở rộng.
+  - Tối ưu cả thời gian lẫn CU. Dùng sub-agent để nghiên cứu song song, lấy cảm hứng từ sản phẩm có sẵn.
+  - Được lấy **ý tưởng** từ cả kiến trúc public nhưng cấm thương mại, miễn là tự viết lại toàn bộ (không chép code, không dùng weights NC).
 
 Câu hỏi còn mở:
 - Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.
@@ -137,14 +142,33 @@ Câu hỏi còn mở:
 - [x] Khung tự động [tools/cx.py](tools/cx.py) + [tools/job.py](tools/job.py) ([docs/AUTONOMY.md](docs/AUTONOMY.md)). Đã test đầy đủ trên Colab thật: T4 (`e0-smoke`) và G4 (`e0-smoke-g4`), gồm launch → sync → kill VM → tự tạo VM mới + resume (giữ lịch sử metrics) → done → tự stop VM.
 - [x] Skill `vrdet-research` (`.agents/skills/`, adapter `.claude/skills/`)
 - [x] Bỏ Google Drive (mount cần người bấm Allow mỗi VM). Thay bằng: data tải trực tiếp trên VM, checkpoint đồng bộ về `runs/` local.
-- [ ] **E0 (tiếp theo)**: `colab/data/` script tải DOTA-v1 + DIOR-R trên VM (cắt tile 1024/200), evaluator rotated-mAP chuẩn DOTA trong `vrdet/eval`, baseline YOLO26-OBB (Ultralytics, chỉ để đo) trên G4
-- [ ] E1: DETR-OBB baseline (Apache) tái hiện số công bố
+- [x] **E0 xong:**
+  - `vrdet/eval/dota.py`: evaluator theo đúng protocol devkit (VOC07, bỏ difficult, IoU polygon, ghép patch bằng NMS 0.1), có test.
+  - `colab/data/get_dota.py` + `split_dota.py`: tải DOTA-v1.0 gốc từ HF `Last-Bullet/DOTAv1.0` (pinned), cắt 1024/200 ra khoảng 15.8k patch train, mất khoảng 6 phút trên VM.
+  - `colab/baselines/yolo_obb.py`: baseline Ultralytics, chỉ chạy trên Colab.
+- [x] **Code VRDet v0** (`vrdet/`):
+  - D-FINE-S (Apache) chuyển sang OBB với rotated FDR (4 cạnh + phân phối góc), cost Chamfer + KLD, MAL dùng IoU xoay chính xác, init từ COCO.
+  - Head dense xoay + rotated TAL (H4) bật bằng `--dense`; eval ghép đầu ra theo nhiều kiểu.
+  - Trainer `vrdet/train.py`: EMA, LR flat-cosine, resume.
+  - Test: `pytest -q tests/` (CPU).
+  - **Lưu ý: torch 2.12 CPU trên máy này crash (heap) khi chạy nhiều luồng.** Chạy CPU thì dùng `--threads 1`, hoặc test trên Colab.
+- [ ] **E1 (đang chạy):**
+  - `e1-yolo26s-dota-24e` (G4): baseline cùng điều kiện, khoảng 40 phút.
+  - `e1-vrdet-smoke-t4` (T4): test chức năng VRDet trên dữ liệu giả lập.
+  - Sau đó: `e1-vrdet-s-dota-24e` (G4).
+- [ ] E2: H4 dense hybrid (`--dense`), rồi H1 ProbIoU, H2, H3 (xem `research/HYPOTHESES.md`).
 
 **GPU mặc định: G4** (RTX PRO 6000 Blackwell 94 GB, ~8.9 CU/h; 500 CU ≈ 55 giờ G4).
 
 **Cần user:** (trống)
 
 ## 9. Nhật ký
+
+- 2026-10-07 (4):
+  - Nghiên cứu web bằng 6 sub-agent. **Mốc mới: RiO-DETR** (ECCV 2026, Apache) đạt SS s 80.3 / x 81.8, nhỉnh hơn YOLO26.
+  - Hai model mạnh ở chỗ khác nhau: DETR thắng class lớn cần ngữ cảnh, YOLO thắng vật nhỏ. Lấy max theo class được 82.3, nên chốt hướng **dense–sparse hybrid**.
+  - Đổi license: DEIMv2 đã thành NC; code O2-RTDETR (ai4rs) chép từ RHINO (NC), nên chỉ lấy ý tưởng.
+  - Viết evaluator, script data, VRDet v0, head dense. Launch baseline YOLO26s.
 
 - 2026-10-07 (3): Xây khung tự động không cần người (cx.py, job.py, AUTONOMY.md, skill vrdet-research). Phát hiện: upload CLI rớt với file >~20–80 MB → chia chunk 16 MB + sha256; exec có thể treo khi 2 tiến trình poll cùng lúc → thêm lock + chỉ coi VM chết khi session biến mất hoặc 3 lần lỗi liên tiếp. G4 đo được 195 TFLOPS bf16. 2 lần smoke tiêu ~4 CU.
 

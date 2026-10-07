@@ -1,0 +1,10 @@
+{
+  "id": "e1-vrdet-smoke-t4",
+  "gpu": "T4",
+  "bundle": ["vrdet", "colab", "tests"],
+  "setup": ["pip install -q -U shapely", "python -c \"import torch,scipy,shapely;print(torch.__version__,scipy.__version__,shapely.__version__)\""],
+  "cmd": "python tests/make_synthetic.py /content/synth/raw 256 32 && python colab/data/split_dota.py --src /content/synth/raw --out /content/synth/split --size 384 --gap 64 && VRDET_DEBUG=1 python -u -m vrdet.train --data /content/synth/split --out {out} --size s --img 384 --batch 16 --epochs 30 --warmup 50 --eval-every 10 --eval-images 32 --workers 4 --ema 0.99 --ema-warmups 20 --log-every 8 --no-amp",
+  "sync": ["metrics.jsonl", "*.log", "eval_val.json", "eval_val.txt"],
+  "max_hours": 0.75,
+  "max_retries": 1
+}

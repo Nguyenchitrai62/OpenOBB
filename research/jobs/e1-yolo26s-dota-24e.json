@@ -1,0 +1,14 @@
+{
+  "id": "e1-yolo26s-dota-24e",
+  "gpu": "G4",
+  "bundle": ["vrdet", "colab"],
+  "setup": [
+    "pip install -q -U ultralytics huggingface_hub hf_xet shapely",
+    "python -c \"import os,torch,ultralytics,shapely;print('cpus',os.cpu_count(),'torch',torch.__version__,'cuda',torch.version.cuda,'ultralytics',ultralytics.__version__,'shapely',shapely.__version__)\"",
+    "nvidia-smi --query-gpu=name,memory.total --format=csv; free -g; df -h /content"
+  ],
+  "cmd": "python -u colab/data/get_dota.py --root /content/datasets && python -u colab/baselines/yolo_obb.py --data /content/datasets/dota1_1024 --out {out} --model yolo26s-obb.yaml --weights yolo26s.pt --epochs 24 --imgsz 1024 --batch 32",
+  "sync": ["last.pt", "metrics.jsonl", "*.log", "eval_val.json", "eval_val.txt", "results.csv", "args.yaml", "train_done"],
+  "max_hours": 5,
+  "max_retries": 3
+}

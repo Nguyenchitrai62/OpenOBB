@@ -43,7 +43,29 @@ Real-time DETR-OBB (Apache-2.0), DOTA-v1 test, 72 epoch, 2×2080Ti. Nguồn: [ar
 | O2-DEIM-R18 | 20M | 147G | 233 | 79.49 | multi-scale |
 | O2-DEIM-R50 | 42M | 339G | 119 | 80.15 | multi-scale |
 
-Nhận xét: họ DETR-OBB real-time hiện vẫn **kém YOLO26 khoảng 1.5–2.5 điểm mAP50** ở cùng cỡ. Đây là khoảng trống để kiến trúc mới lấp và vượt.
+Ghi chú license: code O2-RTDETR trong ai4rs giống 82–96% code RHINO (CC BY-NC). VRDet chỉ lấy ý tưởng từ paper, tự viết lại.
+
+**Mốc mới (cập nhật 2026-10-07): RiO-DETR** ([arXiv 2603.09411](https://arxiv.org/abs/2603.09411), ECCV 2026, repo Apache-2.0, chỉ công bố baseline). DOTA-v1.0 test, single-scale (SS), train+val:
+
+| Cỡ | RiO-DETR SS | YOLO26 SS (bảng của RiO) | YOLO26 MS (Ultralytics) | RiO params / FLOPs / T4 FP16 |
+|---|---|---|---|---|
+| n | 78.4 | 77.7 | 78.9 | 4.0M / 17G / 2.7 ms |
+| s | 80.3 | 79.7 | 80.9 | 8.2M / 53G / 5.2 ms |
+| m | 80.9 (MS 81.49) | 80.0 (MS 81.00) | 81.0 | 18.6M / 158G / 8.8 ms |
+| l | 81.7 | 80.2 | 81.6 | 27.5M / 230G / 13.4 ms |
+| x | 81.8 (MS 81.76) | 80.4 (MS 81.70) | 81.7 | 62.5M / 527G / 29.9 ms |
+
+Nhận xét:
+- Khi tinh chỉnh tốt, DETR-OBB đã ngang YOLO26 ở SS. Ở MS khoảng cách gần như bằng 0: +0.49 với m, +0.06 với x.
+- Theo class (x, SS), RiO và YOLO26 mạnh ở những chỗ khác nhau:
+  - RiO thắng các class lớn cần ngữ cảnh: BR +4.6, GTF +5.4, LV +7.3, SBF +4.5, RA +4.5.
+  - YOLO26 thắng vật nhỏ: PL +1.4, HC +3.6, SP +1.1.
+  - Lấy max theo từng class của hai model được **82.3** (RiO-x 81.8, YOLO26x 80.4).
+- Kết luận: kiến trúc lai, gồm **head dense** (mạnh vật nhỏ) và **decoder quan hệ** (mạnh vật lớn/ngữ cảnh), là đòn bẩy rõ nhất để vượt cả hai.
+- Các mốc khác:
+  - Strip R-CNN-S MS 82.28 (license NC, chậm).
+  - Nơi mất điểm là BR, SBF, RA, GTF, HA, HC, chiếm 54–59% phần còn thiếu.
+  - Công thức train đáng giá: xoay ngẫu nhiên +4, multi-scale +2–4.5, ProbIoU hơn KLD 2.1 (PP-YOLOE-R).
 
 ### 2.3 Benchmark phụ
 
@@ -74,30 +96,42 @@ Kiến trúc tự chế, train from scratch, assigner/loss/evaluator tự viết
 
 Tên làm việc: **VRDet**. Lõi là detector OBB raster tổng quát (benchmark được trên DOTA). Nhánh vector là **plug-in** riêng cho CAD.
 
-### 4.1 Khung nền
+### 4.1 Khung nền (đã code, `vrdet/models/`)
 
-Real-time DETR-OBB kiểu D-FINE/DEIM (Apache-2.0):
-- backbone CNN pretrained,
-- hybrid encoder (AIFI + CCFM),
-- decoder ~6 lớp, query selection,
-- box (cx, cy, w, h, θ) refine bằng phân phối,
-- dense O2O matching, NMS-free.
+Dựa trên D-FINE (Apache-2.0), init từ checkpoint **COCO** của D-FINE: chỉ COCO, tránh điều khoản Objects365.
+- Backbone HGNetv2 cộng hybrid encoder (AIFI + CCFM), giữ nguyên D-FINE.
+- Decoder OBB do VRDet tự viết:
+  - **rotated FDR**: 4 phân phối cho cạnh trong hệ trục box, cộng 1 phân phối cho góc dư ±45°;
+  - GT được "căn" về biểu diễn tương đương gần góc tham chiếu nhất, nên không có bài toán biên góc;
+  - deformable sampling xoay theo θ;
+  - positional query không chứa θ (RiO-DETR GDQE: +0.7);
+  - oriented CDN.
+- Matching: focal 2 + Chamfer 5 + KLD 2 (O2: Chamfer là cost tốt nhất).
+- Loss: MAL (DEIM) với target là IoU xoay chính xác, L1 (căn góc) 5 + KLD 2 + FGL 0.15 + DDF 1.5.
 
-Chọn khung này vì nó có **suy luận quan hệ giữa object** (self-attention giữa các query), đúng thứ YOLO thiếu cho dữ liệu ngữ nghĩa cao.
+### 4.2 Lõi đóng góp: dense–sparse hybrid (H4) và các giả thuyết
 
-### 4.2 Giả thuyết đóng góp mới (mỗi cái là một ablation)
+**Head dense xoay** (`vrdet/models/dense_head.py`) gắn lên P3–P5 của encoder:
+- Tower depthwise rẻ, train one-to-many bằng rotated TAL (IoU xoay chính xác, mở rộng ứng viên cho vật tí hon kiểu STAL).
+- Loss: ProbIoU cộng angle penalty cho box gần vuông (YOLO26).
 
-| Mã | Giả thuyết | Lý do / bằng chứng gợi ý | Kiểm chứng |
+Head dense được dùng theo ba cách, đo từ cùng một lần train:
+- (a) chỉ làm giám sát phụ;
+- (b) đầu ra thứ hai, ghép với decoder lúc inference: chỉ decoder / chỉ dense / hợp / định tuyến theo kích thước. Pipeline DOTA vốn đã có NMS khi ghép patch, nên ghép đầu ra không tốn thêm gì;
+- (c) nguồn query cho decoder, kèm lọc trùng (DDQ).
+
+| Mã | Giả thuyết | Bằng chứng / lý do | Đo |
 |---|---|---|---|
-| H1 | **Angle-aware matching & loss bằng phân phối Gaussian** (ProbIoU/KLD trong cả cost Hungarian lẫn loss) | tránh discontinuity của góc ở biên 0/90/180°; YOLO-OBB đã dùng ProbIoU cho loss | Δ mAP50-95 trên DOTA val, đặc biệt class dài (bridge, harbor) |
-| H2 | **Oriented deformable attention**: điểm sampling của decoder xoay theo θ dự đoán và co giãn theo (w, h) | deformable attention gốc lấy mẫu theo hộp thẳng, lệch với object xoay mảnh | Δ trên HRSC2016 và DOTA class dài |
-| H3 | **Strip / large-kernel trong backbone hoặc encoder** cho object dài mảnh | object dài (bridge, ship, wall, pipe line trong CAD) cần receptive field dị hướng | Δ trên HRSC + class dài; đo chi phí FPS |
-| H4 | **Dense proposal head kiểu YOLO + relation decoder**: head dense một-nhiều vừa làm giám sát phụ vừa sinh proposal cho decoder | ảnh dày (DOTA 100+ object/tile, CAD 150–400) làm DETR thiếu recall; Co-DETR/DEIM cho thấy giám sát dense giúp hội tụ | recall@1000 + mAP; số query cần thiết |
-| H5 | **Geometric relation bias** trong self-attention của query (vị trí tương đối, góc tương đối, khoảng cách theo cạnh) | quan hệ "cửa nằm trên tường", "xe xếp hàng trong bãi" là hình học tương đối | Δ mAP ở class phụ thuộc ngữ cảnh |
-| H6 | **Global context token xuyên tile**: thumbnail cả ảnh → vài token toàn cục, đưa vào mỗi tile | cắt tile 1024 làm mất ngữ cảnh toàn ảnh (DOTA 4000 px; bản vẽ CAD cả sheet có legend/title block) | Δ mAP trên ảnh lớn; chi phí FPS nhỏ |
-| H7 | **Plug-in vector cho CAD**: primitive tokens từ PDF (nét, layer, text) cross-attend vào feature raster | AI_Takeoff: FP và TP giống hệt trên ảnh, chỉ phân biệt được qua layer/text/topology | FloorPlanCAD + data nội bộ |
+| H4 | Dense one-to-many cộng decoder quan hệ thắng cả hai đơn lẻ | Max theo class của RiO-x và YOLO26x = 82.3 (xem §2.2) | mAP50 val; per-class PL/SV/SP/HC vs BR/GTF/SBF/RA |
+| H1 | ProbIoU thay KLD (cost và loss) | PP-YOLOE-R: 78.14 vs 76.03 | mAP50, mAP50-95 |
+| H2 | Sampling trực giao (nửa số head xoay θ, nửa xoay θ+90°, RROA) | RiO: +0.56 DIOR-R | mAP50 |
+| H3 | Strip / large-kernel depthwise trong CCFM cho BR, GTF, SBF, RA, HA | LSKNet/Strip R-CNN: BR +1.6–2.9, SBF +3 | per-class, FPS |
+| H5 | Bias quan hệ hình học trong self-attention của query | quan hệ tương đối (xe xếp hàng, cửa trên tường) | class ngữ cảnh |
+| H6 | Token ngữ cảnh toàn ảnh xuyên tile | tile 1024 cắt mất ngữ cảnh (ảnh DOTA 4000 px) | ảnh lớn |
+| H7 | Plug-in vector cho CAD | AI_Takeoff: FP và TP giống hệt nhau trên ảnh | FloorPlanCAD + data nội bộ |
+| H8 | Công thức train: xoay ngẫu nhiên, mosaic có rot90 mỗi ô (oriented dense O2O), multi-scale | xoay +4.0; RiO dense O2O +0.27; MS +2–4.5 | chỉ khi gộp cuối |
 
-Thứ tự ưu tiên ban đầu: H1 → H4 → H2 → H3 → H5 → H6 (lõi raster, benchmark DOTA) rồi mới H7 (domain CAD).
+Thứ tự: E1 baseline → H4 → H1 → H2/H3 → H8 khi gộp cuối → H5/H6 → H7.
 
 ### 4.3 Họ model
 
@@ -107,15 +141,17 @@ Theo YOLO, kiến trúc phải scale được thành n/s/m/l/x bằng depth/widt
 
 | Bước | Nội dung | Tiêu chí qua | Ước tính GPU |
 |---|---|---|---|
-| E0 | Hạ tầng: Colab CLI, data DOTA/DIOR-R trên Drive, evaluator DOTA, checkpoint + resume | eval GT=pred cho mAP=1.0; resume đúng sau khi kill | nhỏ |
-| E1 | Baseline: YOLO26s-obb (Ultralytics, chỉ đo) + DETR-OBB baseline (code Apache) trên DIOR-R/DOTA val, schedule ngắn | DETR-OBB tái hiện số công bố ±1 điểm | trung bình |
+| E0 | Hạ tầng: Colab CLI, data DOTA tải trực tiếp trên VM, evaluator DOTA, checkpoint + resume | eval GT=pred cho mAP=1.0; resume đúng sau khi kill (**xong**) | nhỏ |
+| E1 | Baseline 24 epoch SS train→val: YOLO26s-obb (chỉ đo) + VRDet-S (D-FINE OBB) | VRDet-S ≥ YOLO26s − 2 | ~6 + ~10 CU |
 | E2 | Ablation H1, H4 (cỡ s, schedule ngắn) | mỗi H: Δ ≥ +0.5 mAP50 hoặc bỏ | trung bình |
 | E3 | Ablation H2, H3, H5, H6 | như trên, kèm FPS | trung bình |
 | E4 | Gộp các H đã qua, train đủ schedule trên DOTA train+val, nộp test server | ≥ YOLO26 cùng cỡ | lớn |
 | E5 | Scale n→x, đo TensorRT FP16 | bảng benchmark đầy đủ | lớn |
 | E6 | Plug-in vector (H7) trên FloorPlanCAD/data nội bộ | Δ rõ ở class ngữ nghĩa | trung bình |
 
-Ngân sách: Colab Pro+, ~500 compute units (2026-10-07). Đo tốc độ tiêu CU thực tế bằng `colab usage` trong E0 rồi chia ngân sách cho từng bước. Chạy ablation ngắn trên L4 hoặc A100, chỉ dùng A100/H100 cho E4/E5.
+Ngân sách: Colab Pro+, ~500 compute units (2026-10-07). G4 ≈ 8.9 CU/h. YOLO26s 24 epoch trên G4 mất khoảng 35 phút (185 ảnh/s, 42 GB). Các ablation đều chạy schedule ngắn này; chỉ cấu hình thắng mới được train dài và multi-scale.
+
+**Vì sao vẫn tự chạy một baseline YOLO dù đã có số công bố:** số công bố dùng test server, train+val, MS và 100+ epoch. Ablation của ta dùng val, 24 epoch, SS. Cần một mốc cùng điều kiện để biết mỗi thay đổi kiến trúc thắng hay thua, và để kiểm chứng pipeline (split, evaluator). Claim cuối cùng sẽ so với số công bố bằng cách nộp test server.
 
 ## 6. Tài liệu tham khảo chính
 

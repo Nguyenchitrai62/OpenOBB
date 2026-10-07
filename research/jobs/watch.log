@@ -30,3 +30,10 @@
 [2026-10-07 15:49:22] watch: balance=499.4 rate=14.2/h active=['e0-smoke-g4'] ended=[]
 [2026-10-07 15:50:47] e0-smoke-g4: finished with status done; stopping VM
 [2026-10-07 15:50:50] watch: balance=498.46 rate=14.2/h active=['e0-smoke-g4'] ended=[('e0-smoke-g4', 'done')]
+[2026-10-07 16:38:27] e1-yolo26s-dota-24e: launching attempt 1 on G4 as session e1-yolo26s-dota-24e-1
+[2026-10-07 16:39:20] e1-yolo26s-dota-24e: running
+[2026-10-07 16:39:54] watch: balance=491.85 rate=19.5/h active=['e1-yolo26s-dota-24e'] ended=[]
+[2026-10-07 16:50:29] watch: balance=490.36 rate=14.2/h active=['e1-yolo26s-dota-24e'] ended=[]
+[2026-10-07 16:55:01] e1-vrdet-smoke-t4: launching attempt 1 on T4 as session e1-vrdet-smoke-t4-1
+[2026-10-07 16:55:39] e1-vrdet-smoke-t4: running
+[2026-10-07 16:58:23] e1-vrdet-smoke-t4: status failed #1 (session listed=True): Command '['C:\\Users\\HP\\.local\\bin\\colab.EXE', 'exec', '-s', 'e1-vrdet-smoke-t4-1']' timed out after 150 seconds

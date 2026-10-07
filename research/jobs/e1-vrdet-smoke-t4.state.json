@@ -1,0 +1,10 @@
+{
+  "attempts": 1,
+  "started": "2026-10-07 16:55:01",
+  "session": "e1-vrdet-smoke-t4-1",
+  "out": "/content/work/runs/e1-vrdet-smoke-t4",
+  "status": "running",
+  "launched": 1791366906.8811078,
+  "updated": "2026-10-07 16:58:23",
+  "fails": 1
+}
