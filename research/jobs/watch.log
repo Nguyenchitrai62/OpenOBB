@@ -106,3 +106,12 @@
 [2026-10-07 19:23:47] watch: balance=419.05 rate=37.3/h active=['e1-vrdet-s-seed1', 'e2-h3-strip-s', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e2-h6-ctx-s'] ended=[]
 [2026-10-07 19:34:42] watch: balance=412.84 rate=37.3/h active=['e1-vrdet-s-seed1', 'e2-h3-strip-s', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e2-h6-ctx-s'] ended=[]
 [2026-10-07 19:42:07] queue: ['e3-ctx-fix-s', 'e3-rfs-s']
+[2026-10-07 19:42:44] e3-ctx-fix-s: launching attempt 1 on G4 as session e3-ctx-fix-s-1
+[2026-10-07 19:42:47] queue: e3-ctx-fix-s waits (no VM available)
+[2026-10-07 19:45:44] watch: balance=406.57 rate=37.3/h active=['e1-vrdet-s-seed1', 'e2-h3-strip-s', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e2-h6-ctx-s'] ended=[]
+[2026-10-07 19:53:46] e3-ctx-fix-s: launching attempt 1 on G4 as session e3-ctx-fix-s-1
+[2026-10-07 19:53:50] queue: e3-ctx-fix-s waits (no VM available)
+[2026-10-07 19:55:09] e2-h3-strip-s: finished with status done; stopping VM
+[2026-10-07 19:57:18] e2-h6-ctx-s: finished with status done; stopping VM
+[2026-10-07 19:57:22] watch: balance=400.4 rate=37.3/h active=['e1-vrdet-s-seed1', 'e2-h3-strip-s', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e2-h6-ctx-s'] ended=[('e2-h3-strip-s', 'done'), ('e2-h6-ctx-s', 'done')]
+[2026-10-07 19:57:47] e3-ctx-fix-s: launching attempt 1 on G4 as session e3-ctx-fix-s-1

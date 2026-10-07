@@ -71,6 +71,11 @@ Nhiễu giữa các run trên DOTA val khoảng ±0.3–0.5. Δ < 0.5 coi là ch
 - H6 thấp hơn đều. Đã tìm ra lỗi thiết kế: thumbnail đi qua backbone dùng chung ở chế độ train, làm hỏng running stats của BN mà tile dùng khi eval. Sửa bằng cách cho thumbnail đi qua với BN eval, no_grad, rồi kiểm lại ở E3.
 - Tốc độ: `--channels-last --compile` cho 86.4 ảnh/s so với 60.3 (×1.43). Các run từ E3 trở đi đều bật.
 
+**Kết quả cuối E2 (full val, so với E1b 69.89):**
+- **H3 strip: 69.76 (−0.13), mAP50:95 +0.49. Chưa kết luận** (ngang nhiễu). SBF +3.9, BD +1.7, LV +1.2; HC −6.1, BC −2.5, GTF −2.4.
+- **H6 ngữ cảnh (bản lỗi BN): 67.96 (−1.93). Bác bỏ bản này.** HC −20.7, BC −6.6, GTF −5.5; SBF +6.7, RA +1.6. Đã sửa, đo lại ở E3.
+- Nhận xét phương pháp: class hiếm (HC 72, SBF 87, BC 124, GTF 131 GT) dao động ±5–20 điểm giữa các run, chiếm phần lớn nhiễu của mAP50. Cần seed replicate, và nên xem thêm mAP trên các class ≥ 200 GT.
+
 ## E3 (bật speed opts; so với trung bình E1b và seed1)
 
 | Job | Biến | Giả thuyết | Pass |
