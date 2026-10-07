@@ -149,6 +149,11 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
 
 - (bổ sung 23:20) User giao toàn quyền nghiên cứu, kể cả chọn G4 hay A100. Điều user quan tâm: một kiến trúc mới thông minh và nhanh, user sở hữu, finetune được trên data riêng tự gắn nhãn, đem đi thương mại. **Train phải tiết kiệm và tối ưu CU.**
 
+- (bổ sung 23:35) **Tập trung kiến trúc trước; finetune bằng dataset riêng để sau.** Nghiên cứu tiếp cho tới khi Colab còn
+  khoảng **120 CU**. Từ đó không mở session train mới, chỉ chạy nốt job đang dở. Sau đó **tạm chốt kiến trúc tốt nhất và dừng**
+  để sáng 2026-10-08 user kiểm tra, đánh giá rồi mới làm tiếp. Đã cài vào watcher: `JOB_NEW_RESERVE=120`, job trong hàng đợi
+  chỉ chạy nếu số dư trừ `est_cu` của job vẫn ≥ 120.
+
 Câu hỏi còn mở:
 - Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.
 

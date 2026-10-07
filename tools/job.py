@@ -263,6 +263,9 @@ def enqueue(jids):
 
 
 MAX_SESSIONS = int(os.environ.get("JOB_MAX_SESSIONS", "3"))
+# User 2026-10-07 23:35: keep ~120 CU for the morning review. A queued job starts only if balance - its estimated
+# cost (spec "est_cu") stays >= NEW_RESERVE; jobs already running still resume and finish (RESERVE_CU applies).
+NEW_RESERVE = float(os.environ.get("JOB_NEW_RESERVE", "120"))
 
 
 def drain_queue():
@@ -273,6 +276,11 @@ def drain_queue():
         n = cx.n_sessions()
         if n is None or n >= MAX_SESSIONS:
             log(f"queue: {jid} waits ({n} live sessions, cap {MAX_SESSIONS})")
+            return
+        bal, _ = cx.balance()
+        est = float(spec(jid).get("est_cu", 15))
+        if bal is None or bal - est < NEW_RESERVE:
+            log(f"queue: {jid} held: balance {bal} - est {est:.0f} CU < new-job reserve {NEW_RESERVE:.0f}")
             return
         try:
             launch(jid)
