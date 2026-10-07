@@ -18,7 +18,7 @@ Conventions the training code MUST follow:
 CLI:
   python tools/job.py launch <id>   # start (or restart) the job on a fresh VM
   python tools/job.py poll <id>     # one babysit step: sync, detect end/death
-  python tools/job.py watch [ids]   # loop poll over active jobs; exits when one ends
+  python tools/job.py watch [ids]   # loop poll over active jobs; exits when one ends (WATCH_UNTIL=all: keep going, drain the queue)
   python tools/job.py stop <id>     # final sync + release the VM
   python tools/job.py queue <id>... # launch later, as soon as Colab grants a VM (watch retries every poll)
   python tools/job.py status
@@ -274,9 +274,12 @@ def watch(ids=None, max_hours=8):
     while True:
         drain_queue()
         ids_now = ids or active()
-        if not ids_now:
+        if not ids_now and not queued():
             log("watch: no active jobs")
             return
+        if not ids_now:
+            time.sleep(POLL_MIN * 60)
+            continue
         bal, rate = cx.balance()
         if bal is not None and bal < RESERVE_CU:
             log(f"watch: balance {bal} < reserve {RESERVE_CU}; stopping all jobs")
@@ -293,7 +296,8 @@ def watch(ids=None, max_hours=8):
             if s != "running":
                 ended.append((j, s))
         log(f"watch: balance={bal} rate={rate}/h active={ids_now} ended={ended}")
-        if ended or time.time() - t0 > max_hours * 3600:
+        until_all = __import__("os").environ.get("WATCH_UNTIL") == "all"   # agents with log monitors
+        if (ended and not until_all) or time.time() - t0 > max_hours * 3600:
             return
         time.sleep(POLL_MIN * 60)
 

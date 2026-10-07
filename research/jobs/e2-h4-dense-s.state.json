@@ -5,37 +5,37 @@
   "out": "/content/work/runs/e2-h4-dense-s",
   "status": "running",
   "launched": 1791382053.4458053,
-  "updated": "2026-10-07 21:10:14",
+  "updated": "2026-10-07 21:18:18",
   "fails": 0,
   "synced": {
     "profile_base/train_progress.log": [
-      14056,
-      1791371848
+      21273,
+      1791382656
     ],
     "setup.log": [
-      1162,
-      1791371336
+      2322,
+      1791382210
     ],
     "train.log": [
-      157717,
-      1791379904
+      236172,
+      1791382656
     ],
     "train_progress.log": [
-      51503,
-      1791379904
+      51686,
+      1791382188
     ],
     "profile_dense/train_progress.log": [
       14108,
-      1791372184
+      1791382199
     ],
     "metrics.jsonl": [
       3931,
-      1791379421
+      1791382172
     ],
     "last.pt": [
       170879973,
-      1791379386
+      1791382165
     ]
   },
-  "tail": "r 9.93e-05 | 26.5 img/s data 0.003s crit 0.191s/it\n[13:30:44] ep 12 it 700/984 loss 18.992 mal=0.776 bbox=0.164 kld=0.407 fgl=1.212 dense_cls=0.213 dense_box=0.072 dense_angle=0.012 lr 9.92e-05 | 26.5 img/s data 0.003s crit 0.191s/it\n[13:31:14] ep 12 it 750/984 loss 17.672 mal=0.666 bbox=0.155 kld=0.247 fgl=1.393 dense_cls=0.106 dense_box=0.040 dense_angle=0.017 lr 9.91e-05 | 26.5 img/s data 0.002s crit 0.191s/it\n[13:31:44] ep 12 it 800/984 loss 17.355 mal=0.616 bbox=0.133 kld=0.252 fgl=1.230 dense_cls=0.132 dense_box=0.064 dense_angle=0.009 lr 9.90e-05 | 26.5 img/s data 0.002s crit 0.191s/it\n"
+  "tail": "mm         1.01%     119.494ms         1.38%     163.494ms      57.166us      97.106ms         1.45%      97.106ms      33.953us          2860  \nvoid at::native::unrolled_elementwise_kernel<at::nat...         0.00%       0.000us         0.00%       0.000us       0.000us      86.465ms         1.29%      86.465ms      60.891us          1420  \n-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  \nSelf CPU time total: 11.823s\nSelf CUDA time total: 6.719s\n\n"
 }
