@@ -1,0 +1,33 @@
+{
+  "attempts": 2,
+  "started": "2026-10-07 15:29:38",
+  "session": "e0-smoke-2",
+  "out": "/content/work/runs/e0-smoke",
+  "status": "done",
+  "launched": 1791362066.1239295,
+  "updated": "2026-10-07 15:40:52",
+  "fails": 0,
+  "synced": {
+    "setup.log": [
+      66,
+      1791362121
+    ],
+    "train.log": [
+      73,
+      1791362367
+    ],
+    "metrics.jsonl": [
+      212,
+      1791362367
+    ],
+    "last.pt": [
+      41944532,
+      1791362367
+    ],
+    "exitcode": [
+      2,
+      1791362368
+    ]
+  },
+  "tail": "resumed from epoch 2\nepoch 2 done\nepoch 3 done\nepoch 4 done\nepoch 5 done\n"
+}

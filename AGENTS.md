@@ -1,6 +1,8 @@
 # AGENTS.md: Nghiên cứu kiến trúc OBB mới cho bản vẽ CAD (vector PDF)
 
 > File bàn giao cho mọi coding agent (Claude Code, Codex, Cursor, Antigravity...).
+>
+> **Tiếp tục nghiên cứu:** gọi skill **`vrdet-research`**. Claude Code: `/vrdet-research`. Codex: `$vrdet-research`. Agent khác: "đọc và làm theo `.agents/skills/vrdet-research/SKILL.md`". Skill tự đọc trạng thái, tự quyết thí nghiệm tiếp theo, tự chạy trên Colab và tự ghi lại kết quả.
 > **Đọc hết file này trước khi làm gì.** Cập nhật mục "Trạng thái hiện tại" và "Nhật ký" mỗi khi xong một bước, để agent sau làm tiếp được.
 
 ## 1. Mục tiêu
@@ -131,14 +133,20 @@ Câu hỏi còn mở:
 ## 8. Trạng thái hiện tại
 
 - [x] Khảo sát vòng cũ + AI_Takeoff + 2 repo tham khảo
-- [x] Cài + vá Colab CLI cho Windows ([docs/COLAB.md](docs/COLAB.md)), user đã đăng nhập (`nam@pose3d.ai`)
-- [x] Smoke test Colab: tạo T4, exec, upload/download OK
-- [x] AGENTS.md, docs/RESEARCH_PLAN.md, docs/COLAB.md, git
-- [ ] Mount Google Drive trên VM (đang chờ user cấp quyền)
-- [ ] **E0**: data DOTA-v1 + DIOR-R lên Drive, evaluator DOTA, khung train có resume
-- [ ] E1: baseline YOLO26-OBB (đo) + DETR-OBB baseline
+- [x] Colab CLI trên Windows (2 bản vá, [docs/COLAB.md](docs/COLAB.md)), user đã đăng nhập (`nam@pose3d.ai`)
+- [x] Khung tự động [tools/cx.py](tools/cx.py) + [tools/job.py](tools/job.py) ([docs/AUTONOMY.md](docs/AUTONOMY.md)). Đã test đầy đủ trên Colab thật: T4 (`e0-smoke`) và G4 (`e0-smoke-g4`), gồm launch → sync → kill VM → tự tạo VM mới + resume (giữ lịch sử metrics) → done → tự stop VM.
+- [x] Skill `vrdet-research` (`.agents/skills/`, adapter `.claude/skills/`)
+- [x] Bỏ Google Drive (mount cần người bấm Allow mỗi VM). Thay bằng: data tải trực tiếp trên VM, checkpoint đồng bộ về `runs/` local.
+- [ ] **E0 (tiếp theo)**: `colab/data/` script tải DOTA-v1 + DIOR-R trên VM (cắt tile 1024/200), evaluator rotated-mAP chuẩn DOTA trong `vrdet/eval`, baseline YOLO26-OBB (Ultralytics, chỉ để đo) trên G4
+- [ ] E1: DETR-OBB baseline (Apache) tái hiện số công bố
+
+**GPU mặc định: G4** (RTX PRO 6000 Blackwell 94 GB, ~8.9 CU/h; 500 CU ≈ 55 giờ G4).
+
+**Cần user:** (trống)
 
 ## 9. Nhật ký
+
+- 2026-10-07 (3): Xây khung tự động không cần người (cx.py, job.py, AUTONOMY.md, skill vrdet-research). Phát hiện: upload CLI rớt với file >~20–80 MB → chia chunk 16 MB + sha256; exec có thể treo khi 2 tiến trình poll cùng lúc → thêm lock + chỉ coi VM chết khi session biến mất hoặc 3 lần lỗi liên tiếp. G4 đo được 195 TFLOPS bf16. 2 lần smoke tiêu ~4 CU.
 
 - 2026-10-07 (2): User chốt: Pro+ 500 CU, mục tiêu = kiến trúc OBB tổng quát benchmark trên DOTA như YOLO, accuracy trước. Viết RESEARCH_PLAN + COLAB. Colab CLI chạy được trên Windows sau 2 bản vá. Mốc phải vượt: YOLO26-OBB (x: 81.7 mAP50 DOTA test); DETR-OBB Apache tốt nhất đang biết: O2-DEIM-R50 80.15.
 

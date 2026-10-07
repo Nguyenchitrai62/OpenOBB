@@ -44,7 +44,7 @@ Token lưu ở `~/.config/colab-cli/token.json` (có refresh token, tự gia h�
 ## 4. Lệnh hay dùng
 
 ```bash
-colab new -s <name> --gpu T4|L4|A100|H100 [--high-mem]   # luôn đặt -s
+colab new -s <name> --gpu T4|L4|G4|A100|H100 [--high-mem]   # luôn đặt -s
 colab exec -s <name> -f script.py            # gửi file local lên chạy, không cần upload
 echo "print(1)" | colab exec -s <name>       # chạy đoạn code ngắn
 colab upload -s <name> LOCAL /content/x      # dùng path tuyệt đối /content/...
@@ -73,9 +73,11 @@ Ghi chú:
 
 Đo thực tế bằng `colab usage` (CU/giờ của các máy đang chạy). Ngày 2026-10-07, khi đang có 1 A100 chạy (session của user, không phải của agent), usage rate là 5.30 CU/h. Cập nhật bảng dưới khi đo được thêm:
 
-| GPU | CU/giờ (đo) | Dùng cho |
+| GPU | CU/giờ (đo 2026-10-07) | Dùng cho |
 |---|---|---|
-| T4 | ? | smoke test |
-| L4 | ? | ablation ngắn |
-| A100 | ~5.3 (cần xác nhận) | train chính |
-| H100 | ? | train cuối/benchmark |
+| T4 | ~1.1 (6.37 − 5.30) | smoke test rẻ |
+| **G4** = RTX PRO 6000 Blackwell, 94 GB, ~195 TFLOPS bf16 (đo) | **~8.9** (14.20 − 5.30) | **GPU mặc định cho nghiên cứu** (user chọn) |
+| A100 | ~5.3 | dự phòng khi G4 hết chỗ |
+| H100 | ? | chưa đo |
+
+500 CU ≈ **~55 giờ G4**. Hãy ước lượng CU trước mỗi job (giờ × 8.9) và ghi vào `decisions.log`.

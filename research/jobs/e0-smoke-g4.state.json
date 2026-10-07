@@ -1,0 +1,33 @@
+{
+  "attempts": 2,
+  "started": "2026-10-07 15:41:25",
+  "session": "e0-smoke-g4-2",
+  "out": "/content/work/runs/e0-smoke-g4",
+  "status": "done",
+  "launched": 1791362784.319747,
+  "updated": "2026-10-07 15:50:47",
+  "fails": 0,
+  "synced": {
+    "setup.log": [
+      132,
+      1791362873
+    ],
+    "train.log": [
+      188,
+      1791363014
+    ],
+    "metrics.jsonl": [
+      518,
+      1791363014
+    ],
+    "last.pt": [
+      41944532,
+      1791363014
+    ],
+    "exitcode": [
+      2,
+      1791363014
+    ]
+  },
+  "tail": "gpu=NVIDIA RTX PRO 6000 Blackwell Server Edition mem=94GB bf16=195.3 TFLOPS\nepoch 0 done\nepoch 1 done\nepoch 2 done\nepoch 3 done\nresumed from epoch 3\nepoch 3 done\nepoch 4 done\nepoch 5 done\n"
+}

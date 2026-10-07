@@ -1,0 +1,10 @@
+{
+  "id": "e0-smoke",
+  "gpu": "T4",
+  "bundle": ["colab"],
+  "setup": ["python -c \"import torch;print(torch.__version__)\""],
+  "cmd": "python -u colab/smoke_train.py --out {out} --epochs 6 --sec 60",
+  "sync": ["last.pt", "*.jsonl", "*.log"],
+  "max_hours": 1,
+  "max_retries": 3
+}

@@ -1,0 +1,32 @@
+[2026-10-07 15:29:38] e0-smoke: launching attempt 1 on T4 as session e0-smoke-1
+[2026-10-07 15:30:14] e0-smoke: running
+[2026-10-07 15:30:31] watch: balance=501.29 rate=6.37/h active=['e0-smoke'] ended=[]
+[2026-10-07 15:31:51] watch: balance=501.29 rate=6.37/h active=['e0-smoke'] ended=[]
+[2026-10-07 15:33:09] watch: balance=501.29 rate=6.37/h active=['e0-smoke'] ended=[]
+[2026-10-07 15:34:16] e0-smoke: status failed #1 (session listed=False): no result from exec on e0-smoke-1 (rc=1):
+[colab] Session 'e0-smoke-1' not found.
+
+[2026-10-07 15:34:20] e0-smoke: launching attempt 2 on T4 as session e0-smoke-2
+[2026-10-07 15:34:39] e0-smoke: pushing local last.pt (40 MB) for resume
+[2026-10-07 15:35:25] e0-smoke: running
+[2026-10-07 15:35:25] watch: balance=500.85 rate=5.3/h active=['e0-smoke'] ended=[]
+[2026-10-07 15:36:48] watch: balance=500.85 rate=6.37/h active=['e0-smoke'] ended=[]
+[2026-10-07 15:38:06] watch: balance=500.85 rate=6.37/h active=['e0-smoke'] ended=[]
+[2026-10-07 15:39:26] watch: balance=500.41 rate=6.37/h active=['e0-smoke'] ended=[]
+[2026-10-07 15:40:52] e0-smoke: finished with status done; stopping VM
+[2026-10-07 15:40:55] watch: balance=500.32 rate=6.37/h active=['e0-smoke'] ended=[('e0-smoke', 'done')]
+[2026-10-07 15:41:25] e0-smoke-g4: launching attempt 1 on G4 as session e0-smoke-g4-1
+[2026-10-07 15:42:05] e0-smoke-g4: running
+[2026-10-07 15:42:23] watch: balance=500.32 rate=14.2/h active=['e0-smoke-g4'] ended=[]
+[2026-10-07 15:43:46] watch: balance=500.32 rate=14.2/h active=['e0-smoke-g4'] ended=[]
+[2026-10-07 15:45:07] watch: balance=499.88 rate=14.2/h active=['e0-smoke-g4'] ended=[]
+[2026-10-07 15:46:14] e0-smoke-g4: status failed #1 (session listed=False): no result from exec on e0-smoke-g4-1 (rc=1):
+[colab] Session 'e0-smoke-g4-1' not found.
+
+[2026-10-07 15:46:18] e0-smoke-g4: launching attempt 2 on G4 as session e0-smoke-g4-2
+[2026-10-07 15:46:41] e0-smoke-g4: restoring 4 synced files (40 MB) for resume
+[2026-10-07 15:47:58] e0-smoke-g4: running
+[2026-10-07 15:47:58] watch: balance=499.4 rate=5.3/h active=['e0-smoke-g4'] ended=[]
+[2026-10-07 15:49:22] watch: balance=499.4 rate=14.2/h active=['e0-smoke-g4'] ended=[]
+[2026-10-07 15:50:47] e0-smoke-g4: finished with status done; stopping VM
+[2026-10-07 15:50:50] watch: balance=498.46 rate=14.2/h active=['e0-smoke-g4'] ended=[('e0-smoke-g4', 'done')]
