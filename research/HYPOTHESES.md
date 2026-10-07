@@ -82,6 +82,13 @@ Nhiễu giữa các run trên DOTA val khoảng ±0.3–0.5. Δ < 0.5 coi là ch
 |---|---|---|---|
 | `e1-vrdet-s-seed1` | seed 1 | đo nhiễu giữa seed (và kiểm chứng speed opts không đổi accuracy) | **70.10 (+0.21)**. Nhiễu khoảng ±0.2 mAP50, class lẻ ±2.5. Speed opts giữ accuracy. Baseline ≈ 70.0 |
 | `e3-ctx-fix-s` | `--context` (đã sửa BN) | H6 công bằng: ngữ cảnh toàn ảnh giúp BR/HA/SBF/GTF/RA | ≥ baseline + 0.5 |
+
+**Kết quả `e3-ctx-fix-s`: 69.71 (−0.18).**
+- Class cần ngữ cảnh tăng: SBF +5.4, SP +4.5, RA +2.6, GTF +2.6, BD +2.5, BC +2.1.
+- Nhưng **HC −19.3**. Bản lỗi trước cũng −20.7, nên đây là hiệu ứng có hệ thống. Nghi prior bối cảnh "sân bay → máy bay".
+- Bỏ HC: 73.39 so với 72.4 (+1.0). 10 class phổ biến: 76.31 so với 75.9.
+- → **H6 có tác dụng thật cho các class ngữ nghĩa**, nhưng cần chống thiên kiến theo bối cảnh với class hiếm (RFS / context dropout).
+- Phân rã khoảng cách tới YOLO26s: 5 class hiếm kém −8.4, 10 class phổ biến kém −2.9.
 | `e3-rfs-s` | `--rfs 0.1` | Repeat-factor sampling sửa điểm yếu class hiếm (HC, SBF, RA, BD, BC) | ≥ baseline + 0.5, class hiếm tăng |
 
 ## E2 cũ (dự kiến ban đầu)
