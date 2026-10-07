@@ -20,5 +20,5 @@
   ],
   "max_hours": 12,
   "max_retries": 4,
-  "est_cu": 60
+  "est_cu": 40
 }
