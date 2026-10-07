@@ -139,6 +139,9 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
   - Phải kiểm chứng trên **nhiều dataset public**: DOTA trước, rồi DIOR-R, HRSC2016, FloorPlanCAD.
   - Kiến trúc, code và weights lưu trong repo này, thuộc sở hữu của user, dùng thương mại được.
   - Hệ quả: H6 (ngữ cảnh toàn ảnh xuyên tile) và H3 (line mảnh) được nâng ưu tiên, ngay sau H4.
+- (bổ sung 21:50) **Đối thủ để so là cỡ lớn nhất: YOLO26x (và YOLO11x)**, không phải bản s.
+  - VRDet được phép chậm hơn, nhưng phải chính xác và thông minh hơn.
+  - **`dataset_obb_train_v3.zip` (floorplan trong repo) là data riêng để finetune sau. KHÔNG dùng để benchmark** cho tới khi kiến trúc đã thắng trên các dataset public (DOTA, FloorPlanCAD...).
 
 Câu hỏi còn mở:
 - Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.
