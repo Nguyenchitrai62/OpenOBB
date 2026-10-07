@@ -1,0 +1,10 @@
+{
+  "id": "e6-vrdet-x-dota-24e",
+  "gpu": "G4",
+  "bundle": ["vrdet", "colab"],
+  "setup": ["pip install -q -U huggingface_hub hf_xet shapely"],
+  "cmd": "python -u colab/data/get_dota.py --root /content/datasets && python -u -m vrdet.train --data /content/datasets/dota1_1024 --out {out} --size x --epochs 24 --batch 8 --lr 6e-5 --backbone-mult 0.1 --wd 1.25e-4 --workers 16 --eval-every 6 --eval-images 100 --channels-last --compile --rfs 0.1",
+  "sync": ["last.pt", "metrics.jsonl", "*.log", "eval_val.json", "eval_val.txt", "train_done", "val_preds.npz"],
+  "max_hours": 12,
+  "max_retries": 4
+}

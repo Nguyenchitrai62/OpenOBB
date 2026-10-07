@@ -1,9 +1,9 @@
 {
-  "attempts": 1,
+  "attempts": 2,
   "started": "2026-10-07 22:06:19",
-  "session": "e5-rfs-ctx-s-1",
+  "session": "e5-rfs-ctx-s-2",
   "out": "/content/work/runs/e5-rfs-ctx-s",
-  "status": "stopped",
-  "launched": 1791385585.9373255,
-  "updated": "2026-10-07 22:06:25"
+  "status": "running",
+  "launched": 1791386248.4871092,
+  "updated": "2026-10-07 22:18:04"
 }

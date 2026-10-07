@@ -194,3 +194,10 @@
 [2026-10-07 22:05:42] e4-fpc-vrdet-s-24e: launching attempt 1 on G4 as session e4-fpc-vrdet-s-24e-1
 [2026-10-07 22:06:17] e4-fpc-vrdet-s-24e: running
 [2026-10-07 22:06:19] e5-rfs-ctx-s: launching attempt 1 on G4 as session e5-rfs-ctx-s-1
+[2026-10-07 22:17:24] e5-rfs-ctx-s: launching attempt 2 on G4 as session e5-rfs-ctx-s-2
+[2026-10-07 22:18:04] e5-rfs-ctx-s: running
+[2026-10-07 22:18:12] e2-h4-dense-s: status failed #1 (session listed=False): no result from exec on e2-h4-dense-s-3 (rc=1):
+[colab] Session 'e2-h4-dense-s-3' appears to be lost (404/401). Cleaning up.
+
+[2026-10-07 22:18:16] e2-h4-dense-s: launching attempt 4 on A100 as session e2-h4-dense-s-4
+[2026-10-07 22:18:40] e2-h4-dense-s: restoring 7 synced files (163 MB) for resume

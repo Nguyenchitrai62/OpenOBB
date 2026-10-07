@@ -1,11 +1,11 @@
 {
-  "attempts": 3,
+  "attempts": 4,
   "started": "2026-10-07 17:51:03",
-  "session": "e2-h4-dense-s-3",
+  "session": "e2-h4-dense-s-4",
   "out": "/content/work/runs/e2-h4-dense-s",
-  "status": "running",
-  "launched": 1791382053.4458053,
-  "updated": "2026-10-07 21:55:35",
+  "status": "starting",
+  "launched": 1791386302.486961,
+  "updated": "2026-10-07 22:18:22",
   "fails": 0,
   "synced": {
     "profile_base/train_progress.log": [
