@@ -26,6 +26,7 @@ CLI:
 import fnmatch
 import io
 import json
+import os
 import sys
 import tarfile
 import time
@@ -261,9 +262,18 @@ def enqueue(jids):
     log(f"queue: {queued()}")
 
 
+MAX_SESSIONS = int(os.environ.get("JOB_MAX_SESSIONS", "3"))
+
+
 def drain_queue():
-    """Launch queued jobs while Colab grants VMs; stop at the first allocation refusal."""
+    """Launch queued jobs while fewer than MAX_SESSIONS sessions are live; stop at the first refusal.
+    The cap matters: asking Colab for a VM above the account's concurrency limit has repeatedly coincided with
+    running VMs being reclaimed (2026-10-07: 21:03, 22:18, 23:05), so never request one at the limit."""
     for jid in queued():
+        n = cx.n_sessions()
+        if n is None or n >= MAX_SESSIONS:
+            log(f"queue: {jid} waits ({n} live sessions, cap {MAX_SESSIONS})")
+            return
         try:
             launch(jid)
         except Exception as e:  # noqa: BLE001

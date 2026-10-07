@@ -1,33 +1,33 @@
 {
-  "attempts": 2,
+  "attempts": 3,
   "started": "2026-10-07 22:06:19",
-  "session": "e5-rfs-ctx-s-2",
+  "session": "e5-rfs-ctx-s-3",
   "out": "/content/work/runs/e5-rfs-ctx-s",
   "status": "running",
-  "launched": 1791386248.4871092,
-  "updated": "2026-10-07 22:34:32",
+  "launched": 1791389161.551145,
+  "updated": "2026-10-07 23:09:13",
   "fails": 0,
   "synced": {
     "train_progress.log": [
-      10693,
-      1791387243
+      26433,
+      1791388286
     ],
     "setup.log": [
       1371,
       1791386280
     ],
     "train.log": [
-      80237,
-      1791387243
+      95977,
+      1791388286
     ],
     "metrics.jsonl": [
-      720,
-      1791387144
+      1965,
+      1791388119
     ],
     "last.pt": [
       174867993,
-      1791387144
+      1791388119
     ]
   },
-  "tail": "it 0.063s/it\n[15:33:34] ep 3 it 350/984 loss 24.012 mal=1.097 bbox=0.483 kld=0.484 fgl=1.263 lr 1.00e-04 | 80.8 img/s data 0.001s crit 0.062s/it\n[15:33:44] ep 3 it 400/984 loss 22.409 mal=0.860 bbox=0.336 kld=0.476 fgl=1.213 lr 1.00e-04 | 80.5 img/s data 0.001s crit 0.062s/it\n[15:33:45] non-finite grad norm at iter 3357; step skipped\n[15:33:54] ep 3 it 450/984 loss 22.037 mal=0.771 bbox=0.547 kld=0.462 fgl=1.207 lr 1.00e-04 | 80.8 img/s data 0.001s crit 0.062s/it\n[15:34:03] ep 3 it 500/984 loss 21.678 mal=0.724 bbox=0.472 kld=0.486 fgl=1.226 lr 1.00e-04 | 80.8 img/s data 0.001s crit 0.062s/it\n"
+  "tail": "kld=0.372 fgl=1.273 lr 1.00e-04 | 81.6 img/s data 0.001s crit 0.061s/it\n[15:50:57] ep 8 it 700/984 loss 17.711 mal=0.786 bbox=0.122 kld=0.227 fgl=1.310 lr 1.00e-04 | 81.6 img/s data 0.001s crit 0.061s/it\n[15:51:07] ep 8 it 750/984 loss 19.195 mal=0.714 bbox=0.195 kld=0.358 fgl=1.255 lr 1.00e-04 | 81.7 img/s data 0.001s crit 0.061s/it\n[15:51:16] ep 8 it 800/984 loss 19.874 mal=0.795 bbox=0.189 kld=0.366 fgl=1.362 lr 1.00e-04 | 81.8 img/s data 0.001s crit 0.061s/it\n[15:51:26] ep 8 it 850/984 loss 18.546 mal=0.653 bbox=0.235 kld=0.345 fgl=1.262 lr 1.00e-04 | 81.8 img/s data 0.001s crit 0.061s/it\n"
 }

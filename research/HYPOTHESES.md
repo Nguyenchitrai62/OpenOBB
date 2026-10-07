@@ -97,6 +97,18 @@ Nhiễu giữa các run trên DOTA val khoảng ±0.3–0.5. Δ < 0.5 coi là ch
 - Khoảng cách tới YOLO26s (24 epoch): −4.9 → −2.4. RFS thành mặc định cho các run sau.
 
 | `e5-rfs-ctx-s` | `--rfs 0.1 --context --ctx-dropout 0.3` | Có RFS bảo vệ class hiếm, ngữ cảnh toàn ảnh sẽ cộng thêm phần ngữ nghĩa (SBF/RA/GTF/BD/BC/SP +2..5) mà không làm hỏng HC | ≥ RFS + 0.5 |
+| `e5-rfs-dense-s` | `--rfs 0.1 --dense` | Head dense O2M (kiểu YOLO) cho encoder thêm tín hiệu dương, tăng recall object nhỏ/dày | ≥ RFS + 0.5 (decoder hoặc fusion) |
+
+`e2-h4-dense-s` (không RFS, A100) mất VM 4 lần, dừng ở epoch 15. Sub-eval (100 ảnh) so với E1b: e6 63.3 vs 61.2, e12 65.6 vs 65.2. Lợi ích nhỏ, trong khi train chậm ×3 (criterion 0.19 s/it so với 0.06). Thay bằng `e5-rfs-dense-s` trên G4.
+
+## E6: so cùng cỡ lớn nhất (VRDet-X vs YOLO26x, 24 epoch, cùng điều kiện)
+
+| Run | Cấu hình | Giả thuyết | Pass |
+|---|---|---|---|
+| `e5-yolo26x-dota-24e` | YOLO26x-OBB, bs16, init COCO (chỉ để đo) | Mốc cần vượt | – |
+| `e6-vrdet-x-dota-24e` | VRDet-X (HGNetv2-B5, D-FINE-X COCO init), bs8, lr 6e-5, backbone ×0.1, `--rfs 0.1` | Dung tích lớn thu hẹp khoảng cách (S: −2.4). DETR có self-attention giữa query, nên lợi từ dung tích ở các class cần quan hệ/ngữ nghĩa | ≥ YOLO26x − 0.5 thì giữ hướng; > YOLO26x thì chuyển sang benchmark thứ 2 |
+
+Cấu hình lõi + RFS (đã xác nhận), chưa thêm context/dense để đo đúng một biến là dung tích. Nếu E5 xác nhận context hoặc dense: GlobalContext khởi tạo 0 nên có thể gắn vào checkpoint X và fine-tune ngắn, không cần train lại 24 epoch.
 
 ## E2 cũ (dự kiến ban đầu)
 - H4 dense: thêm head one-to-many dense (TAL xoay) trên P3–P5 của encoder, dùng làm giám sát phụ và nguồn query. Kỳ vọng tăng SV/PL/SP.

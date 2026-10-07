@@ -215,3 +215,27 @@
 [2026-10-07 22:39:53] watch: balance=325.8 rate=32.0/h active=['e2-h4-dense-s', 'e4-fpc-vrdet-s-24e', 'e5-rfs-ctx-s', 'e5-yolo26x-dota-24e'] ended=[]
 [2026-10-07 22:51:20] e4-fpc-vrdet-s-24e: finished with status done; stopping VM
 [2026-10-07 22:52:06] queue: ['e5-rfs-dense-s']
+[2026-10-07 22:56:44] e5-yolo26x-dota-24e: poll error colab download -s e5-yolo26x-dota-24e-2 /content/.cxdl/last.pt/p00026 C:\Users\HP\AppData\Local\Temp\cxget_qn76jwf1\p00026 -> rc=1
+[colab] Download failed: File or directory not found: /content/.cxdl/last.pt/p00026
+
+[2026-10-07 22:56:44] watch: balance=317.78 rate=32.0/h active=['e2-h4-dense-s', 'e4-fpc-vrdet-s-24e', 'e5-rfs-ctx-s', 'e5-yolo26x-dota-24e'] ended=[('e4-fpc-vrdet-s-24e', 'done')]
+[2026-10-07 23:04:47] e5-rfs-dense-s: launching attempt 1 on G4 as session e5-rfs-dense-s-1
+[2026-10-07 23:05:37] e5-rfs-dense-s: running
+[2026-10-07 23:05:47] e2-h4-dense-s: status failed #1 (session listed=False): no result from exec on e2-h4-dense-s-4 (rc=1):
+[colab] Session 'e2-h4-dense-s-4' appears to be lost (404/401). Cleaning up.
+
+[2026-10-07 23:05:51] e5-rfs-ctx-s: status failed #1 (session listed=False): no result from exec on e5-rfs-ctx-s-2 (rc=1):
+[colab] Session 'e5-rfs-ctx-s-2' not found.
+
+[2026-10-07 23:05:55] e5-rfs-ctx-s: launching attempt 3 on G4 as session e5-rfs-ctx-s-3
+[2026-10-07 23:06:19] e5-rfs-ctx-s: restoring 5 synced files (166 MB) for resume
+[2026-10-07 23:09:13] e5-rfs-ctx-s: running
+[2026-10-07 23:09:31] e5-yolo26x-dota-24e: status failed #1 (session listed=False): no result from exec on e5-yolo26x-dota-24e-2 (rc=1):
+[colab] Session 'e5-yolo26x-dota-24e-2' not found.
+
+[2026-10-07 23:09:35] e5-yolo26x-dota-24e: launching attempt 3 on G4 as session e5-yolo26x-dota-24e-3
+[2026-10-07 23:09:59] e5-yolo26x-dota-24e: restoring 4 synced files (0 MB) for resume
+[2026-10-07 23:11:04] e5-yolo26x-dota-24e: running
+[2026-10-07 23:11:04] watch: balance=313.21 rate=8.9/h active=['e2-h4-dense-s', 'e5-rfs-ctx-s', 'e5-rfs-dense-s', 'e5-yolo26x-dota-24e'] ended=[('e2-h4-dense-s', 'failed_vm')]
+[2026-10-07 23:13:00] queue: ['e6-vrdet-x-dota-24e']
+[2026-10-07 23:13:07] queue: e6-vrdet-x-dota-24e waits (3 live sessions, cap 3)

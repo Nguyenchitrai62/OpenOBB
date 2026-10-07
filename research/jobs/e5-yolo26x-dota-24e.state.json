@@ -1,11 +1,11 @@
 {
-  "attempts": 2,
+  "attempts": 3,
   "started": "2026-10-07 21:53:56",
-  "session": "e5-yolo26x-dota-24e-2",
+  "session": "e5-yolo26x-dota-24e-3",
   "out": "/content/work/runs/e5-yolo26x-dota-24e",
   "status": "running",
-  "launched": 1791386593.7395494,
-  "updated": "2026-10-07 22:24:29",
+  "launched": 1791389382.0410268,
+  "updated": "2026-10-07 23:11:04",
   "fails": 0,
   "synced": {
     "setup.log": [

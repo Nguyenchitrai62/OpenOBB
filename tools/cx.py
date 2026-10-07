@@ -57,6 +57,14 @@ def sessions():
     return res
 
 
+def n_sessions():
+    """Number of live sessions on the account (including foreign '[?]' ones); None if the listing failed."""
+    rc, out = run(["sessions"], check=False, timeout=120)
+    if rc != 0:
+        return None
+    return len(re.findall(r"^\[[^\]]+\]\s+\S+\s+\|\s+Hardware:", out, re.M))
+
+
 def new(name, gpu=None, high_mem=False):
     args = ["new", "-s", name] + (["--gpu", gpu] if gpu else []) + (["--high-mem"] if high_mem else [])
     rc, out = run(args, check=False, timeout=1200)
@@ -167,7 +175,9 @@ print({MARK!r}+'ok')""", timeout=300)
 
 def get(name, remote, local, size=None):
     """Download; files above CHUNK are split on the VM and fetched piecewise (large single downloads fail),
-    then re-assembled locally and verified with sha256."""
+    then re-assembled locally and verified with sha256. A snapshot that was only partly fetched is resumed
+    on the next call (remote split dir + local chunk dir both carry the snapshot sha), so every poll makes
+    progress even when individual chunk downloads keep failing."""
     local = Path(local)
     local.parent.mkdir(parents=True, exist_ok=True)
     if size is None or size <= CHUNK:
@@ -176,24 +186,43 @@ def get(name, remote, local, size=None):
             raise ColabError(f"download produced no file: {remote}")
         return
     rdir = f"/content/.cxdl/{Path(remote).name}"
-    info = retry(lambda: exec_json(name, f"""import os,shutil,hashlib
-shutil.rmtree({rdir!r},ignore_errors=True);os.makedirs({rdir!r})
-h=hashlib.sha256();n=0
-with open({remote!r},'rb') as f:
-    while True:
-        b=f.read({CHUNK})
-        if not b: break
-        h.update(b);open({rdir!r}+'/p%05d'%n,'wb').write(b);n+=1
-print({MARK!r}+'{{"n":%d,"sha":"%s"}}'%(n,h.hexdigest()))""", timeout=600), tries=3, wait=5)
-    tmp = Path(tempfile.mkdtemp(prefix="cxget_"))
-    for i in range(info["n"]):
-        part = tmp / f"p{i:05d}"
-        retry(lambda part=part, i=i: run(["download", "-s", name, f"{rdir}/p{i:05d}", str(part)], timeout=600))
+    info = retry(lambda: exec_json(name, f"""import os,shutil,hashlib,json
+m={rdir!r}+'/manifest.json'
+if os.path.exists(m):
+    info=json.load(open(m))
+else:
+    shutil.rmtree({rdir!r},ignore_errors=True);os.makedirs({rdir!r})
+    h=hashlib.sha256();n=0;sz=0
+    with open({remote!r},'rb') as f:
+        while True:
+            b=f.read({CHUNK})
+            if not b: break
+            h.update(b);open({rdir!r}+'/p%05d'%n,'wb').write(b);n+=1;sz+=len(b)
+    info={{"n":n,"sha":h.hexdigest(),"size":sz}}
+    json.dump(info,open(m,'w'))
+print({MARK!r}+json.dumps(info))""", timeout=600), tries=3, wait=5)
+    ldir = Path(str(local) + ".chunks")
+    man = ldir / "manifest.json"
+    if not man.exists() or json.loads(man.read_text()).get("sha") != info["sha"]:
+        shutil.rmtree(ldir, ignore_errors=True)
+        ldir.mkdir(parents=True)
+        man.write_text(json.dumps(info))
+    n = info["n"]
+    for i in range(n):
+        part = ldir / f"p{i:05d}"
+        want = CHUNK if i < n - 1 else info["size"] - CHUNK * (n - 1)
+        if part.exists() and part.stat().st_size == want:
+            continue
+        retry(lambda part=part, i=i: run(["download", "-s", name, f"{rdir}/p{i:05d}", str(part)], timeout=600),
+              tries=5, wait=10)
+        if not part.exists() or part.stat().st_size != want:
+            raise ColabError(f"chunk {i} of {remote} incomplete")
     with open(str(local) + ".part", "wb") as o:
-        for i in range(info["n"]):
-            o.write((tmp / f"p{i:05d}").read_bytes())
-    shutil.rmtree(tmp, ignore_errors=True)
+        for i in range(n):
+            o.write((ldir / f"p{i:05d}").read_bytes())
     if _sha(str(local) + ".part") != info["sha"]:
+        shutil.rmtree(ldir, ignore_errors=True)
         raise ColabError(f"sha mismatch after chunked download {remote}")
     os.replace(str(local) + ".part", local)
+    shutil.rmtree(ldir, ignore_errors=True)
     exec_py(name, f"import shutil;shutil.rmtree({rdir!r},ignore_errors=True)", timeout=120)
