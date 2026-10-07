@@ -3,9 +3,9 @@
   "started": "2026-10-07 21:53:56",
   "session": "e5-yolo26x-dota-24e-3",
   "out": "/content/work/runs/e5-yolo26x-dota-24e",
-  "status": "running",
+  "status": "done",
   "launched": 1791389382.0410268,
-  "updated": "2026-10-08 00:35:12",
+  "updated": "2026-10-08 01:24:57",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -17,21 +17,37 @@
       1791389616
     ],
     "train.log": [
-      2815609,
-      1791394406
+      4161063,
+      1791396815
     ],
     "metrics.jsonl": [
-      7524,
-      1791394381
+      11226,
+      1791396815
     ],
     "train/weights/last.pt": [
-      502700705,
-      1791394380
+      126128981,
+      1791396743
     ],
     "train/results.csv": [
-      2466,
-      1791394380
+      3588,
+      1791396742
+    ],
+    "eval_val.json": [
+      3010,
+      1791396815
+    ],
+    "exitcode": [
+      2,
+      1791396819
+    ],
+    "eval_val.txt": [
+      1013,
+      1791396815
+    ],
+    "train_done": [
+      2,
+      1791396752
     ]
   },
-  "tail": "   341       1024: 8% \u2578\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 82/985 3.4it/s 24.1s<4:24\n\u001b[K      17/24      43.4G     0.7332     0.4877    0.01921     0.0161         70       1024: 8% \u2501\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 83/985 3.4it/s 24.4s<4:22\n\u001b[K      17/24      43.4G     0.7305      0.488    0.01967    0.01628         32       1024: 8% \u2501\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 84/985 3.5it/s 24.7s<4:21\n\u001b[K      17/24      43.4G      0.729     0.4852    0.01962    0.01616        642       1024: 8% \u2501\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 85/985 3.4it/s 25.0s<4:25\n\u001b[K      17/24      43.4G     0.7304      0.486    0.01971    0.01617         68       1024: 8% \u2501\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 86/985 3.4it/s 25.3s<4:23"
+  "tail": "ill be removed in the future. Use 'quantize' instead.\nWARNING \u26a0\ufe0f 'half' is deprecated and will be removed in the future. Use 'quantize' instead.\nWARNING \u26a0\ufe0f 'half' is deprecated and will be removed in the future. Use 'quantize' instead.\nWARNING \u26a0\ufe0f 'half' is deprecated and will be removed in the future. Use 'quantize' instead.\nWARNING \u26a0\ufe0f 'half' is deprecated and will be removed in the future. Use 'quantize' instead.\nWARNING \u26a0\ufe0f 'half' is deprecated and will be removed in the future. Use 'quantize' instead.\nWARNING \u26a0\ufe0f 'half' is deprecated and will be removed in the future. Use 'quantize' instead.\n"
 }

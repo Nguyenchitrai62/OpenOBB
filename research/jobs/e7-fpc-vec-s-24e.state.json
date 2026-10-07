@@ -1,0 +1,33 @@
+{
+  "attempts": 1,
+  "started": "2026-10-08 01:03:53",
+  "session": "e7-fpc-vec-s-24e-1",
+  "out": "/content/work/runs/e7-fpc-vec-s-24e",
+  "status": "running",
+  "launched": 1791396239.2028027,
+  "updated": "2026-10-08 01:15:31",
+  "fails": 0,
+  "synced": {
+    "metrics.jsonl": [
+      958,
+      1791396783
+    ],
+    "train_progress.log": [
+      7366,
+      1791396848
+    ],
+    "setup.log": [
+      350,
+      1791396266
+    ],
+    "last.pt": [
+      176175965,
+      1791396783
+    ],
+    "train.log": [
+      9626,
+      1791396848
+    ]
+  },
+  "tail": "kld=0.280 fgl=0.799 lr 1.00e-04 | 70.8 img/s data 0.003s crit 0.063s/it\n[18:13:36] ep 4 it 150/435 loss 18.889 mal=0.704 bbox=0.267 kld=0.335 fgl=0.788 lr 1.00e-04 | 72.2 img/s data 0.002s crit 0.062s/it\n[18:13:47] ep 4 it 200/435 loss 19.011 mal=0.667 bbox=0.311 kld=0.308 fgl=0.935 lr 1.00e-04 | 72.9 img/s data 0.001s crit 0.061s/it\n[18:13:58] ep 4 it 250/435 loss 19.056 mal=0.743 bbox=0.231 kld=0.331 fgl=0.876 lr 1.00e-04 | 73.1 img/s data 0.001s crit 0.061s/it\n[18:14:08] ep 4 it 300/435 loss 18.792 mal=0.676 bbox=0.303 kld=0.358 fgl=0.840 lr 1.00e-04 | 73.5 img/s data 0.001s crit 0.060s/it\n"
+}
