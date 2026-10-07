@@ -1,0 +1,25 @@
+{
+  "attempts": 1,
+  "started": "2026-10-08 00:27:39",
+  "session": "e6-vrdet-x-dota-24e-1",
+  "out": "/content/work/runs/e6-vrdet-x-dota-24e",
+  "status": "running",
+  "launched": 1791394065.781188,
+  "updated": "2026-10-08 00:35:26",
+  "fails": 0,
+  "synced": {
+    "train_progress.log": [
+      2037,
+      1791394505
+    ],
+    "setup.log": [
+      1161,
+      1791394090
+    ],
+    "train.log": [
+      60295,
+      1791394505
+    ]
+  },
+  "tail": "0.735 fgl=1.060 lr 2.11e-05 | 14.8 img/s data 0.001s crit 0.080s/it\n[17:34:23] ep 0 it 400/1968 loss 41.735 mal=0.755 bbox=0.691 kld=0.590 fgl=1.347 lr 2.41e-05 | 15.7 img/s data 0.001s crit 0.079s/it\n[17:34:38] ep 0 it 450/1968 loss 55.988 mal=1.032 bbox=1.518 kld=1.007 fgl=0.453 lr 2.71e-05 | 16.5 img/s data 0.001s crit 0.079s/it\n[17:34:51] ep 0 it 500/1968 loss 53.903 mal=1.286 bbox=0.724 kld=0.598 fgl=1.239 lr 3.01e-05 | 17.3 img/s data 0.001s crit 0.079s/it\n[17:35:05] ep 0 it 550/1968 loss 45.236 mal=1.000 bbox=0.790 kld=0.632 fgl=1.190 lr 3.31e-05 | 17.9 img/s data 0.001s crit 0.079s/it\n"
+}

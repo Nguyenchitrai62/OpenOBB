@@ -104,6 +104,13 @@ Nhiễu giữa các run trên DOTA val khoảng ±0.3–0.5. Δ < 0.5 coi là ch
 - **H6 (ngữ cảnh thumbnail) BÁC BỎ**: hai lần đều âm, ctx-dropout không cứu được HC. Không đưa vào bản X.
 - Suy luận toàn bản vẽ cho CAD chuyển sang nhánh vector (H7).
 
+**Kết quả `e5-rfs-dense-s`: decoder 71.84 (−0.51 so với RFS); riêng nhánh dense 49.83.**
+- Head dense bản hiện tại không có lợi. Bản thân nhánh dense hỏng ở vật nhỏ dày đặc: trên patch đông xe, nhánh dense chỉ còn 59–101 box,
+  score tối đa khoảng 0.55, box quá dài. Không đưa vào X.
+- **Phát hiện H9 (trần query):** decoder chạm trần 300. 68 patch val có hơn 250 dự đoán, chứa 28.5% số SV, 46% số SH và 17% số LV
+  được phát hiện, đúng các class đang thua YOLO. Số query không có tham số, nên thử ngay khi suy luận:
+  `e9-dota-qinfer-s` (checkpoint RFS, 300/600/900 query).
+
 `e2-h4-dense-s` (không RFS, A100) mất VM 4 lần, dừng ở epoch 15. Sub-eval (100 ảnh) so với E1b: e6 63.3 vs 61.2, e12 65.6 vs 65.2. Lợi ích nhỏ, trong khi train chậm ×3 (criterion 0.19 s/it so với 0.06). Thay bằng `e5-rfs-dense-s` trên G4.
 
 ## E6: so cùng cỡ lớn nhất (VRDet-X vs YOLO26x, 24 epoch, cùng điều kiện)

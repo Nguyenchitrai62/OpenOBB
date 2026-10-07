@@ -251,3 +251,12 @@
 [2026-10-08 00:09:17] watch: balance=289.69 rate=26.7/h active=['e5-rfs-ctx-s', 'e5-rfs-dense-s', 'e5-yolo26x-dota-24e'] ended=[]
 [2026-10-08 00:17:19] queue: e6-vrdet-x-dota-24e waits (3 live sessions, cap 3)
 [2026-10-08 00:18:59] e5-rfs-ctx-s: finished with status done; stopping VM
+[2026-10-08 00:23:57] watch: balance=283.0 rate=26.7/h active=['e5-rfs-ctx-s', 'e5-rfs-dense-s', 'e5-yolo26x-dota-24e'] ended=[('e5-rfs-ctx-s', 'done')]
+[2026-10-08 00:27:39] e6-vrdet-x-dota-24e: launching attempt 1 on G4 as session e6-vrdet-x-dota-24e-1
+[2026-10-08 00:28:15] e6-vrdet-x-dota-24e: running
+[2026-10-08 00:28:18] queue: e7-fpc-vec-s-24e waits (3 live sessions, cap 3)
+[2026-10-08 00:31:51] queue: e7-fpc-vec-s-24e waits (3 live sessions, cap 3)
+[2026-10-08 00:35:26] watch: balance=278.25 rate=26.7/h active=['e5-rfs-dense-s', 'e5-yolo26x-dota-24e', 'e6-vrdet-x-dota-24e'] ended=[]
+[2026-10-08 00:43:29] queue: e7-fpc-vec-s-24e waits (3 live sessions, cap 3)
+[2026-10-08 00:45:49] e5-rfs-dense-s: finished with status done; stopping VM
+[2026-10-08 00:48:16] queue: ['e7-fpc-vec-s-24e', 'e9-dota-qinfer-s']
