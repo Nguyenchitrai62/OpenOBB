@@ -1,0 +1,42 @@
+[{"stream_name":"stderr","time":7.251608157,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":7.252397103,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":7.252406003,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":7.252408613,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stderr","time":7.850726518,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":7.850765662,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":7.8507715319999996,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":7.850775616,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stdout","time":13.981686012,"data":"2.10.0+cu128 True\n"}
+,{"stream_name":"stdout","time":13.981739316,"data":"name, memory.total [MiB]\r\n"}
+,{"stream_name":"stdout","time":13.981743696,"data":"Tesla T4, 15360 MiB\r\n"}
+,{"stream_name":"stdout","time":13.981747146,"data":"Tesla T4, 15360 MiB\r\n"}
+,{"stream_name":"stdout","time":14.095034169,"data":"['/kaggle/input/datasets']\n"}
+,{"stream_name":"stderr","time":16.448477221,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":16.44850481,"data":"  File \"\u003cstring\u003e\", line 1, in \u003cmodule\u003e\n"}
+,{"stream_name":"stderr","time":16.448508564,"data":"  File \"/usr/local/lib/python3.12/dist-packages/papermill/execute.py\", line 131, in execute_notebook\n"}
+,{"stream_name":"stderr","time":16.448656956,"data":"    raise_for_execution_errors(nb, output_path)\n"}
+,{"stream_name":"stderr","time":16.449110419,"data":"  File \"/usr/local/lib/python3.12/dist-packages/papermill/execute.py\", line 251, in raise_for_execution_errors\n"}
+,{"stream_name":"stderr","time":16.449122813,"data":"    raise error\n"}
+,{"stream_name":"stderr","time":16.449127621,"data":"papermill.exceptions.PapermillExecutionError: \n"}
+,{"stream_name":"stderr","time":16.449131891,"data":"---------------------------------------------------------------------------\n"}
+,{"stream_name":"stderr","time":16.449136352,"data":"Exception encountered at \"In [2]\":\n"}
+,{"stream_name":"stderr","time":16.44914062,"data":"---------------------------------------------------------------------------\n"}
+,{"stream_name":"stderr","time":16.449144481,"data":"IndexError                                Traceback (most recent call last)\n"}
+,{"stream_name":"stderr","time":16.449148767,"data":"/tmp/ipykernel_23/2110298872.py in \u003ccell line: 0\u003e()\n"}
+,{"stream_name":"stderr","time":16.449153409,"data":"      1 import glob, os\n"}
+,{"stream_name":"stderr","time":16.449156815,"data":"      2 print(glob.glob('/kaggle/input/*'))\n"}
+,{"stream_name":"stderr","time":16.449160474,"data":"----\u003e 3 IN = glob.glob('/kaggle/input/*floorplan*')[0]\n"}
+,{"stream_name":"stderr","time":16.449164127,"data":"      4 print('IN=', IN)\n"}
+,{"stream_name":"stderr","time":16.449167687,"data":"      5 print(os.listdir(IN)[:20])\n"}
+,{"stream_name":"stderr","time":16.449171074,"data":"\n"}
+,{"stream_name":"stderr","time":16.44917448,"data":"IndexError: list index out of range\n"}
+,{"stream_name":"stderr","time":16.449177914,"data":"\n"}
+,{"stream_name":"stderr","time":18.55224438,"data":"/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":18.552293913,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":18.707269813,"data":"/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":18.707299405,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":19.302762389,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to notebook\n"}
+,{"stream_name":"stderr","time":19.588797576,"data":"[NbConvertApp] Writing 6920 bytes to __notebook__.ipynb\n"}
+,{"stream_name":"stderr","time":21.885528331,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to html\n"}
+,{"stream_name":"stderr","time":22.6582088,"data":"[NbConvertApp] Writing 282753 bytes to __results__.html\n"}
+]

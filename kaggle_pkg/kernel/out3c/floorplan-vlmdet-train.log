@@ -1,0 +1,76 @@
+[{"stream_name":"stderr","time":5.706024373,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":5.706083173,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":5.706087814,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":5.706090494,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stderr","time":6.240838371,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":6.240866878,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":6.240872309,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":6.240876663,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stdout","time":10.786131703,"data":"2.10.0+cu128 True\n"}
+,{"stream_name":"stdout","time":10.786184226,"data":"name, memory.total [MiB]\r\n"}
+,{"stream_name":"stdout","time":10.786188147,"data":"Tesla T4, 15360 MiB\r\n"}
+,{"stream_name":"stdout","time":10.786190861,"data":"Tesla T4, 15360 MiB\r\n"}
+,{"stream_name":"stdout","time":21.570869921,"data":"['/kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800']\n"}
+,{"stream_name":"stdout","time":21.570906211,"data":"/kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800\n"}
+,{"stream_name":"stdout","time":21.570912205,"data":"['infer.py', 'train.py', 'infer_run.py', 'model.py', 'loss.py', 'yolo_baseline.py', 'dataset.py', 'data', 'data_kaggle.yaml']\n"}
+,{"stream_name":"stdout","time":21.570916597,"data":"800\r\n"}
+,{"stream_name":"stdout","time":21.75511139,"data":"/kaggle/working/dataset.py    /kaggle/working/model.py\r\n"}
+,{"stream_name":"stdout","time":21.755137477,"data":"/kaggle/working/infer.py      /kaggle/working/train.py\r\n"}
+,{"stream_name":"stdout","time":21.755140877,"data":"/kaggle/working/infer_run.py  /kaggle/working/yolo_baseline.py\r\n"}
+,{"stream_name":"stdout","time":21.755150393,"data":"/kaggle/working/loss.py\r\n"}
+,{"stream_name":"stdout","time":25.123818758,"data":"train /kaggle/input/floorplan-vlmdet-800/data/train/images | /kaggle/input/floorplan-vlmdet-800/data/train/labels\r\n"}
+,{"stream_name":"stdout","time":25.123865356,"data":"valid /kaggle/input/floorplan-vlmdet-800/data/valid/images | /kaggle/input/floorplan-vlmdet-800/data/valid/labels\r\n"}
+,{"stream_name":"stdout","time":25.123869915,"data":"device cuda\r\n"}
+,{"stream_name":"stdout","time":25.123872526,"data":"Traceback (most recent call last):\r\n"}
+,{"stream_name":"stdout","time":25.123875235,"data":"  File \"/kaggle/working/train.py\", line 91, in \u003cmodule\u003e\r\n"}
+,{"stream_name":"stdout","time":25.123878385,"data":"    main()\r\n"}
+,{"stream_name":"stdout","time":25.123880661,"data":"  File \"/kaggle/working/train.py\", line 49, in main\r\n"}
+,{"stream_name":"stdout","time":25.123883174,"data":"    train_ds = OBBDataset(tri, trl, imgsz=args.imgsz, augment=True)\r\n"}
+,{"stream_name":"stdout","time":25.123885477,"data":"               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n"}
+,{"stream_name":"stdout","time":25.123887751,"data":"  File \"/kaggle/working/dataset.py\", line 30, in __init__\r\n"}
+,{"stream_name":"stdout","time":25.123890207,"data":"    self.imgs = sorted([f for f in os.listdir(img_dir) if f.lower().endswith((\".png\", \".jpg\", \".jpeg\"))])\r\n"}
+,{"stream_name":"stdout","time":25.123892792,"data":"                                   ^^^^^^^^^^^^^^^^^^^\r\n"}
+,{"stream_name":"stdout","time":25.12391641,"data":"FileNotFoundError: [Errno 2] No such file or directory: '/kaggle/input/floorplan-vlmdet-800/data/train/images'\r\n"}
+,{"stream_name":"stdout","time":27.478516371,"data":"\u001b[?25l     \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m0.0/46.7 kB\u001b[0m \u001b[31m?\u001b[0m eta \u001b[36m-:--:--\u001b[0m\r\u001b[2K     \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m46.7/46.7 kB\u001b[0m \u001b[31m1.5 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\r\n"}
+,{"stream_name":"stdout","time":28.035297292,"data":"\u001b[?25h\u001b[?25l   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m0.0/1.5 MB\u001b[0m \u001b[31m?\u001b[0m eta \u001b[36m-:--:--\u001b[0m\r\u001b[2K   \u001b[91m━━━━━━━\u001b[0m\u001b[91m╸\u001b[0m\u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m0.3/1.5 MB\u001b[0m \u001b[31m8.1 MB/s\u001b[0m eta \u001b[36m0:00:01\u001b[0m\r\u001b[2K   \u001b[91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[91m╸\u001b[0m\u001b[90m━━\u001b[0m \u001b[32m1.4/1.5 MB\u001b[0m \u001b[31m21.7 MB/s\u001b[0m eta \u001b[36m0:00:01\u001b[0m\r\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m1.5/1.5 MB\u001b[0m \u001b[31m16.8 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\r\n"}
+,{"stream_name":"stdout","time":28.035332301,"data":"\u001b[?25h\u001b[?25l   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m0.0/88.7 kB\u001b[0m \u001b[31m?\u001b[0m eta \u001b[36m-:--:--\u001b[0m\r\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m88.7/88.7 kB\u001b[0m \u001b[31m7.9 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\r\n"}
+,{"stream_name":"stdout","time":44.794150051,"data":"\u001b[?25h    m.train(data=args.data, epochs=args.epochs, imgsz=args.imgsz, batch=args.batch,\r\n"}
+,{"stream_name":"stdout","time":44.794210231,"data":"  File \"/usr/local/lib/python3.12/dist-packages/ultralytics/engine/model.py\", line 870, in train\r\n"}
+,{"stream_name":"stdout","time":44.794215581,"data":"    self.trainer = (trainer or self._smart_load(\"trainer\"))(overrides=args, _callbacks=self.callbacks)\r\n"}
+,{"stream_name":"stdout","time":44.794219826,"data":"                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n"}
+,{"stream_name":"stdout","time":44.794223605,"data":"  File \"/usr/local/lib/python3.12/dist-packages/ultralytics/models/yolo/obb/train.py\", line 46, in __init__\r\n"}
+,{"stream_name":"stdout","time":44.794227108,"data":"    super().__init__(cfg, overrides, _callbacks)\r\n"}
+,{"stream_name":"stdout","time":44.794230424,"data":"  File \"/usr/local/lib/python3.12/dist-packages/ultralytics/models/yolo/detect/train.py\", line 62, in __init__\r\n"}
+,{"stream_name":"stdout","time":44.794234113,"data":"    super().__init__(cfg, overrides, _callbacks)\r\n"}
+,{"stream_name":"stdout","time":44.794237378,"data":"  File \"/usr/local/lib/python3.12/dist-packages/ultralytics/engine/trainer.py\", line 194, in __init__\r\n"}
+,{"stream_name":"stdout","time":44.79424079,"data":"    self.data = self.get_dataset()\r\n"}
+,{"stream_name":"stdout","time":44.794254181,"data":"                ^^^^^^^^^^^^^^^^^^\r\n"}
+,{"stream_name":"stdout","time":44.794257383,"data":"  File \"/usr/local/lib/python3.12/dist-packages/ultralytics/engine/trainer.py\", line 835, in get_dataset\r\n"}
+,{"stream_name":"stdout","time":44.794260109,"data":"    raise RuntimeError(emojis(f\"Dataset '{clean_url(self.args.data)}' error ❌ {e}\")) from e\r\n"}
+,{"stream_name":"stdout","time":44.794263951,"data":"RuntimeError: Dataset '/kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800/data_kaggle.yaml' error ❌ Dataset '/kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800/data_kaggle.yaml' images not found, missing path '/kaggle/input/floorplan-vlmdet-800/data/valid/images'\r\n"}
+,{"stream_name":"stdout","time":44.794267823,"data":"Note dataset download directory is '/kaggle/working/datasets'. You can update this in '/root/.config/Ultralytics/settings.json'\r\n"}
+,{"stream_name":"stdout","time":44.974082959,"data":"vlmdet_small  yolo11x\r\n"}
+,{"stream_name":"stdout","time":47.059665815,"data":"  File \"/kaggle/working/infer_run.py\", line 52, in \u003cmodule\u003e\r\n"}
+,{"stream_name":"stdout","time":47.059706019,"data":"    main()\r\n"}
+,{"stream_name":"stdout","time":47.059713522,"data":"  File \"/kaggle/working/infer_run.py\", line 41, in main\r\n"}
+,{"stream_name":"stdout","time":47.059716366,"data":"    ck = torch.load(args.ckpt, map_location=\"cpu\")\r\n"}
+,{"stream_name":"stdout","time":47.059718829,"data":"         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n"}
+,{"stream_name":"stdout","time":47.059721979,"data":"  File \"/usr/local/lib/python3.12/dist-packages/torch/serialization.py\", line 1500, in load\r\n"}
+,{"stream_name":"stdout","time":47.059724584,"data":"    with _open_file_like(f, \"rb\") as opened_file:\r\n"}
+,{"stream_name":"stdout","time":47.059726956,"data":"         ^^^^^^^^^^^^^^^^^^^^^^^^\r\n"}
+,{"stream_name":"stdout","time":47.059729264,"data":"  File \"/usr/local/lib/python3.12/dist-packages/torch/serialization.py\", line 768, in _open_file_like\r\n"}
+,{"stream_name":"stdout","time":47.05973175,"data":"    return _open_file(name_or_buffer, mode)\r\n"}
+,{"stream_name":"stdout","time":47.059733994,"data":"           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n"}
+,{"stream_name":"stdout","time":47.059736276,"data":"  File \"/usr/local/lib/python3.12/dist-packages/torch/serialization.py\", line 749, in __init__\r\n"}
+,{"stream_name":"stdout","time":47.059739071,"data":"    super().__init__(open(name, mode))  # noqa: SIM115\r\n"}
+,{"stream_name":"stdout","time":47.059741491,"data":"                     ^^^^^^^^^^^^^^^^\r\n"}
+,{"stream_name":"stdout","time":47.059743787,"data":"FileNotFoundError: [Errno 2] No such file or directory: '/kaggle/working/runs/vlmdet_small/best.pt'\r\n"}
+,{"stream_name":"stderr","time":50.0032358,"data":"/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":50.003279607,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":50.138327923,"data":"/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":50.138366495,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":50.769532751,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to notebook\n"}
+,{"stream_name":"stderr","time":51.095535237,"data":"[NbConvertApp] Writing 11714 bytes to __notebook__.ipynb\n"}
+,{"stream_name":"stderr","time":53.428663924,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to html\n"}
+,{"stream_name":"stderr","time":54.198598577,"data":"[NbConvertApp] Writing 288165 bytes to __results__.html\n"}
+]

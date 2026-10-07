@@ -1,0 +1,106 @@
+[{"stream_name":"stderr","time":6.31892407,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":6.319013228,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":6.319019515,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":6.319023164,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stderr","time":6.895861983,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":6.895893816,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":6.8958989630000005,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":6.89590836,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stdout","time":11.941125968,"data":"2.10.0+cu128 True\n"}
+,{"stream_name":"stdout","time":11.941205208,"data":"name, memory.total [MiB]\r\n"}
+,{"stream_name":"stdout","time":11.941211079,"data":"Tesla T4, 15360 MiB\r\n"}
+,{"stream_name":"stdout","time":11.941220739,"data":"Tesla T4, 15360 MiB\r\n"}
+,{"stream_name":"stdout","time":14.502712072,"data":"['/kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800']\n"}
+,{"stream_name":"stdout","time":14.50274755,"data":"/kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800\n"}
+,{"stream_name":"stdout","time":14.502752324,"data":"['infer.py', 'train.py', 'infer_run.py', 'model.py', 'loss.py', 'yolo_baseline.py', 'dataset.py', 'data', 'data_kaggle.yaml']\n"}
+,{"stream_name":"stdout","time":14.502755657,"data":"OLD yaml:\n"}
+,{"stream_name":"stdout","time":14.502758589,"data":"train: /kaggle/input/floorplan-vlmdet-800/data/train/images\n"}
+,{"stream_name":"stdout","time":14.502761869,"data":"val: /kaggle/input/floorplan-vlmdet-800/data/valid/images\n"}
+,{"stream_name":"stdout","time":14.502764765,"data":"nc: 7\n"}
+,{"stream_name":"stdout","time":14.502767792,"data":"names: [wall, window, door, slide_door, double_door, opening, junction]\n"}
+,{"stream_name":"stdout","time":14.50277075,"data":"\n"}
+,{"stream_name":"stdout","time":14.502773537,"data":"NEW yaml:\n"}
+,{"stream_name":"stdout","time":14.502776332,"data":"train: /kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800/data/train/images\n"}
+,{"stream_name":"stdout","time":14.502779312,"data":"val: /kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800/data/valid/images\n"}
+,{"stream_name":"stdout","time":14.502782217,"data":"nc: 7\n"}
+,{"stream_name":"stdout","time":14.502785002,"data":"names: [wall, window, door, slide_door, double_door, opening, junction]\n"}
+,{"stream_name":"stdout","time":14.502787912,"data":"\n"}
+,{"stream_name":"stdout","time":14.502790774,"data":"800\r\n"}
+,{"stream_name":"stdout","time":14.622962468,"data":"200\r\n"}
+,{"stream_name":"stdout","time":14.774153872,"data":"/kaggle/working/dataset.py    /kaggle/working/model.py\r\n"}
+,{"stream_name":"stdout","time":14.774185346,"data":"/kaggle/working/infer.py      /kaggle/working/train.py\r\n"}
+,{"stream_name":"stdout","time":14.774189384,"data":"/kaggle/working/infer_run.py  /kaggle/working/yolo_baseline.py\r\n"}
+,{"stream_name":"stdout","time":14.774192659,"data":"/kaggle/working/loss.py\r\n"}
+,{"stream_name":"stdout","time":11604.278769344,"data":"  self.enc = nn.TransformerEncoder(enc, num_layers=layers)\r\n"}
+,{"stream_name":"stdout","time":11604.278818308,"data":"/kaggle/working/loss.py:159: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.\r\n"}
+,{"stream_name":"stdout","time":11604.278848011,"data":"Consider using tensor.detach() first. (Triggered internally at /pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:836.)\r\n"}
+,{"stream_name":"stdout","time":11604.278851443,"data":"  \"cls\": float(total_cls / n),\r\n"}
+,{"stream_name":"stdout","time":11604.27885388,"data":"train /kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800/data/train/images | /kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800/data/train/labels\r\n"}
+,{"stream_name":"stdout","time":11604.278856359,"data":"valid /kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800/data/valid/images | /kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800/data/valid/labels\r\n"}
+,{"stream_name":"stdout","time":11604.278858747,"data":"device cuda\r\n"}
+,{"stream_name":"stdout","time":11604.278861155,"data":"n_train=800 batches=100\r\n"}
+,{"stream_name":"stdout","time":11604.278863355,"data":"variant=small params=25.33M\r\n"}
+,{"stream_name":"stdout","time":11604.27886565,"data":"epoch 1/20 loss=3.5229 cls=0.4260 box=0.7488 dfl=1.9734 ang=0.3745 topo=0.0002 lr=1.99e-04 t=588.0s\r\n"}
+,{"stream_name":"stdout","time":11604.278867953,"data":"epoch 2/20 loss=2.0363 cls=0.0713 box=0.3519 dfl=1.3011 ang=0.3087 topo=0.0033 lr=1.95e-04 t=580.7s\r\n"}
+,{"stream_name":"stdout","time":11604.27887023,"data":"epoch 3/20 loss=1.7189 cls=0.0190 box=0.2591 dfl=1.1451 ang=0.2938 topo=0.0019 lr=1.89e-04 t=575.9s\r\n"}
+,{"stream_name":"stdout","time":11604.278872493,"data":"epoch 4/20 loss=1.5917 cls=0.0113 box=0.2220 dfl=1.0640 ang=0.2933 topo=0.0011 lr=1.81e-04 t=576.2s\r\n"}
+,{"stream_name":"stdout","time":11604.278874835,"data":"epoch 5/20 loss=1.5093 cls=0.0088 box=0.1976 dfl=1.0065 ang=0.2955 topo=0.0009 lr=1.71e-04 t=574.7s\r\n"}
+,{"stream_name":"stdout","time":11604.278877178,"data":"epoch 6/20 loss=1.4357 cls=0.0075 box=0.1818 dfl=0.9622 ang=0.2835 topo=0.0007 lr=1.59e-04 t=576.0s\r\n"}
+,{"stream_name":"stdout","time":11604.27887947,"data":"epoch 7/20 loss=1.3938 cls=0.0066 box=0.1701 dfl=0.9218 ang=0.2948 topo=0.0005 lr=1.45e-04 t=575.6s\r\n"}
+,{"stream_name":"stdout","time":11604.278881739,"data":"epoch 8/20 loss=1.3351 cls=0.0058 box=0.1595 dfl=0.8914 ang=0.2781 topo=0.0003 lr=1.31e-04 t=576.9s\r\n"}
+,{"stream_name":"stdout","time":11604.278884081,"data":"epoch 9/20 loss=1.3008 cls=0.0053 box=0.1516 dfl=0.8646 ang=0.2791 topo=0.0002 lr=1.16e-04 t=575.5s\r\n"}
+,{"stream_name":"stdout","time":11604.278886359,"data":"epoch 10/20 loss=1.2644 cls=0.0050 box=0.1444 dfl=0.8394 ang=0.2754 topo=0.0002 lr=1.00e-04 t=577.3s\r\n"}
+,{"stream_name":"stdout","time":11604.278888638,"data":"epoch 11/20 loss=1.2430 cls=0.0047 box=0.1386 dfl=0.8174 ang=0.2821 topo=0.0002 lr=8.44e-05 t=577.0s\r\n"}
+,{"stream_name":"stdout","time":11604.278890907,"data":"epoch 12/20 loss=1.2191 cls=0.0045 box=0.1346 dfl=0.8034 ang=0.2765 topo=0.0002 lr=6.91e-05 t=575.9s\r\n"}
+,{"stream_name":"stdout","time":11604.278894143,"data":"epoch 13/20 loss=1.1925 cls=0.0043 box=0.1304 dfl=0.7846 ang=0.2731 topo=0.0001 lr=5.46e-05 t=575.8s\r\n"}
+,{"stream_name":"stdout","time":11604.278896485,"data":"epoch 14/20 loss=1.1732 cls=0.0042 box=0.1273 dfl=0.7732 ang=0.2684 topo=0.0001 lr=4.12e-05 t=576.0s\r\n"}
+,{"stream_name":"stdout","time":11604.278898857,"data":"epoch 15/20 loss=1.1698 cls=0.0041 box=0.1251 dfl=0.7639 ang=0.2766 topo=0.0001 lr=2.93e-05 t=604.8s\r\n"}
+,{"stream_name":"stdout","time":11604.278901128,"data":"epoch 16/20 loss=1.1535 cls=0.0040 box=0.1225 dfl=0.7546 ang=0.2722 topo=0.0001 lr=1.91e-05 t=577.5s\r\n"}
+,{"stream_name":"stdout","time":11604.278903401,"data":"epoch 17/20 loss=1.1396 cls=0.0039 box=0.1212 dfl=0.7482 ang=0.2662 topo=0.0001 lr=1.09e-05 t=578.6s\r\n"}
+,{"stream_name":"stdout","time":11604.278911147,"data":"epoch 18/20 loss=1.1335 cls=0.0039 box=0.1202 dfl=0.7451 ang=0.2641 topo=0.0001 lr=4.89e-06 t=577.4s\r\n"}
+,{"stream_name":"stdout","time":11604.278913913,"data":"epoch 19/20 loss=1.1386 cls=0.0039 box=0.1198 dfl=0.7431 ang=0.2717 topo=0.0001 lr=1.23e-06 t=577.8s\r\n"}
+,{"stream_name":"stdout","time":11604.278916216,"data":"epoch 20/20 loss=1.1405 cls=0.0039 box=0.1189 dfl=0.7412 ang=0.2765 topo=0.0001 lr=0.00e+00 t=577.4s\r\n"}
+,{"stream_name":"stdout","time":11604.278918546,"data":"saved to /kaggle/working/runs/vlmdet_small\r\n"}
+,{"stream_name":"stdout","time":11606.658156983,"data":"\u001b[?25l     \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m0.0/46.7 kB\u001b[0m \u001b[31m?\u001b[0m eta \u001b[36m-:--:--\u001b[0m\r\u001b[2K     \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m46.7/46.7 kB\u001b[0m \u001b[31m3.3 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\r\n"}
+,{"stream_name":"stdout","time":11607.0625923,"data":"\u001b[?25h\u001b[?25l   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m0.0/1.5 MB\u001b[0m \u001b[31m?\u001b[0m eta \u001b[36m-:--:--\u001b[0m\r\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m1.5/1.5 MB\u001b[0m \u001b[31m58.8 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\r\n"}
+,{"stream_name":"stdout","time":11607.062627067,"data":"\u001b[?25h\u001b[?25l   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m0.0/88.7 kB\u001b[0m \u001b[31m?\u001b[0m eta \u001b[36m-:--:--\u001b[0m\r\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m88.7/88.7 kB\u001b[0m \u001b[31m8.1 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\r\n"}
+,{"stream_name":"stdout","time":13608.74202856,"data":"\u001b[?25hOptimizer stripped from /kaggle/working/runs/yolo11x/train/weights/best.pt, 118.3MB\r\n"}
+,{"stream_name":"stdout","time":13608.742081169,"data":"\r\n"}
+,{"stream_name":"stdout","time":13608.742086466,"data":"Validating /kaggle/working/runs/yolo11x/train/weights/best.pt...\r\n"}
+,{"stream_name":"stdout","time":13608.742089833,"data":"Ultralytics 8.4.159 🚀 Python-3.12.13 torch-2.10.0+cu128 CUDA:0 (Tesla T4, 14912MiB)\r\n"}
+,{"stream_name":"stdout","time":13608.742093558,"data":"YOLO11x-obb summary (fused): 199 layers, 58,743,688 parameters, 0 gradients, 203.1 GFLOPs\r\n"}
+,{"stream_name":"stdout","time":13608.742113582,"data":"\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 4% ──────────── 1/25 9.9s/it 3.0s\u003c3:58\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 8% ╸─────────── 2/25 5.7s/it 5.8s\u003c2:11\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 12% ━─────────── 3/25 4.0s/it 8.2s\u003c1:29\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 16% ━╸────────── 4/25 3.8s/it 11.5s\u003c1:19\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 20% ━━────────── 5/25 1.2s/it 12.0s\u003c23.9s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 24% ━━╸───────── 6/25 1.3it/s 12.4s\u003c14.8s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 28% ━━━───────── 7/25 1.6it/s 12.9s\u003c11.4s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 32% ━━━╸──────── 8/25 1.8it/s 13.3s\u003c9.2s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 36% ━━━━──────── 9/25 2.0it/s 13.7s\u003c8.0s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 40% ━━━━╸─────── 10/25 2.1it/s 14.1s\u003c7.2s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 44% ━━━━━─────── 11/25 2.1it/s 14.6s\u003c6.5s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 48% ━━━━━╸────── 12/25 2.2it/s 15.0s\u003c5.9s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 52% ━━━━━━────── 13/25 2.2it/s 15.5s\u003c5.4s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 56% ━━━━━━╸───── 14/25 2.2it/s 15.9s\u003c4.9s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 60% ━━━━━━━───── 15/25 2.3it/s 16.3s\u003c4.3s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 64% ━━━━━━━╸──── 16/25 2.3it/s 16.7s\u003c3.8s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 68% ━━━━━━━━──── 17/25 2.3it/s 17.1s\u003c3.4s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 72% ━━━━━━━━╸─── 18/25 2.3it/s 17.6s\u003c3.1s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 76% ━━━━━━━━━─── 19/25 2.2it/s 18.1s\u003c2.7s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 80% ━━━━━━━━━╸── 20/25 2.2it/s 18.5s\u003c2.2s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 84% ━━━━━━━━━━── 21/25 2.2it/s 19.0s\u003c1.8s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 88% ━━━━━━━━━━╸─ 22/25 2.3it/s 19.4s\u003c1.3s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 92% ━━━━━━━━━━━─ 23/25 2.2it/s 19.8s\u003c0.9s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 96% ━━━━━━━━━━━╸ 24/25 2.3it/s 20.3s\u003c0.4s\r\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% ━━━━━━━━━━━━ 25/25 1.2it/s 20.7s\r\n"}
+,{"stream_name":"stdout","time":13608.742154594,"data":"                   all        200      29488      0.827      0.704      0.772      0.584\r\n"}
+,{"stream_name":"stdout","time":13608.7421586,"data":"                  wall        200      13584      0.878      0.838      0.875      0.665\r\n"}
+,{"stream_name":"stdout","time":13608.742162122,"data":"                window        198       2256      0.807      0.826      0.868      0.695\r\n"}
+,{"stream_name":"stdout","time":13608.742166265,"data":"                  door        194       2116      0.857      0.539      0.682      0.482\r\n"}
+,{"stream_name":"stdout","time":13608.742170461,"data":"            slide_door        131        377      0.645      0.491      0.558       0.39\r\n"}
+,{"stream_name":"stdout","time":13608.742174499,"data":"           double_door        122        310      0.855      0.626       0.71      0.499\r\n"}
+,{"stream_name":"stdout","time":13608.74218168,"data":"              junction        200      10845      0.919      0.906       0.94       0.77\r\n"}
+,{"stream_name":"stdout","time":13608.742185314,"data":"Speed: 0.7ms preprocess, 55.5ms inference, 0.0ms loss, 18.4ms postprocess per image\r\n"}
+,{"stream_name":"stdout","time":13608.742188759,"data":"Results saved to \u001b[1m/kaggle/working/runs/yolo11x/train\u001b[0m\r\n"}
+,{"stream_name":"stdout","time":13609.013107268,"data":"vlmdet_small  yolo11x\r\n"}
+,{"stream_name":"stdout","time":13609.013146506,"data":"best.pt  last.pt\r\n"}
+,{"stream_name":"stdout","time":13619.626941218,"data":"/kaggle/working/model.py:85: UserWarning: enable_nested_tensor is True, but self.use_nested_tensor is False because encoder_layer.norm_first was True\r\n"}
+,{"stream_name":"stdout","time":13619.627018637,"data":"  self.enc = nn.TransformerEncoder(enc, num_layers=layers)\r\n"}
+,{"stream_name":"stdout","time":13619.627026755,"data":"19103-1.png -\u003e 190 boxes\r\n"}
+,{"stream_name":"stdout","time":13619.627031892,"data":"19104-2.png -\u003e 25 boxes\r\n"}
+,{"stream_name":"stdout","time":13619.627036182,"data":"19113-2.png -\u003e 42 boxes\r\n"}
+,{"stream_name":"stdout","time":13619.627040563,"data":"19113-3.png -\u003e 79 boxes\r\n"}
+,{"stream_name":"stdout","time":13619.627044842,"data":"19117-1.png -\u003e 357 boxes\r\n"}
+,{"stream_name":"stdout","time":13619.627054618,"data":"19118-1.png -\u003e 270 boxes\r\n"}
+,{"stream_name":"stdout","time":13619.627057965,"data":"19119-1.png -\u003e 177 boxes\r\n"}
+,{"stream_name":"stdout","time":13619.627074551,"data":"19122-2.png -\u003e 214 boxes\r\n"}
+,{"stream_name":"stdout","time":13619.627079288,"data":"19124-2.png -\u003e 47 boxes\r\n"}
+,{"stream_name":"stdout","time":13619.627083747,"data":"1913-2.png -\u003e 113 boxes\r\n"}
+,{"stream_name":"stdout","time":13619.627089852,"data":"19133-1.png -\u003e 407 boxes\r\n"}
+,{"stream_name":"stdout","time":13619.627095971,"data":"19135-2.png -\u003e 281 boxes\r\n"}
+,{"stream_name":"stderr","time":13622.598650491,"data":"/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":13622.598707925,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":13622.737020883,"data":"/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":13622.737059208,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":13623.312342219,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to notebook\n"}
+,{"stream_name":"stderr","time":13623.601078817,"data":"[NbConvertApp] Writing 14055 bytes to __notebook__.ipynb\n"}
+,{"stream_name":"stderr","time":13625.892092617,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to html\n"}
+,{"stream_name":"stderr","time":13626.66474164,"data":"[NbConvertApp] Writing 290538 bytes to __results__.html\n"}
+]

@@ -1,0 +1,17 @@
+.env
+*.zip
+*.pt
+*.pth
+*.onnx
+*.engine
+__pycache__/
+.pytest_cache/
+# datasets / images
+cad_vlmdet/micro/
+cad_vlmdet/subset/
+**/images/
+**/labels/
+datasets/
+runs/
+kaggle_pkg/kernel/**/runs/
+kaggle_pkg/kernel/**/weights/

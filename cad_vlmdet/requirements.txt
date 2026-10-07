@@ -1,0 +1,7 @@
+torch>=2.2
+numpy
+opencv-python-headless
+pillow
+# kaggle gpu only:
+# ultralytics>=8.3  (baseline YOLO11x/YOLO26x-OBB, AGPL - chỉ dùng để so sánh, không ship)
+# kaggle>=1.6

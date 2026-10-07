@@ -1,0 +1,21 @@
+W= ['/kaggle/input/floorplan-vlmdet-train/runs/vlmdet_small4/best.pt']
+/kaggle/working/dataset.py    /kaggle/working/loss.py
+### /kaggle/input/floorplan-vlmdet-train/runs/vlmdet_small4/best.pt
+wall         AP50(HBB-proxy)=0.122 npred=74024 ngt=13584
+window       AP50(HBB-proxy)=0.098 npred=845 ngt=2256
+door         AP50(HBB-proxy)=0.000 npred=0 ngt=2116
+slide_door   AP50(HBB-proxy)=0.000 npred=0 ngt=377
+double_door  AP50(HBB-proxy)=0.000 npred=0 ngt=310
+junction     AP50(HBB-proxy)=0.790 npred=25014 ngt=10845
+wall         AP50(HBB-proxy)=0.122 npred=73631 ngt=13584
+window       AP50(HBB-proxy)=0.098 npred=842 ngt=2256
+door         AP50(HBB-proxy)=0.000 npred=0 ngt=2116
+slide_door   AP50(HBB-proxy)=0.000 npred=0 ngt=377
+double_door  AP50(HBB-proxy)=0.000 npred=0 ngt=310
+junction     AP50(HBB-proxy)=0.790 npred=24899 ngt=10845
+wall         AP50(HBB-proxy)=0.122 npred=72705 ngt=13584
+window       AP50(HBB-proxy)=0.098 npred=839 ngt=2256
+door         AP50(HBB-proxy)=0.000 npred=0 ngt=2116
+slide_door   AP50(HBB-proxy)=0.000 npred=0 ngt=377
+double_door  AP50(HBB-proxy)=0.000 npred=0 ngt=310
+junction     AP50(HBB-proxy)=0.790 npred=24562 ngt=10845

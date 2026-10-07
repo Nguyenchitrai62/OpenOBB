@@ -1,0 +1,190 @@
+2.10.0+cu128 True
+name, memory.total [MiB]
+
+Tesla T4, 15360 MiB
+
+Tesla T4, 15360 MiB
+
+['/kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800']
+/kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800
+['infer.py', 'train.py', 'infer_run.py', 'model.py', 'loss.py', 'yolo_baseline.py', 'dataset.py', 'data', 'data_kaggle.yaml']
+OLD yaml:
+train: /kaggle/input/floorplan-vlmdet-800/data/train/images
+val: /kaggle/input/floorplan-vlmdet-800/data/valid/images
+nc: 7
+names: [wall, window, door, slide_door, double_door, opening, junction]
+
+NEW yaml:
+train: /kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800/data/train/images
+val: /kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800/data/valid/images
+nc: 7
+names: [wall, window, door, slide_door, double_door, opening, junction]
+
+800
+
+200
+
+/kaggle/working/dataset.py    /kaggle/working/model.py
+
+/kaggle/working/infer.py      /kaggle/working/train.py
+
+/kaggle/working/infer_run.py  /kaggle/working/yolo_baseline.py
+
+/kaggle/working/loss.py
+
+  self.enc = nn.TransformerEncoder(enc, num_layers=layers)
+
+/kaggle/working/loss.py:159: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+
+Consider using tensor.detach() first. (Triggered internally at /pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:836.)
+
+  "cls": float(total_cls / n),
+
+train /kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800/data/train/images | /kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800/data/train/labels
+
+valid /kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800/data/valid/images | /kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800/data/valid/labels
+
+device cuda
+
+n_train=800 batches=100
+
+variant=small params=25.33M
+
+epoch 1/20 loss=3.5229 cls=0.4260 box=0.7488 dfl=1.9734 ang=0.3745 topo=0.0002 lr=1.99e-04 t=588.0s
+
+epoch 2/20 loss=2.0363 cls=0.0713 box=0.3519 dfl=1.3011 ang=0.3087 topo=0.0033 lr=1.95e-04 t=580.7s
+
+epoch 3/20 loss=1.7189 cls=0.0190 box=0.2591 dfl=1.1451 ang=0.2938 topo=0.0019 lr=1.89e-04 t=575.9s
+
+epoch 4/20 loss=1.5917 cls=0.0113 box=0.2220 dfl=1.0640 ang=0.2933 topo=0.0011 lr=1.81e-04 t=576.2s
+
+epoch 5/20 loss=1.5093 cls=0.0088 box=0.1976 dfl=1.0065 ang=0.2955 topo=0.0009 lr=1.71e-04 t=574.7s
+
+epoch 6/20 loss=1.4357 cls=0.0075 box=0.1818 dfl=0.9622 ang=0.2835 topo=0.0007 lr=1.59e-04 t=576.0s
+
+epoch 7/20 loss=1.3938 cls=0.0066 box=0.1701 dfl=0.9218 ang=0.2948 topo=0.0005 lr=1.45e-04 t=575.6s
+
+epoch 8/20 loss=1.3351 cls=0.0058 box=0.1595 dfl=0.8914 ang=0.2781 topo=0.0003 lr=1.31e-04 t=576.9s
+
+epoch 9/20 loss=1.3008 cls=0.0053 box=0.1516 dfl=0.8646 ang=0.2791 topo=0.0002 lr=1.16e-04 t=575.5s
+
+epoch 10/20 loss=1.2644 cls=0.0050 box=0.1444 dfl=0.8394 ang=0.2754 topo=0.0002 lr=1.00e-04 t=577.3s
+
+epoch 11/20 loss=1.2430 cls=0.0047 box=0.1386 dfl=0.8174 ang=0.2821 topo=0.0002 lr=8.44e-05 t=577.0s
+
+epoch 12/20 loss=1.2191 cls=0.0045 box=0.1346 dfl=0.8034 ang=0.2765 topo=0.0002 lr=6.91e-05 t=575.9s
+
+epoch 13/20 loss=1.1925 cls=0.0043 box=0.1304 dfl=0.7846 ang=0.2731 topo=0.0001 lr=5.46e-05 t=575.8s
+
+epoch 14/20 loss=1.1732 cls=0.0042 box=0.1273 dfl=0.7732 ang=0.2684 topo=0.0001 lr=4.12e-05 t=576.0s
+
+epoch 15/20 loss=1.1698 cls=0.0041 box=0.1251 dfl=0.7639 ang=0.2766 topo=0.0001 lr=2.93e-05 t=604.8s
+
+epoch 16/20 loss=1.1535 cls=0.0040 box=0.1225 dfl=0.7546 ang=0.2722 topo=0.0001 lr=1.91e-05 t=577.5s
+
+epoch 17/20 loss=1.1396 cls=0.0039 box=0.1212 dfl=0.7482 ang=0.2662 topo=0.0001 lr=1.09e-05 t=578.6s
+
+epoch 18/20 loss=1.1335 cls=0.0039 box=0.1202 dfl=0.7451 ang=0.2641 topo=0.0001 lr=4.89e-06 t=577.4s
+
+epoch 19/20 loss=1.1386 cls=0.0039 box=0.1198 dfl=0.7431 ang=0.2717 topo=0.0001 lr=1.23e-06 t=577.8s
+
+epoch 20/20 loss=1.1405 cls=0.0039 box=0.1189 dfl=0.7412 ang=0.2765 topo=0.0001 lr=0.00e+00 t=577.4s
+
+saved to /kaggle/working/runs/vlmdet_small
+
+[?25l     [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m0.0/46.7 kB[0m [31m?[0m eta [36m-:--:--[0m
+[2K     [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m46.7/46.7 kB[0m [31m3.3 MB/s[0m eta [36m0:00:00[0m
+
+[?25h[?25l   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m0.0/1.5 MB[0m [31m?[0m eta [36m-:--:--[0m
+[2K   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m1.5/1.5 MB[0m [31m58.8 MB/s[0m eta [36m0:00:00[0m
+
+[?25h[?25l   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m0.0/88.7 kB[0m [31m?[0m eta [36m-:--:--[0m
+[2K   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m88.7/88.7 kB[0m [31m8.1 MB/s[0m eta [36m0:00:00[0m
+
+[?25hOptimizer stripped from /kaggle/working/runs/yolo11x/train/weights/best.pt, 118.3MB
+
+
+
+Validating /kaggle/working/runs/yolo11x/train/weights/best.pt...
+
+Ultralytics 8.4.159 🚀 Python-3.12.13 torch-2.10.0+cu128 CUDA:0 (Tesla T4, 14912MiB)
+
+YOLO11x-obb summary (fused): 199 layers, 58,743,688 parameters, 0 gradients, 203.1 GFLOPs
+
+
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 4% ──────────── 1/25 9.9s/it 3.0s<3:58
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 8% ╸─────────── 2/25 5.7s/it 5.8s<2:11
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 12% ━─────────── 3/25 4.0s/it 8.2s<1:29
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 16% ━╸────────── 4/25 3.8s/it 11.5s<1:19
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 20% ━━────────── 5/25 1.2s/it 12.0s<23.9s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 24% ━━╸───────── 6/25 1.3it/s 12.4s<14.8s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 28% ━━━───────── 7/25 1.6it/s 12.9s<11.4s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 32% ━━━╸──────── 8/25 1.8it/s 13.3s<9.2s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 36% ━━━━──────── 9/25 2.0it/s 13.7s<8.0s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 40% ━━━━╸─────── 10/25 2.1it/s 14.1s<7.2s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 44% ━━━━━─────── 11/25 2.1it/s 14.6s<6.5s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 48% ━━━━━╸────── 12/25 2.2it/s 15.0s<5.9s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 52% ━━━━━━────── 13/25 2.2it/s 15.5s<5.4s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 56% ━━━━━━╸───── 14/25 2.2it/s 15.9s<4.9s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 60% ━━━━━━━───── 15/25 2.3it/s 16.3s<4.3s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 64% ━━━━━━━╸──── 16/25 2.3it/s 16.7s<3.8s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 68% ━━━━━━━━──── 17/25 2.3it/s 17.1s<3.4s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 72% ━━━━━━━━╸─── 18/25 2.3it/s 17.6s<3.1s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 76% ━━━━━━━━━─── 19/25 2.2it/s 18.1s<2.7s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 80% ━━━━━━━━━╸── 20/25 2.2it/s 18.5s<2.2s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 84% ━━━━━━━━━━── 21/25 2.2it/s 19.0s<1.8s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 88% ━━━━━━━━━━╸─ 22/25 2.3it/s 19.4s<1.3s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 92% ━━━━━━━━━━━─ 23/25 2.2it/s 19.8s<0.9s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 96% ━━━━━━━━━━━╸ 24/25 2.3it/s 20.3s<0.4s
+[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% ━━━━━━━━━━━━ 25/25 1.2it/s 20.7s
+
+                   all        200      29488      0.827      0.704      0.772      0.584
+
+                  wall        200      13584      0.878      0.838      0.875      0.665
+
+                window        198       2256      0.807      0.826      0.868      0.695
+
+                  door        194       2116      0.857      0.539      0.682      0.482
+
+            slide_door        131        377      0.645      0.491      0.558       0.39
+
+           double_door        122        310      0.855      0.626       0.71      0.499
+
+              junction        200      10845      0.919      0.906       0.94       0.77
+
+Speed: 0.7ms preprocess, 55.5ms inference, 0.0ms loss, 18.4ms postprocess per image
+
+Results saved to [1m/kaggle/working/runs/yolo11x/train[0m
+
+vlmdet_small  yolo11x
+
+best.pt  last.pt
+
+/kaggle/working/model.py:85: UserWarning: enable_nested_tensor is True, but self.use_nested_tensor is False because encoder_layer.norm_first was True
+
+  self.enc = nn.TransformerEncoder(enc, num_layers=layers)
+
+19103-1.png -> 190 boxes
+
+19104-2.png -> 25 boxes
+
+19113-2.png -> 42 boxes
+
+19113-3.png -> 79 boxes
+
+19117-1.png -> 357 boxes
+
+19118-1.png -> 270 boxes
+
+19119-1.png -> 177 boxes
+
+19122-2.png -> 214 boxes
+
+19124-2.png -> 47 boxes
+
+1913-2.png -> 113 boxes
+
+19133-1.png -> 407 boxes
+
+19135-2.png -> 281 boxes
+

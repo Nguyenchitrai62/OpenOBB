@@ -1,0 +1,76 @@
+[2026-09-22 21:46:01] chua co evidence GPU (kernel v4 RUNNING). Cho watcher 5-phut. Khong dot quota.
+[2026-09-22 21:55:24] evidence co 60 dong, 32 dong mAP.
+[2026-09-22 21:55:24] EVID: [K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 76% ━━━━━━━━━─── 19/25 2.2it/s 18.1s<2.7s
+[2026-09-22 22:14:24] evidence co 9 dong, 3 dong mAP.
+[2026-09-22 22:14:24] EVID: ['/kaggle/input/floorplan-vlmdet-train/runs/vlmdet_small/best.pt', '/kaggle/input/floorplan-vlmdet-train/runs/yolo11x/train/weights/best.pt']
+[2026-09-22 22:14:24] EVID: W= /kaggle/input/floorplan-vlmdet-train/runs/vlmdet_small/best.pt
+[2026-09-22 22:14:24] EVID: wall         AP50(HBB-proxy)=0.040
+[2026-09-22 22:14:24] De nghi: so sanh VLMDet-small vs yolo11x cung dieu kien; neu cua hiem/junction hon >=2 diem -> CHOT D4 (base full 16k); nguoc lai -> D1/D2/D3 theo class loi nhat.
+[2026-09-22 22:35:59] evidence co 9 dong, 3 dong mAP.
+[2026-09-22 22:35:59] EVID: ['/kaggle/input/floorplan-vlmdet-train/runs/vlmdet_small/best.pt', '/kaggle/input/floorplan-vlmdet-train/runs/yolo11x/train/weights/best.pt']
+[2026-09-22 22:35:59] EVID: W= /kaggle/input/floorplan-vlmdet-train/runs/vlmdet_small/best.pt
+[2026-09-22 22:35:59] EVID: wall         AP50(HBB-proxy)=0.040
+[2026-09-22 22:35:59] De nghi: so sanh VLMDet-small vs yolo11x cung dieu kien; neu cua hiem/junction hon >=2 diem -> CHOT D4 (base full 16k); nguoc lai -> D1/D2/D3 theo class loi nhat.
+[2026-09-23 02:46:02] evidence co 30 dong, 4 dong mAP.
+[2026-09-23 02:46:02] EVID: names: [wall, window, door, slide_door, double_door, opening, junction]
+[2026-09-23 02:46:02] EVID: variant=small params=25.33M
+[2026-09-23 02:46:02] EVID: saved to /kaggle/working/runs/vlmdet_small2
+[2026-09-23 02:46:02] EVID: wall         AP50(HBB-proxy)=0.126
+[2026-09-23 02:46:02] De nghi: so sanh VLMDet-small vs yolo11x cung dieu kien; neu cua hiem/junction hon >=2 diem -> CHOT D4 (base full 16k); nguoc lai -> D1/D2/D3 theo class loi nhat.
+[2026-09-23 08:30:00] evidence co 30 dong, 4 dong mAP.
+[2026-09-23 08:30:00] EVID: names: [wall, window, door, slide_door, double_door, opening, junction]
+[2026-09-23 08:30:00] EVID: variant=small params=25.33M
+[2026-09-23 08:30:00] EVID: saved to /kaggle/working/runs/vlmdet_small2
+[2026-09-23 08:30:00] EVID: wall         AP50(HBB-proxy)=0.126
+[2026-09-23 08:30:00] De nghi: so sanh VLMDet-small vs yolo11x cung dieu kien; neu cua hiem/junction hon >=2 diem -> CHOT D4 (base full 16k); nguoc lai -> D1/D2/D3 theo class loi nhat.
+[2026-09-23 08:32:12] evidence co 30 dong, 4 dong mAP.
+[2026-09-23 08:32:12] EVID: names: [wall, window, door, slide_door, double_door, opening, junction]
+[2026-09-23 08:32:12] EVID: variant=small params=25.33M
+[2026-09-23 08:32:12] EVID: saved to /kaggle/working/runs/vlmdet_small2
+[2026-09-23 08:32:12] EVID: wall         AP50(HBB-proxy)=0.126
+[2026-09-23 08:32:12] De nghi: so sanh VLMDet-small vs yolo11x cung dieu kien; neu cua hiem/junction hon >=2 diem -> CHOT D4 (base full 16k); nguoc lai -> D1/D2/D3 theo class loi nhat.
+[2026-09-23 08:56:13] evidence co 38 dong, 7 dong mAP.
+[2026-09-23 08:56:13] EVID: W= ['/kaggle/input/floorplan-vlmdet-train/runs/vlmdet_small2/best.pt']
+[2026-09-23 08:56:13] EVID: wall         AP50(HBB-proxy)=0.126 npred=72301 ngt=13584
+[2026-09-23 08:56:13] EVID: wall         AP50(HBB-proxy)=0.150 npred=66008 ngt=13584
+[2026-09-23 08:56:13] EVID: wall         AP50(HBB-proxy)=0.126 npred=71073 ngt=13584
+[2026-09-23 08:56:13] EVID: wall         AP50(HBB-proxy)=0.150 npred=63571 ngt=13584
+[2026-09-23 08:56:13] EVID: wall         AP50(HBB-proxy)=0.126 npred=69501 ngt=13584
+[2026-09-23 08:56:13] EVID: wall         AP50(HBB-proxy)=0.150 npred=61105 ngt=13584
+[2026-09-23 08:56:13] De nghi: so sanh VLMDet-small vs yolo11x cung dieu kien; neu cua hiem/junction hon >=2 diem -> CHOT D4 (base full 16k); nguoc lai -> D1/D2/D3 theo class loi nhat.
+[2026-09-23 09:16:58] evidence co 38 dong, 7 dong mAP.
+[2026-09-23 09:16:58] EVID: W= ['/kaggle/input/floorplan-vlmdet-train/runs/vlmdet_small2/best.pt']
+[2026-09-23 09:16:58] EVID: wall         AP50(HBB-proxy)=0.126 npred=72301 ngt=13584
+[2026-09-23 09:16:58] EVID: wall         AP50(HBB-proxy)=0.150 npred=66008 ngt=13584
+[2026-09-23 09:16:58] EVID: wall         AP50(HBB-proxy)=0.126 npred=71073 ngt=13584
+[2026-09-23 09:16:58] EVID: wall         AP50(HBB-proxy)=0.150 npred=63571 ngt=13584
+[2026-09-23 09:16:58] EVID: wall         AP50(HBB-proxy)=0.126 npred=69501 ngt=13584
+[2026-09-23 09:16:58] EVID: wall         AP50(HBB-proxy)=0.150 npred=61105 ngt=13584
+[2026-09-23 09:16:58] De nghi: so sanh VLMDet-small vs yolo11x cung dieu kien; neu cua hiem/junction hon >=2 diem -> CHOT D4 (base full 16k); nguoc lai -> D1/D2/D3 theo class loi nhat.
+[v8-running] Khung ablation H2 xong local: small full 25.33M / noreason 20.89M / nogcam 24.38M, forward OK, fix UserWarning loss stats. Staged cho dataset tiep theo. Cho v8 de quyet v9.
+[2026-09-23 13:11:39] evidence co 29 dong, 3 dong mAP.
+[2026-09-23 13:11:39] EVID: variant=small params=25.33M
+[2026-09-23 13:11:39] EVID: saved to /kaggle/working/runs/vlmdet_small3
+[2026-09-23 13:11:39] EVID: wall         AP50(HBB-proxy)=0.125 npred=68513 ngt=13584
+[2026-09-23 13:11:39] De nghi: so sanh VLMDet-small vs yolo11x cung dieu kien; neu cua hiem/junction hon >=2 diem -> CHOT D4 (base full 16k); nguoc lai -> D1/D2/D3 theo class loi nhat.
+[2026-09-23 13:45:45] evidence co 29 dong, 3 dong mAP.
+[2026-09-23 13:45:45] EVID: variant=small params=25.33M
+[2026-09-23 13:45:45] EVID: saved to /kaggle/working/runs/vlmdet_small3
+[2026-09-23 13:45:45] EVID: wall         AP50(HBB-proxy)=0.125 npred=68513 ngt=13584
+[2026-09-23 13:45:45] De nghi: so sanh VLMDet-small vs yolo11x cung dieu kien; neu cua hiem/junction hon >=2 diem -> CHOT D4 (base full 16k); nguoc lai -> D1/D2/D3 theo class loi nhat.
+[2026-09-24 09:07:25] evidence co 28 dong, 2 dong mAP.
+[2026-09-24 09:07:25] EVID: variant=small ablate=noreason params=20.89M
+[2026-09-24 09:07:25] EVID: wall         AP50(HBB-proxy)=0.115 npred=70515 ngt=13584
+[2026-09-24 09:07:25] De nghi: so sanh VLMDet-small vs yolo11x cung dieu kien; neu cua hiem/junction hon >=2 diem -> CHOT D4 (base full 16k); nguoc lai -> D1/D2/D3 theo class loi nhat.
+[2026-09-24 14:13:00] evidence co 29 dong, 3 dong mAP.
+[2026-09-24 14:13:00] EVID: variant=small ablate=None params=25.33M
+[2026-09-24 14:13:00] EVID: saved to /kaggle/working/runs/vlmdet_small4
+[2026-09-24 14:13:00] EVID: wall         AP50(HBB-proxy)=0.122 npred=71740 ngt=13584
+[2026-09-24 14:13:00] De nghi: so sanh VLMDet-small vs yolo11x cung dieu kien; neu cua hiem/junction hon >=2 diem -> CHOT D4 (base full 16k); nguoc lai -> D1/D2/D3 theo class loi nhat.
+[2026-09-24 15:42:44] evidence co 21 dong, 5 dong mAP.
+[2026-09-24 15:42:45] EVID: W= ['/kaggle/input/floorplan-vlmdet-train/runs/vlmdet_small4/best.pt']
+[2026-09-24 15:42:45] EVID: ### /kaggle/input/floorplan-vlmdet-train/runs/vlmdet_small4/best.pt
+[2026-09-24 15:42:45] EVID: wall         AP50(HBB-proxy)=0.122 npred=74024 ngt=13584
+[2026-09-24 15:42:45] EVID: wall         AP50(HBB-proxy)=0.122 npred=73631 ngt=13584
+[2026-09-24 15:42:45] EVID: wall         AP50(HBB-proxy)=0.122 npred=72705 ngt=13584
+[2026-09-24 15:42:45] De nghi: so sanh VLMDet-small vs yolo11x cung dieu kien; neu cua hiem/junction hon >=2 diem -> CHOT D4 (base full 16k); nguoc lai -> D1/D2/D3 theo class loi nhat.

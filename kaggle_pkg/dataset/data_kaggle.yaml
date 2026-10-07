@@ -1,0 +1,4 @@
+train: /kaggle/input/floorplan-vlmdet-800/data/train/images
+val: /kaggle/input/floorplan-vlmdet-800/data/valid/images
+nc: 7
+names: [wall, window, door, slide_door, double_door, opening, junction]

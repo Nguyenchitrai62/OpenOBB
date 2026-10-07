@@ -1,0 +1,59 @@
+2.10.0+cu128 True
+name, memory.total [MiB]
+Tesla T4, 15360 MiB
+Tesla T4, 15360 MiB
+['/kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800']
+/kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800
+['infer.py', 'train.py', 'infer_run.py', 'model.py', 'loss.py', 'yolo_baseline.py', 'dataset.py', 'data', 'data_kaggle.yaml']
+800
+/kaggle/working/dataset.py    /kaggle/working/model.py
+/kaggle/working/infer.py      /kaggle/working/train.py
+/kaggle/working/infer_run.py  /kaggle/working/yolo_baseline.py
+/kaggle/working/loss.py
+train /kaggle/input/floorplan-vlmdet-800/data/train/images | /kaggle/input/floorplan-vlmdet-800/data/train/labels
+valid /kaggle/input/floorplan-vlmdet-800/data/valid/images | /kaggle/input/floorplan-vlmdet-800/data/valid/labels
+device cuda
+Traceback (most recent call last):
+  File "/kaggle/working/train.py", line 91, in <module>
+    main()
+  File "/kaggle/working/train.py", line 49, in main
+    train_ds = OBBDataset(tri, trl, imgsz=args.imgsz, augment=True)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/kaggle/working/dataset.py", line 30, in __init__
+    self.imgs = sorted([f for f in os.listdir(img_dir) if f.lower().endswith((".png", ".jpg", ".jpeg"))])
+                                   ^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/kaggle/input/floorplan-vlmdet-800/data/train/images'
+[?25l     [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m0.0/46.7 kB[0m [31m?[0m eta [36m-:--:--[0m[2K     [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m46.7/46.7 kB[0m [31m1.5 MB/s[0m eta [36m0:00:00[0m
+[?25h[?25l   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m0.0/1.5 MB[0m [31m?[0m eta [36m-:--:--[0m[2K   [91m━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m0.3/1.5 MB[0m [31m8.1 MB/s[0m eta [36m0:00:01[0m[2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━[0m [32m1.4/1.5 MB[0m [31m21.7 MB/s[0m eta [36m0:00:01[0m[2K   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m1.5/1.5 MB[0m [31m16.8 MB/s[0m eta [36m0:00:00[0m
+[?25h[?25l   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m0.0/88.7 kB[0m [31m?[0m eta [36m-:--:--[0m[2K   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m88.7/88.7 kB[0m [31m7.9 MB/s[0m eta [36m0:00:00[0m
+[?25h    m.train(data=args.data, epochs=args.epochs, imgsz=args.imgsz, batch=args.batch,
+  File "/usr/local/lib/python3.12/dist-packages/ultralytics/engine/model.py", line 870, in train
+    self.trainer = (trainer or self._smart_load("trainer"))(overrides=args, _callbacks=self.callbacks)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/ultralytics/models/yolo/obb/train.py", line 46, in __init__
+    super().__init__(cfg, overrides, _callbacks)
+  File "/usr/local/lib/python3.12/dist-packages/ultralytics/models/yolo/detect/train.py", line 62, in __init__
+    super().__init__(cfg, overrides, _callbacks)
+  File "/usr/local/lib/python3.12/dist-packages/ultralytics/engine/trainer.py", line 194, in __init__
+    self.data = self.get_dataset()
+                ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/ultralytics/engine/trainer.py", line 835, in get_dataset
+    raise RuntimeError(emojis(f"Dataset '{clean_url(self.args.data)}' error ❌ {e}")) from e
+RuntimeError: Dataset '/kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800/data_kaggle.yaml' error ❌ Dataset '/kaggle/input/datasets/nguynchtrai/floorplan-vlmdet-800/data_kaggle.yaml' images not found, missing path '/kaggle/input/floorplan-vlmdet-800/data/valid/images'
+Note dataset download directory is '/kaggle/working/datasets'. You can update this in '/root/.config/Ultralytics/settings.json'
+vlmdet_small  yolo11x
+  File "/kaggle/working/infer_run.py", line 52, in <module>
+    main()
+  File "/kaggle/working/infer_run.py", line 41, in main
+    ck = torch.load(args.ckpt, map_location="cpu")
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/torch/serialization.py", line 1500, in load
+    with _open_file_like(f, "rb") as opened_file:
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/torch/serialization.py", line 768, in _open_file_like
+    return _open_file(name_or_buffer, mode)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/torch/serialization.py", line 749, in __init__
+    super().__init__(open(name, mode))  # noqa: SIM115
+                     ^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/kaggle/working/runs/vlmdet_small/best.pt'
