@@ -132,3 +132,8 @@
 [2026-10-07 20:53:07] e3-ctx-fix-s: launching attempt 2 on G4 as session e3-ctx-fix-s-2
 [2026-10-07 20:53:33] e3-ctx-fix-s: restoring 5 synced files (166 MB) for resume
 [2026-10-07 20:53:56] queue: ['e4-fpc-yolo26s-24e', 'e4-fpc-vrdet-s-24e', 'e1-vrdet-s-seed1']
+[2026-10-07 20:56:18] e3-ctx-fix-s: running
+[2026-10-07 20:56:21] e3-rfs-s: launching attempt 2 on G4 as session e3-rfs-s-2
+[2026-10-07 20:56:43] e3-rfs-s: restoring 5 synced files (157 MB) for resume
+[2026-10-07 20:59:22] e3-rfs-s: running
+[2026-10-07 20:59:35] e1-vrdet-s-seed1: launching attempt 3 on G4 as session e1-vrdet-s-seed1-3

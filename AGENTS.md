@@ -162,17 +162,24 @@ Câu hỏi còn mở:
   - **Lưu ý: torch 2.12 CPU trên máy này crash (heap) khi chạy nhiều luồng.** Chạy CPU thì dùng `--threads 1`, hoặc test trên Colab.
 - [x] **E1a YOLO26s** (24 epoch, SS, train→val): **val mAP50 74.77**, mAP50:95 49.49. Sanity OK.
 - [x] Smoke test VRDet trên T4 (dữ liệu giả lập): mAP50 1.00, pipeline đúng.
-- [ ] **E1b `e1-vrdet-s-dota-24e`** (G4, đang chạy):
-  - Epoch 6/24 đạt sub-mAP50 61.2 trên 100 ảnh val; 60 ảnh/s; 23 GB.
-  - Xong khoảng 19:15 (2026-10-07).
-- [ ] **E2 ablation** (mỗi run đổi 1 biến so với E1b, xem `research/HYPOTHESES.md`):
-  - Đang chạy: `e2-h6-ctx-s` (ngữ cảnh toàn ảnh), `e2-h3-strip-s` (strip).
-  - **Trong hàng đợi** `research/jobs/queue.txt`: `e2-h4-dense-s` (kèm profile tốc độ), `e2-h4c-dq-s`. Watcher tự launch khi Colab có chỗ; giới hạn khoảng 5 session đồng thời, kể cả session của user.
-  - `e1-vrdet-smoke2-t4`: kiểm chứng bản sửa NaN của head dense.
-- Bài học 2026-10-07:
-  - Head dense từng ra NaN vì ProbIoU có `sqrt(det)` khi box co về 0, và vì `atan2` gần gốc. Đã sửa: chặn dưới cạnh, góc dùng số thô, bỏ qua bước có grad norm không hữu hạn.
-  - Loss phân loại dense lúc đầu quá lớn (BCE 68), đã chuyển sang QFL.
-
+- [x] **E1b VRDet-S:** val mAP50 **69.89**, kém YOLO26s 4.9 điểm.
+  - Thua ở class hiếm (HC, SBF, RA, BD, BC) do matching one-to-one cho quá ít mẫu dương ở lịch 24 epoch, và ở vật nhỏ dày (SV, SP) do trần 300 query.
+  - Ngang YOLO ở class phổ biến. Latency 9.4 ms so với 8.9 ms.
+- [x] **E2:**
+  - H3 strip: −0.13, chưa kết luận.
+  - H6 ngữ cảnh: −1.93, do lỗi BN của thumbnail (đã sửa).
+  - H4 dense: e6 sub-mAP 63.3 so với 61.2, hứa hẹn.
+  - H4c dense-query: e6 59.6.
+  - H4 và H4c chạy trên A100 (chậm, 27 ảnh/s), xong khoảng 22:10.
+- [ ] **E3 đang chạy** (G4, `--channels-last --compile`):
+  - `e3-ctx-fix-s` (ngữ cảnh đã sửa) và `e3-rfs-s` (repeat-factor sampling).
+  - Đã resume sau lỗi compile/EMA. Các dòng sub_mAP trước 20:35 của hai run này không hợp lệ.
+- [ ] **Hàng đợi** `research/jobs/queue.txt`: `e1-vrdet-s-seed1` (đo nhiễu seed + speed opts), `e4-fpc-yolo26s-24e`, `e4-fpc-vrdet-s-24e` (benchmark CAD thứ 2: FloorPlanCAD).
+- Bài học hạ tầng 2026-10-07:
+  - Colab cấp tối đa khoảng 3 G4 cùng lúc. A100 dự phòng nhưng chậm hơn khoảng 2 lần với workload này (VM ít CPU).
+  - `--compile` phải đặt sau khi tạo EMA (đã sửa).
+  - Exec treo khi resume checkpoint 160 MB: đã thêm retry ngắn và ghép chunk an toàn khi chạy lại.
+  - Máy local cạn commit memory (~2.5 GB) → torch CPU dễ crash; test trên Colab.
 
 **GPU mặc định: G4** (RTX PRO 6000 Blackwell 94 GB, ~8.9 CU/h; 500 CU ≈ 55 giờ G4).
 

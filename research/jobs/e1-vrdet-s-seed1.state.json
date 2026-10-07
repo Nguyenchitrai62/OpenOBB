@@ -1,11 +1,11 @@
 {
-  "attempts": 2,
+  "attempts": 3,
   "started": "2026-10-07 19:09:04",
-  "session": "e1-vrdet-s-seed1-2",
+  "session": "e1-vrdet-s-seed1-3",
   "out": "/content/work/runs/e1-vrdet-s-seed1",
-  "status": "start_failed",
-  "launched": 1791380100.9340253,
-  "updated": "2026-10-07 20:53:01",
+  "status": "starting",
+  "launched": 1791381580.8837633,
+  "updated": "2026-10-07 20:59:40",
   "fails": 0,
   "synced": {
     "setup.log": [

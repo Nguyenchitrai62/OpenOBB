@@ -1,11 +1,11 @@
 {
-  "attempts": 1,
+  "attempts": 2,
   "started": "2026-10-07 19:58:34",
-  "session": "e3-rfs-s-1",
+  "session": "e3-rfs-s-2",
   "out": "/content/work/runs/e3-rfs-s",
-  "status": "stopped",
-  "launched": 1791377919.840335,
-  "updated": "2026-10-07 20:34:45",
+  "status": "running",
+  "launched": 1791381386.7287903,
+  "updated": "2026-10-07 20:59:22",
   "fails": 0,
   "synced": {
     "setup.log": [

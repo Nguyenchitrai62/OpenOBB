@@ -3,9 +3,9 @@
   "started": "2026-10-07 19:57:47",
   "session": "e3-ctx-fix-s-2",
   "out": "/content/work/runs/e3-ctx-fix-s",
-  "status": "starting",
+  "status": "running",
   "launched": 1791381196.7274275,
-  "updated": "2026-10-07 20:53:16",
+  "updated": "2026-10-07 20:56:18",
   "fails": 0,
   "synced": {
     "setup.log": [
