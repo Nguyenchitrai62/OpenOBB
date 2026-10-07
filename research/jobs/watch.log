@@ -213,3 +213,5 @@
 [colab] Download failed: 
 
 [2026-10-07 22:39:53] watch: balance=325.8 rate=32.0/h active=['e2-h4-dense-s', 'e4-fpc-vrdet-s-24e', 'e5-rfs-ctx-s', 'e5-yolo26x-dota-24e'] ended=[]
+[2026-10-07 22:51:20] e4-fpc-vrdet-s-24e: finished with status done; stopping VM
+[2026-10-07 22:52:06] queue: ['e5-rfs-dense-s']

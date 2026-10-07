@@ -5,7 +5,7 @@
   "out": "/content/work/runs/e2-h4-dense-s",
   "status": "running",
   "launched": 1791386302.486961,
-  "updated": "2026-10-07 22:33:24",
+  "updated": "2026-10-07 22:49:45",
   "fails": 0,
   "synced": {
     "profile_base/train_progress.log": [
@@ -17,25 +17,25 @@
       1791386500
     ],
     "train.log": [
-      355182,
-      1791387073
+      375090,
+      1791388077
     ],
     "train_progress.log": [
-      64297,
-      1791386470
+      69212,
+      1791388077
     ],
     "profile_dense/train_progress.log": [
-      28640,
-      1791387073
+      42324,
+      1791387330
     ],
     "metrics.jsonl": [
-      4945,
-      1791386446
+      5283,
+      1791387982
     ],
     "last.pt": [
       170880037,
-      1791386438
+      1791387981
     ]
   },
-  "tail": "riable_methods.cpp:836.)\n  log(f\"ep {epoch} it {bi}/{iters_per_epoch} loss {float(loss):.3f} \"\n[15:30:33] ep 0 it 0/984 loss 29.825 mal=0.374 bbox=1.939 kld=0.948 fgl=0.398 dense_cls=0.544 dense_box=0.226 dense_angle=0.114 lr 1.00e-07 | 0.7 img/s data 1.531s crit 0.369s/it\n/usr/local/lib/python3.13/dist-packages/torch/profiler/profiler.py:224: UserWarning: Warning: Profiler clears events at the end of each cycle.Only events from the current cycle will be reported.To keep events across cycles, set acc_events=True.\n  _warn_once(\n[15:31:13] [profile] 0.935 s/it over 20 its (batch 16, 17.1 img/s)\n"
+  "tail": " lr 7.75e-05 | 6.3 img/s data 0.893s crit 0.673s/it\n[15:46:56] ep 16 it 50/984 loss 17.433 mal=0.648 bbox=0.156 kld=0.277 fgl=1.168 dense_cls=0.130 dense_box=0.012 dense_angle=0.023 lr 7.70e-05 | 23.6 img/s data 0.018s crit 0.219s/it\n[15:47:27] ep 16 it 100/984 loss 16.100 mal=0.433 bbox=0.090 kld=0.232 fgl=1.322 dense_cls=0.097 dense_box=0.005 dense_angle=0.007 lr 7.65e-05 | 24.7 img/s data 0.009s crit 0.209s/it\n[15:47:57] ep 16 it 150/984 loss 17.579 mal=0.652 bbox=0.170 kld=0.275 fgl=1.232 dense_cls=0.137 dense_box=0.040 dense_angle=0.015 lr 7.59e-05 | 25.2 img/s data 0.006s crit 0.204s/it\n"
 }
