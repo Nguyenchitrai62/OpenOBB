@@ -264,18 +264,19 @@ def enqueue(jids):
 
 
 MAX_SESSIONS = int(os.environ.get("JOB_MAX_SESSIONS", "3"))
-# User 2026-10-08 00:25: keep >= 170 CU (was 120). A queued job starts only if
-#   balance - its est_cu - remaining est_cu of running jobs >= new-job reserve,
-# so jobs already running can finish without pushing the balance below the reserve. The reserve is read from
-# research/jobs/new_reserve.txt on every check (change it without restarting the watcher), else JOB_NEW_RESERVE.
+# User 2026-10-08 00:35: at ~170 CU stop opening new sessions; running ones finish, and the balance left after
+# everything ends should be ~120-150. research/jobs/new_reserve.txt = "<open_min> <final_floor>" (default 170 130),
+# read on every check. A queued job starts only if
+#   balance >= open_min  and  balance - its est_cu - remaining est_cu of running jobs >= final_floor.
 RESERVE_FILE = JOBS / "new_reserve.txt"
 
 
 def new_reserve():
     try:
-        return float(RESERVE_FILE.read_text().strip())
-    except (OSError, ValueError):
-        return float(os.environ.get("JOB_NEW_RESERVE", "170"))
+        v = [float(x) for x in RESERVE_FILE.read_text().split()]
+        return (v[0], v[1]) if len(v) > 1 else (v[0], v[0])
+    except (OSError, ValueError, IndexError):
+        return 170.0, 130.0
 
 
 def remaining_cu(jid):
@@ -309,9 +310,10 @@ def drain_queue():
         bal, _ = cx.balance()
         est = float(spec(jid).get("est_cu", 15))
         running = sum(remaining_cu(j) for j in active())
-        reserve = new_reserve()
-        if bal is None or bal - est - running < reserve:
-            log(f"queue: {jid} held: balance {bal} - est {est:.0f} - running {running:.0f} CU < reserve {reserve:.0f}")
+        open_min, floor = new_reserve()
+        if bal is None or bal < open_min or bal - est - running < floor:
+            log(f"queue: {jid} held: balance {bal} (open >= {open_min:.0f}), projected end "
+                f"{(bal or 0) - est - running:.0f} CU (floor {floor:.0f}; est {est:.0f}, running {running:.0f})")
             return
         try:
             launch(jid)
