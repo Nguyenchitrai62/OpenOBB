@@ -165,3 +165,6 @@
 [2026-10-07 21:10:32] e2-h4c-dq-s: launching attempt 3 on A100 as session e2-h4c-dq-s-3
 [2026-10-07 21:10:50] e2-h4c-dq-s: restoring 5 synced files (161 MB) for resume
 [2026-10-07 21:13:05] e2-h4c-dq-s: running
+[2026-10-07 21:17:03] e4-fpc-yolo26s-24e: launching attempt 1 on G4 as session e4-fpc-yolo26s-24e-1
+[2026-10-07 21:17:06] queue: e4-fpc-yolo26s-24e waits (no VM available)
+[2026-10-07 21:17:35] e1-vrdet-s-seed1: finished with status done; stopping VM

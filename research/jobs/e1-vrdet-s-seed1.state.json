@@ -3,9 +3,9 @@
   "started": "2026-10-07 19:09:04",
   "session": "e1-vrdet-s-seed1-3",
   "out": "/content/work/runs/e1-vrdet-s-seed1",
-  "status": "running",
+  "status": "done",
   "launched": 1791381580.8837633,
-  "updated": "2026-10-07 21:03:42",
+  "updated": "2026-10-07 21:17:34",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,29 +13,37 @@
       1791381764
     ],
     "train.log": [
-      182046,
-      1791381781
+      235497,
+      1791381960
     ],
     "metrics.jsonl": [
-      6107,
-      1791381720
+      6649,
+      1791381965
     ],
     "train_progress.log": [
-      72163,
-      1791381743
+      73511,
+      1791381960
     ],
     "last.pt": [
       165363381,
       1791381712
     ],
     "eval_val.json": [
-      3030,
-      1791381601
+      3029,
+      1791381960
     ],
     "eval_val.txt": [
       1013,
-      1791381608
+      1791381960
+    ],
+    "exitcode": [
+      2,
+      1791381968
+    ],
+    "train_done": [
+      2,
+      1791381965
     ]
   },
-  "tail": "[00:10<03:37, 16.62it/s]\nFetching 3738 files:   4%|\u258e         | 132/3738 [00:10<03:46, 15.92it/s]\nFetching 3738 files:   4%|\u258e         | 134/3738 [00:10<03:36, 16.64it/s]\nFetching 3738 files:   4%|\u258e         | 137/3738 [00:10<03:21, 17.89it/s]\nFetching 3738 files:   4%|\u258e         | 140/3738 [00:10<03:05, 19.37it/s]\nFetching 3738 files:   4%|\u258d         | 142/3738 [00:11<03:28, 17.26it/s]\nFetching 3738 files:   4%|\u258d         | 144/3738 [00:11<03:42, 16.17it/s]\nFetching 3738 files:   4%|\u258d         | 147/3738 [00:11<03:33, 16.81it/s]\nFetching 3738 files:   4%|\u258d         | 150/3738 [00:11<03:02, 19.70it/s]"
+  "tail": " 94.22\nship                   8861    51736  87.74    58.61  93.96\ntennis-court            739    32598  90.64    86.05  96.35\nbasketball-court        124    29561  65.25    49.91  86.29\nstorage-tank           1869    91323  88.40    63.79  96.52\nsoccer-ball-field        87    26132  61.23    48.70  88.51\nroundabout              164    39730  60.90    35.69  81.10\nharbor                 2065    60493  75.21    36.56  82.95\nswimming-pool           366    21837  55.04    23.42  80.87\nhelicopter               72    10467  36.09    13.59  81.94\nmAP                                   70.10    46.27\n"
 }

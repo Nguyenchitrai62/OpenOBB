@@ -80,7 +80,7 @@ Nhiễu giữa các run trên DOTA val khoảng ±0.3–0.5. Δ < 0.5 coi là ch
 
 | Job | Biến | Giả thuyết | Pass |
 |---|---|---|---|
-| `e1-vrdet-s-seed1` | seed 1 | đo nhiễu giữa seed (và kiểm chứng speed opts không đổi accuracy) | – |
+| `e1-vrdet-s-seed1` | seed 1 | đo nhiễu giữa seed (và kiểm chứng speed opts không đổi accuracy) | **70.10 (+0.21)**. Nhiễu khoảng ±0.2 mAP50, class lẻ ±2.5. Speed opts giữ accuracy. Baseline ≈ 70.0 |
 | `e3-ctx-fix-s` | `--context` (đã sửa BN) | H6 công bằng: ngữ cảnh toàn ảnh giúp BR/HA/SBF/GTF/RA | ≥ baseline + 0.5 |
 | `e3-rfs-s` | `--rfs 0.1` | Repeat-factor sampling sửa điểm yếu class hiếm (HC, SBF, RA, BD, BC) | ≥ baseline + 0.5, class hiếm tăng |
 
