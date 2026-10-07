@@ -27,10 +27,17 @@ CONFIGS = {
               encoder=dict(in_channels=[384, 768, 1536], hidden_dim=256, depth_mult=0.67, expansion=1.0),
               decoder=dict(num_layers=4, hidden_dim=256, feat_channels=[256, 256, 256], num_points=[3, 6, 3]),
               pretrained="m"),
-    "l": dict(backbone=dict(name='B4', use_lab=False, return_idx=[1, 2, 3]),
+    # L / X follow D-FINE: stem frozen and BatchNorm frozen in the backbone (also ~halves BN cost)
+    "l": dict(backbone=dict(name='B4', use_lab=False, return_idx=[1, 2, 3], freeze_at=0, freeze_norm=True),
               encoder=dict(in_channels=[512, 1024, 2048], hidden_dim=256, depth_mult=1.0, expansion=1.0),
               decoder=dict(num_layers=6, hidden_dim=256, feat_channels=[256, 256, 256], num_points=[3, 6, 3]),
               pretrained="l"),
+    "x": dict(backbone=dict(name='B5', use_lab=False, return_idx=[1, 2, 3], freeze_at=0, freeze_norm=True),
+              encoder=dict(in_channels=[512, 1024, 2048], hidden_dim=384, depth_mult=1.0, expansion=1.0,
+                           dim_feedforward=2048),
+              decoder=dict(num_layers=6, hidden_dim=256, feat_channels=[384, 384, 384], num_points=[3, 6, 3],
+                           reg_scale=8.0),
+              pretrained="x"),
 }
 
 # COCO (contiguous 80-class index) -> DOTA-v1.0 class, used only to initialise classifier rows.
@@ -66,7 +73,9 @@ class VRDet(nn.Module):
         for k, v in overrides.items():          # e.g. decoder=dict(num_layers=4)
             cfg[k].update(v)
         self.cfg = cfg
-        self.backbone = HGNetv2(**cfg["backbone"], freeze_at=-1, freeze_norm=False, pretrained=False)
+        bb = dict(freeze_at=-1, freeze_norm=False)
+        bb.update(cfg["backbone"])
+        self.backbone = HGNetv2(**bb, pretrained=False)
         self.encoder = HybridEncoder(**cfg["encoder"], eval_spatial_size=[img_size, img_size])
         self.decoder = OBBDFINETransformer(num_classes=num_classes, num_queries=num_queries,
                                            eval_spatial_size=[img_size, img_size], rotate_sampling=rotate_sampling,

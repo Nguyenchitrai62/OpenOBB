@@ -5,7 +5,7 @@
   "out": "/content/work/runs/e3-rfs-s",
   "status": "running",
   "launched": 1791381386.7287903,
-  "updated": "2026-10-07 21:32:23",
+  "updated": "2026-10-07 21:44:53",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,21 +13,21 @@
       1791381557
     ],
     "train.log": [
-      193384,
-      1791383501
+      205446,
+      1791384257
     ],
     "metrics.jsonl": [
-      4541,
-      1791383491
+      5561,
+      1791384228
     ],
     "train_progress.log": [
-      55117,
-      1791383501
+      67179,
+      1791384257
     ],
     "last.pt": [
       165363445,
-      1791383481
+      1791384228
     ]
   },
-  "tail": "14:31:31] epoch 17 done in 3.1 min: {\"epoch\": 17, \"iter\": 17712, \"lr\": 5.5011972532837376e-05, \"epoch_s\": 184.5, \"img_s\": 85.3, \"crit_s_per_it\": 0.058, \"data_s_per_it\": 0.0, \"max_mem_gb\": 20.3, \"loss_mal\": 0.673, \"loss_bbox\": 0.1525, \"loss_kld\": 0.2908, \"loss_fgl\": 1.2394, \"total\": 17.3226, \"sub_mAP50\": 0.6849, \"sub_mAP50_95\": 0.4478}\n[14:31:31] ep 18 it 0/984 loss 15.877 mal=0.576 bbox=0.097 kld=0.215 fgl=1.239 lr 5.50e-05 | 25.9 img/s data 0.212s crit 0.153s/it\n[14:31:41] ep 18 it 50/984 loss 18.249 mal=0.740 bbox=0.142 kld=0.343 fgl=1.249 lr 5.44e-05 | 79.4 img/s data 0.004s crit 0.063s/it\n"
+  "tail": "_bbox\": 0.1448, \"loss_kld\": 0.2837, \"loss_fgl\": 1.2417, \"total\": 17.1}\n[14:43:49] ep 22 it 0/984 loss 17.072 mal=0.754 bbox=0.105 kld=0.267 fgl=1.268 lr 1.60e-05 | 27.4 img/s data 0.225s crit 0.137s/it\n[14:43:58] ep 22 it 50/984 loss 16.774 mal=0.662 bbox=0.157 kld=0.228 fgl=1.151 lr 1.57e-05 | 80.5 img/s data 0.005s crit 0.061s/it\n[14:44:08] ep 22 it 100/984 loss 14.278 mal=0.546 bbox=0.070 kld=0.180 fgl=1.091 lr 1.54e-05 | 83.0 img/s data 0.002s crit 0.060s/it\n[14:44:17] ep 22 it 150/984 loss 16.415 mal=0.615 bbox=0.108 kld=0.259 fgl=1.262 lr 1.52e-05 | 84.2 img/s data 0.002s crit 0.058s/it\n"
 }
