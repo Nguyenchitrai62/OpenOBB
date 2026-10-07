@@ -49,9 +49,9 @@ Thư mục: `cad_vlmdet/` (code), `kaggle_pkg/` (kernel + log + weights), `resea
 - Evaluator: rotated mAP50 / mAP50-95 chuẩn (kiểu DOTA devkit / mmrotate), cộng thêm F2 theo class cho bài toán sản phẩm.
 - Không claim vượt trội khi chưa có số.
 
-## 4. Hướng kiến trúc đề xuất (bản nháp, chờ user chốt các câu hỏi ở mục 7)
+## 4. Hướng kiến trúc (tóm tắt)
 
-Tên làm việc: **VRDet** (Vector-Raster Detector).
+Tên làm việc: **VRDet**. Lõi = detector OBB raster tổng quát (benchmark DOTA). Nhánh vector = plug-in cho CAD. **Bản đầy đủ, cập nhật hơn: [docs/RESEARCH_PLAN.md](docs/RESEARCH_PLAN.md)**; mục này chỉ là tóm tắt.
 
 ```
 PDF page
@@ -96,7 +96,7 @@ Weights thương mại cuối cùng nên train trên data sạch (data nội b�
 - Máy local: Windows 11, **không có GPU NVIDIA** (Intel UHD 730), RAM 32 GB, ổ F còn ~50 GB. Train **chỉ trên Colab** (hoặc Kaggle nếu user đồng ý).
 - Python: `py -3.12` (có pip), `uv` ở `C:\Users\HP\.local\bin\uv.exe`. Python 3.11 hệ thống **không có pip**. Torch chưa cài local.
 - WSL Ubuntu **hỏng** (thiếu ext4.vhdx). Docker Desktop không chạy.
-- **Colab CLI** (`google-colab-cli` 0.7.4) đã cài bằng `uv tool install google-colab-cli`.
+- **Colab CLI**: xem [docs/COLAB.md](docs/COLAB.md) (bắt buộc đọc). (`google-colab-cli` 0.7.4) đã cài bằng `uv tool install google-colab-cli`.
   - Bản gốc không chạy trên Windows (`import termios`). **Đã vá**: `C:\Users\HP\AppData\Roaming\uv\tools\google-colab-cli\Lib\site-packages\colab_cli\console.py`, bọc `termios`/`tty` trong try/except (bản gốc lưu ở `console.py.orig`). Mọi lệnh chạy được trừ `colab console`. Nếu `uv tool upgrade` thì phải vá lại.
   - Trên Windows nên đặt `PYTHONIOENCODING=utf-8` khi gọi từ Git Bash.
   - Lệnh chính: `colab new -s <name> --gpu T4|L4|A100|H100`, `colab exec -s <name> -f script.py`, `colab upload/download -s <name> LOCAL REMOTE`, `colab drivemount -s <name>`, `colab install -s <name> -r requirements.txt`, `colab status`, `colab usage`, `colab stop -s <name>`, `colab run --gpu A100 script.py` (VM tạm).
@@ -117,23 +117,29 @@ vrdet/                    ← (sẽ tạo) code kiến trúc mới
 colab/                    ← (sẽ tạo) script chạy trên Colab
 ```
 
-## 7. Câu hỏi mở cho user (chặn một phần công việc)
+## 7. Quyết định của user (2026-10-07)
 
-1. Gói Colab: Free / Pro / Pro+? Còn bao nhiêu compute units? Có cho dùng thêm Kaggle (30h T4/tuần) không?
-2. **Domain mục tiêu**: data trong thư mục này là floorplan (wall/door/window), còn AI_Takeoff là MEP (FIRE junction/connect, HVAC symbols, ELCV symbols). Ưu tiên domain nào?
-3. Có cấp được **PDF gốc + nhãn GT** export từ AI_Takeoff không (để có vector)? Nguồn gốc/license của `dataset_obb_train_v3`?
-4. Mức chặt license: được dùng backbone pretrained ImageNet (timm, Apache) không? Data NC (FloorPlanCAD, DOTA) chỉ để benchmark có ổn không?
-5. Mục tiêu tốc độ: inference chạy GPU gì (hay CPU)? Bao nhiêu giây/trang?
+- Colab **Pro+**, ~500 CU. Không cần quá dè sẻn nhưng phải log CU mỗi thí nghiệm.
+- **Mục tiêu chính là tạo kiến trúc OBB mới tổng quát**, theo đúng quy trình YOLO: thiết kế → pretrain trên dataset public → benchmark → user finetune trên data riêng tự gắn nhãn. Code vòng cũ (`cad_vlmdet`) chỉ là thử nghiệm, không phải nền.
+- Dataset public chỉ dùng cho nghiên cứu/benchmark, nên license NC/học thuật (DOTA, FloorPlanCAD) dùng được. Backbone pretrained ImageNet cũng được.
+- Ưu tiên: **độ chính xác trước**, tốc độ sau (kỳ vọng gần YOLO, chậm hơn chút được).
+- → Benchmark chính: **DOTA-v1.0** (giống YOLO-OBB). Chi tiết: [docs/RESEARCH_PLAN.md](docs/RESEARCH_PLAN.md).
+
+Câu hỏi còn mở:
+- Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.
 
 ## 8. Trạng thái hiện tại
 
 - [x] Khảo sát vòng cũ + AI_Takeoff + 2 repo tham khảo
-- [x] Cài + vá Colab CLI cho Windows
-- [x] Viết AGENTS.md, init git
-- [ ] User đăng nhập Colab (`colab usage` để kích hoạt OAuth)
-- [ ] User trả lời mục 7
-- [ ] E0 hạ tầng
+- [x] Cài + vá Colab CLI cho Windows ([docs/COLAB.md](docs/COLAB.md)), user đã đăng nhập (`nam@pose3d.ai`)
+- [x] Smoke test Colab: tạo T4, exec, upload/download OK
+- [x] AGENTS.md, docs/RESEARCH_PLAN.md, docs/COLAB.md, git
+- [ ] Mount Google Drive trên VM (đang chờ user cấp quyền)
+- [ ] **E0**: data DOTA-v1 + DIOR-R lên Drive, evaluator DOTA, khung train có resume
+- [ ] E1: baseline YOLO26-OBB (đo) + DETR-OBB baseline
 
 ## 9. Nhật ký
+
+- 2026-10-07 (2): User chốt: Pro+ 500 CU, mục tiêu = kiến trúc OBB tổng quát benchmark trên DOTA như YOLO, accuracy trước. Viết RESEARCH_PLAN + COLAB. Colab CLI chạy được trên Windows sau 2 bản vá. Mốc phải vượt: YOLO26-OBB (x: 81.7 mAP50 DOTA test); DETR-OBB Apache tốt nhất đang biết: O2-DEIM-R50 80.15.
 
 - 2026-10-07: Bắt đầu vòng nghiên cứu mới (VRDet). Kết luận vòng cũ thất bại do tự chế + from scratch. Đề xuất hướng hybrid vector+raster trên nền DETR-OBB Apache-2.0.
