@@ -1,6 +1,6 @@
 {
   "id": "e2-h4c-dq-s",
-  "gpu": "G4",
+  "gpu": "A100",
   "bundle": ["vrdet", "colab"],
   "setup": ["pip install -q -U huggingface_hub hf_xet shapely"],
   "cmd": "python -u colab/data/get_dota.py --root /content/datasets && python -u -m vrdet.train --data /content/datasets/dota1_1024 --out {out} --size s --epochs 24 --batch 16 --lr 1e-4 --workers 16 --eval-every 6 --eval-images 100 --dense-queries",

@@ -1,6 +1,6 @@
 {
   "id": "e2-h4-dense-s",
-  "gpu": "G4",
+  "gpu": "A100",
   "bundle": [
     "vrdet",
     "colab"

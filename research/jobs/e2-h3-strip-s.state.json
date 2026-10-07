@@ -5,5 +5,29 @@
   "out": "/content/work/runs/e2-h3-strip-s",
   "status": "running",
   "launched": 1791370508.0001202,
-  "updated": "2026-10-07 17:55:36"
+  "updated": "2026-10-07 18:07:45",
+  "fails": 0,
+  "synced": {
+    "setup.log": [
+      1162,
+      1791370531
+    ],
+    "train.log": [
+      64299,
+      1791371256
+    ],
+    "metrics.jsonl": [
+      242,
+      1791370983
+    ],
+    "train_progress.log": [
+      5728,
+      1791371256
+    ],
+    "last.pt": [
+      168970697,
+      1791370983
+    ]
+  },
+  "tail": "kld=0.454 fgl=1.316 lr 1.00e-04 | 55.5 img/s data 0.001s crit 0.055s/it\n[11:06:54] ep 1 it 800/984 loss 23.632 mal=0.856 bbox=0.581 kld=0.559 fgl=1.158 lr 1.00e-04 | 55.5 img/s data 0.001s crit 0.055s/it\n[11:07:08] ep 1 it 850/984 loss 21.797 mal=0.488 bbox=0.769 kld=0.855 fgl=0.722 lr 1.00e-04 | 55.6 img/s data 0.001s crit 0.055s/it\n[11:07:22] ep 1 it 900/984 loss 21.626 mal=0.898 bbox=0.248 kld=0.403 fgl=1.355 lr 1.00e-04 | 55.6 img/s data 0.001s crit 0.055s/it\n[11:07:36] ep 1 it 950/984 loss 21.250 mal=0.759 bbox=0.349 kld=0.418 fgl=1.273 lr 1.00e-04 | 55.6 img/s data 0.001s crit 0.055s/it\n"
 }

@@ -3,9 +3,39 @@
   "started": "2026-10-07 17:28:46",
   "session": "e1-vrdet-smoke2-t4-1",
   "out": "/content/work/runs/e1-vrdet-smoke2-t4",
-  "status": "running",
+  "status": "done",
   "launched": 1791370475.4967182,
-  "updated": "2026-10-07 17:54:59",
+  "updated": "2026-10-07 18:05:18",
   "fails": 0,
-  "tail": "ed = merge_parallel(pd, 0.1, merge_workers)\n  File \"/content/work/code/vrdet/engine.py\", line 147, in merge_parallel\n    parts = pool.map(_merge_chunk, [(c, iou_thr) for c in chunks if c])\n  File \"/usr/lib/python3.13/multiprocessing/pool.py\", line 367, in map\n    return self._map_async(func, iterable, mapstar, chunksize).get()\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^\n  File \"/usr/lib/python3.13/multiprocessing/pool.py\", line 774, in get\n    raise self._value\nshapely.errors.GEOSException: IllegalArgumentException: Points of LinearRing do not form a closed linestring\n"
+  "tail": "  0.00\nship                     34      121 100.00    80.52 100.00\ntennis-court              0       67   0.00     0.00   0.00\nbasketball-court          0       77   0.00     0.00   0.00\nstorage-tank             35     1010 100.00    81.41 100.00\nsoccer-ball-field         0      109   0.00     0.00   0.00\nroundabout                0       84   0.00     0.00   0.00\nharbor                    0       89   0.00     0.00   0.00\nswimming-pool             0       89   0.00     0.00   0.00\nhelicopter                0       52   0.00     0.00   0.00\nmAP                                  100.00    81.25\n",
+  "synced": {
+    "metrics.jsonl": [
+      7094,
+      1791370987
+    ],
+    "train_progress.log": [
+      23066,
+      1791370978
+    ],
+    "setup.log": [
+      186,
+      1791370496
+    ],
+    "train.log": [
+      23706,
+      1791370978
+    ],
+    "eval_val.json": [
+      3107,
+      1791370978
+    ],
+    "exitcode": [
+      2,
+      1791370992
+    ],
+    "eval_val.txt": [
+      1013,
+      1791370978
+    ]
+  }
 }

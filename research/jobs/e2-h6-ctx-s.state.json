@@ -5,5 +5,29 @@
   "out": "/content/work/runs/e2-h6-ctx-s",
   "status": "running",
   "launched": 1791370305.3089714,
-  "updated": "2026-10-07 17:52:14"
+  "updated": "2026-10-07 18:07:56",
+  "fails": 0,
+  "synced": {
+    "train_progress.log": [
+      7850,
+      1791371261
+    ],
+    "setup.log": [
+      1162,
+      1791370329
+    ],
+    "train.log": [
+      66482,
+      1791371261
+    ],
+    "metrics.jsonl": [
+      483,
+      1791371073
+    ],
+    "last.pt": [
+      174867673,
+      1791371073
+    ]
+  },
+  "tail": "kld=0.405 fgl=1.279 lr 1.00e-04 | 55.2 img/s data 0.001s crit 0.055s/it\n[11:06:58] ep 2 it 500/984 loss 22.896 mal=0.908 bbox=0.475 kld=0.563 fgl=1.107 lr 1.00e-04 | 55.3 img/s data 0.001s crit 0.055s/it\n[11:07:13] ep 2 it 550/984 loss 19.912 mal=0.754 bbox=0.198 kld=0.348 fgl=1.344 lr 1.00e-04 | 55.3 img/s data 0.001s crit 0.055s/it\n[11:07:27] ep 2 it 600/984 loss 19.418 mal=0.733 bbox=0.230 kld=0.348 fgl=1.276 lr 1.00e-04 | 55.3 img/s data 0.001s crit 0.055s/it\n[11:07:41] ep 2 it 650/984 loss 21.269 mal=0.796 bbox=0.337 kld=0.426 fgl=1.292 lr 1.00e-04 | 55.3 img/s data 0.001s crit 0.055s/it\n"
 }

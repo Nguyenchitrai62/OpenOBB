@@ -80,3 +80,15 @@
 [2026-10-07 17:56:25] queue: ['e2-h4-dense-s', 'e2-h4c-dq-s']
 [2026-10-07 17:56:35] e2-h4-dense-s: launching attempt 1 on G4 as session e2-h4-dense-s-1
 [2026-10-07 17:56:38] queue: e2-h4-dense-s waits (no VM available)
+[2026-10-07 17:58:02] watch: balance=470.77 rate=33.07/h active=['e1-vrdet-s-dota-24e', 'e1-vrdet-smoke2-t4', 'e2-h3-strip-s', 'e2-h6-ctx-s'] ended=[]
+[2026-10-07 18:04:05] e2-h4-dense-s: launching attempt 1 on G4 as session e2-h4-dense-s-1
+[2026-10-07 18:04:08] queue: e2-h4-dense-s waits (no VM available)
+[2026-10-07 18:05:18] e1-vrdet-smoke2-t4: finished with status done; stopping VM
+[2026-10-07 18:06:35] watch: balance=468.06 rate=33.07/h active=['e1-vrdet-s-dota-24e', 'e1-vrdet-smoke2-t4', 'e2-h3-strip-s', 'e2-h6-ctx-s'] ended=[('e1-vrdet-smoke2-t4', 'done')]
+[2026-10-07 18:07:16] e2-h4-dense-s: launching attempt 1 on G4 as session e2-h4-dense-s-1
+[2026-10-07 18:07:20] queue: e2-h4-dense-s waits (no VM available)
+[2026-10-07 18:07:50] e2-h4c-dq-s: launching attempt 1 on A100 as session e2-h4c-dq-s-1
+[2026-10-07 18:07:56] watch: balance=465.31 rate=32.0/h active=['e1-vrdet-s-dota-24e', 'e2-h3-strip-s', 'e2-h6-ctx-s'] ended=[]
+[2026-10-07 18:08:20] e2-h4c-dq-s: running
+[2026-10-07 18:08:29] e2-h4-dense-s: launching attempt 1 on A100 as session e2-h4-dense-s-1
+[2026-10-07 18:09:00] e2-h4-dense-s: running

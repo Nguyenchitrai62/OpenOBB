@@ -80,4 +80,10 @@ Ghi chú:
 | A100 | ~5.3 | dự phòng khi G4 hết chỗ |
 | H100 | ? | chưa đo |
 
-500 CU ≈ **~55 giờ G4**. Hãy ước lượng CU trước mỗi job (giờ × 8.9) và ghi vào `decisions.log`.
+500 CU ≈ **~55 giờ G4**.
+
+**Giới hạn đồng thời (đo 2026-10-07):**
+- Colab chỉ cấp khoảng **3 G4 cùng lúc**. VM thứ tư báo "Allocation refused (precondition failed)".
+- Lúc đó A100 vẫn cấp được (đã chạy 2 A100 song song với 3 G4).
+- A100 rẻ hơn mỗi giờ (~5.3 so với ~8.9 CU/h). Bộ nhớ 40 GB đủ cho VRDet-S batch 16 ở 1024 (khoảng 23 GB).
+- `tools/job.py queue <id>` đưa job vào hàng đợi; watcher tự launch khi có chỗ. Hãy ước lượng CU trước mỗi job (giờ × 8.9) và ghi vào `decisions.log`.
