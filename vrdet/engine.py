@@ -73,12 +73,22 @@ def param_groups(model, lr, backbone_mult=0.5, wd=1e-4):
 
 
 def ctx_batch(targets, device):
-    """Global-context inputs (H6) gathered from the targets, or None when the dataset has no context."""
-    if not targets or "thumb" not in targets[0]:
-        return None
-    return {"thumb": torch.stack([d["thumb"] for d in targets]).to(device, non_blocking=True).float().div_(255.0),
-            "tile": torch.stack([d["tile"] for d in targets]).to(device, non_blocking=True),
-            "valid": torch.tensor([d["ctx_valid"] for d in targets], device=device)}
+    """Side inputs gathered from the targets: global context (H6: thumb/tile/valid) and vector tokens (H7:
+    vec (B, M, 21) zero-padded + vec_mask). None when the dataset provides neither."""
+    out = {}
+    if targets and "thumb" in targets[0]:
+        out.update(thumb=torch.stack([d["thumb"] for d in targets]).to(device, non_blocking=True).float().div_(255.0),
+                   tile=torch.stack([d["tile"] for d in targets]).to(device, non_blocking=True),
+                   valid=torch.tensor([d["ctx_valid"] for d in targets], device=device))
+    if targets and "vec" in targets[0]:
+        M = max(len(d["vec"]) for d in targets)
+        vec = torch.zeros(len(targets), M, targets[0]["vec"].shape[1])
+        mask = torch.zeros(len(targets), M, dtype=torch.bool)
+        for i, d in enumerate(targets):
+            vec[i, :len(d["vec"])] = d["vec"]
+            mask[i, :len(d["vec"])] = True
+        out.update(vec=vec.to(device, non_blocking=True), vec_mask=mask.to(device, non_blocking=True))
+    return out or None
 
 
 def to_device(imgs, targets, device):
@@ -181,11 +191,12 @@ def load_preds(path):
 
 
 def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num_top=300, img_size=1024,
-              merge_workers=16, log=print, fusion=False, variants=None, save_preds_to=None, context=False):
+              merge_workers=16, log=print, fusion=False, variants=None, save_preds_to=None, context=False,
+              vectors=False):
     """DOTA-protocol eval of the decoder output (primary). With fusion=True and a dense head, also scores
     the dense-only / union / size-routed variants (res["fusion"])."""
     t0 = time.time()
-    ds = DotaPatches(data_root, "val", augment=False, context=context)
+    ds = DotaPatches(data_root, "val", augment=False, context=context, vectors=vectors)
     if image_ids is not None:
         keep = set(image_ids)
         ds.items = [m for m in ds.items if m["src"] in keep]

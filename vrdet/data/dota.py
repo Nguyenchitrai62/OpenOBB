@@ -3,6 +3,8 @@
 Targets per image: dict(labels=int64 (N,), boxes=float32 (N, 5) = (cx, cy, w, h, theta) with
 cx, cy, w, h normalised by the (square) patch size and theta in le90 radians).
 Images are returned as uint8 CHW RGB tensors; normalisation happens on the GPU.
+With vectors=True (CAD data with {root}/vectors/{split}/{name}.npz) the target also carries "vec" (M, 21):
+type, 8 points / image size, rgb, width / image size, transformed together with the image by every augmentation.
 """
 import json
 import math
@@ -62,8 +64,9 @@ def clip_to_window(polys, labels, S, iof_thr=0.7):
 class DotaPatches(Dataset):
     def __init__(self, root, split, size=1024, augment=False, filter_empty=False, min_size=2.0,
                  hsv=(0.015, 0.5, 0.3), rot90=True, flip=True, limit=None, keep_difficult=True, rotate_p=0.0,
-                 mosaic_p=0.0, context=False, thumb=512, ctx_dropout=0.0):
+                 mosaic_p=0.0, context=False, thumb=512, ctx_dropout=0.0, vectors=False, max_tokens=4096):
         self.root, self.split, self.size = Path(root), split, size
+        self.vectors, self.max_tokens = vectors, max_tokens
         self.context, self.thumb, self.ctx_dropout = context, thumb, ctx_dropout
         self.rotate_p, self.mosaic_p = rotate_p, mosaic_p
         self.augment, self.min_size, self.hsv, self.rot90, self.flip = augment, min_size, hsv, rot90, flip
@@ -85,6 +88,29 @@ class DotaPatches(Dataset):
         polys = np.array([o[3:] for o in objs], dtype=np.float32).reshape(-1, 8)
         labels = np.array([o[0] for o in objs], dtype=np.int64)
         return img, polys, labels
+
+    def _load_vec(self, m):
+        """Primitive tokens in pixel units: pts (M, 16) and attr (M, 5) = type, r, g, b, width."""
+        z = np.load(self.root / "vectors" / self.split / f"{m['name']}.npz")
+        t = z["tokens"].astype(np.float32)
+        view = float(z["view"]) if "view" in z.files else 140.0     # FloorPlanCAD: widths in viewBox units
+        S = self.size
+        attr = np.concatenate([t[:, :1], t[:, 17:20], t[:, 20:21] / view * S], 1)
+        return {"pts": t[:, 1:17] * S, "attr": attr}
+
+    def _vec_out(self, vec):
+        """Drop primitives that left the image, cap the count, normalise -> (M, 21) float32 tensor."""
+        S = self.size
+        pts, attr = vec["pts"], vec["attr"]
+        x, y = pts[:, 0::2], pts[:, 1::2]
+        inside = ((x >= 0) & (x <= S) & (y >= 0) & (y <= S)).any(1)
+        pts, attr = pts[inside], attr[inside]
+        if len(pts) > self.max_tokens:
+            sel = (np.sort(np.random.choice(len(pts), self.max_tokens, replace=False)) if self.augment
+                   else np.arange(self.max_tokens))
+            pts, attr = pts[sel], attr[sel]
+        out = np.concatenate([attr[:, :1], pts / S, attr[:, 1:4], attr[:, 4:5] / S], 1).astype(np.float32)
+        return torch.from_numpy(out.reshape(-1, 21))
 
     def _load_ctx(self, m):
         """Whole-image thumbnail on a THUMB x THUMB canvas + the tile's box on that canvas (global context, H6)."""
@@ -108,7 +134,7 @@ class DotaPatches(Dataset):
         x0, y0, x1, y1 = ctx["tile"]
         ctx["tile"] = np.array([y0, T - x1, y1, T - x0], np.float32)     # (x, y) -> (y, T - x)
 
-    def _rotate(self, img, polys, labels, ctx=None):
+    def _rotate(self, img, polys, labels, ctx=None, vec=None):
         """Arbitrary-angle rotation about the centre (images with square-like classes: 90-degree steps only)."""
         S = img.shape[0]
         if np.isin(labels, SQUARE_CLASSES).any():
@@ -123,6 +149,8 @@ class DotaPatches(Dataset):
             Mt = cv2.getRotationMatrix2D((float(c[0]), float(c[1])), ang, 1.0)
             ctx["thumb"] = cv2.warpAffine(np.ascontiguousarray(ctx["thumb"]), Mt, (T, T), flags=cv2.INTER_LINEAR,
                                           borderValue=PAD_BGR)
+        if vec is not None and len(vec["pts"]):
+            vec["pts"] = (vec["pts"].reshape(-1, 2) @ M[:, :2].T + M[:, 2]).reshape(-1, 16).astype(np.float32)
         if len(polys):
             pts = polys.reshape(-1, 2) @ M[:, :2].T + M[:, 2]
             polys, labels = clip_to_window(pts.reshape(-1, 8).astype(np.float32), labels, S)
@@ -133,11 +161,18 @@ class DotaPatches(Dataset):
         S, h = self.size, self.size // 2
         canvas = np.empty((S, S, 3), np.uint8)
         canvas[:] = PAD_BGR
-        P, L = [], []
+        P, L, V = [], [], []
         for q, j in enumerate([i] + [random.randrange(len(self.items)) for _ in range(3)]):
             img, polys, labels = self._load(self.items[j])
-            img, polys = self._augment(img, polys, color=False)
+            vec = self._load_vec(self.items[j]) if self.vectors else None
+            img, polys = self._augment(img, polys, color=False, vec=vec)
             ox, oy = (q % 2) * h, (q // 2) * h
+            if vec is not None:
+                vp = vec["pts"] * 0.5
+                vp[:, 0::2] += ox
+                vp[:, 1::2] += oy
+                vec["attr"][:, 4] *= 0.5
+                V.append({"pts": vp, "attr": vec["attr"]})
             canvas[oy:oy + h, ox:ox + h] = cv2.resize(np.ascontiguousarray(img), (h, h), interpolation=cv2.INTER_AREA)
             if len(polys):
                 pp = polys * 0.5
@@ -147,15 +182,19 @@ class DotaPatches(Dataset):
                 L.append(labels)
         polys = np.concatenate(P) if P else np.zeros((0, 8), np.float32)
         labels = np.concatenate(L) if L else np.zeros(0, np.int64)
-        return canvas, polys, labels
+        vec = ({"pts": np.concatenate([v["pts"] for v in V]), "attr": np.concatenate([v["attr"] for v in V])}
+               if V else None)
+        return canvas, polys, labels, vec
 
-    def _augment(self, img, polys, color=True, ctx=None):
-        """Flips / rot90 applied identically to the patch and (if given) to the context thumbnail + tile box."""
+    def _augment(self, img, polys, color=True, ctx=None, vec=None):
+        """Flips / rot90 applied identically to the patch, the vector points and the context thumbnail + tile box."""
+        vp = vec["pts"] if vec is not None else np.zeros((0, 16), np.float32)
         S = img.shape[0]
         T = ctx["thumb"].shape[0] if ctx is not None else 0
         if self.flip and random.random() < 0.5:
             img = img[:, ::-1]
             polys[:, 0::2] = S - polys[:, 0::2]
+            vp[:, 0::2] = S - vp[:, 0::2]
             if ctx is not None:
                 ctx["thumb"] = ctx["thumb"][:, ::-1]
                 x0, y0, x1, y1 = ctx["tile"]
@@ -163,6 +202,7 @@ class DotaPatches(Dataset):
         if self.flip and random.random() < 0.5:
             img = img[::-1]
             polys[:, 1::2] = S - polys[:, 1::2]
+            vp[:, 1::2] = S - vp[:, 1::2]
             if ctx is not None:
                 ctx["thumb"] = ctx["thumb"][::-1]
                 x0, y0, x1, y1 = ctx["tile"]
@@ -174,6 +214,9 @@ class DotaPatches(Dataset):
                 x = polys[:, 0::2].copy()
                 polys[:, 0::2] = polys[:, 1::2]
                 polys[:, 1::2] = S - x
+                x = vp[:, 0::2].copy()
+                vp[:, 0::2] = vp[:, 1::2]
+                vp[:, 1::2] = S - x
                 if ctx is not None:
                     self._ctx_rot90(ctx)
         if color:
@@ -195,22 +238,24 @@ class DotaPatches(Dataset):
     def __getitem__(self, i):
         m = self.items[i]
         ctx = None
+        vec = None
         if self.augment and self.mosaic_p and random.random() < self.mosaic_p:
-            img, polys, labels = self._mosaic(i)
+            img, polys, labels, vec = self._mosaic(i)
             img = self._hsv(img)
             if self.context:                    # a mosaic has no single parent image: no context
                 ctx = self._load_ctx(m)
                 ctx["valid"] = False
         else:
             img, polys, labels = self._load(m)
+            vec = self._load_vec(m) if self.vectors else None
             if self.context:
                 ctx = self._load_ctx(m)
                 if self.augment and self.ctx_dropout and random.random() < self.ctx_dropout:
                     ctx["valid"] = False         # context dropout: do not let scene priors dominate rare classes
             if self.augment:
-                img, polys = self._augment(img, polys, ctx=ctx)
+                img, polys = self._augment(img, polys, ctx=ctx, vec=vec)
                 if self.rotate_p and random.random() < self.rotate_p:
-                    img, polys, labels = self._rotate(img, polys, labels, ctx=ctx)
+                    img, polys, labels = self._rotate(img, polys, labels, ctx=ctx, vec=vec)
         obb = polys_to_obb(polys)
         keep = (obb[:, 2] >= self.min_size) & (obb[:, 3] >= self.min_size) if len(obb) else np.zeros(0, bool)
         obb, labels = obb[keep], labels[keep]
@@ -221,6 +266,8 @@ class DotaPatches(Dataset):
             tgt["thumb"] = torch.from_numpy(np.ascontiguousarray(ctx["thumb"][..., ::-1].transpose(2, 0, 1)))
             tgt["tile"] = torch.from_numpy(np.asarray(ctx["tile"], np.float32))
             tgt["ctx_valid"] = bool(ctx["valid"])
+        if self.vectors:
+            tgt["vec"] = self._vec_out(vec)
         return torch.from_numpy(img), tgt
 
 

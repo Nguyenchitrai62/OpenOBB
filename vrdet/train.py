@@ -60,6 +60,10 @@ def get_args(argv=None):
     ap.add_argument("--box-loss", default="kld", choices=["kld", "probiou"], help="H1")
     ap.add_argument("--ortho-heads", action="store_true", help="H2: half the heads sample at theta+90")
     ap.add_argument("--strip-k", type=int, default=0, help="H3: strip-context kernel (0 = off)")
+    ap.add_argument("--vectors", action="store_true", help="H7: CAD primitive tokens ({data}/vectors) fused in")
+    ap.add_argument("--vec-dim", type=int, default=128)
+    ap.add_argument("--vec-layers", type=int, default=2)
+    ap.add_argument("--max-tokens", type=int, default=4096)
     ap.add_argument("--rotate-p", type=float, default=0.0, help="H8: arbitrary-angle rotation prob")
     ap.add_argument("--mosaic-p", type=float, default=0.0, help="H8: oriented mosaic prob")
     ap.add_argument("--context", action="store_true", help="H6: whole-image context tokens for each tile")
@@ -107,7 +111,7 @@ def main(argv=None):
     model = VRDet(a.size, num_classes=len(classes), num_queries=a.queries, img_size=a.img,
                   rotate_sampling=not a.no_rotate_sampling, num_denoising=a.denoising, dense=a.dense,
                   strip_k=a.strip_k, ortho_heads=a.ortho_heads, context=a.context,
-                  dense_queries=a.dense_queries)
+                  dense_queries=a.dense_queries, vectors=a.vectors, vec_dim=a.vec_dim, vec_layers=a.vec_layers)
     last = out / "last.pt"
     if not last.exists() and not a.no_pretrained:
         load_dfine_coco(model, a.size, class_names=classes, log=log)
@@ -118,7 +122,8 @@ def main(argv=None):
     a.dense = a.dense or a.dense_queries
     dense_crit = DenseCriterion() if a.dense else None
     ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,
-                     rotate_p=a.rotate_p, mosaic_p=a.mosaic_p, context=a.context, ctx_dropout=a.ctx_dropout)
+                     rotate_p=a.rotate_p, mosaic_p=a.mosaic_p, context=a.context, ctx_dropout=a.ctx_dropout,
+                     vectors=a.vectors, max_tokens=a.max_tokens)
     sampler = None
     if a.rfs > 0:
         from vrdet.data.dota import repeat_factors
@@ -244,7 +249,7 @@ def main(argv=None):
         os.replace(out / "last.tmp", last)
         if val_subset and ((epoch + 1) % a.eval_every == 0) and epoch + 1 < a.epochs:
             res, _ = eval_dota(ema.module, a.data, device, val_subset, batch=a.batch, workers=a.workers,
-                               num_top=a.num_top, img_size=a.img, log=log, context=a.context)
+                               num_top=a.num_top, img_size=a.img, log=log, context=a.context, vectors=a.vectors)
             rec["sub_mAP50"] = round(res["mAP50"], 4)
             rec["sub_mAP50_95"] = round(res["mAP50_95"], 4)
         jlog(rec)
@@ -254,7 +259,8 @@ def main(argv=None):
         return
     res, dets = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.num_top,
                           img_size=a.img, log=log, fusion=a.dense, variants=["dec", "dense"],
-                          save_preds_to=(out / "val_preds.npz") if a.dense else None, context=a.context)
+                          save_preds_to=(out / "val_preds.npz") if a.dense else None, context=a.context,
+                          vectors=a.vectors)
     table = format_table(res, classes)
     log("\n" + table)
     (out / "eval_val.txt").write_text(table + "\n")
@@ -264,13 +270,18 @@ def main(argv=None):
     if device.type == "cuda":
         m = ema.module.eval()
         x = torch.rand(1, 3, a.img, a.img, device=device)
+        side = None
+        if a.vectors:                           # latency includes the vector branch (1000 primitives)
+            v = torch.rand(1, 1000, 21, device=device)
+            v[..., 0] = 0
+            side = {"vec": v, "vec_mask": torch.ones(1, 1000, dtype=torch.bool, device=device)}
         with torch.no_grad(), torch.autocast(device_type="cuda", dtype=torch.float16):
             for _ in range(20):
-                m(x)
+                m(x, ctx=side)
             torch.cuda.synchronize()
             t = time.time()
             for _ in range(100):
-                m(x)
+                m(x, ctx=side)
             torch.cuda.synchronize()
         lat = (time.time() - t) / 100 * 1000
     jlog({"final": True, "split": "val", "weights": "ema_last", "mAP50": res["mAP50"], "mAP50_95": res["mAP50_95"],
