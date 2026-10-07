@@ -3,9 +3,9 @@
   "started": "2026-10-07 19:58:34",
   "session": "e3-rfs-s-1",
   "out": "/content/work/runs/e3-rfs-s",
-  "status": "running",
+  "status": "stopped",
   "launched": 1791377919.840335,
-  "updated": "2026-10-07 20:12:16",
+  "updated": "2026-10-07 20:34:45",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,21 +13,21 @@
       1791377963
     ],
     "train.log": [
-      85279,
-      1791378688
+      105801,
+      1791380034
     ],
     "metrics.jsonl": [
-      479,
-      1791378641
+      2201,
+      1791379986
     ],
     "train_progress.log": [
-      7037,
-      1791378688
+      27559,
+      1791380034
     ],
     "last.pt": [
       165363445,
-      1791378641
+      1791379986
     ]
   },
-  "tail": "kld=0.551 fgl=1.403 lr 1.00e-04 | 78.9 img/s data 0.007s crit 0.060s/it\n[13:11:00] ep 2 it 100/984 loss 22.281 mal=0.779 bbox=0.324 kld=0.452 fgl=1.330 lr 1.00e-04 | 82.7 img/s data 0.004s crit 0.057s/it\n[13:11:10] ep 2 it 150/984 loss 21.938 mal=0.765 bbox=0.283 kld=0.375 fgl=1.328 lr 1.00e-04 | 84.0 img/s data 0.003s crit 0.056s/it\n[13:11:19] ep 2 it 200/984 loss 21.756 mal=0.822 bbox=0.216 kld=0.448 fgl=1.314 lr 1.00e-04 | 84.6 img/s data 0.002s crit 0.056s/it\n[13:11:28] ep 2 it 250/984 loss 21.292 mal=0.882 bbox=0.317 kld=0.540 fgl=1.065 lr 1.00e-04 | 85.1 img/s data 0.002s crit 0.055s/it\n"
+  "tail": "kld=0.229 fgl=1.200 lr 1.00e-04 | 85.8 img/s data 0.001s crit 0.055s/it\n[13:22:12] ep 5 it 750/984 loss 20.927 mal=0.647 bbox=0.464 kld=0.500 fgl=1.113 lr 1.00e-04 | 85.7 img/s data 0.001s crit 0.055s/it\n[13:22:21] ep 5 it 800/984 loss 19.286 mal=0.750 bbox=0.230 kld=0.335 fgl=1.250 lr 1.00e-04 | 85.7 img/s data 0.001s crit 0.055s/it\n[13:22:31] ep 5 it 850/984 loss 19.754 mal=0.765 bbox=0.207 kld=0.362 fgl=1.254 lr 1.00e-04 | 85.7 img/s data 0.000s crit 0.055s/it\n[13:22:40] ep 5 it 900/984 loss 19.578 mal=0.751 bbox=0.173 kld=0.340 fgl=1.280 lr 1.00e-04 | 85.8 img/s data 0.000s crit 0.055s/it\n"
 }

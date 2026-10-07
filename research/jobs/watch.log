@@ -121,3 +121,10 @@
 [2026-10-07 20:00:34] watch: balance=397.33 rate=37.3/h active=['e1-vrdet-s-seed1', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e3-ctx-fix-s', 'e3-rfs-s'] ended=[]
 [2026-10-07 20:12:16] watch: balance=392.16 rate=37.3/h active=['e1-vrdet-s-seed1', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e3-ctx-fix-s', 'e3-rfs-s'] ended=[]
 [2026-10-07 20:13:50] queue: ['e4-fpc-yolo26s-24e', 'e4-fpc-vrdet-s-24e']
+[2026-10-07 20:20:18] e4-fpc-yolo26s-24e: launching attempt 1 on G4 as session e4-fpc-yolo26s-24e-1
+[2026-10-07 20:20:21] queue: e4-fpc-yolo26s-24e waits (no VM available)
+[2026-10-07 20:23:28] watch: balance=382.83 rate=37.3/h active=['e1-vrdet-s-seed1', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e3-ctx-fix-s', 'e3-rfs-s'] ended=[]
+[2026-10-07 20:31:30] e4-fpc-yolo26s-24e: launching attempt 1 on G4 as session e4-fpc-yolo26s-24e-1
+[2026-10-07 20:31:33] queue: e4-fpc-yolo26s-24e waits (no VM available)
+[2026-10-07 20:34:55] e1-vrdet-s-seed1: launching attempt 2 on G4 as session e1-vrdet-s-seed1-2
+[2026-10-07 20:35:17] e1-vrdet-s-seed1: restoring 7 synced files (157 MB) for resume

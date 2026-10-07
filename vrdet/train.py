@@ -67,6 +67,7 @@ def get_args(argv=None):
     ap.add_argument("--channels-last", action="store_true", help="NHWC convs/BN (profiling: BN was ~42% of GPU time)")
     ap.add_argument("--compile", action="store_true", help="torch.compile backbone + encoder (falls back to eager)")
     ap.add_argument("--rfs", type=float, default=0.0, help="repeat-factor sampling threshold t (0 = off)")
+    ap.add_argument("--eval-only", action="store_true", help="evaluate EMA weights of {out}/last.pt, no training")
     ap.add_argument("--threads", type=int, default=0, help="torch CPU threads (0 = default)")
     return ap.parse_args(argv)
 
@@ -75,7 +76,7 @@ def main(argv=None):
     a = get_args(argv)
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    if (out / "train_done").exists():
+    if (out / "train_done").exists() and "--eval-only" not in (argv or __import__("sys").argv):
         print("train_done exists: nothing to do", flush=True)
         return
     logf = open(out / "train_progress.log", "a")
@@ -112,13 +113,6 @@ def main(argv=None):
     model.to(device)
     if a.channels_last:
         model.to(memory_format=torch.channels_last)
-    if a.compile and device.type == "cuda":
-        try:
-            model.backbone.forward = torch.compile(model.backbone.forward)
-            model.encoder.forward = torch.compile(model.encoder.forward, dynamic=False)
-            log("torch.compile enabled for backbone + encoder")
-        except Exception as e:  # noqa: BLE001
-            log(f"torch.compile unavailable, eager mode: {e}")
     crit = build_criterion(num_classes=len(classes), box_loss=a.box_loss)
     a.dense = a.dense or a.dense_queries
     dense_crit = DenseCriterion() if a.dense else None
@@ -147,6 +141,18 @@ def main(argv=None):
         opt.load_state_dict(ck["opt"])
         start_epoch, it = ck["epoch"] + 1, ck["iter"]
         log(f"resumed from epoch {ck['epoch']} (iter {it})")
+    # Compile AFTER the EMA deep copy: compiled forwards are bound methods of the live model, and a copy made
+    # afterwards kept calling the live (training-mode) backbone/encoder at eval time (bug seen 2026-10-07:
+    # identical train losses, ~7 points lower EMA eval).
+    if a.compile and device.type == "cuda" and not a.eval_only:
+        try:
+            model.backbone.forward = torch.compile(model.backbone.forward)
+            model.encoder.forward = torch.compile(model.encoder.forward, dynamic=False)
+            log("torch.compile enabled for backbone + encoder (training model only)")
+        except Exception as e:  # noqa: BLE001
+            log(f"torch.compile unavailable, eager mode: {e}")
+    if a.eval_only:
+        start_epoch = a.epochs                  # skip training: evaluate the EMA weights of last.pt
     n_par = sum(p.numel() for p in model.parameters()) / 1e6
     log(f"VRDet-{a.size} {n_par:.2f}M params | train patches {len(ds)} | {iters_per_epoch} it/epoch x {a.epochs} "
         f"| batch {a.batch} | device {device} amp={amp}")

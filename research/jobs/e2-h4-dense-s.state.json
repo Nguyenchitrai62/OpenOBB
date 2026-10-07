@@ -5,7 +5,7 @@
   "out": "/content/work/runs/e2-h4-dense-s",
   "status": "running",
   "launched": 1791371315.5973,
-  "updated": "2026-10-07 20:09:40",
+  "updated": "2026-10-07 20:32:52",
   "fails": 0,
   "synced": {
     "profile_base/train_progress.log": [
@@ -17,25 +17,25 @@
       1791371336
     ],
     "train.log": [
-      147678,
-      1791378531
+      157717,
+      1791379904
     ],
     "train_progress.log": [
-      42426,
-      1791378531
+      51503,
+      1791379904
     ],
     "profile_dense/train_progress.log": [
       14108,
       1791372184
     ],
     "metrics.jsonl": [
-      3245,
-      1791378196
+      3931,
+      1791379421
     ],
     "last.pt": [
       170879973,
-      1791378196
+      1791379386
     ]
   },
-  "tail": "r 1.00e-04 | 26.2 img/s data 0.004s crit 0.195s/it\n[13:07:51] ep 10 it 450/984 loss 19.350 mal=0.996 bbox=0.159 kld=0.254 fgl=1.281 dense_cls=0.180 dense_box=0.036 dense_angle=0.018 lr 1.00e-04 | 26.2 img/s data 0.003s crit 0.195s/it\n[13:08:21] ep 10 it 500/984 loss 18.467 mal=0.693 bbox=0.213 kld=0.300 fgl=1.300 dense_cls=0.154 dense_box=0.037 dense_angle=0.039 lr 1.00e-04 | 26.3 img/s data 0.003s crit 0.195s/it\n[13:08:51] ep 10 it 550/984 loss 16.368 mal=0.518 bbox=0.202 kld=0.184 fgl=1.216 dense_cls=0.108 dense_box=0.048 dense_angle=0.035 lr 1.00e-04 | 26.3 img/s data 0.003s crit 0.194s/it\n"
+  "tail": "r 9.93e-05 | 26.5 img/s data 0.003s crit 0.191s/it\n[13:30:44] ep 12 it 700/984 loss 18.992 mal=0.776 bbox=0.164 kld=0.407 fgl=1.212 dense_cls=0.213 dense_box=0.072 dense_angle=0.012 lr 9.92e-05 | 26.5 img/s data 0.003s crit 0.191s/it\n[13:31:14] ep 12 it 750/984 loss 17.672 mal=0.666 bbox=0.155 kld=0.247 fgl=1.393 dense_cls=0.106 dense_box=0.040 dense_angle=0.017 lr 9.91e-05 | 26.5 img/s data 0.002s crit 0.191s/it\n[13:31:44] ep 12 it 800/984 loss 17.355 mal=0.616 bbox=0.133 kld=0.252 fgl=1.230 dense_cls=0.132 dense_box=0.064 dense_angle=0.009 lr 9.90e-05 | 26.5 img/s data 0.002s crit 0.191s/it\n"
 }
