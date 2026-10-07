@@ -147,6 +147,8 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
   - VRDet được phép chậm hơn, nhưng phải chính xác và thông minh hơn.
   - **`dataset_obb_train_v3.zip` (floorplan trong repo) là data riêng để finetune sau. KHÔNG dùng để benchmark** cho tới khi kiến trúc đã thắng trên các dataset public (DOTA, FloorPlanCAD...).
 
+- (bổ sung 23:20) User giao toàn quyền nghiên cứu, kể cả chọn G4 hay A100. Điều user quan tâm: một kiến trúc mới thông minh và nhanh, user sở hữu, finetune được trên data riêng tự gắn nhãn, đem đi thương mại. **Train phải tiết kiệm và tối ưu CU.**
+
 Câu hỏi còn mở:
 - Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.
 
@@ -178,15 +180,19 @@ Câu hỏi còn mở:
   - H4 dense: e6 sub-mAP 63.3 so với 61.2, hứa hẹn.
   - H4c dense-query: e6 59.6.
   - H4 và H4c chạy trên A100 (chậm, 27 ảnh/s), xong khoảng 22:10.
-- [ ] **E3 đang chạy** (G4, `--channels-last --compile`):
-  - `e3-ctx-fix-s` (ngữ cảnh đã sửa) và `e3-rfs-s` (repeat-factor sampling).
-  - Đã resume sau lỗi compile/EMA. Các dòng sub_mAP trước 20:35 của hai run này không hợp lệ.
-- [ ] **Hàng đợi** `research/jobs/queue.txt`: `e1-vrdet-s-seed1` (đo nhiễu seed + speed opts), `e4-fpc-yolo26s-24e`, `e4-fpc-vrdet-s-24e` (benchmark CAD thứ 2: FloorPlanCAD).
+- [x] **E3:** ngữ cảnh đã sửa BN: 69.71 (−0.18, class ngữ cảnh tăng nhưng HC −19). **RFS: 72.34 (+2.45), thành mặc định.** Khoảng cách tới YOLO26s còn −2.4.
+- [x] **E4 FloorPlanCAD** (benchmark CAD thứ 2, val 810 bản vẽ, 30 class): YOLO26s 78.51, VRDet-S+RFS 75.96 (−2.55).
+- [x] Kiểm kê phần mượn (23:30): VRDet-X 62.5M tham số = backbone 53% + encoder 33% của D-FINE (Apache) + decoder OBB 14% viết lại. Phần làm nên "kiến trúc mới thật" là nhánh vector + ngữ cảnh + head hybrid → đẩy H7 lên sớm.
+- [ ] **Đang chạy / chờ (2026-10-07 23:30)**, hàng đợi ở `research/jobs/queue.txt`, watcher `WATCH_UNTIL=all`:
+  - `e5-rfs-ctx-s` (RFS + context + ctx-dropout), `e5-rfs-dense-s` (RFS + head dense), `e5-yolo26x-dota-24e` (mốc cỡ X, chạy lại từ đầu do mất VM).
+  - Hàng đợi: `e6-vrdet-x-dota-24e` (VRDet-X + RFS, so YOLO26x), `e7-fpc-vec-s-24e` (**H7 nhánh vector** trên FloorPlanCAD, so với 75.96).
+  - `e2-h4-dense-s` bỏ (mất A100 4 lần), thay bằng `e5-rfs-dense-s`.
 - Bài học hạ tầng 2026-10-07:
-  - Colab cấp tối đa khoảng 3 G4 cùng lúc. A100 dự phòng nhưng chậm hơn khoảng 2 lần với workload này (VM ít CPU).
+  - Giữ tối đa 3 session (`JOB_MAX_SESSIONS=3`, đếm cả session lạ). Ba đợt mất VM (21:03, 22:18, 23:05) trùng lúc xin VM mới; user cho biết có lần là bị người khác tắt nhầm trên UI Colab. Session của agent tên dạng `e<N>-...-<attempt>`.
+  - A100 chậm hơn G4 khoảng 2 lần với workload này (VM ít CPU). Head dense trên G4 + compile đạt 72 ảnh/s, gần bằng bản không dense (82).
   - `--compile` phải đặt sau khi tạo EMA (đã sửa).
-  - Exec treo khi resume checkpoint 160 MB: đã thêm retry ngắn và ghép chunk an toàn khi chạy lại.
-  - Máy local cạn commit memory (~2.5 GB) → torch CPU dễ crash; test trên Colab.
+  - Checkpoint lớn (YOLO26x 700 MB, VRDet-X ~1 GB) tải về theo chunk 16 MB, resume được qua nhiều lần poll (`cx.get`).
+  - Máy local cạn commit memory (~2.5 GB) → torch CPU dễ crash; test nhỏ thì `OMP_NUM_THREADS=1`.
 
 **GPU mặc định: G4** (RTX PRO 6000 Blackwell 94 GB, ~8.9 CU/h; 500 CU ≈ 55 giờ G4).
 

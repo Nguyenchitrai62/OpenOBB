@@ -116,3 +116,18 @@ Cấu hình lõi + RFS (đã xác nhận), chưa thêm context/dense để đo �
 - Số query: 300 → 600.
 - H3 ngữ cảnh: strip/large-kernel depthwise trong CCFM. Kỳ vọng tăng BR/GTF/SBF/RA/HA.
 - Công thức train: xoay ngẫu nhiên góc bất kỳ, mosaic.
+
+## E7: H7 nhánh vector trên FloorPlanCAD (cùng điều kiện với `e4-fpc-vrdet-s-24e`)
+
+| Run | Thay đổi duy nhất | Giả thuyết | Pass |
+|---|---|---|---|
+| `e7-fpc-vec-s-24e` | `--vectors` | Token primitive (loại nét, hình học chính xác, màu layer, độ dày) cộng transformer toàn bản vẽ cho model bằng chứng mà pixel không phân biệt được: cung cửa, nét kính/cửa sổ, symbol nhỏ. Tăng mạnh ở các class đang thua YOLO (escalator, airconditioner, bath, sliding-door, bay-window, opening-symbol) | ≥ 75.96 + 1.0, và tiến gần hoặc vượt YOLO26s 78.51 |
+
+Thiết kế (`vrdet/models/vector.py`):
+- Mỗi primitive là 1 token: Fourier của 8 điểm, hình dạng tương đối, loại nét, rgb, log độ dày.
+- 2 lớp transformer (d 128) toàn bản vẽ, có 1 register token.
+- Splat feature theo đường nét lên lưới stride 8/16/32, cộng mật độ nét (log count).
+- Conv 1×1 khởi tạo 0, cộng vào output backbone. Model lúc khởi tạo trùng hệt bản raster.
+- Dataset biến đổi điểm vector cùng mọi augmentation (test `tests/test_vector.py`).
+- Không dùng `sem`/`inst` (là nhãn).
+- Định dạng token dùng chung cho PDF (PyMuPDF `get_drawings`) khi finetune trên data riêng. Còn dành chỗ type 4+ cho bezier, rect, text.
