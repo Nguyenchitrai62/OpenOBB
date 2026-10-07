@@ -160,11 +160,19 @@ Câu hỏi còn mở:
   - Trainer `vrdet/train.py`: EMA, LR flat-cosine, resume.
   - Test: `pytest -q tests/` (CPU).
   - **Lưu ý: torch 2.12 CPU trên máy này crash (heap) khi chạy nhiều luồng.** Chạy CPU thì dùng `--threads 1`, hoặc test trên Colab.
-- [ ] **E1 (đang chạy):**
-  - `e1-yolo26s-dota-24e` (G4): baseline cùng điều kiện, khoảng 40 phút.
-  - `e1-vrdet-smoke-t4` (T4): test chức năng VRDet trên dữ liệu giả lập.
-  - Sau đó: `e1-vrdet-s-dota-24e` (G4).
-- [ ] E2: H4 dense hybrid (`--dense`), rồi H1 ProbIoU, H2, H3 (xem `research/HYPOTHESES.md`).
+- [x] **E1a YOLO26s** (24 epoch, SS, train→val): **val mAP50 74.77**, mAP50:95 49.49. Sanity OK.
+- [x] Smoke test VRDet trên T4 (dữ liệu giả lập): mAP50 1.00, pipeline đúng.
+- [ ] **E1b `e1-vrdet-s-dota-24e`** (G4, đang chạy):
+  - Epoch 6/24 đạt sub-mAP50 61.2 trên 100 ảnh val; 60 ảnh/s; 23 GB.
+  - Xong khoảng 19:15 (2026-10-07).
+- [ ] **E2 ablation** (mỗi run đổi 1 biến so với E1b, xem `research/HYPOTHESES.md`):
+  - Đang chạy: `e2-h6-ctx-s` (ngữ cảnh toàn ảnh), `e2-h3-strip-s` (strip).
+  - **Trong hàng đợi** `research/jobs/queue.txt`: `e2-h4-dense-s` (kèm profile tốc độ), `e2-h4c-dq-s`. Watcher tự launch khi Colab có chỗ; giới hạn khoảng 5 session đồng thời, kể cả session của user.
+  - `e1-vrdet-smoke2-t4`: kiểm chứng bản sửa NaN của head dense.
+- Bài học 2026-10-07:
+  - Head dense từng ra NaN vì ProbIoU có `sqrt(det)` khi box co về 0, và vì `atan2` gần gốc. Đã sửa: chặn dưới cạnh, góc dùng số thô, bỏ qua bước có grad norm không hữu hạn.
+  - Loss phân loại dense lúc đầu quá lớn (BCE 68), đã chuyển sang QFL.
+
 
 **GPU mặc định: G4** (RTX PRO 6000 Blackwell 94 GB, ~8.9 CU/h; 500 CU ≈ 55 giờ G4).
 

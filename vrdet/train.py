@@ -180,8 +180,13 @@ def main(argv=None):
                 continue
             opt.zero_grad(set_to_none=True)
             loss.backward()
-            if a.clip > 0:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), a.clip)
+            gn = torch.nn.utils.clip_grad_norm_(model.parameters(), a.clip if a.clip > 0 else 1e9)
+            if not torch.isfinite(gn):          # never let one bad batch poison the weights
+                log(f"non-finite grad norm at iter {it}; step skipped")
+                opt.zero_grad(set_to_none=True)
+                it += 1
+                tick = time.time()
+                continue
             opt.step()
             ema.update(model)
             main = {k: float(v) for k, v in losses.items() if "_aux" not in k and "_dn" not in k and "_enc" not in k

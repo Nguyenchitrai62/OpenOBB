@@ -16,8 +16,7 @@ def _gt():
 def test_decode_identity():
     pts = torch.tensor([[0.5, 0.5]])
     st = torch.tensor([8 / 1024])
-    reg = torch.zeros(1, 1, 6)
-    reg[..., 4] = 1.0
+    reg = torch.zeros(1, 1, 5)
     b = decode(reg, pts, st)[0, 0]
     assert torch.allclose(b, torch.tensor([0.5, 0.5, 16 / 1024, 16 / 1024, 0.0]), atol=1e-6)
 

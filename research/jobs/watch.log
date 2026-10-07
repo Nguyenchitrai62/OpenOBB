@@ -56,3 +56,27 @@
 [2026-10-07 17:32:22] e1-vrdet-smoke2-t4: process gone without exit code; relaunching (attempt 2)
 [2026-10-07 17:32:27] e1-vrdet-smoke2-t4: launching attempt 2 on T4 as session e1-vrdet-smoke2-t4-2
 [2026-10-07 17:32:44] e1-vrdet-smoke2-t4: restoring 1 synced files (0 MB) for resume
+[2026-10-07 17:32:57] e1-vrdet-smoke2-t4: running
+[2026-10-07 17:32:57] watch: balance=477.35 rate=15.27/h active=['e1-vrdet-s-dota-24e', 'e1-vrdet-smoke2-t4'] ended=[]
+[2026-10-07 17:41:59] e1-vrdet-smoke2-t4: finished with status failed_rc1; stopping VM
+[2026-10-07 17:42:02] watch: balance=474.86 rate=15.27/h active=['e1-vrdet-s-dota-24e', 'e1-vrdet-smoke2-t4'] ended=[('e1-vrdet-smoke2-t4', 'failed_rc1')]
+[2026-10-07 17:43:29] e1-vrdet-smoke2-t4: launching attempt 1 on T4 as session e1-vrdet-smoke2-t4-1
+[2026-10-07 17:43:55] e1-vrdet-smoke2-t4: running
+[2026-10-07 17:45:03] watch: balance=474.86 rate=15.27/h active=['e1-vrdet-s-dota-24e', 'e1-vrdet-smoke2-t4'] ended=[]
+[2026-10-07 17:50:58] e1-vrdet-smoke2-t4: finished with status failed_rc1; stopping VM
+[2026-10-07 17:51:02] watch: balance=472.39 rate=15.27/h active=['e1-vrdet-s-dota-24e', 'e1-vrdet-smoke2-t4'] ended=[('e1-vrdet-smoke2-t4', 'failed_rc1')]
+[2026-10-07 17:51:03] e2-h4-dense-s: launching attempt 1 on G4 as session e2-h4-dense-s-1
+[2026-10-07 17:51:36] e2-h4-dense-s: running
+[2026-10-07 17:51:39] e2-h6-ctx-s: launching attempt 1 on G4 as session e2-h6-ctx-s-1
+[2026-10-07 17:52:14] e2-h6-ctx-s: running
+[2026-10-07 17:52:18] e2-h4c-dq-s: launching attempt 1 on G4 as session e2-h4c-dq-s-1
+[2026-10-07 17:52:23] e2-h3-strip-s: launching attempt 1 on G4 as session e2-h3-strip-s-1
+[2026-10-07 17:54:29] e1-vrdet-smoke2-t4: launching attempt 1 on T4 as session e1-vrdet-smoke2-t4-1
+[2026-10-07 17:54:59] e1-vrdet-smoke2-t4: running
+[2026-10-07 17:55:02] e2-h3-strip-s: launching attempt 1 on G4 as session e2-h3-strip-s-1
+[2026-10-07 17:55:36] e2-h3-strip-s: running
+[2026-10-07 17:55:47] e2-h4-dense-s: launching attempt 1 on G4 as session e2-h4-dense-s-1
+[2026-10-07 17:55:53] e2-h4c-dq-s: launching attempt 1 on G4 as session e2-h4c-dq-s-1
+[2026-10-07 17:56:25] queue: ['e2-h4-dense-s', 'e2-h4c-dq-s']
+[2026-10-07 17:56:35] e2-h4-dense-s: launching attempt 1 on G4 as session e2-h4-dense-s-1
+[2026-10-07 17:56:38] queue: e2-h4-dense-s waits (no VM available)

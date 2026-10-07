@@ -39,7 +39,18 @@ Quy tắc:
 - Pass (để đi tiếp E2): mAP50 ≥ E1a − 2. Fail: tìm bug trước (matching, góc, merge), không thêm module mới.
 - Kết quả: (chưa chạy)
 
-## E2 (dự kiến, mỗi cái 1 ablation so với E1b)
+## E2: ablation lõi kiến trúc (mỗi run đổi đúng 1 biến so với E1b, cùng 24 epoch / 1024 SS / train→val)
+
+Nhiễu giữa các run trên DOTA val khoảng ±0.3–0.5. Δ < 0.5 coi là chưa kết luận (lặp seed nếu hứa hẹn).
+
+| Job | Biến | Giả thuyết | Pass |
+|---|---|---|---|
+| `e2-h4-dense-s` | `--dense` | Head dense one-to-many (TAL xoay) làm giám sát phụ giúp encoder. Khi ghép đầu ra (hợp / định tuyến theo kích thước), vật nhỏ tăng | decoder-only ≥ E1b + 0.5, **hoặc** kiểu ghép tốt nhất ≥ max(E1b, YOLO) + 0.5, kèm SV/PL/SP/HC tăng |
+| `e2-h4c-dq-s` | `--dense-queries` | Query decoder lấy từ head dense (top-k sau lọc trùng) cho vật nhỏ "chỗ ngồi" trong 300 query | ≥ E1b + 0.5 |
+| `e2-h6-ctx-s` | `--context` | Token ngữ cảnh toàn ảnh (thumbnail) giúp các class cần ngữ cảnh | ≥ E1b + 0.5, BR/HA/SBF/GTF/RA tăng |
+| `e2-h3-strip-s` | `--strip-k 11` | Strip-context giúp vật dài mảnh | ≥ E1b + 0.5, hoặc BR/HA tăng ≥ 1.5 |
+
+## E2 cũ (dự kiến ban đầu)
 - H4 dense: thêm head one-to-many dense (TAL xoay) trên P3–P5 của encoder, dùng làm giám sát phụ và nguồn query. Kỳ vọng tăng SV/PL/SP.
 - H1 loss: ProbIoU thay KLD (cost và loss).
 - Số query: 300 → 600.

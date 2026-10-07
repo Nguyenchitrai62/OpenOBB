@@ -20,6 +20,7 @@ CLI:
   python tools/job.py poll <id>     # one babysit step: sync, detect end/death
   python tools/job.py watch [ids]   # loop poll over active jobs; exits when one ends
   python tools/job.py stop <id>     # final sync + release the VM
+  python tools/job.py queue <id>... # launch later, as soon as Colab grants a VM (watch retries every poll)
   python tools/job.py status
 """
 import fnmatch
@@ -236,10 +237,39 @@ def active():
             if json.loads(p.read_text(encoding="utf-8")).get("status") == "running"]
 
 
+QUEUE = JOBS / "queue.txt"
+
+
+def queued():
+    return [l.strip() for l in QUEUE.read_text().splitlines() if l.strip()] if QUEUE.exists() else []
+
+
+def enqueue(jids):
+    q = queued()
+    QUEUE.write_text("\n".join(q + [j for j in jids if j not in q]) + "\n")
+    log(f"queue: {queued()}")
+
+
+def drain_queue():
+    """Launch queued jobs while Colab grants VMs; stop at the first allocation refusal."""
+    for jid in queued():
+        try:
+            launch(jid)
+        except Exception as e:  # noqa: BLE001
+            msg = str(e)
+            if "Allocation refused" in msg or "too many active sessions" in msg:
+                log(f"queue: {jid} waits (no VM available)")
+                return
+            log(f"queue: {jid} failed to start, dropped: {msg[:300]}")
+        QUEUE.write_text("\n".join(j for j in queued() if j != jid) + "\n")
+
+
 def watch(ids=None, max_hours=8):
-    """Babysit until any job leaves 'running' (or max_hours), then exit so the agent wakes up."""
+    """Babysit until any job leaves 'running' (or max_hours), then exit so the agent wakes up.
+    Queued jobs are launched whenever a VM becomes available."""
     t0 = time.time()
     while True:
+        drain_queue()
         ids_now = ids or active()
         if not ids_now:
             log("watch: no active jobs")
@@ -292,8 +322,8 @@ def _lock():
 
 if __name__ == "__main__":
     cmd, args = sys.argv[1], sys.argv[2:]
-    if cmd not in ("status", "launch"):     # launch only touches its own new session
+    if cmd not in ("status", "launch", "queue"):     # launch only touches its own new session
         _lock()
     {"launch": lambda: launch(args[0]), "poll": lambda: print(poll(args[0])),
-     "watch": lambda: watch(args or None), "stop": lambda: stop(args[0]),
+     "watch": lambda: watch(args or None), "stop": lambda: stop(args[0]), "queue": lambda: enqueue(args),
      "status": status}[cmd]()

@@ -17,3 +17,4 @@ kaggle_pkg/kernel/**/runs/
 kaggle_pkg/kernel/**/weights/
 research/jobs/.bundle.tar.gz
 research/jobs/.lock
+research/jobs/queue.txt

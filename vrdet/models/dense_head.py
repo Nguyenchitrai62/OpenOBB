@@ -41,13 +41,13 @@ class DenseRotatedHead(nn.Module):
         self.cls_towers = nn.ModuleList([nn.Sequential(dw_block(in_ch, width), dw_block(width, width)) for _ in strides])
         self.reg_towers = nn.ModuleList([nn.Sequential(dw_block(in_ch, width), dw_block(width, width)) for _ in strides])
         self.cls_out = nn.ModuleList([nn.Conv2d(width, num_classes, 1) for _ in strides])
-        self.reg_out = nn.ModuleList([nn.Conv2d(width, 6, 1) for _ in strides])     # 4 log-distances + (cos, sin) of 2*theta
+        # 4 log-distances + raw angle (no squash, as YOLO26: every angle loss / assignment here is periodic)
+        self.reg_out = nn.ModuleList([nn.Conv2d(width, 5, 1) for _ in strides])
         for c, r in zip(self.cls_out, self.reg_out):
             nn.init.constant_(c.bias, -math.log((1 - prior) / prior))
             nn.init.normal_(c.weight, std=0.01)
             nn.init.normal_(r.weight, std=0.01)
             nn.init.constant_(r.bias, 0.0)
-            r.bias.data[4] = 1.0
         self._grid = {}
 
     def anchors(self, shapes, device, dtype):
@@ -76,8 +76,8 @@ class DenseRotatedHead(nn.Module):
 
 
 def decode(reg, pts, strides):
-    d = reg[..., :4].clamp(max=8.0).exp() * strides[None, :, None]          # l, t, r, b (normalised)
-    t = 0.5 * torch.atan2(reg[..., 5], reg[..., 4])
+    d = reg[..., :4].clamp(min=-6.0, max=8.0).exp() * strides[None, :, None]   # l, t, r, b (normalised)
+    t = reg[..., 4]
     c, s = torch.cos(t), torch.sin(t)
     du, dv = (d[..., 2] - d[..., 0]) / 2, (d[..., 3] - d[..., 1]) / 2
     cx = pts[None, :, 0] + du * c - dv * s
@@ -161,7 +161,10 @@ class DenseCriterion(nn.Module):
         fg = torch.stack(fgs)
         tgt = torch.stack(gts)
         norm = tsc.sum().clamp(min=1.0)
-        l_cls = F.binary_cross_entropy_with_logits(logits, tsc, reduction="sum") / norm
+        # Quality focal loss (GFL / RTMDet): BCE to the soft target, modulated by |sigmoid - target|^2 so the
+        # ~45k easy negatives per image do not swamp the loss (plain BCE starts at ~70 vs ~35 for the decoder)
+        mod = (logits.detach().sigmoid() - tsc).abs().pow(2)
+        l_cls = (F.binary_cross_entropy_with_logits(logits, tsc, reduction="none") * mod).sum() / norm
         if fg.any():
             w = tsc.sum(-1)[fg]
             p, g = boxes[fg], tgt[fg]

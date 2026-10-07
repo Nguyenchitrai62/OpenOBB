@@ -37,10 +37,11 @@ def norm_le90(obb):
 
 # ------------------------------------------------------------------ Gaussian (ProbIoU / KLD)
 
-def _gauss(obb):
-    """Mean and covariance entries (a, b, c) with cov = [[a, c], [c, b]] of the uniform-box Gaussian."""
-    w2 = obb[..., 2].pow(2) / 12
-    h2 = obb[..., 3].pow(2) / 12
+def _gauss(obb, min_side=1e-4):
+    """Mean and covariance entries (a, b, c) with cov = [[a, c], [c, b]] of the uniform-box Gaussian.
+    Sides are floored so degenerate boxes cannot produce infinite gradients."""
+    w2 = obb[..., 2].clamp(min=min_side).pow(2) / 12
+    h2 = obb[..., 3].clamp(min=min_side).pow(2) / 12
     c, s = torch.cos(obb[..., 4]), torch.sin(obb[..., 4])
     a = w2 * c * c + h2 * s * s
     b = w2 * s * s + h2 * c * c
@@ -58,7 +59,7 @@ def probiou(obb1, obb2, eps=EPS):
     t2 = (c * (x2 - x1) * (y1 - y2)) / (den + eps) * 0.5
     det1 = (a1 * b1 - c1 * c1).clamp(min=0)
     det2 = (a2 * b2 - c2 * c2).clamp(min=0)
-    t3 = torch.log(den / (4 * torch.sqrt(det1 * det2) + eps) + eps) * 0.5
+    t3 = torch.log(den / (4 * torch.sqrt((det1 * det2).clamp(min=1e-20)) + eps) + eps) * 0.5
     bd = (t1 + t2 + t3).clamp(eps, 100.0)
     hd = torch.sqrt(1.0 - torch.exp(-bd) + eps)
     return 1 - hd

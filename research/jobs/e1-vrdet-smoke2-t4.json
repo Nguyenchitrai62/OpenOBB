@@ -3,7 +3,7 @@
   "gpu": "T4",
   "bundle": ["vrdet", "colab", "tests"],
   "setup": ["pip install -q -U shapely"],
-  "cmd": "python tests/make_synthetic.py /content/synth/raw 256 32 && python colab/data/split_dota.py --src /content/synth/raw --out /content/synth/split --size 384 --gap 64 && python -u -m vrdet.train --data /content/synth/split --out {out} --size s --img 384 --batch 16 --epochs 30 --warmup 50 --eval-every 10 --eval-images 32 --workers 2 --ema 0.99 --ema-warmups 20 --log-every 8 --no-amp --context --dense --strip-k 11 --ortho-heads --box-loss probiou --rotate-p 0.5 --mosaic-p 0.3",
+  "cmd": "python tests/make_synthetic.py /content/synth/raw 256 32 && python colab/data/split_dota.py --src /content/synth/raw --out /content/synth/split --size 384 --gap 64 && python -u -m vrdet.train --data /content/synth/split --out {out} --size s --img 384 --batch 8 --epochs 20 --warmup 50 --eval-every 10 --eval-images 32 --workers 2 --ema 0.99 --ema-warmups 20 --log-every 8 --no-amp --context --dense --strip-k 11 --ortho-heads --box-loss probiou --rotate-p 0.5 --mosaic-p 0.3",
   "sync": ["metrics.jsonl", "*.log", "eval_val.json", "eval_val.txt"],
   "max_hours": 0.75,
   "max_retries": 1
