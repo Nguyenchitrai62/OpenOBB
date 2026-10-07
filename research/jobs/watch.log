@@ -209,3 +209,7 @@
 [2026-10-07 22:23:31] e5-yolo26x-dota-24e: restoring 3 synced files (0 MB) for resume
 [2026-10-07 22:24:29] e5-yolo26x-dota-24e: running
 [2026-10-07 22:24:29] watch: balance=331.82 rate=17.8/h active=['e2-h4-dense-s', 'e4-fpc-vrdet-s-24e', 'e5-rfs-ctx-s', 'e5-yolo26x-dota-24e'] ended=[]
+[2026-10-07 22:39:53] e5-yolo26x-dota-24e: poll error colab download -s e5-yolo26x-dota-24e-2 /content/work/runs/e5-yolo26x-dota-24e/train/weights/last.pt F:\Source_code\NEW_architecture\runs\e5-yolo26x-dota-24e\train\weights\last.pt -> rc=1
+[colab] Download failed: 
+
+[2026-10-07 22:39:53] watch: balance=325.8 rate=32.0/h active=['e2-h4-dense-s', 'e4-fpc-vrdet-s-24e', 'e5-rfs-ctx-s', 'e5-yolo26x-dota-24e'] ended=[]

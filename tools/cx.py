@@ -165,8 +165,35 @@ print({MARK!r}+'ok')""", timeout=300)
         raise ColabError(f"sha mismatch after upload {local} -> {remote}")
 
 
-def get(name, remote, local):
-    Path(local).parent.mkdir(parents=True, exist_ok=True)
-    retry(lambda: run(["download", "-s", name, remote, str(local)], timeout=1800))
-    if not Path(local).exists():
-        raise ColabError(f"download produced no file: {remote}")
+def get(name, remote, local, size=None):
+    """Download; files above CHUNK are split on the VM and fetched piecewise (large single downloads fail),
+    then re-assembled locally and verified with sha256."""
+    local = Path(local)
+    local.parent.mkdir(parents=True, exist_ok=True)
+    if size is None or size <= CHUNK:
+        retry(lambda: run(["download", "-s", name, remote, str(local)], timeout=1800))
+        if not local.exists():
+            raise ColabError(f"download produced no file: {remote}")
+        return
+    rdir = f"/content/.cxdl/{Path(remote).name}"
+    info = retry(lambda: exec_json(name, f"""import os,shutil,hashlib
+shutil.rmtree({rdir!r},ignore_errors=True);os.makedirs({rdir!r})
+h=hashlib.sha256();n=0
+with open({remote!r},'rb') as f:
+    while True:
+        b=f.read({CHUNK})
+        if not b: break
+        h.update(b);open({rdir!r}+'/p%05d'%n,'wb').write(b);n+=1
+print({MARK!r}+'{{"n":%d,"sha":"%s"}}'%(n,h.hexdigest()))""", timeout=600), tries=3, wait=5)
+    tmp = Path(tempfile.mkdtemp(prefix="cxget_"))
+    for i in range(info["n"]):
+        part = tmp / f"p{i:05d}"
+        retry(lambda part=part, i=i: run(["download", "-s", name, f"{rdir}/p{i:05d}", str(part)], timeout=600))
+    with open(str(local) + ".part", "wb") as o:
+        for i in range(info["n"]):
+            o.write((tmp / f"p{i:05d}").read_bytes())
+    shutil.rmtree(tmp, ignore_errors=True)
+    if _sha(str(local) + ".part") != info["sha"]:
+        raise ColabError(f"sha mismatch after chunked download {remote}")
+    os.replace(str(local) + ".part", local)
+    exec_py(name, f"import shutil;shutil.rmtree({rdir!r},ignore_errors=True)", timeout=120)

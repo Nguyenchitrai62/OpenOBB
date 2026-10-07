@@ -173,7 +173,7 @@ def _sync(jid, sess, out, files, st):
     for rel, meta in files.items():
         if seen.get(rel) != meta:
             dst = RUNS / jid / rel
-            cx.get(sess, f"{out}/{rel}", dst)
+            cx.get(sess, f"{out}/{rel}", dst, size=meta[0])
             seen[rel] = meta
 
 

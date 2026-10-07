@@ -5,16 +5,16 @@
   "out": "/content/work/runs/e4-fpc-vrdet-s-24e",
   "status": "running",
   "launched": 1791385548.3218818,
-  "updated": "2026-10-07 22:22:27",
+  "updated": "2026-10-07 22:34:01",
   "fails": 0,
   "synced": {
     "metrics.jsonl": [
-      2203,
-      1791386449
+      4548,
+      1791387183
     ],
     "train_progress.log": [
-      14802,
-      1791386505
+      27865,
+      1791387203
     ],
     "setup.log": [
       350,
@@ -22,12 +22,12 @@
     ],
     "last.pt": [
       165671733,
-      1791386448
+      1791387182
     ],
     "train.log": [
-      16957,
-      1791386505
+      30020,
+      1791387203
     ]
   },
-  "tail": "kld=0.192 fgl=0.896 lr 1.00e-04 | 83.9 img/s data 0.004s crit 0.059s/it\n[15:21:17] ep 9 it 150/435 loss 17.697 mal=0.656 bbox=0.423 kld=0.250 fgl=0.951 lr 1.00e-04 | 84.8 img/s data 0.003s crit 0.058s/it\n[15:21:26] ep 9 it 200/435 loss 16.882 mal=0.688 bbox=0.145 kld=0.223 fgl=0.966 lr 1.00e-04 | 85.1 img/s data 0.002s crit 0.058s/it\n[15:21:36] ep 9 it 250/435 loss 17.374 mal=0.790 bbox=0.237 kld=0.308 fgl=0.914 lr 1.00e-04 | 85.4 img/s data 0.002s crit 0.058s/it\n[15:21:45] ep 9 it 300/435 loss 17.303 mal=0.641 bbox=0.237 kld=0.268 fgl=0.938 lr 1.00e-04 | 85.7 img/s data 0.001s crit 0.057s/it\n"
+  "tail": "per_it\": 0.057, \"data_s_per_it\": 0.001, \"max_mem_gb\": 12.8, \"loss_mal\": 0.5891, \"loss_bbox\": 0.1286, \"loss_kld\": 0.2129, \"loss_fgl\": 0.8728, \"total\": 15.0434, \"sub_mAP50\": 0.7873, \"sub_mAP50_95\": 0.6722}\n[15:33:04] ep 18 it 0/435 loss 14.431 mal=0.663 bbox=0.116 kld=0.210 fgl=0.769 lr 5.50e-05 | 23.4 img/s data 0.247s crit 0.193s/it\n[15:33:14] ep 18 it 50/435 loss 14.410 mal=0.608 bbox=0.107 kld=0.170 fgl=0.806 lr 5.36e-05 | 80.2 img/s data 0.005s crit 0.063s/it\n[15:33:23] ep 18 it 100/435 loss 14.452 mal=0.690 bbox=0.130 kld=0.184 fgl=0.786 lr 5.23e-05 | 83.0 img/s data 0.003s crit 0.060s/it\n"
 }
