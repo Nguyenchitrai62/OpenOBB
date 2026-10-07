@@ -58,6 +58,27 @@ Nhiễu giữa các run trên DOTA val khoảng ±0.3–0.5. Δ < 0.5 coi là ch
 | `e2-h6-ctx-s` | `--context` | Token ngữ cảnh toàn ảnh (thumbnail) giúp các class cần ngữ cảnh | ≥ E1b + 0.5, BR/HA/SBF/GTF/RA tăng |
 | `e2-h3-strip-s` | `--strip-k 11` | Strip-context giúp vật dài mảnh | ≥ E1b + 0.5, hoặc BR/HA tăng ≥ 1.5 |
 
+### Tiến độ giữa chừng E2 (19:41, sub-mAP50 trên 100 ảnh val, epoch 6 / 12 / 18)
+
+| Run | e6 | e12 | e18 |
+|---|---|---|---|
+| E1b baseline | 61.2 | 65.2 | 67.3 |
+| H4 dense (`--dense`) | **63.3** | – | – |
+| H4c dense-query | 59.6 | – | – |
+| H3 strip | 60.9 | 66.0 | 66.2 |
+| H6 ngữ cảnh | 60.4 | 63.1 | 64.1 |
+
+- H6 thấp hơn đều. Đã tìm ra lỗi thiết kế: thumbnail đi qua backbone dùng chung ở chế độ train, làm hỏng running stats của BN mà tile dùng khi eval. Sửa bằng cách cho thumbnail đi qua với BN eval, no_grad, rồi kiểm lại ở E3.
+- Tốc độ: `--channels-last --compile` cho 86.4 ảnh/s so với 60.3 (×1.43). Các run từ E3 trở đi đều bật.
+
+## E3 (bật speed opts; so với trung bình E1b và seed1)
+
+| Job | Biến | Giả thuyết | Pass |
+|---|---|---|---|
+| `e1-vrdet-s-seed1` | seed 1 | đo nhiễu giữa seed (và kiểm chứng speed opts không đổi accuracy) | – |
+| `e3-ctx-fix-s` | `--context` (đã sửa BN) | H6 công bằng: ngữ cảnh toàn ảnh giúp BR/HA/SBF/GTF/RA | ≥ baseline + 0.5 |
+| `e3-rfs-s` | `--rfs 0.1` | Repeat-factor sampling sửa điểm yếu class hiếm (HC, SBF, RA, BD, BC) | ≥ baseline + 0.5, class hiếm tăng |
+
 ## E2 cũ (dự kiến ban đầu)
 - H4 dense: thêm head one-to-many dense (TAL xoay) trên P3–P5 của encoder, dùng làm giám sát phụ và nguồn query. Kỳ vọng tăng SV/PL/SP.
 - H1 loss: ProbIoU thay KLD (cost và loss).
