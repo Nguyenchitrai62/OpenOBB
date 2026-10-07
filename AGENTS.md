@@ -139,6 +139,10 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
   - Phải kiểm chứng trên **nhiều dataset public**: DOTA trước, rồi DIOR-R, HRSC2016, FloorPlanCAD.
   - Kiến trúc, code và weights lưu trong repo này, thuộc sở hữu của user, dùng thương mại được.
   - Hệ quả: H6 (ngữ cảnh toàn ảnh xuyên tile) và H3 (line mảnh) được nâng ưu tiên, ngay sau H4.
+- (bổ sung 22:10) **Kiến trúc phải mới và thuộc sở hữu của user để thương mại hoá.**
+  - Không dùng thư viện hạn chế thương mại như Ultralytics (AGPL) trong code sản phẩm.
+  - Trường hợp tệ nhất vẫn chấp nhận: một kiến trúc mới độc quyền, độ chính xác và tốc độ na ná YOLO.
+  - Đã chốt bằng `LICENSE` (proprietary), `THIRD_PARTY_NOTICES.md` (chỉ Apache-2.0: D-FINE/DEIM), `LICENSES/`, và `tests/test_license_guard.py` (cấm import ultralytics/mmcv/mmdet/mmrotate/ai4rs trong `vrdet/`).
 - (bổ sung 21:50) **Đối thủ để so là cỡ lớn nhất: YOLO26x (và YOLO11x)**, không phải bản s.
   - VRDet được phép chậm hơn, nhưng phải chính xác và thông minh hơn.
   - **`dataset_obb_train_v3.zip` (floorplan trong repo) là data riêng để finetune sau. KHÔNG dùng để benchmark** cho tới khi kiến trúc đã thắng trên các dataset public (DOTA, FloorPlanCAD...).
@@ -186,7 +190,7 @@ Câu hỏi còn mở:
 
 **GPU mặc định: G4** (RTX PRO 6000 Blackwell 94 GB, ~8.9 CU/h; 500 CU ≈ 55 giờ G4).
 
-**Cần user:** (trống)
+**Cần user:** điền tên chủ sở hữu pháp lý (cá nhân hoặc công ty) vào `LICENSE` (hiện để "the repository owner").
 
 ## 9. Nhật ký
 

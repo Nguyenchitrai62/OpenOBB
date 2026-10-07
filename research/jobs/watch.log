@@ -191,3 +191,6 @@
 [2026-10-07 21:57:21] e3-rfs-s: finished with status done; stopping VM
 [2026-10-07 21:57:39] watch: balance=339.14 rate=32.0/h active=['e2-h4-dense-s', 'e3-ctx-fix-s', 'e3-rfs-s', 'e5-yolo26x-dota-24e'] ended=[('e3-ctx-fix-s', 'done'), ('e3-rfs-s', 'done')]
 [2026-10-07 21:57:58] queue: ['e4-fpc-vrdet-s-24e', 'e5-rfs-ctx-s']
+[2026-10-07 22:05:42] e4-fpc-vrdet-s-24e: launching attempt 1 on G4 as session e4-fpc-vrdet-s-24e-1
+[2026-10-07 22:06:17] e4-fpc-vrdet-s-24e: running
+[2026-10-07 22:06:19] e5-rfs-ctx-s: launching attempt 1 on G4 as session e5-rfs-ctx-s-1

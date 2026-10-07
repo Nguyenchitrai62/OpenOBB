@@ -1,0 +1,10 @@
+VRDet - Proprietary License
+
+Copyright (c) 2026 the repository owner. All rights reserved.
+
+This software and its documentation, model architecture and trained weights produced by it are the
+proprietary property of the repository owner. No license is granted to any other party without the
+owner's written permission.
+
+Third-party components included under their own permissive licenses are listed in
+THIRD_PARTY_NOTICES.md; those components remain under their original licenses (Apache-2.0).
