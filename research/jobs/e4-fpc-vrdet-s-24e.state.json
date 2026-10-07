@@ -5,5 +5,29 @@
   "out": "/content/work/runs/e4-fpc-vrdet-s-24e",
   "status": "running",
   "launched": 1791385548.3218818,
-  "updated": "2026-10-07 22:06:17"
+  "updated": "2026-10-07 22:22:27",
+  "fails": 0,
+  "synced": {
+    "metrics.jsonl": [
+      2203,
+      1791386449
+    ],
+    "train_progress.log": [
+      14802,
+      1791386505
+    ],
+    "setup.log": [
+      350,
+      1791385572
+    ],
+    "last.pt": [
+      165671733,
+      1791386448
+    ],
+    "train.log": [
+      16957,
+      1791386505
+    ]
+  },
+  "tail": "kld=0.192 fgl=0.896 lr 1.00e-04 | 83.9 img/s data 0.004s crit 0.059s/it\n[15:21:17] ep 9 it 150/435 loss 17.697 mal=0.656 bbox=0.423 kld=0.250 fgl=0.951 lr 1.00e-04 | 84.8 img/s data 0.003s crit 0.058s/it\n[15:21:26] ep 9 it 200/435 loss 16.882 mal=0.688 bbox=0.145 kld=0.223 fgl=0.966 lr 1.00e-04 | 85.1 img/s data 0.002s crit 0.058s/it\n[15:21:36] ep 9 it 250/435 loss 17.374 mal=0.790 bbox=0.237 kld=0.308 fgl=0.914 lr 1.00e-04 | 85.4 img/s data 0.002s crit 0.058s/it\n[15:21:45] ep 9 it 300/435 loss 17.303 mal=0.641 bbox=0.237 kld=0.268 fgl=0.938 lr 1.00e-04 | 85.7 img/s data 0.001s crit 0.057s/it\n"
 }

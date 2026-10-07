@@ -159,6 +159,14 @@ Ngân sách: Colab Pro+, ~500 compute units (2026-10-07). G4 ≈ 8.9 CU/h. YOLO2
 
 **Vì sao vẫn tự chạy một baseline YOLO dù đã có số công bố:** số công bố dùng test server, train+val, MS và 100+ epoch. Ablation của ta dùng val, 24 epoch, SS. Cần một mốc cùng điều kiện để biết mỗi thay đổi kiến trúc thắng hay thua, và để kiểm chứng pipeline (split, evaluator). Claim cuối cùng sẽ so với số công bố bằng cách nộp test server.
 
+### 5.0 Mở rộng benchmark theo giai đoạn (user 2026-10-07: thử vài bộ rồi mới mở rộng)
+
+| Giai đoạn | Dataset | Trạng thái |
+|---|---|---|
+| 1 | DOTA-v1.0 (chính, so với YOLO26x), FloorPlanCAD (CAD) | đang chạy |
+| 2 | **DIOR-R**: 20 class, train+val 11,725 / test 11,738 ảnh 800², ship 62k + vehicle 40k object. Script `colab/data/get_dior.py`. **HRSC2016**: tàu dài mảnh, nguồn Kaggle `guofeng/hrsc2016`, cần unrar | script DIOR-R sẵn sàng |
+| 3 | DOTA-v1.5/v2.0, thêm bộ CAD khác | khi kiến trúc đã ổn |
+
 ### 5.1 Benchmark CAD (E6): FloorPlanCAD (khảo sát 2026-10-07)
 
 - **Nguồn:** bộ SVG GT `gdown 1wsOQxIXjsqYzMlUpPNRjyQiMnwgVbtJG`, 132 MB, khoảng 11.6k bản vẽ, split train/val/test. Bộ gốc kèm PNG nằm trên Google Drive, khoảng 5 GB. License CC BY-NC (chỉ benchmark).

@@ -5,5 +5,21 @@
   "out": "/content/work/runs/e5-rfs-ctx-s",
   "status": "running",
   "launched": 1791386248.4871092,
-  "updated": "2026-10-07 22:18:04"
+  "updated": "2026-10-07 22:22:38",
+  "fails": 0,
+  "synced": {
+    "train_progress.log": [
+      448,
+      1791386467
+    ],
+    "setup.log": [
+      1371,
+      1791386280
+    ],
+    "train.log": [
+      69645,
+      1791386467
+    ]
+  },
+  "tail": "Downloading: \"https://github.com/Peterande/storage/releases/download/dfinev1.0/dfine_s_coco.pth\" to /root/.cache/torch/hub/checkpoints/dfine_s_coco.pth\n[15:20:59] [init] D-FINE COCO: 770 full, 22 partial, 16 new tensors\n[15:21:00] RFS repeat factors: plane=1.0 baseba=2.1 bridge=1.0 ground=2.0 small-=1.0 large-=1.0 ship=1.0 tennis=1.5 basket=2.3 storag=1.6 soccer=2.1 rounda=1.7 harbor=1.0 swimmi=1.7 helico=3.7\n[15:21:07] torch.compile enabled for backbone + encoder (training model only)\n[15:21:07] VRDet-s 10.86M params | train patches 15749 | 984 it/epoch x 24 | batch 16 | device cuda amp=True\n"
 }

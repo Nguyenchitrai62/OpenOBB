@@ -3,9 +3,9 @@
   "started": "2026-10-07 17:51:03",
   "session": "e2-h4-dense-s-4",
   "out": "/content/work/runs/e2-h4-dense-s",
-  "status": "starting",
+  "status": "running",
   "launched": 1791386302.486961,
-  "updated": "2026-10-07 22:18:22",
+  "updated": "2026-10-07 22:21:46",
   "fails": 0,
   "synced": {
     "profile_base/train_progress.log": [
