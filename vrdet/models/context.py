@@ -45,7 +45,16 @@ class GlobalContext(nn.Module):
     def tokens(self, thumb, tile):
         """thumb (B, 3, T, T) in [0, 1]; tile (B, 4) = tile box on the thumbnail canvas, in canvas pixels."""
         B, _, T, _ = thumb.shape
-        f = self.pool(self.proj(self.backbone[0](thumb)[-1]))         # (B, C, g, g)
+        # The backbone is shared with the tile path: run the thumbnail with BatchNorm in eval mode and no
+        # gradient, otherwise its batch statistics (different scale) leak into the running stats used by
+        # the tiles at test time (observed: e2-h6-ctx-s trailed the baseline by ~3 points).
+        bb = self.backbone[0]
+        was_training = bb.training
+        bb.eval()
+        with torch.no_grad():
+            feat = bb(thumb)[-1]
+        bb.train(was_training)
+        f = self.pool(self.proj(feat))                                # (B, C, g, g)
         g = self.grid
         tok = f.flatten(2).transpose(1, 2)                            # (B, g*g, C), row-major
         idx = torch.arange(g, device=thumb.device, dtype=torch.float32)

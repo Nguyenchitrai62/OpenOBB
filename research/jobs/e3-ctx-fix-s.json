@@ -1,0 +1,13 @@
+{
+  "id": "e3-ctx-fix-s",
+  "gpu": "G4",
+  "bundle": ["vrdet", "colab"],
+  "setup": [
+    "pip install -q -U huggingface_hub hf_xet shapely",
+    "python -c \"import os,torch,shapely,scipy;print('cpus',os.cpu_count(),'torch',torch.__version__,'shapely',shapely.__version__,'scipy',scipy.__version__)\""
+  ],
+  "cmd": "python -u colab/data/get_dota.py --root /content/datasets && python -u -m vrdet.train --data /content/datasets/dota1_1024 --out {out} --size s --epochs 24 --batch 16 --lr 1e-4 --workers 16 --eval-every 6 --eval-images 100 --channels-last --compile --context",
+  "sync": ["last.pt", "metrics.jsonl", "*.log", "eval_val.json", "eval_val.txt", "train_done"],
+  "max_hours": 5,
+  "max_retries": 3
+}

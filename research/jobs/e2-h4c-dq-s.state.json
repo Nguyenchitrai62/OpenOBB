@@ -5,29 +5,29 @@
   "out": "/content/work/runs/e2-h4c-dq-s",
   "status": "running",
   "launched": 1791371275.9095955,
-  "updated": "2026-10-07 19:10:30",
+  "updated": "2026-10-07 19:34:04",
   "fails": 0,
   "synced": {
     "train_progress.log": [
-      22869,
-      1791374995
+      32617,
+      1791376387
     ],
     "setup.log": [
       1160,
       1791371296
     ],
     "train.log": [
-      105082,
-      1791374995
+      115311,
+      1791376387
     ],
     "metrics.jsonl": [
-      1604,
-      1791374584
+      2612,
+      1791376354
     ],
     "last.pt": [
       169245109,
-      1791374584
+      1791376354
     ]
   },
-  "tail": "1 lr 1.00e-04 | 27.2 img/s data 0.003s crit 0.178s/it\n[12:08:56] ep 5 it 600/984 loss 19.702 mal=0.810 bbox=0.424 kld=0.420 fgl=1.258 dense_cls=0.207 dense_box=0.079 dense_angle=0.032 lr 1.00e-04 | 27.3 img/s data 0.002s crit 0.177s/it\n[12:09:26] ep 5 it 650/984 loss 17.972 mal=0.692 bbox=0.279 kld=0.517 fgl=1.005 dense_cls=0.189 dense_box=0.157 dense_angle=0.020 lr 1.00e-04 | 27.3 img/s data 0.002s crit 0.177s/it\n[12:09:55] ep 5 it 700/984 loss 18.705 mal=0.895 bbox=0.233 kld=0.410 fgl=1.218 dense_cls=0.218 dense_box=0.119 dense_angle=0.026 lr 1.00e-04 | 27.3 img/s data 0.002s crit 0.177s/it\n"
+  "tail": "_per_it\": 0.178, \"data_s_per_it\": 0.002, \"max_mem_gb\": 24.7, \"loss_mal\": 0.7698, \"loss_bbox\": 0.2536, \"loss_kld\": 0.3797, \"loss_fgl\": 1.1956, \"loss_dense_cls\": 0.1787, \"loss_dense_box\": 0.0541, \"loss_dense_angle\": 0.0326, \"total\": 17.9286}\n[12:32:36] ep 8 it 0/984 loss 20.061 mal=0.971 bbox=0.388 kld=0.424 fgl=1.197 dense_cls=0.294 dense_box=0.147 dense_angle=0.019 lr 1.00e-04 | 6.1 img/s data 0.901s crit 0.760s/it\n[12:33:07] ep 8 it 50/984 loss 17.315 mal=0.770 bbox=0.161 kld=0.309 fgl=1.269 dense_cls=0.163 dense_box=0.012 dense_angle=0.040 lr 1.00e-04 | 24.3 img/s data 0.018s crit 0.204s/it\n"
 }

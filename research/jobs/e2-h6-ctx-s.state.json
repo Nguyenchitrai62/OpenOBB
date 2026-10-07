@@ -5,29 +5,29 @@
   "out": "/content/work/runs/e2-h6-ctx-s",
   "status": "running",
   "launched": 1791370305.3089714,
-  "updated": "2026-10-07 19:01:25",
+  "updated": "2026-10-07 19:34:42",
   "fails": 0,
   "synced": {
     "train_progress.log": [
-      40527,
-      1791374443
+      61321,
+      1791376443
     ],
     "setup.log": [
       1162,
       1791370329
     ],
     "train.log": [
-      99159,
-      1791374443
+      119953,
+      1791376443
     ],
     "metrics.jsonl": [
-      3238,
-      1791374226
+      5086,
+      1791376226
     ],
     "last.pt": [
       174867673,
-      1791374226
+      1791376226
     ]
   },
-  "tail": "0.235 fgl=1.257 lr 9.63e-05 | 55.2 img/s data 0.001s crit 0.055s/it\n[12:00:00] ep 13 it 600/984 loss 17.103 mal=0.665 bbox=0.137 kld=0.306 fgl=1.143 lr 9.61e-05 | 55.2 img/s data 0.001s crit 0.055s/it\n[12:00:14] ep 13 it 650/984 loss 17.331 mal=0.683 bbox=0.121 kld=0.282 fgl=1.178 lr 9.58e-05 | 55.3 img/s data 0.001s crit 0.054s/it\n[12:00:29] ep 13 it 700/984 loss 20.095 mal=0.727 bbox=0.445 kld=0.685 fgl=0.810 lr 9.56e-05 | 55.4 img/s data 0.001s crit 0.054s/it\n[12:00:43] ep 13 it 750/984 loss 16.705 mal=0.650 bbox=0.101 kld=0.227 fgl=1.224 lr 9.53e-05 | 55.4 img/s data 0.001s crit 0.054s/it\n"
+  "tail": "0.320 fgl=1.336 lr 2.71e-05 | 55.4 img/s data 0.001s crit 0.054s/it\n[12:33:20] ep 20 it 600/984 loss 17.545 mal=0.632 bbox=0.169 kld=0.347 fgl=1.211 lr 2.66e-05 | 55.4 img/s data 0.001s crit 0.054s/it\n[12:33:34] ep 20 it 650/984 loss 18.004 mal=0.715 bbox=0.137 kld=0.364 fgl=1.137 lr 2.61e-05 | 55.4 img/s data 0.001s crit 0.054s/it\n[12:33:49] ep 20 it 700/984 loss 17.618 mal=0.808 bbox=0.132 kld=0.253 fgl=1.291 lr 2.57e-05 | 55.4 img/s data 0.001s crit 0.054s/it\n[12:34:03] ep 20 it 750/984 loss 16.889 mal=0.640 bbox=0.149 kld=0.252 fgl=1.284 lr 2.52e-05 | 55.4 img/s data 0.001s crit 0.054s/it\n"
 }
