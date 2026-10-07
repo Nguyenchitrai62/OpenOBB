@@ -3,31 +3,31 @@
   "started": "2026-10-07 18:07:50",
   "session": "e2-h4c-dq-s-3",
   "out": "/content/work/runs/e2-h4c-dq-s",
-  "status": "running",
+  "status": "stopped",
   "launched": 1791382237.748595,
-  "updated": "2026-10-07 21:13:05",
+  "updated": "2026-10-07 21:42:33",
   "fails": 0,
   "synced": {
     "train_progress.log": [
-      52616,
-      1791379276
+      63205,
+      1791384106
     ],
     "setup.log": [
-      1160,
-      1791371296
+      2320,
+      1791382382
     ],
     "train.log": [
-      136272,
-      1791379276
+      214968,
+      1791384106
     ],
     "metrics.jsonl": [
-      4278,
-      1791379273
+      4951,
+      1791383759
     ],
     "last.pt": [
-      169245109,
-      1791379273
+      169245173,
+      1791383759
     ]
   },
-  "tail": "e-05 | 27.4 img/s data 0.002s crit 0.177s/it\n[13:21:13] epoch 12 done in 9.6 min: {\"epoch\": 12, \"iter\": 12792, \"lr\": 9.846975936411005e-05, \"epoch_s\": 575.0, \"img_s\": 27.4, \"crit_s_per_it\": 0.177, \"data_s_per_it\": 0.002, \"max_mem_gb\": 24.7, \"loss_mal\": 0.7346, \"loss_bbox\": 0.2085, \"loss_kld\": 0.3449, \"loss_fgl\": 1.2067, \"loss_dense_cls\": 0.1576, \"loss_dense_box\": 0.0455, \"loss_dense_angle\": 0.0244, \"total\": 17.2159}\n[13:21:16] ep 13 it 0/984 loss 17.319 mal=0.732 bbox=0.193 kld=0.289 fgl=1.299 dense_cls=0.166 dense_box=0.093 dense_angle=0.019 lr 9.85e-05 | 5.1 img/s data 1.052s crit 0.884s/it\n"
+  "tail": "r 9.24e-05 | 27.3 img/s data 0.006s crit 0.177s/it\n[14:29:29] ep 14 it 300/984 loss 18.136 mal=0.691 bbox=0.336 kld=0.564 fgl=0.996 dense_cls=0.173 dense_box=0.096 dense_angle=0.027 lr 9.21e-05 | 27.4 img/s data 0.005s crit 0.176s/it\n[14:29:58] ep 14 it 350/984 loss 17.729 mal=0.735 bbox=0.220 kld=0.281 fgl=1.363 dense_cls=0.161 dense_box=0.036 dense_angle=0.067 lr 9.17e-05 | 27.5 img/s data 0.005s crit 0.175s/it\n[14:30:26] ep 14 it 400/984 loss 16.118 mal=0.652 bbox=0.151 kld=0.282 fgl=1.263 dense_cls=0.131 dense_box=0.054 dense_angle=0.024 lr 9.14e-05 | 27.6 img/s data 0.004s crit 0.175s/it\n"
 }

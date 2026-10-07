@@ -5,7 +5,7 @@
   "out": "/content/work/runs/e3-rfs-s",
   "status": "running",
   "launched": 1791381386.7287903,
-  "updated": "2026-10-07 21:09:01",
+  "updated": "2026-10-07 21:32:23",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,21 +13,21 @@
       1791381557
     ],
     "train.log": [
-      171018,
-      1791382103
+      193384,
+      1791383501
     ],
     "metrics.jsonl": [
-      2440,
-      1791381989
+      4541,
+      1791383491
     ],
     "train_progress.log": [
-      32751,
-      1791382103
+      55117,
+      1791383501
     ],
     "last.pt": [
       165363445,
-      1791381989
+      1791383481
     ]
   },
-  "tail": "0.367 fgl=1.337 lr 1.00e-04 | 84.6 img/s data 0.001s crit 0.058s/it\n[14:07:54] ep 10 it 450/984 loss 17.443 mal=0.659 bbox=0.087 kld=0.276 fgl=1.275 lr 1.00e-04 | 84.8 img/s data 0.001s crit 0.058s/it\n[14:08:04] ep 10 it 500/984 loss 18.727 mal=0.718 bbox=0.153 kld=0.281 fgl=1.298 lr 1.00e-04 | 84.6 img/s data 0.001s crit 0.059s/it\n[14:08:13] ep 10 it 550/984 loss 17.977 mal=0.676 bbox=0.161 kld=0.299 fgl=1.227 lr 1.00e-04 | 84.7 img/s data 0.001s crit 0.059s/it\n[14:08:23] ep 10 it 600/984 loss 16.667 mal=0.615 bbox=0.153 kld=0.246 fgl=1.217 lr 1.00e-04 | 84.8 img/s data 0.001s crit 0.059s/it\n"
+  "tail": "14:31:31] epoch 17 done in 3.1 min: {\"epoch\": 17, \"iter\": 17712, \"lr\": 5.5011972532837376e-05, \"epoch_s\": 184.5, \"img_s\": 85.3, \"crit_s_per_it\": 0.058, \"data_s_per_it\": 0.0, \"max_mem_gb\": 20.3, \"loss_mal\": 0.673, \"loss_bbox\": 0.1525, \"loss_kld\": 0.2908, \"loss_fgl\": 1.2394, \"total\": 17.3226, \"sub_mAP50\": 0.6849, \"sub_mAP50_95\": 0.4478}\n[14:31:31] ep 18 it 0/984 loss 15.877 mal=0.576 bbox=0.097 kld=0.215 fgl=1.239 lr 5.50e-05 | 25.9 img/s data 0.212s crit 0.153s/it\n[14:31:41] ep 18 it 50/984 loss 18.249 mal=0.740 bbox=0.142 kld=0.343 fgl=1.249 lr 5.44e-05 | 79.4 img/s data 0.004s crit 0.063s/it\n"
 }

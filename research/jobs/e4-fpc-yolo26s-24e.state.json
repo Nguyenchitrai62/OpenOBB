@@ -1,0 +1,37 @@
+{
+  "attempts": 1,
+  "started": "2026-10-07 21:20:13",
+  "session": "e4-fpc-yolo26s-24e-1",
+  "out": "/content/work/runs/e4-fpc-yolo26s-24e",
+  "status": "running",
+  "launched": 1791382819.4451764,
+  "updated": "2026-10-07 21:33:12",
+  "fails": 0,
+  "synced": {
+    "setup.log": [
+      839,
+      1791382842
+    ],
+    "train/args.yaml": [
+      1720,
+      1791382890
+    ],
+    "train.log": [
+      683350,
+      1791383564
+    ],
+    "metrics.jsonl": [
+      6063,
+      1791383564
+    ],
+    "train/weights/last.pt": [
+      85284193,
+      1791383563
+    ],
+    "train/results.csv": [
+      2606,
+      1791383563
+    ]
+  },
+  "tail": "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2578 24/25 9.1it/s 2.8s<0.1s\n\u001b[K                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501 25/25 8.6it/s 2.9s\n                   all        800      11741      0.829      0.832      0.852      0.783\n\n      Epoch    GPU_mem   box_loss   cls_loss    l1_loss angle_loss  Instances       Size\n\n\u001b[K      18/24      34.8G     0.4075     0.3931    0.01344    0.01631        453       1024: 0% \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 0/218  0.2s\n\u001b[K      18/24      34.8G     0.4422     0.4779    0.01535    0.01653        306       1024: 0% \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 1/218 2.1it/s 0.3s<1:44"
+}

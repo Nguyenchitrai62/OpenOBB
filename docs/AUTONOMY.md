@@ -35,6 +35,14 @@ Agent thức dậy vì một trong ba lý do: watcher kết thúc, task định 
 - Chọn, sửa, huỷ thí nghiệm; viết/sửa code trong repo; tạo/tắt VM **do chính agent tạo** (session tên theo job id).
 - Chọn GPU: **G4 (RTX PRO 6000 Blackwell 94 GB, user chọn) là mặc định** cho ablation và train. T4 chỉ dùng cho smoke test/debug rẻ. A100 là dự phòng khi G4 không cấp được.
 
+## 3b. Quy tắc tiết kiệm CU (user nhắc 2026-10-07)
+
+- **Chỉ dùng G4**, tối đa **3 phiên song song**.
+  - A100 trên Colab chậm khoảng 2× với workload VRDet (VM ít CPU), tốn khoảng 1.9× CU mỗi ảnh train.
+  - Mọi run phải bật `--channels-last --compile` (×1.43 tốc độ).
+- **Dừng sớm**: khi 2 checkpoint sub-mAP liên tiếp thấp hơn baseline rõ rệt (> 1 điểm), dừng run (`job.py stop`) và ghi kết luận.
+- Trước khi launch, ước lượng CU (giờ × 8.9) và cân nhắc giá trị thông tin. Ưu tiên ablation rẻ và gộp sớm các thành phần đã có tín hiệu tốt.
+
 ## 4. Luật cứng (KHÔNG được vi phạm)
 
 - **Ngân sách**: không launch nếu số dư < 40 CU (watcher tự stop mọi job khi chạm ngưỡng). Mỗi job phải có `max_hours`. Ghi CU tiêu thụ vào `decisions.log`.

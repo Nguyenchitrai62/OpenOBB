@@ -168,3 +168,14 @@
 [2026-10-07 21:17:03] e4-fpc-yolo26s-24e: launching attempt 1 on G4 as session e4-fpc-yolo26s-24e-1
 [2026-10-07 21:17:06] queue: e4-fpc-yolo26s-24e waits (no VM available)
 [2026-10-07 21:17:35] e1-vrdet-s-seed1: finished with status done; stopping VM
+[2026-10-07 21:20:10] watch: balance=360.5 rate=37.3/h active=['e1-vrdet-s-seed1', 'e2-h4-dense-s', 'e2-h4c-dq-s', 'e3-ctx-fix-s', 'e3-rfs-s'] ended=[('e1-vrdet-s-seed1', 'done')]
+[2026-10-07 21:20:13] e4-fpc-yolo26s-24e: launching attempt 1 on G4 as session e4-fpc-yolo26s-24e-1
+[2026-10-07 21:20:47] e4-fpc-yolo26s-24e: running
+[2026-10-07 21:20:49] e4-fpc-vrdet-s-24e: launching attempt 1 on G4 as session e4-fpc-vrdet-s-24e-1
+[2026-10-07 21:20:52] queue: e4-fpc-vrdet-s-24e waits (no VM available)
+[2026-10-07 21:22:15] watch: balance=358.11 rate=37.3/h active=['e2-h4-dense-s', 'e2-h4c-dq-s', 'e3-ctx-fix-s', 'e3-rfs-s', 'e4-fpc-yolo26s-24e'] ended=[]
+[2026-10-07 21:30:18] e4-fpc-vrdet-s-24e: launching attempt 1 on G4 as session e4-fpc-vrdet-s-24e-1
+[2026-10-07 21:30:22] queue: e4-fpc-vrdet-s-24e waits (no VM available)
+[2026-10-07 21:33:12] watch: balance=351.97 rate=37.3/h active=['e2-h4-dense-s', 'e2-h4c-dq-s', 'e3-ctx-fix-s', 'e3-rfs-s', 'e4-fpc-yolo26s-24e'] ended=[]
+[2026-10-07 21:41:14] e4-fpc-vrdet-s-24e: launching attempt 1 on G4 as session e4-fpc-vrdet-s-24e-1
+[2026-10-07 21:41:18] queue: e4-fpc-vrdet-s-24e waits (no VM available)

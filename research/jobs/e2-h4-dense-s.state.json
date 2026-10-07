@@ -5,28 +5,28 @@
   "out": "/content/work/runs/e2-h4-dense-s",
   "status": "running",
   "launched": 1791382053.4458053,
-  "updated": "2026-10-07 21:18:18",
+  "updated": "2026-10-07 21:30:34",
   "fails": 0,
   "synced": {
     "profile_base/train_progress.log": [
-      21273,
-      1791382656
+      28112,
+      1791382705
     ],
     "setup.log": [
       2322,
       1791382210
     ],
     "train.log": [
-      236172,
-      1791382656
+      262343,
+      1791383414
     ],
     "train_progress.log": [
-      51686,
-      1791382188
+      54033,
+      1791383414
     ],
     "profile_dense/train_progress.log": [
-      14108,
-      1791382199
+      28216,
+      1791383041
     ],
     "metrics.jsonl": [
       3931,
@@ -37,5 +37,5 @@
       1791382165
     ]
   },
-  "tail": "mm         1.01%     119.494ms         1.38%     163.494ms      57.166us      97.106ms         1.45%      97.106ms      33.953us          2860  \nvoid at::native::unrolled_elementwise_kernel<at::nat...         0.00%       0.000us         0.00%       0.000us       0.000us      86.465ms         1.29%      86.465ms      60.891us          1420  \n-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  \nSelf CPU time total: 11.823s\nSelf CUDA time total: 6.719s\n\n"
+  "tail": "r 9.97e-05 | 24.5 img/s data 0.008s crit 0.189s/it\n[14:29:15] ep 12 it 450/984 loss 18.197 mal=0.689 bbox=0.148 kld=0.333 fgl=1.161 dense_cls=0.130 dense_box=0.041 dense_angle=0.012 lr 9.97e-05 | 24.7 img/s data 0.007s crit 0.189s/it\n[14:29:44] ep 12 it 500/984 loss 21.755 mal=1.047 bbox=0.320 kld=0.379 fgl=1.300 dense_cls=0.233 dense_box=0.108 dense_angle=0.040 lr 9.96e-05 | 24.9 img/s data 0.006s crit 0.189s/it\n[14:30:14] ep 12 it 550/984 loss 22.677 mal=0.961 bbox=0.391 kld=0.499 fgl=1.150 dense_cls=0.237 dense_box=0.192 dense_angle=0.067 lr 9.95e-05 | 25.1 img/s data 0.006s crit 0.188s/it\n"
 }
