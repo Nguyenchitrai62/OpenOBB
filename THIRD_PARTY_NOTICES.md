@@ -29,5 +29,9 @@ All other code in `vrdet/`, `colab/data/`, `tools/`, `tests/` is original VRDet 
 
 - **Ultralytics (AGPL-3.0)** is only used by `colab/baselines/yolo_obb.py` to train and measure YOLO baselines
   on Colab. It is never imported by `vrdet/` (enforced by `tests/test_license_guard.py`) and is not distributed.
+- **PyMuPDF (AGPL-3.0, or a paid Artifex licence)** is what AI_Takeoff uses to read PDF vectors. The VRDet vector
+  branch only consumes a neutral token array (`vrdet/models/vector.py`, 21 floats per primitive), so the PDF reader
+  is replaceable: for a fully permissive product use pypdfium2 (Apache-2.0 / BSD-3, PDFium path objects) or
+  pdfminer.six (MIT) to produce the tokens, or keep PyMuPDF under its commercial licence.
 - Ideas taken from published papers (O2-DETR, RiO-DETR, YOLO26, PP-YOLOE-R, RTMDet-R, DDQ, LSKNet, Strip R-CNN,
   ...) were re-implemented from the papers; no code was copied from non-commercial repositories.
