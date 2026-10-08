@@ -94,9 +94,9 @@ Quy ước: toàn bộ là val, 24 epoch, ảnh 1024. DOTA cắt SS 1024/200, in
 | 3 | Init Objects365 → COCO (ngang YOLO) | F9; D-FINE X +3.5 COCO AP | 10 CU | e15 xếp hàng |
 | 4 | Nhóm query một-nhiều (H-DETR) | H-DETR, MS-DETR | 12 CU | e12 xếp hàng |
 | 5 | Công thức augmentation YOLO (mosaic giữ tỉ lệ, scale, translate) | F9 | 11 CU | e13 xếp hàng |
-| 6 | Adaptive query denoising (RHINO) | DOTA val +1.9 AP50 (DINO); nhắm vào F2 | trung bình | chưa làm |
+| 6 | Adaptive query denoising (RHINO) | DOTA val +1.9 AP50 (DINO); nhắm vào F2 | trung bình | đã code (`--aqd`); e17 xếp hàng |
 | 7 | ProgLoss: giảm dần trọng số nhánh một-nhiều | YOLO26 +0.3 AP | thấp | chưa làm |
-| 8 | Loss góc cho object gần vuông trên decoder | YOLO26 +0.6 AP50 / +1.2 50:95; HC định vị kém | thấp | chưa làm |
+| 8 | Loss góc cho object gần vuông trên decoder | YOLO26 +0.6 AP50 / +1.2 50:95; HC định vị kém | thấp | đã code (`--angle-weight`); e18 xếp hàng |
 | 9 | Train với 900 query | F4; RHINO train 900 | thấp | chưa làm |
 | 10 | Tắt mosaic ở 50% số epoch (DEIM) | DEIM | thấp | sau #5 |
 | 11 | Copy-paste class hiếm (HC, SBF, BC, SP) | F2, F3 | trung bình | chưa làm |

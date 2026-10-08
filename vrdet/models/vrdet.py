@@ -113,12 +113,15 @@ class VRDet(nn.Module):
         return out
 
 
-def build_criterion(num_classes=15, reg_max=32, box_loss="kld", weights=None, cost=None, o2m_k=6):
+def build_criterion(num_classes=15, reg_max=32, box_loss="kld", weights=None, cost=None, o2m_k=6, aqd=False,
+                    angle_weight=0.0):
     """box_loss: 'kld' (O2-DETR / RiO-DETR) or 'probiou' (PP-YOLOE-R, YOLO26); used in both cost and loss."""
     cost = cost or dict(cost_class=2.0, cost_chamfer=5.0, cost_kld=2.0)
     weights = weights or {'loss_mal': 1, 'loss_bbox': 5, 'loss_kld': 2, 'loss_fgl': 0.15, 'loss_ddf': 1.5}
+    if angle_weight:
+        weights = dict(weights, loss_angle=angle_weight)
     return OBBCriterion(OBBHungarianMatcher(**cost, gauss=box_loss), weights, num_classes=num_classes,
-                        reg_max=reg_max, gauss=box_loss, o2m_k=o2m_k)
+                        reg_max=reg_max, gauss=box_loss, o2m_k=o2m_k, aqd=aqd)
 
 
 def load_dfine_coco(model, ckpt_or_size, class_names=None, log=print, init="coco"):

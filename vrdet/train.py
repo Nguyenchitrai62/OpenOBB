@@ -47,6 +47,8 @@ def get_args(argv=None):
     ap.add_argument("--o2m-queries", type=int, default=0,
                     help="H10: training-only one-to-many query group (e.g. 1500); dropped at inference")
     ap.add_argument("--o2m-k", type=int, default=6, help="H10: queries assigned per target in the o2m group")
+    ap.add_argument("--aqd", action="store_true", help="H12: adaptive query denoising (RHINO idea)")
+    ap.add_argument("--angle-weight", type=float, default=0.0, help="H13: square-aware angle loss on the decoder")
     ap.add_argument("--eval-queries", type=int, default=0,
                     help="H9: also evaluate the final EMA model with N queries / top-N (queries have no parameters)")
     ap.add_argument("--denoising", type=int, default=100)
@@ -132,7 +134,8 @@ def main(argv=None):
     model.to(device)
     if a.channels_last:
         model.to(memory_format=torch.channels_last)
-    crit = build_criterion(num_classes=len(classes), box_loss=a.box_loss, o2m_k=a.o2m_k)
+    crit = build_criterion(num_classes=len(classes), box_loss=a.box_loss, o2m_k=a.o2m_k, aqd=a.aqd,
+                           angle_weight=a.angle_weight)
     a.dense = a.dense or a.dense_queries
     dense_crit = DenseCriterion() if a.dense else None
     ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,

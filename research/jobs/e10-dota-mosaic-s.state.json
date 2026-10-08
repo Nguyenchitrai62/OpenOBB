@@ -5,7 +5,7 @@
   "out": "/content/work/runs/e10-dota-mosaic-s",
   "status": "running",
   "launched": 1791423097.6059973,
-  "updated": "2026-10-08 09:25:21",
+  "updated": "2026-10-08 09:35:56",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,21 +13,21 @@
       1791423124
     ],
     "train.log": [
-      110087,
-      1791426258
+      119473,
+      1791426904
     ],
     "metrics.jsonl": [
-      3493,
-      1791426237
+      4265,
+      1791426843
     ],
     "train_progress.log": [
-      42016,
-      1791426258
+      51402,
+      1791426904
     ],
     "last.pt": [
       165363637,
-      1791426237
+      1791426843
     ]
   },
-  "tail": "-05, \"epoch_s\": 201.4, \"img_s\": 78.2, \"crit_s_per_it\": 0.07, \"data_s_per_it\": 0.001, \"max_mem_gb\": 22.1, \"loss_mal\": 0.6857, \"loss_bbox\": 0.1818, \"loss_kld\": 0.3765, \"loss_fgl\": 1.2053, \"total\": 18.1432}\n[02:23:58] ep 14 it 0/984 loss 18.751 mal=0.780 bbox=0.205 kld=0.365 fgl=1.285 lr 9.40e-05 | 21.6 img/s data 0.426s crit 0.125s/it\n[02:24:08] ep 14 it 50/984 loss 17.520 mal=0.640 bbox=0.153 kld=0.332 fgl=1.249 lr 9.37e-05 | 71.6 img/s data 0.009s crit 0.076s/it\n[02:24:18] ep 14 it 100/984 loss 19.162 mal=0.720 bbox=0.255 kld=0.488 fgl=1.119 lr 9.34e-05 | 75.4 img/s data 0.004s crit 0.072s/it\n"
+  "tail": "0.349 fgl=1.261 lr 6.55e-05 | 77.1 img/s data 0.004s crit 0.069s/it\n[02:34:34] ep 17 it 150/984 loss 18.515 mal=0.628 bbox=0.290 kld=0.476 fgl=1.083 lr 6.49e-05 | 78.0 img/s data 0.003s crit 0.068s/it\n[02:34:44] ep 17 it 200/984 loss 18.842 mal=0.665 bbox=0.289 kld=0.469 fgl=1.156 lr 6.43e-05 | 78.0 img/s data 0.002s crit 0.069s/it\n[02:34:54] ep 17 it 250/984 loss 17.927 mal=0.576 bbox=0.185 kld=0.448 fgl=1.150 lr 6.37e-05 | 78.1 img/s data 0.002s crit 0.069s/it\n[02:35:04] ep 17 it 300/984 loss 17.925 mal=0.695 bbox=0.137 kld=0.352 fgl=1.243 lr 6.31e-05 | 78.4 img/s data 0.002s crit 0.069s/it\n"
 }

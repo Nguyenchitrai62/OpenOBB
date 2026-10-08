@@ -44,3 +44,21 @@ def test_o2m_group_is_training_only_and_trains():
     assert o2m and all(torch.isfinite(v) for v in o2m.values())
     sum(losses.values()).backward()
     assert m.decoder.dec_score_head[0].weight.grad is not None
+
+
+def test_aqd_and_angle_loss_train_step():
+    torch.manual_seed(0)
+    m = VRDet("s", num_classes=3, img_size=256, num_denoising=20).train()
+    x = torch.rand(2, 3, 256, 256)
+    tg = [{"labels": torch.tensor([1, 2, 0]), "boxes": torch.tensor([[0.5, 0.5, 0.2, 0.1, 0.3], [0.2, 0.3, 0.1, 0.1, 0.0],
+                                                                     [0.7, 0.7, 0.15, 0.05, -0.6]])},
+          {"labels": torch.tensor([0]), "boxes": torch.tensor([[0.6, 0.4, 0.3, 0.2, -0.5]])}]
+    out = m(x, tg)
+    crit = build_criterion(num_classes=3, aqd=True, angle_weight=0.5)
+    ind = crit.aqd_indices(out["dn_outputs"][-1], out["dn_meta"], tg)
+    full = crit.get_cdn_matched_indices(out["dn_meta"], tg)
+    for (q, g), (qf, gf) in zip(ind, full):                       # AQD keeps a subset of the fixed dn pairs
+        assert set(zip(q.tolist(), g.tolist())) <= set(zip(qf.tolist(), gf.tolist()))
+    losses = crit(out, tg)
+    assert "loss_angle" in losses and all(torch.isfinite(v) for v in losses.values())
+    sum(losses.values()).backward()

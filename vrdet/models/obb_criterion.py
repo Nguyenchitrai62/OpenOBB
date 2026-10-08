@@ -93,9 +93,12 @@ class OBBHungarianMatcher(nn.Module):
 
 class OBBCriterion(nn.Module):
     def __init__(self, matcher, weight_dict, losses=('mal', 'boxes', 'local'), num_classes=15, reg_max=32,
-                 gamma=1.5, mal_alpha=None, use_uni_set=True, gauss="kld", o2m_k=6, o2m_weight=1.0):
+                 gamma=1.5, mal_alpha=None, use_uni_set=True, gauss="kld", o2m_k=6, o2m_weight=1.0, aqd=False,
+                 angle_lam=3.0):
         super().__init__()
         self.o2m_k, self.o2m_weight = o2m_k, o2m_weight
+        self.aqd = aqd                  # H12: denoising queries that lose their source GT get a background class
+        self.angle_lam = angle_lam      # H13: square-aware angle loss (weight 'loss_angle' in weight_dict)
         self.gauss = gauss
         self.matcher, self.weight_dict, self.losses = matcher, weight_dict, list(losses)
         self.num_classes, self.reg_max, self.gamma, self.mal_alpha = num_classes, reg_max, gamma, mal_alpha
@@ -147,7 +150,13 @@ class OBBCriterion(nn.Module):
         tgt_al = align_to(tgt, src[:, 4].detach())
         l1 = (src[:, :4] - tgt_al[:, :4]).abs().sum(-1) + (src[:, 4] - tgt_al[:, 4]).abs() / math.pi
         g = kld(src, tgt) if self.gauss == "kld" else 1 - probiou(src, tgt)
-        return {'loss_bbox': l1.sum() / num_boxes, 'loss_kld': g.sum() / num_boxes}
+        out = {'loss_bbox': l1.sum() / num_boxes, 'loss_kld': g.sum() / num_boxes}
+        if 'loss_angle' in self.weight_dict:
+            # YOLO26-OBB: sin^2(2 dtheta), down-weighted for near-square targets whose angle is ill-defined
+            ratio = torch.log(tgt[:, 2].clamp(min=1e-6) / tgt[:, 3].clamp(min=1e-6))
+            omega = torch.exp(-ratio.pow(2) / self.angle_lam ** 2)
+            out['loss_angle'] = (torch.sin(2 * (src[:, 4] - tgt[:, 4])).pow(2) * omega).sum() / num_boxes
+        return out
 
     # ---------------------------------------------------------------- FGL + DDF (D-FINE)
     def loss_local(self, outputs, targets, indices, num_boxes, T=5):
@@ -227,6 +236,31 @@ class OBBCriterion(nn.Module):
                             torch.tensor(list(column_to_row.values()), dtype=torch.int64)))
         return results
 
+    @torch.no_grad()
+    def aqd_indices(self, dn_out, dn_meta, targets):
+        """H12 (RHINO's adaptive query denoising): inside every denoising group, match the positive noised queries
+        to the targets with the Hungarian cost on their current predictions; a query whose match is not its own
+        source target keeps the box loss but gets a background class target (it duplicates a better query)."""
+        out = []
+        G = dn_meta["dn_num_group"]
+        for i, t in enumerate(targets):
+            n = len(t['labels'])
+            if n == 0:
+                e = torch.zeros(0, dtype=torch.int64)
+                out.append((e, e))
+                continue
+            q = dn_meta["dn_positive_idx"][i].reshape(G, n)
+            keep_q, keep_g = [], []
+            for g in range(G):
+                C = self.matcher.pair_cost(dn_out['pred_logits'][i, q[g]], dn_out['pred_boxes'][i, q[g]],
+                                           t['labels'], t['boxes'])
+                r, c = linear_sum_assignment(C.cpu().numpy())
+                own = torch.as_tensor(r[r == c], dtype=torch.int64)
+                keep_q.append(q[g].cpu()[own])
+                keep_g.append(own)
+            out.append((torch.cat(keep_q), torch.cat(keep_g)))
+        return out
+
     @staticmethod
     def get_cdn_matched_indices(dn_meta, targets):
         dn_positive_idx, dn_num_group = dn_meta["dn_positive_idx"], dn_meta["dn_num_group"]
@@ -286,14 +320,19 @@ class OBBCriterion(nn.Module):
         if 'dn_outputs' in outputs:
             indices_dn = dev(self.get_cdn_matched_indices(outputs['dn_meta'], targets))
             dn_num_boxes = num_boxes * outputs['dn_meta']['dn_num_group']
+            indices_dn_cls = indices_dn
+            if self.aqd:                        # one group-wise matching on the last dn layer, used for all layers
+                indices_dn_cls = dev(self.aqd_indices(outputs['dn_outputs'][-1], outputs['dn_meta'], targets))
             for i, aux in enumerate(outputs['dn_outputs']):
                 aux['is_dn'] = True
                 aux['up'], aux['reg_scale'] = outputs['up'], outputs['reg_scale']
                 for loss in self.losses:
-                    losses.update(self._weighted(self.get_loss(loss, aux, targets, indices_dn, dn_num_boxes), f'_dn_{i}'))
+                    ind = indices_dn_cls if loss == 'mal' else indices_dn
+                    losses.update(self._weighted(self.get_loss(loss, aux, targets, ind, dn_num_boxes), f'_dn_{i}'))
             if 'dn_pre_outputs' in outputs:
                 for loss in self.losses:
-                    losses.update(self._weighted(self.get_loss(loss, outputs['dn_pre_outputs'], targets, indices_dn,
+                    ind = indices_dn_cls if loss == 'mal' else indices_dn
+                    losses.update(self._weighted(self.get_loss(loss, outputs['dn_pre_outputs'], targets, ind,
                                                                dn_num_boxes), '_dn_pre'))
         if 'o2m_outputs' in outputs:           # H10: one-to-many group, one assignment (last layer) for all layers
             ind_o2m = dev(self.matcher.one_to_many(outputs['o2m_outputs'][-1], targets, self.o2m_k))
