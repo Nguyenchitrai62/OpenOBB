@@ -129,6 +129,28 @@ Cấu hình lõi + RFS (đã xác nhận), chưa thêm context/dense để đo �
 - H3 ngữ cảnh: strip/large-kernel depthwise trong CCFM. Kỳ vọng tăng BR/GTF/SBF/RA/HA.
 - Công thức train: xoay ngẫu nhiên góc bất kỳ, mosaic.
 
+**Kết quả E6 (DOTA val, 24 epoch):**
+
+| Model | mAP50 | mAP50:95 | Latency |
+|---|---|---|---|
+| YOLO26x | **78.42** | **53.10** | 12.8 ms |
+| VRDet-X + RFS | 75.61 (−2.81) | 52.31 (−0.79) | 20.0 ms (64% FPS) |
+
+- VRDet-X thắng ở BD +3.6, HA +1.1, RA +0.3; thua ở SV −11.2 (trần 300 query), HC −19.0, SP −5.7.
+- **Dung tích lớn không tự đóng được khoảng cách:** S kém −2.4, X kém −2.8.
+- Độ chính xác vị trí gần ngang YOLO (mAP50:95 chỉ kém 0.8). Khoảng cách nằm ở recall cảnh đông (trần query) và class hiếm HC.
+- Chưa đo X với 600 query lúc suy luận (ở S, 600 query cho +0.7, SV +6.3).
+
+## E9: H9 số query lúc suy luận (checkpoint `e3-rfs-s`, không train lại)
+
+| Query | mAP50 | mAP50:95 | SV | Latency |
+|---|---|---|---|---|
+| 300 | 72.27 | 48.23 | 69.3 | 9.3 ms |
+| **600** | **72.99** | 48.81 | **75.6** | 9.4 ms |
+| 900 | 72.95 | 48.90 | 75.8 | 9.4 ms |
+
+**XÁC NHẬN:** suy luận với 600 query là lợi miễn phí. Bước tiếp: train với 600 query (H9 train) và eval X với 600 query.
+
 ## E7: H7 nhánh vector trên FloorPlanCAD (cùng điều kiện với `e4-fpc-vrdet-s-24e`)
 
 | Run | Thay đổi duy nhất | Giả thuyết | Pass |
@@ -143,3 +165,18 @@ Thiết kế (`vrdet/models/vector.py`):
 - Dataset biến đổi điểm vector cùng mọi augmentation (test `tests/test_vector.py`).
 - Không dùng `sem`/`inst` (là nhãn).
 - Định dạng token dùng chung cho PDF (PyMuPDF `get_drawings`) khi finetune trên data riêng. Còn dành chỗ type 4+ cho bezier, rect, text.
+
+**Kết quả `e7-fpc-vec-s-24e`: 76.80 (+0.84 so với raster 75.96), mAP50:95 67.67 (+2.51).** YOLO26s: 78.51 / 70.54.
+- Tăng: single-door +3.6, bay-window +5.7, table +4.6, escalator +6.3, sink +2.6, window +2.3. Giảm: urinal −5.0.
+- Latency 11.5 ms (1000 token) so với 9.9 ms. Train chậm hơn 14%.
+- **Xác nhận một phần:** mAP50 chưa đạt ngưỡng +1.0, nhưng định vị tốt rõ (+2.5 mAP50:95).
+- Vẫn kém YOLO26s ở airconditioner −12.5, escalator −20.7, bath −7.6, sliding-door −6.9.
+
+## E10 (đã soạn, chưa chạy vì Colab hết phiên đăng nhập): H8 mosaic (dense O2O kiểu DEIM)
+
+**Yếu tố gây nhiễu:** YOLO train có mosaic (Ultralytics mặc định 1.0, tắt ở 10 epoch cuối), còn mọi run VRDet đều không có mosaic.
+
+| Run | Thay đổi | So với | Pass |
+|---|---|---|---|
+| `e10-dota-mosaic-s` | `--mosaic-p 0.5` (tắt ở 4 epoch cuối) | `e3-rfs-s` 72.35 | ≥ +1.0 |
+| `e10-fpc-vec-mosaic-s` | `--mosaic-p 0.5` | `e7-fpc-vec-s-24e` 76.80 | ≥ +1.0 |

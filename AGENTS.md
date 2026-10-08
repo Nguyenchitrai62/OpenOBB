@@ -193,10 +193,18 @@ Câu hỏi còn mở:
 - [x] **E3:** ngữ cảnh đã sửa BN: 69.71 (−0.18, class ngữ cảnh tăng nhưng HC −19). **RFS: 72.34 (+2.45), thành mặc định.** Khoảng cách tới YOLO26s còn −2.4.
 - [x] **E4 FloorPlanCAD** (benchmark CAD thứ 2, val 810 bản vẽ, 30 class): YOLO26s 78.51, VRDet-S+RFS 75.96 (−2.55).
 - [x] Kiểm kê phần mượn (23:30): VRDet-X 62.5M tham số = backbone 53% + encoder 33% của D-FINE (Apache) + decoder OBB 14% viết lại. Phần làm nên "kiến trúc mới thật" là nhánh vector + ngữ cảnh + head hybrid → đẩy H7 lên sớm.
-- [ ] **Đang chạy / chờ (2026-10-07 23:30)**, hàng đợi ở `research/jobs/queue.txt`, watcher `WATCH_UNTIL=all`:
-  - `e5-rfs-ctx-s` (RFS + context + ctx-dropout), `e5-rfs-dense-s` (RFS + head dense), `e5-yolo26x-dota-24e` (mốc cỡ X, chạy lại từ đầu do mất VM).
-  - Hàng đợi: `e6-vrdet-x-dota-24e` (VRDet-X + RFS, so YOLO26x), `e7-fpc-vec-s-24e` (**H7 nhánh vector** trên FloorPlanCAD, so với 75.96).
-  - `e2-h4-dense-s` bỏ (mất A100 4 lần), thay bằng `e5-rfs-dense-s`.
+- [x] **E5:** context + RFS 68.47 (−3.88) → **H6 thumbnail BÁC BỎ**. Head dense + RFS: decoder 71.84 (−0.51), riêng nhánh dense 49.8 (hỏng ở vật nhỏ dày đặc) → chưa dùng.
+- [x] **E6 VRDet-X so với YOLO26x (DOTA val, 24 epoch):**
+  - VRDet-X: **75.61 / 52.31**, latency 20.0 ms. YOLO26x: **78.42 / 53.10**, 12.8 ms.
+  - Kém 2.81 mAP50 nhưng chỉ kém 0.79 mAP50:95. Đạt 64% FPS, thoả R3.
+  - Dung tích lớn không tự đóng được khoảng cách.
+- [x] **E7 nhánh vector (H7) trên FloorPlanCAD, cỡ S:** **76.80 / 67.67** (+0.84 / +2.51 so với raster). YOLO26s: 78.51 / 70.54.
+- [x] **E9 trần query (H9):** suy luận với 600 query cho +0.7 (SV +6.3), latency không đổi → dùng 600 khi suy luận. Cờ mới `--eval-queries`.
+- [ ] **Kiến trúc tạm chốt (2026-10-08):** VRDet = D-FINE-OBB (rotated FDR, Chamfer+KLD, MAL IoU xoay) + RFS + nhánh vector cho CAD + 600 query khi suy luận. Chưa vượt YOLO26 cùng cỡ. Báo cáo: [docs/REPORT_2026-10-08.md](docs/REPORT_2026-10-08.md).
+- [ ] **Bước tiếp (đã soạn, chưa chạy):**
+  - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
+  - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.
+  - **Chặn:** Colab CLI hết phiên đăng nhập OAuth (07:35). User phải đăng nhập lại; số dư khoảng 225 CU, không còn session nào.
 - Bài học hạ tầng 2026-10-07:
   - Giữ tối đa 3 session (`JOB_MAX_SESSIONS=3`, đếm cả session lạ). Ba đợt mất VM (21:03, 22:18, 23:05) trùng lúc xin VM mới; user cho biết có lần là bị người khác tắt nhầm trên UI Colab. Session của agent tên dạng `e<N>-...-<attempt>`.
   - A100 chậm hơn G4 khoảng 2 lần với workload này (VM ít CPU). Head dense trên G4 + compile đạt 72 ảnh/s, gần bằng bản không dense (82).
@@ -209,6 +217,15 @@ Câu hỏi còn mở:
 **Cần user:** điền tên chủ sở hữu pháp lý (cá nhân hoặc công ty) vào `LICENSE` (hiện để "the repository owner").
 
 ## 9. Nhật ký
+
+- 2026-10-08 (đêm):
+  - Mốc YOLO26x DOTA val (24 epoch) **78.42**. VRDet-X đạt **75.61** (−2.81; mAP50:95 −0.79; 64% FPS).
+  - Context thumbnail bị bác bỏ (−3.88). Head dense chưa có lợi, bản thân nhánh dense hỏng.
+  - Nhánh vector H7 trên FloorPlanCAD: +0.84 mAP50, +2.51 mAP50:95.
+  - 600 query lúc suy luận cho +0.7 (SV +6.3).
+  - Phát hiện yếu tố gây nhiễu mosaic (YOLO có, VRDet không), đã soạn E10.
+  - Hạ tầng: giới hạn 3 session; download resume theo chunk; quy tắc CU 170/130; `tools/summarize.py`; `tools/import_yolo_obb.py` (finetune data riêng, để sau).
+  - Tiêu khoảng 275 CU từ đầu, còn khoảng 225.
 
 - 2026-10-07 (4):
   - Nghiên cứu web bằng 6 sub-agent. **Mốc mới: RiO-DETR** (ECCV 2026, Apache) đạt SS s 80.3 / x 81.8, nhỉnh hơn YOLO26.
