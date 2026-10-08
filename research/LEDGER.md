@@ -130,6 +130,10 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 
 ## 6. Hướng mở, xếp theo bằng chứng
 
+**User 10-08 13:35: BỎ nhánh vector, chỉ OBB raster.** c3 dừng giữa chừng. Mọi mục vector bên dưới (#13, #18–#20, #24, c3) ngoài phạm vi.
+Raster đang chạy: c4 (gộp SOTA), c5 (+P2). Hàng đợi: c6 (+LSK), c7 (+strip), c8 (cỡ M).
+
+
 **ĐỔI MỤC TIÊU (user, 10-08 13:15): suy luận trên ẢNH CAD, không vector.** Ưu tiên raster-only trên FloorPlanCAD so với YOLO26x:
 - c4 (bản gộp không vector), đang chạy.
 - **P2 stride 4** (nét mảnh, vật nhỏ).

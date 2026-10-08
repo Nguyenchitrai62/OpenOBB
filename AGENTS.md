@@ -192,6 +192,9 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
 - (bổ sung 13:30, 2026-10-08) **Bỏ giới hạn 80–100 CU.** Chỉ giữ dự phòng gốc 40 CU (`new_reserve.txt` = `50 40`).
   Tiếp tục nghiên cứu kiến trúc cho ảnh CAD (raster).
 
+- (bổ sung 13:35, 2026-10-08) **BỎ nhánh vector.** Chỉ làm OBB detection trên ảnh (raster). Code vector (`--vectors`,
+  layer pooling, box neo theo nét c3) giữ trong repo nhưng ngoài phạm vi; c3 đã dừng giữa chừng để tiết kiệm CU.
+
 Câu hỏi còn mở:
 - Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.
 
