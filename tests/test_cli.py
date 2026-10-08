@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 import pytest
 
-from vrdet.cli import _run_dir, parse_kv
+from vrdet.cli import parse_kv
 
 
 def test_parse_kv():
@@ -14,15 +14,22 @@ def test_parse_kv():
     assert kv == {"data": "a/data.yaml", "epochs": 50, "lr0": 1e-4, "compile": False, "name": "my-run", "p2": True}
 
 
-def test_run_dir_resume_and_increment(tmp_path):
-    d, resuming = _run_dir(tmp_path, "exp", exist_ok=False, resume=True)
-    assert d == tmp_path / "exp" and not resuming
-    d.mkdir()
-    (d / "last.pt").write_text("x")                       # unfinished run -> resumed
-    assert _run_dir(tmp_path, "exp", False, True) == (d, True)
-    assert _run_dir(tmp_path, "exp", False, False)[0] == tmp_path / "exp2"
-    (d / "train_done").write_text("ok")                   # finished run -> new dir
-    assert _run_dir(tmp_path, "exp", False, True) == (tmp_path / "exp2", False)
+def test_run_folders_and_resume_lookup(tmp_path):
+    from vrdet.cli import _find_last, increment_path
+    assert increment_path(tmp_path, "train") == tmp_path / "train"
+    (tmp_path / "train" / "weights").mkdir(parents=True)
+    assert increment_path(tmp_path, "train") == tmp_path / "train2"            # never reuses a folder by default
+    assert increment_path(tmp_path, "train", exist_ok=True) == tmp_path / "train"
+    (tmp_path / "train" / "weights" / "last.pt").write_text("x")
+    (tmp_path / "train2" / "weights").mkdir(parents=True)
+    (tmp_path / "train2" / "weights" / "last.pt").write_text("x")
+    newer = (tmp_path / "train" / "weights" / "last.pt").stat().st_mtime + 10
+    os.utime(tmp_path / "train2" / "weights" / "last.pt", (newer, newer))
+    assert _find_last(True, "s", tmp_path, None) == tmp_path / "train2" / "weights" / "last.pt"   # newest
+    assert _find_last(True, "s", tmp_path, "train") == tmp_path / "train2" / "weights" / "last.pt"   # newest of train*
+    assert _find_last(True, "pretrained.pt", tmp_path, None) == tmp_path / "train2" / "weights" / "last.pt"
+    (tmp_path / "train2" / "train_done").write_text("ok")
+    assert _find_last(True, "s", tmp_path, None) == tmp_path / "train" / "weights" / "last.pt"
 
 
 def _dataset(root, n_train=3, n_val=1, size=640):
@@ -169,7 +176,8 @@ def test_typo_and_resume_rules(tmp_path, monkeypatch):
     def fake_main(argv):
         calls.append(argv)
         out = Path(argv[argv.index("--out") + 1])
-        (out / "last.pt").write_text("x")            # a run that stopped mid-way
+        (out / "weights").mkdir(parents=True, exist_ok=True)
+        (out / "weights" / "last.pt").write_text("x")   # a run that stopped mid-way
 
     monkeypatch.setattr(trainer, "main", fake_main)
     data = _dataset(tmp_path / "ds")
@@ -177,10 +185,12 @@ def test_typo_and_resume_rules(tmp_path, monkeypatch):
     train(str(data), epochs=10, batch=4, imgsz=512, **kw)
     saved = _json.loads((tmp_path / "runs" / "r" / "vrdet_args.json").read_text())
     assert saved["batch"] == 4 and saved["epochs"] == 10
-    train(str(data), epochs=20, batch=8, imgsz=512, patience=5, **kw)        # resume keeps batch / epochs
+    train(str(data), epochs=20, batch=8, imgsz=512, **kw)                     # default: a new run, r2
+    assert "r2" in " ".join(calls[-1]) and "--epochs 20" in " ".join(calls[-1])
+    train(epochs=50, batch=16, imgsz=512, patience=5, resume=True, **kw)      # newest unfinished r*: r2
     second = " ".join(calls[-1])
-    assert "--batch 4" in second and "--epochs 10" in second
-    train(str(data), epochs=20, batch=8, imgsz=512, resume=False, exist_ok=True, **kw)   # start over in place
+    assert "r2" in second and "--batch 8" in second and "--epochs 20" in second   # its saved settings win
+    train(str(data), epochs=20, batch=8, imgsz=512, exist_ok=True, **kw)     # start over in the same folder
     assert "--epochs 20" in " ".join(calls[-1]) and "--batch 8" in " ".join(calls[-1])
 
 
@@ -238,7 +248,9 @@ def test_optimizer_auto_ignores_lr0(tmp_path, monkeypatch):
     monkeypatch.setattr(trainer, "main", lambda argv: calls.append(" ".join(argv)))
     data = _dataset(tmp_path / "ds")
     kw = dict(epochs=10, batch=4, imgsz=512, project=str(tmp_path / "runs"), cache_dir=str(tmp_path / "c"), workers=1)
-    train(str(data), name="a", lr0=0.001, **kw)
-    assert "--lr 0.0001 " in calls[-1]                      # auto: measured default for VRDet-s
+    train(str(data), name="a", **kw)
+    assert "--lr 0.0001 " in calls[-1]                      # no lr0: measured default for VRDet-s
+    train(str(data), name="c", lr0=0.001, **kw)
+    assert "--lr 0.001 " in calls[-1]                       # lr0 given: used as is
     train(str(data), name="b", lr0=0.0002, optimizer="AdamW", **kw)
     assert "--lr 0.0002 " in calls[-1]

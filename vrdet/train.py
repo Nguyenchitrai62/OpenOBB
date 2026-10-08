@@ -125,6 +125,7 @@ def build_parser():
                     help="class-wise polygon NMS IoU when merging detections (0.1 = DOTA tile merge)")
     ap.add_argument("--patience", type=int, default=0,
                     help="stop when val mAP50-95 has not improved for N epochs (needs full-val each epoch; 0 = off)")
+    ap.add_argument("--wdir", default="", help="sub-folder of --out for last.pt / best.pt (the CLI uses 'weights')")
     ap.add_argument("--verbose", action="store_true",
                     help="print the detailed per-iteration log instead of the compact progress table")
     return ap
@@ -138,6 +139,8 @@ def main(argv=None):
     a = get_args(argv)
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
+    wdir = out / a.wdir if a.wdir else out
+    wdir.mkdir(parents=True, exist_ok=True)
     if (out / "train_done").exists() and "--eval-only" not in (argv or __import__("sys").argv):
         print("train_done exists: nothing to do", flush=True)
         return
@@ -184,7 +187,7 @@ def main(argv=None):
                   strip_k=a.strip_k, ortho_heads=a.ortho_heads, context=a.context,
                   dense_queries=a.dense_queries, vectors=a.vectors, vec_dim=a.vec_dim, vec_layers=a.vec_layers,
                   o2m_queries=a.o2m_queries, lsk=a.lsk, vec_lfe=a.vec_lfe, vec_ground=a.vec_ground > 0, p2=a.p2)
-    last = out / "last.pt"
+    last = wdir / "last.pt"
     if not last.exists() and a.weights:
         # shape-tolerant copy of a VRDet checkpoint; class rows are matched by name (new classes start fresh)
         src_cls = list(torch.load(a.weights, map_location="cpu", weights_only=False).get("classes") or [])
@@ -328,8 +331,8 @@ def main(argv=None):
     def save_best(score, epoch):
         # compact deployable checkpoint: EMA weights + args + classes (no optimiser state)
         torch.save({"model": ema.module.state_dict(), "epoch": epoch, "args": vars(a), "classes": list(classes),
-                    "val_mAP50_95": score}, out / "best.tmp")
-        os.replace(out / "best.tmp", out / "best.pt")
+                    "val_mAP50_95": score}, wdir / "best.tmp")
+        os.replace(wdir / "best.tmp", wdir / "best.pt")
         log(f"best.pt <- epoch {epoch} (val mAP50:95 {score:.4f})")
 
     t_train = time.time()
@@ -482,8 +485,8 @@ def main(argv=None):
                 save_best(best_score, epoch)
         torch.save({"model": model.state_dict(), "ema": ema.state_dict(), "opt": opt.state_dict(), "epoch": epoch,
                     "iter": it, "args": vars(a), "classes": list(classes), "best_score": best_score,
-                    "best_epoch": best_epoch, "recoveries": recoveries, "lr_scale": lr_scale}, out / "last.tmp")
-        os.replace(out / "last.tmp", last)
+                    "best_epoch": best_epoch, "recoveries": recoveries, "lr_scale": lr_scale}, wdir / "last.tmp")
+        os.replace(wdir / "last.tmp", last)
         jlog(rec)
         append_results(out, rec, res)
         plot_results(out)
@@ -505,12 +508,12 @@ def main(argv=None):
         log(f"epoch {epoch} done in {dt / 60:.1f} min: " + json.dumps(rec))
 
     if a.skip_final_eval:
-        if not (out / "best.pt").exists():
+        if not (wdir / "best.pt").exists():
             save_best(-1.0, a.epochs - 1)
         return
     weights = "ema_last"
-    if full_val and best_score >= 0 and (out / "best.pt").exists() and not a.eval_only:
-        ema.module.load_state_dict(torch.load(out / "best.pt", map_location="cpu", weights_only=False)["model"])
+    if full_val and best_score >= 0 and (wdir / "best.pt").exists() and not a.eval_only:
+        ema.module.load_state_dict(torch.load(wdir / "best.pt", map_location="cpu", weights_only=False)["model"])
         weights = "best"
         say(f"\nTraining finished. Validating best.pt (epoch {best_epoch + 1}) on all val images...")
     else:
@@ -536,12 +539,12 @@ def main(argv=None):
         ema.module.decoder.num_queries = a.queries
     final = rq if a.eval_queries and a.eval_queries != a.queries else res
     say(summary_table(final, classes))
-    if not a.eval_only and (out / "best.pt").exists():  # per-class confidence (best F2) for predict conf=auto
-        ck = torch.load(out / "best.pt", map_location="cpu", weights_only=False)
+    if not a.eval_only and (wdir / "best.pt").exists():  # per-class confidence (best F2) for predict conf=auto
+        ck = torch.load(wdir / "best.pt", map_location="cpu", weights_only=False)
         ck["conf_thr"] = {c: round(final["classes"][c].get("conf_f2", 0.25), 3) for c in classes}
         ck["conf_f1"] = final.get("conf_f1")
-        torch.save(ck, out / "best.tmp")
-        os.replace(out / "best.tmp", out / "best.pt")
+        torch.save(ck, wdir / "best.tmp")
+        os.replace(wdir / "best.tmp", wdir / "best.pt")
     try:
         plot_val_predictions(out, ema.module, a.data, device, a.img, classes, num_top=a.num_top)
     except Exception as e:  # noqa: BLE001 - a report must never fail the run
@@ -566,7 +569,8 @@ def main(argv=None):
         lat = (time.time() - t) / 100 * 1000
     if lat is not None:
         say(f"Speed: {lat:.1f} ms per {a.img}px tile (batch 1, fp16, PyTorch)")
-    say(f"Results saved to {out}\n  best.pt (deploy / fine-tune), last.pt (resume), results.csv/png, val_pred.jpg")
+    say(f"Results saved to {out}\n  {wdir / 'best.pt'} (deploy / fine-tune), {wdir / 'last.pt'} (resume=True), "
+        f"results.csv/png, val_pred.jpg")
     jlog({"final": True, "split": "val", "weights": weights, "mAP50": res["mAP50"], "mAP50_95": res["mAP50_95"],
           "per_class_AP50": {c: round(r["AP50"], 4) for c, r in res["classes"].items()},
           "latency_ms_pt_fp16_bs1": lat, "fusion": {k: round(v["mAP50"], 4) for k, v in res.get("fusion", {}).items()}})
@@ -574,8 +578,8 @@ def main(argv=None):
         ck = torch.load(last, map_location="cpu", weights_only=False)
         if "opt" in ck:
             torch.save({"model": ck["ema"]["module"], "epoch": ck["epoch"], "args": ck["args"],
-                        "classes": ck["classes"], "best_score": ck.get("best_score")}, out / "last.tmp")
-            os.replace(out / "last.tmp", last)
+                        "classes": ck["classes"], "best_score": ck.get("best_score")}, wdir / "last.tmp")
+            os.replace(wdir / "last.tmp", last)
     (out / "train_done").write_text("ok")
 
 

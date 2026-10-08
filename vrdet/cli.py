@@ -1,21 +1,23 @@
 """VRDet command line and Python API. Arguments are key=value pairs.
 
-    vrdet train   data=data.yaml model=s epochs=100 imgsz=1024 project=runs name=exp
-    vrdet train   data=data.yaml model=runs/exp/best.pt epochs=50            # fine-tune from a VRDet checkpoint
-    vrdet val     model=runs/exp/best.pt data=data.yaml
-    vrdet predict model=runs/exp/best.pt source=pages/ conf=0.25 save_dir=preds
+    vrdet train   data=data.yaml model=s epochs=100 imgsz=1024             # -> runs/obb/train, train2, ...
+    vrdet train   data=data.yaml model=runs/obb/train/weights/best.pt epochs=50   # fine-tune
+    vrdet train   resume=True                                                # continue the latest unfinished run
+    vrdet val     model=runs/obb/train/weights/best.pt data=data.yaml
+    vrdet predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.25   # -> runs/obb/predict, ...
     vrdet prepare data=data.yaml out=datasets/mydata imgsz=1024
 
     from vrdet import Detector
-    model = Detector("s")                       # or Detector("runs/exp/best.pt")
-    r = model.train(data="data.yaml", epochs=100, imgsz=1024, project="runs", name="exp")
-    model.predict("pages/", conf=0.25, save_dir="preds")
+    model = Detector("s")                       # or Detector("runs/obb/train/weights/best.pt")
+    r = model.train(data="data.yaml", epochs=100, imgsz=1024)    # r.best = runs/obb/train/weights/best.pt
+    model.predict("pages/", conf=0.25)
 
 Datasets: data.yaml ('names' + train/val image folders) with labels 'class x1 y1 x2 y2 x3 y3 x4 y4' normalised to
 [0, 1] in a sibling 'labels' folder. Images of any size work: each image is resized so its long side = imgsz
 (training, validation and prediction alike). tile=True instead cuts large pages into imgsz tiles at native
 resolution (tile_scale= to resize first), for very large pages with tiny objects. Without a val split, val_frac of
-the train images is held out. Prepared data is cached (~/.cache/vrdet). A run resumes from {project}/{name}/last.pt.
+the train images is held out. Prepared data is cached (~/.cache/vrdet). Every train call starts a new run folder
+({project}/{name}, then name2, name3...; exist_ok=True reuses it); resume=True continues a run from weights/last.pt.
 
 Training defaults follow the usual one-stage recipe: mosaic=1.0, scale=0.5 (random zoom 0.5-1.5), translate=0.1,
 close_mosaic=10, warmup_epochs=3, LR decayed linearly to lr0 * lrf (lrf=0.01; cos_lr=True for cosine), patience=100,
@@ -122,17 +124,37 @@ def prepare_data(data, imgsz=1024, gap=200, val_frac=0.15, scale=1.0, cache_dir=
                    fit=fit)
 
 
-def _run_dir(project, name, exist_ok, resume):
-    """New run -> fresh dir (name, name2, ...); an unfinished run with last.pt is resumed when resume=True."""
+def increment_path(project, name, exist_ok=False):
+    """runs/obb/train, runs/obb/train2, train3, ... (exist_ok=True reuses the folder)."""
     base = Path(project)
-    k = 1
-    while True:
-        d = base / (name if k == 1 else f"{name}{k}")
-        if exist_ok or not d.exists() or not any(d.iterdir()):
-            return d, bool(resume) and (d / "last.pt").exists() and not (d / "train_done").exists()
-        if resume and (d / "last.pt").exists() and not (d / "train_done").exists():
-            return d, True
+    d = base / name
+    k = 2
+    while d.exists() and not exist_ok:
+        d = base / f"{name}{k}"
         k += 1
+    return d
+
+
+def _find_last(resume, model, project, name):
+    """resume=True: resume=<last.pt> or model=<.../last.pt>; else the newest unfinished run among name, name2, ...
+    (when name is given) or under project (like the usual trainer's latest-run lookup)."""
+    import re
+    if isinstance(resume, (str, Path)) and str(resume).endswith(".pt") and Path(resume).exists():
+        return Path(resume)
+    if isinstance(model, (str, Path)) and Path(model).name == "last.pt" and Path(model).exists():
+        return Path(model)
+    runs = [f for f in list(Path(project).glob("**/weights/last.pt")) + list(Path(project).glob("**/last.pt"))
+            if not (_run_root(f) / "train_done").exists()]
+    if name:
+        pat = re.compile(rf"^{re.escape(name)}\d*$")
+        runs = [f for f in runs if pat.match(_run_root(f).name)]
+    if not runs:
+        raise SystemExit(f"resume=True but no unfinished run (weights/last.pt) under {Path(project) / (name or '')}")
+    return max(runs, key=lambda f: f.stat().st_mtime)
+
+
+def _run_root(last):
+    return last.parent.parent if last.parent.name == "weights" else last.parent
 
 
 def _ram_bytes():
@@ -236,7 +258,7 @@ def _to_argv(opts):
 
 
 RESUME_OK = ("workers", "cache", "patience", "eval_every", "verbose", "time")   # may change when resuming
-RUN_FILES = ("last.pt", "best.pt", "train_done", "results.csv", "metrics.jsonl", "train_progress.log", "eval_val.txt",
+RUN_FILES = ("weights/last.pt", "weights/best.pt", "last.pt", "best.pt", "train_done", "results.csv", "metrics.jsonl", "train_progress.log", "eval_val.txt",
              "eval_val.json", "exitcode")
 
 
@@ -282,6 +304,7 @@ def _batch_from(batch, sd, imgsz, n_train):
 def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_ema):
     """Run the trainer; on CUDA out-of-memory before the first epoch is saved, halve the batch and retry."""
     from vrdet import train as trainer
+    opts["wdir"] = "weights"
     for attempt in range(4):
         ipe = max(1, n_train // int(opts["batch"]))
         total = ipe * int(epochs)
@@ -300,7 +323,7 @@ def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_
             return
         except RuntimeError as e:                    # torch.OutOfMemoryError is a RuntimeError
             if ("out of memory" not in str(e).lower() or int(opts["batch"]) <= 2 or attempt == 3
-                    or (save_dir / "last.pt").exists()):
+                    or (save_dir / "weights" / "last.pt").exists()):
                 raise
         gc.collect()
         import torch
@@ -310,8 +333,8 @@ def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_
         print(f"[vrdet] WARNING: CUDA out of memory with batch={old}. Reducing to batch={opts['batch']} and retrying.")
 
 
-def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", name="exp", exist_ok=False,
-          resume=True, tile=False, tile_scale=None, gap=200, val_frac=0.15, cache="auto", cache_dir=None, workers=None,
+def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="runs/obb", name=None,
+          exist_ok=False, resume=False, tile=False, tile_scale=None, gap=200, val_frac=0.15, cache="auto", cache_dir=None, workers=None,
           device=None, recipe=True, warmup_epochs=3, patience=100, lrf=0.01, cos_lr=False, seed=0, optimizer="auto",
           **extra):
     """Train (or fine-tune when `model` is a .pt path). Returns SimpleNamespace(save_dir, best, last, metrics)."""
@@ -331,11 +354,13 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
         batch = None                                 # batch=-1: automatic
     user_ema = "ema" in extra
 
-    # ---- resume: the run's saved settings win; only a few may change (like the usual trainer)
-    save_dir, resuming = _run_dir(project, name, exist_ok, resume)
-    save_dir.mkdir(parents=True, exist_ok=True)
-    saved_file = save_dir / "vrdet_args.json"
-    if resuming and saved_file.exists():
+    # ---- resume=True only (like the usual trainer): continue a run with its saved settings
+    if resume:
+        last = _find_last(resume, model, project, name)
+        save_dir = _run_root(last)
+        saved_file = save_dir / "vrdet_args.json"
+        if not saved_file.exists():
+            raise SystemExit(f"{save_dir} has no vrdet_args.json: cannot resume it")
         saved = json.loads(saved_file.read_text())
         prepared = Path(saved.get("prepared", ""))
         if not _is_prepared(prepared):               # new machine / VM: rebuild the same prepared data
@@ -345,20 +370,21 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
         given = {"batch": batch, "imgsz": imgsz, **extra, **({"epochs": epochs} if epochs != 100 else {})}
         ignored = [k for k, v in given.items() if v is not None and k not in RESUME_OK
                    and str(opts.get(ALIASES.get(k, k), v)) != str(v)]
-        if ignored:
-            print(f"[vrdet] resuming {save_dir}: keeps its saved settings, ignores {ignored} "
-                  f"(resume=False or a new name to start over)")
-        else:
-            print(f"[vrdet] resuming {save_dir}")
+        print(f"[vrdet] resuming {save_dir} with its saved settings"
+              + (f" (ignores {ignored})" if ignored else ""))
         opts.update({k: extra[k] for k in RESUME_OK if k in extra})
         if workers is not None:
             opts["workers"] = int(workers)
         n_train = _n_lines(Path(prepared) / "meta" / "train.jsonl")
         _run_trainer(save_dir, prepared, opts, n_train, opts["epochs"], warmup_epochs, user_ema=True)
         return _summary(save_dir)
-    if not resuming:                                 # exist_ok=True on an old run: start over in place
-        for f in RUN_FILES:
-            (save_dir / f).unlink(missing_ok=True)
+    if data is None:
+        raise SystemExit("vrdet train needs data=<data.yaml or dataset folder>")
+    save_dir = increment_path(project, name or "train", exist_ok)   # new run: train, train2, ... (never resumes)
+    save_dir.mkdir(parents=True, exist_ok=True)
+    saved_file = save_dir / "vrdet_args.json"
+    for f in RUN_FILES:                              # exist_ok=True on an old folder: start over in place
+        (save_dir / f).unlink(missing_ok=True)
 
     aug = {k: extra.pop(k, v) for k, v in AUGMENT.items()}
     hsv = [extra.pop(k, d) for k, d in (("hsv_h", 0.015), ("hsv_s", 0.5), ("hsv_v", 0.3))]
@@ -393,12 +419,8 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
         scale = auto_scale(data, imgsz) if tile_scale in (None, "auto") else float(tile_scale)
 
     sd = SIZE_DEFAULTS[size]
-    if str(optimizer).lower() == "auto":            # like the usual trainer: auto picks the measured LR, ignores lr0
-        if "lr" in extra:
-            print(f"[vrdet] optimizer=auto: ignoring lr0={extra.pop('lr'):g}, using AdamW lr={sd['lr']:g} (measured for "
-                  f"VRDet-{size}); set optimizer=AdamW to use your own lr0")
-    elif str(optimizer).lower() != "adamw":
-        raise SystemExit("optimizer must be 'auto' or 'AdamW'")
+    if str(optimizer).lower() not in ("auto", "adamw"):
+        raise SystemExit("optimizer must be 'auto' or 'AdamW'")   # lr0 given -> used; otherwise the measured LR
     prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, seed, fit=fit)
     n_train = _n_lines(Path(prepared) / "meta" / "train.jsonl")
     if cache == "auto":                              # decoded uint8 images in RAM when they take < 25% of it
@@ -448,8 +470,8 @@ def _summary(save_dir):
             r = json.loads(p.read_text())
             metrics = {"mAP50": r.get("mAP50"), "mAP50_95": r.get("mAP50_95"), "file": f}
             break
-    return SimpleNamespace(save_dir=str(save_dir), best=str(save_dir / "best.pt"), last=str(save_dir / "last.pt"),
-                           metrics=metrics)
+    w = save_dir / "weights" if (save_dir / "weights").exists() else save_dir
+    return SimpleNamespace(save_dir=str(save_dir), best=str(w / "best.pt"), last=str(w / "last.pt"), metrics=metrics)
 
 
 def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, batch=8, workers=8, queries=900,
@@ -485,14 +507,18 @@ def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, b
     return res
 
 
-def predict(model, source, conf=0.25, save_dir="runs/predict", vis=True, imgsz=None, tile=None, tile_scale=None,
-            gap=200, queries=900, batch=8, device=None, classes=None, names=None):
+def predict(model, source, conf=0.25, save_dir=None, vis=True, imgsz=None, tile=None, tile_scale=None,
+            gap=200, queries=900, batch=8, device=None, classes=None, names=None, project="runs/obb", name="predict",
+            exist_ok=False, save=True):
     """Detections per image {path: [{"class", "class_id", "score", "poly" (8 pixel coords)}]}; files in save_dir.
     Images are resized exactly as in training; tile=True forces tiling at native resolution (tile_scale).
     conf="auto" uses the per-class thresholds (best F2 on val) stored in best.pt; classes= keeps only these class
     ids or names; names= supplies class names for checkpoints that lack them."""
     _set_device(device)
     from vrdet.predict import run
+    if save_dir is None and save:
+        save_dir = increment_path(project, name, exist_ok)
+        print(f"[vrdet] results -> {save_dir}")
     return run(model, source, save_dir, conf, names, imgsz, gap, queries, batch, bool(vis) and save_dir is not None,
                scale=tile_scale, tile=True if tile_scale is not None else tile, classes=classes)
 
@@ -536,14 +562,12 @@ def main(argv=None):
             raise SystemExit(f"'{bad[0]}' is not a valid argument for vrdet {mode}."
                              + (f" Similar: {', '.join(near)}" if near else ""))
     if mode == "train":
-        if "data" not in kv:
-            raise SystemExit("vrdet train needs data=<data.yaml or dataset folder>")
+        if "data" not in kv and not kv.get("resume"):
+            raise SystemExit("vrdet train needs data=<data.yaml or dataset folder> (or resume=True)")
         train(**kv)
     elif mode == "val":
         val(**kv)
     elif mode == "predict":
-        if "save" in kv:
-            kv["vis"] = kv.pop("save")
         predict(**kv)
     elif mode == "prepare":
         out = kv.pop("out", None)

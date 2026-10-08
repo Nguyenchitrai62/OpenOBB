@@ -38,12 +38,12 @@ pip install git+https://github.com/Nguyenchitrai62/vrdet.git     # hoặc trong 
 ## 2. Train
 
 ```bash
-vrdet train data=path/data.yaml model=s epochs=100 imgsz=1024 project=runs name=exp
+vrdet train data=path/data.yaml model=s epochs=100 imgsz=1024        # -> runs/obb/train
 ```
 
 ```python
 from vrdet import Detector
-r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024, project="runs", name="exp")
+r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024)   # r.best = .../weights/best.pt
 ```
 
 **`model`:**
@@ -64,8 +64,8 @@ r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024, project="
 | `lrf` | 0.01 | learning rate giảm tuyến tính từ `lr0` về `lr0 × lrf` ở cuối run (`cos_lr=True`: giảm theo cosine) |
 | `cache` | auto | giải mã ảnh train một lần vào RAM nếu chiếm dưới 25% RAM (`cache=False` để tắt) |
 | `patience` | 100 | dừng nếu mAP50-95 val không tăng sau N epoch |
-| `optimizer` | auto | như YOLO: `auto` **bỏ qua `lr0`** và dùng LR đã đo cho từng cỡ (S 1e-4, X 6e-5); `optimizer=AdamW` để dùng `lr0` của bạn |
-| `lr0` | theo cỡ model | chỉ có tác dụng khi `optimizer=AdamW`; kiểu DETR không nên dùng mức 1e-3 của YOLO |
+| `optimizer` | auto | AdamW; không truyền `lr0` thì dùng LR đã đo cho từng cỡ (S 1e-4, X 6e-5) |
+| `lr0` | theo cỡ model | truyền vào là dùng đúng giá trị đó (có cảnh báo nếu > 3 lần mặc định); kiểu DETR thường diverge ở mức 1e-3 của YOLO |
 | `fliplr`, `flipud` | 0.5, 0.5 | xác suất lật ngang / dọc; `rot90=False` để tắt xoay 90° (symbol có chiều) |
 | `freeze` | – | `backbone`, `encoder` (chỉ train decoder) hoặc số stage backbone; hợp với data rất ít |
 | `time` | – | ngân sách giờ train; số epoch tự tính lại sau mỗi epoch để LR vẫn giảm hết |
@@ -75,7 +75,8 @@ r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024, project="
 - Kiến trúc mặc định là bản chốt (c6): adapter LSK, RFS, nhóm query một-nhiều, AQD, loss góc, IoU-cost.
   - `recipe=False` để tắt.
   - Mọi flag của `python -m vrdet.train` truyền được dạng `key=value`.
-- **Resume:** chạy lại đúng lệnh, run chưa xong sẽ train tiếp từ `last.pt` với **đúng tham số đã lưu**.
+- **Thư mục kết quả như YOLO:** mặc định `runs/obb/train`, lần sau `train2`, `train3`... (`project=`, `name=` để đổi; `exist_ok=True` ghi đè thư mục cũ). Weights ở `weights/best.pt` và `weights/last.pt`.
+- **Resume chỉ khi `resume=True`** (như YOLO): train tiếp run chưa xong mới nhất (hoặc `name=` / `resume=<last.pt>`) với **đúng tham số đã lưu**.
   - Chỉ đổi được `workers`, `cache`, `patience`, `time`; tham số khác bị bỏ qua và có thông báo.
   - Muốn train lại từ đầu: `resume=False` (sang thư mục mới), hoặc `resume=False exist_ok=True` (ghi đè thư mục cũ).
 - **Tự phục hồi khi diverge:** epoch có nhiều bước NaN hoặc thống kê BatchNorm hỏng thì tự nạp lại `last.pt` của epoch trước và giảm LR một nửa (tối đa 3 lần, như YOLO).
@@ -95,8 +96,8 @@ Khi xong, màn hình in bảng theo từng class của `best.pt`. Kết quả n�
 
 | File | Nội dung |
 |---|---|
-| `best.pt` | weights tốt nhất trên val (gọn), dùng để deploy hoặc fine-tune |
-| `last.pt` | checkpoint đầy đủ, dùng để resume |
+| `weights/best.pt` | weights tốt nhất trên val (gọn), dùng để deploy hoặc fine-tune |
+| `weights/last.pt` | checkpoint đầy đủ, dùng cho `resume=True` |
 | `results.csv`, `results.png` | loss, P, R, mAP50, mAP50-95 theo epoch |
 | `labels.jpg` | số object theo class và phân bố cỡ box |
 | `val_pred.jpg` | dự đoán trên 4 ảnh val (xanh lá: nhãn, màu: dự đoán) |
@@ -107,8 +108,8 @@ Khi xong, màn hình in bảng theo từng class của `best.pt`. Kết quả n�
 ## 3. Đánh giá và suy luận
 
 ```bash
-vrdet val     model=runs/exp/best.pt data=path/data.yaml
-vrdet predict model=runs/exp/best.pt source=pages/ conf=0.3 save_dir=preds
+vrdet val     model=runs/obb/train/weights/best.pt data=path/data.yaml
+vrdet predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.3   # -> runs/obb/predict
 ```
 
 - Ảnh được xử lý đúng như lúc train. `tile=True` để cắt tile ảnh rất lớn.
