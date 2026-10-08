@@ -1,0 +1,21 @@
+{
+  "attempts": 1,
+  "started": "2026-10-08 11:36:11",
+  "session": "c2-dota-hybrid-s-1",
+  "out": "/content/work/runs/c2-dota-hybrid-s",
+  "status": "running",
+  "launched": 1791434176.7162855,
+  "updated": "2026-10-08 11:37:13",
+  "fails": 0,
+  "synced": {
+    "setup.log": [
+      1372,
+      1791434207
+    ],
+    "train.log": [
+      6181,
+      1791434228
+    ]
+  },
+  "tail": "[00:14<02:46, 21.31it/s]\nFetching 3738 files:   5%|\u258c         | 199/3738 [00:15<03:47, 15.54it/s]\nFetching 3738 files:   5%|\u258c         | 202/3738 [00:15<03:20, 17.64it/s]\nFetching 3738 files:   5%|\u258c         | 205/3738 [00:15<02:59, 19.70it/s]\nFetching 3738 files:   6%|\u258c         | 208/3738 [00:15<02:43, 21.53it/s]\nFetching 3738 files:   6%|\u258c         | 211/3738 [00:15<03:23, 17.29it/s]\nFetching 3738 files:   6%|\u258c         | 215/3738 [00:15<02:59, 19.59it/s]\nFetching 3738 files:   6%|\u258c         | 218/3738 [00:15<02:59, 19.57it/s]\nFetching 3738 files:   6%|\u258c         | 222/3738 [00:16<02:36, 22.46it/s]"
+}

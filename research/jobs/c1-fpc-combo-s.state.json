@@ -5,5 +5,21 @@
   "out": "/content/work/runs/c1-fpc-combo-s",
   "status": "running",
   "launched": 1791433956.7375546,
-  "updated": "2026-10-08 11:33:00"
+  "updated": "2026-10-08 11:37:04",
+  "fails": 0,
+  "synced": {
+    "train_progress.log": [
+      2958,
+      1791434206
+    ],
+    "setup.log": [
+      350,
+      1791433976
+    ],
+    "train.log": [
+      5173,
+      1791434206
+    ]
+  },
+  "tail": ".548 bbox_o2m_1=1.046 kld_o2m_1=0.977 angle_o2m_1=0.035 fgl_o2m_1=0.486 mal_o2m_2=0.563 bbox_o2m_2=1.002 kld_o2m_2=0.979 angle_o2m_2=0.035 fgl_o2m_2=0.487 lr 2.01e-05 | 20.0 img/s data 0.003s crit 0.144s/it\n[04:36:46] ep 0 it 250/435 loss 39.888 mal=0.434 bbox=1.380 kld=1.109 angle=0.059 fgl=0.278 mal_o2m_0=0.538 bbox_o2m_0=0.860 kld_o2m_0=0.981 angle_o2m_0=0.046 fgl_o2m_0=0.489 mal_o2m_1=0.648 bbox_o2m_1=0.785 kld_o2m_1=0.941 angle_o2m_1=0.046 fgl_o2m_1=0.538 mal_o2m_2=0.692 bbox_o2m_2=0.762 kld_o2m_2=0.932 angle_o2m_2=0.046 fgl_o2m_2=0.549 lr 2.51e-05 | 22.6 img/s data 0.002s crit 0.144s/it\n"
 }

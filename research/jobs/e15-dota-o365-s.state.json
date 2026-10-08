@@ -3,9 +3,9 @@
   "started": "2026-10-08 09:58:00",
   "session": "e15-dota-o365-s-1",
   "out": "/content/work/runs/e15-dota-o365-s",
-  "status": "running",
+  "status": "done",
   "launched": 1791428285.6724403,
-  "updated": "2026-10-08 11:21:33",
+  "updated": "2026-10-08 11:37:46",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,16 +13,16 @@
       1791428316
     ],
     "train.log": [
-      143182,
-      1791433081
+      143273,
+      1791433216
     ],
     "metrics.jsonl": [
-      6097,
-      1791433044
+      6722,
+      1791433219
     ],
     "train_progress.log": [
-      72371,
-      1791433081
+      72462,
+      1791433216
     ],
     "last.pt": [
       165363829,
@@ -35,7 +35,23 @@
     "eval_val.txt": [
       1013,
       1791433081
+    ],
+    "exitcode": [
+      2,
+      1791433224
+    ],
+    "eval_val_q900.json": [
+      3039,
+      1791433216
+    ],
+    "train_done": [
+      2,
+      1791433219
+    ],
+    "eval_val_q900.txt": [
+      1013,
+      1791433216
     ]
   },
-  "tail": " 94.69\nship                   8861    48129  88.17    58.09  94.30\ntennis-court            739    49824  90.68    85.91  96.62\nbasketball-court        124    45925  66.96    52.94  89.52\nstorage-tank           1869    83005  88.82    64.09  97.43\nsoccer-ball-field        87    30513  69.71    56.47  94.25\nroundabout              164    39396  60.52    37.18  81.10\nharbor                 2065    48554  73.55    34.43  82.95\nswimming-pool           366    38302  58.15    24.96  85.25\nhelicopter               72     9154  36.31    15.73  86.11\nmAP                                   70.29    46.86\n"
+  "tail": "739    49824  90.68    85.91  96.62\nbasketball-court        124    45925  66.96    52.94  89.52\nstorage-tank           1869    83005  88.82    64.09  97.43\nsoccer-ball-field        87    30513  69.71    56.47  94.25\nroundabout              164    39396  60.52    37.18  81.10\nharbor                 2065    48554  73.55    34.43  82.95\nswimming-pool           366    38302  58.15    24.96  85.25\nhelicopter               72     9154  36.31    15.73  86.11\nmAP                                   70.29    46.86\n[04:20:16] [eval] 5297 patches / 458 images: predict 20s, merge+eval 113s, dec mAP50 70.78\n"
 }

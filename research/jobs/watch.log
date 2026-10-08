@@ -359,3 +359,7 @@
 [2026-10-08 11:32:27] c1-dota-combo-s: running
 [2026-10-08 11:32:32] c1-fpc-combo-s: launching attempt 1 on G4 as session c1-fpc-combo-s-1
 [2026-10-08 11:33:00] c1-fpc-combo-s: running
+[2026-10-08 11:36:11] c2-dota-hybrid-s: launching attempt 1 on G4 as session c2-dota-hybrid-s-1
+[2026-10-08 11:36:51] c2-dota-hybrid-s: running
+[2026-10-08 11:37:46] e15-dota-o365-s: finished with status done; stopping VM
+[2026-10-08 11:37:49] watch: balance=139.23 rate=32.0/h active=['c1-fpc-combo-s', 'c2-dota-hybrid-s', 'e15-dota-o365-s'] ended=[('e15-dota-o365-s', 'done')]
