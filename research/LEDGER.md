@@ -38,7 +38,7 @@ Quy ước: toàn bộ là val, 24 epoch, ảnh 1024. DOTA cắt SS 1024/200, in
 | 10-08 | e11-dota-x-qinfer | DOTA | X | 900 query khi suy luận | e6 | **76.29 / 52.84** | +0.69 | so YOLO26x: −2.13 / −0.26 | 3 |
 | 10-08 | e10-fpc-vec-mosaic-s | FPC | S | mosaic thu nhỏ 0.5×, p 0.5 | e7 | 72.92 / 61.89 | −3.88 | **BÁC BỎ** cho CAD | 7 |
 | 10-08 | e14-dota-post-eval | DOTA | S+X | argmax post, 900 query | flat q900 | S 72.79 / 48.66; X 75.91 / 52.64 | −0.16 / −0.38 | **BÁC BỎ**: giữ flat; HC cũng giảm (54.1 so với 56.4) | 3 |
-| 10-08 | e10-dota-mosaic-s | DOTA | S | mosaic thu nhỏ 0.5×, p 0.5 | e3 | đang chạy | | | |
+| 10-08 | e10-dota-mosaic-s | DOTA | S | mosaic thu nhỏ 0.5×, p 0.5 | e3 | 70.93 / 47.63 | −1.42 (không tính HC: **+0.33**) | HC sụp 53.3 → 27.4; 14 class còn lại gần trung tính (BC +4.8, SP +4.3, BR −3.9) | 10 |
 
 Đang xếp hàng (2026-10-08 09:30):
 - e14: argmax post (eval S/X).
@@ -62,6 +62,10 @@ Quy ước: toàn bộ là val, 24 epoch, ảnh 1024. DOTA cắt SS 1024/200, in
   - YOLO có mosaic giữ tỉ lệ cùng scale jitter 0.5–1.5 và translate 0.1, VRDet thì không.
   - YOLO khởi tạo từ Objects365 → COCO, VRDet chỉ từ COCO.
   - YOLO26 dùng AdamW (MuSGD chỉ bật khi trên 10k iteration).
+- **F13. Helicopter (HC) cực nhiễu và chi phối mAP DOTA:** chỉ 72 mẫu val; AP dao động 17–56 giữa các run VRDet; một class
+  = 6.7% trọng số mAP. Không tính HC: VRDet-X q900 77.71 so với YOLO26x 78.66 (**−0.95**, so với −2.13 khi tính HC).
+  Context (e3-ctx) +1.2 và mosaic (e10) +0.3 trên 14 class còn lại, chỉ HC sụp.
+  **Từ nay báo cả mAP50 và mAP50 không tính HC**; quyết định ablation xem cả hai. HC gần vuông nên góc mơ hồ: thử e18.
 - **F10. Lỗi ProbIoU** (xem §4).
 - **F11. Tốc độ:** VRDet-X 20.0 ms so với YOLO26x 12.8 ms (64% FPS). VRDet-S 9.4–10.1 ms so với 8.9. Số query không ảnh hưởng latency (300 → 900 vẫn khoảng 20 ms). A100 chậm hơn G4 khoảng 2 lần với workload này.
 - **F12. YOLO26-OBB, đọc từ source/paper:**

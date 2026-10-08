@@ -31,6 +31,10 @@ def info(run):
             d = json.loads(line)
             lat = d.get("latency_ms_pt_fp16_bs1") or d.get("latency_ms_e2e_pt") or lat     # VRDet / YOLO probes
     fusion = {k: v["mAP50"] for k, v in r.get("fusion", {}).items() if k != "dec"}
+    c = r["classes"]
+    if "helicopter" in c:            # F13: helicopter (72 val instances) swings +-20 AP between runs
+        ex = [v["AP50"] for k, v in c.items() if k != "helicopter"]
+        fusion = dict(fusion, **{"w/o HC": sum(ex) / len(ex)})
     return data, model, r["mAP50"], r["mAP50_95"], lat, fusion
 
 
