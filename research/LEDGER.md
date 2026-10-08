@@ -175,6 +175,7 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
 |---|---|---|---|
+| 10-08 | Fine-tune Wall_Color VRDet-X, `torch.compile` bật (100 epoch ≥ 3000 bước) + EMA kiểu cache tham chiếu: loss train bình thường nhưng 100% prediction của EMA là NaN, kể cả LR mặc định 6e-5. Run v1 (compile tắt) không bị. Nguyên nhân chính xác chưa xác minh (compile × EMA cache, hoặc init từ best.pt) | val = 0 suốt run | EMA quay lại `state_dict` mỗi bước; `repair()` trước mỗi lần val (báo + đồng bộ lại); CLI tắt compile mặc định |
 | 10-08 | Fine-tune Wall_Color VRDet-X với `lr0=0.001` (gấp 17 lần mặc định 6e-5): sinh box NaN/inf, bước ghép val crash trong shapely sau epoch 1 | run của user dừng | bỏ box không hữu hạn ở eval/merge/plot (có cảnh báo); CLI cảnh báo khi lr0 > 3 lần mặc định. Kiểu DETR không dùng được LR 1e-3 của YOLO |
 | 10-07 | Thumbnail đi qua backbone ở chế độ train, làm hỏng running stats của BN | e2-h6 vô hiệu | thumbnail chạy BN eval + no_grad |
 | 10-07 | `torch.compile` gắn trước khi copy EMA, nên eval EMA gọi nhầm model đang train | sub-mAP trước 20:35 của seed1 / ctx-fix / rfs thấp khoảng 7 điểm | compile sau khi tạo EMA |
