@@ -342,3 +342,7 @@
 [2026-10-08 10:24:25] queue: ['e20-dota-base12-s', 'e13-dota-yoloaug-s', 'e17-dota-aqd-s', 'e18-dota-angle-s', 'e19-dota-lsk-s', 'e21-dota-layer-diag', 'e22-dota-ortho-s', 'e23-dota-iocost-s']
 [2026-10-08 10:25:57] watch: balance=177.43 rate=37.3/h active=['e12-dota-o2m-s', 'e15-dota-o365-s', 'e16-dota-dense-fix-s'] ended=[]
 [2026-10-08 10:31:32] e20-dota-base12-s: launching attempt 1 on G4 as session e20-dota-base12-s-1
+[2026-10-08 10:32:13] e20-dota-base12-s: running
+[2026-10-08 10:32:15] queue: e24-fpc-vec-lfe-s waits (3 live sessions, cap 3)
+[2026-10-08 10:35:08] watch: balance=171.87 rate=37.3/h active=['e15-dota-o365-s', 'e16-dota-dense-fix-s', 'e20-dota-base12-s'] ended=[]
+[2026-10-08 10:43:10] queue: e24-fpc-vec-lfe-s waits (3 live sessions, cap 3)

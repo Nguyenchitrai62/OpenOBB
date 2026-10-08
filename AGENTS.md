@@ -174,6 +174,11 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
   nghiên cứu học thuật. Code VRDet vẫn tự viết. Bản thương mại được user finetune trên data tự gắn nhãn.
   Đã giao 3 sub-agent: kiến trúc detection/OBB SOTA, ngữ nghĩa CAD + VLM grounding, dataset + pretrain đa dataset.
 
+- (bổ sung 10:45, 2026-10-08) **Tốn CU quá: còn khoảng 80–100 CU thì DỪNG**, chốt gọn bản kiến trúc tốt nhất kèm cách train, để user tự train
+  trên dataset riêng tự gán nhãn. Watcher: `new_reserve.txt` = `100 85`. Hàng đợi cắt còn e24, e12b, e17, e18, e13, e23.
+  Bỏ e19 (LSK), e21 (chẩn đoán lớp), e22 (ortho). Không chạy run gộp cỡ X (khoảng 40 CU) vì thiếu ngân sách.
+  Session A100 của người dùng chung cũng trừ vào số dư (khoảng 10 CU/giờ).
+
 Câu hỏi còn mở:
 - Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.
 

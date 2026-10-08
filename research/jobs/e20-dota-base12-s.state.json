@@ -3,7 +3,23 @@
   "started": "2026-10-08 10:31:32",
   "session": "e20-dota-base12-s-1",
   "out": "/content/work/runs/e20-dota-base12-s",
-  "status": "starting",
+  "status": "running",
   "launched": 1791430297.137341,
-  "updated": "2026-10-08 10:31:37"
+  "updated": "2026-10-08 10:35:08",
+  "fails": 0,
+  "synced": {
+    "train_progress.log": [
+      67,
+      1791430503
+    ],
+    "setup.log": [
+      1371,
+      1791430331
+    ],
+    "train.log": [
+      67414,
+      1791430503
+    ]
+  },
+  "tail": "<00:00, 24.77it/s] \n[get_dota] train: 1411 images, 1411 label files\n[get_dota] val: 458 images, 458 label files\n[get_dota] source ready in 152s: /content/datasets/dota_raw/DOTA_V1.0\n[split] train: 1411 images -> 15749 patches, 190149 objects\n[get_dota] split train in 9s\n[split] val: 458 images -> 5297 patches, 55804 objects\n[get_dota] split val in 3s\n[get_dota] all done in 164s\nDownloading: \"https://github.com/Peterande/storage/releases/download/dfinev1.0/dfine_s_coco.pth\" to /root/.cache/torch/hub/checkpoints/dfine_s_coco.pth\n[03:35:03] [init] D-FINE coco: 770 full, 22 partial, 0 new tensors\n"
 }
