@@ -123,9 +123,15 @@ vrdet predict model=runs/exp/best.pt source=pages/ conf=0.3 save_dir=preds
 
 ## 4. Test nhanh bằng giao diện kéo thả (Streamlit)
 
+Trên máy này đã có sẵn môi trường `.venv` (torch CPU, streamlit, VRDet): **bấm đúp `run_app.bat`** ở thư mục repo.
+
+Máy khác thì tạo lại môi trường:
+
 ```bash
-pip install streamlit
-streamlit run app/streamlit_app.py
+uv venv .venv --python 3.12
+uv pip install --python .venv/Scripts/python.exe torch --index-url https://download.pytorch.org/whl/cpu
+uv pip install --python .venv/Scripts/python.exe -e ".[app]"
+.venv/Scripts/python.exe -m streamlit run app/streamlit_app.py
 ```
 
 - Đặt `best.pt` tải từ Drive vào `models/best.pt`. Hoặc sửa `MODEL_PATH` đầu file [app/streamlit_app.py](../app/streamlit_app.py), hoặc gõ đường dẫn ở thanh bên.
