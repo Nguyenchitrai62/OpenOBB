@@ -203,6 +203,11 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
   - Báo cáo: `results.csv/png`, `labels.jpg`, `val_pred.jpg`. Kiểm tra nhãn lúc nạp.
   - Cắt tile giờ chỉ là tuỳ chọn `tile=True`.
   - Data Wall_Color: user tự train trên Colab bằng `colab/VRDet_wall_color.ipynb`.
+  - (bổ sung chiều 10-08, theo user) **Thao tác y như YOLO:**
+    - Mỗi lần train là một thư mục mới `runs/obb/train`, `train2`...; weights nằm trong `weights/best.pt` và `weights/last.pt`.
+    - **Không tự resume**: chỉ resume khi có `resume=True`.
+    - `lr0` truyền vào là dùng đúng giá trị đó. Lưu ý: YOLO với `optimizer=auto` thì bỏ qua lr0; ở đây user chọn khác.
+    - Predict lưu vào `runs/obb/predict`, `predict2`...
 
 Câu hỏi còn mở:
 - Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.
