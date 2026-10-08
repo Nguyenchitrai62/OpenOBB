@@ -171,6 +171,14 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - → Pretrain cùng miền (CAD) quan trọng hơn dung tích ở dữ liệu 250 trang. Chưa có checkpoint X trên CAD.
   - User hỏi khởi tạo ngẫu nhiên có tốt hơn không: không. Vòng cũ train từ đầu chỉ đạt 0.144 AP50.
 
+- **F22. VRDet-X Wall_Color với `lr0=1e-3`** (user tự chạy, gấp 17 lần mặc định):
+  - Đến epoch 35: val mAP50-95 0.327, cao hơn run 6e-5 ở epoch 16 (0.123). Chưa so cùng epoch.
+  - Đổi lại: feature tầng stride-32 phình khoảng 1e16, running_var của `encoder.input_proj.2` thành inf.
+  - Train tiếp ở 1e-3 thì gradient không hữu hạn, 179 tensor BatchNorm hỏng, val NaN, VRAM vọt 65→91 GB.
+  - → LR cao hội tụ nhanh hơn nhưng không ổn định với VRDet. Đã thêm `optimizer=auto` (bỏ qua lr0 như YOLO)
+    và cơ chế tự phục hồi (nạp last.pt, giảm LR một nửa).
+  - **Hướng đáng đo:** tìm LR tối ưu giữa 6e-5 và 1e-3 (ví dụ 2e-4, 4e-4), cùng số epoch.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
