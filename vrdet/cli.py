@@ -297,6 +297,8 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
     opts.update(inherited)
     if weights:
         opts["weights"] = weights
+    if opts.get("compile") and "compile" not in extra and n_train // int(opts["batch"]) * int(epochs) < 3000:
+        opts["compile"] = False      # short runs: compile warm-up (1-2 min) costs more than it saves
     opts.update(extra)
 
     from vrdet import train as trainer
