@@ -17,6 +17,7 @@ resizes pages first. Without a val split, `val_frac` of the train pages is held 
 (default ~/.cache/vrdet) and reused. A run resumes automatically from {project}/{name}/last.pt.
 """
 import hashlib
+import math
 import json
 import os
 import sys
@@ -133,6 +134,33 @@ def _queries_for(prepared):
     return 300 if p99 <= 240 else int(min(900, np.ceil(p99 * 1.5 / 100) * 100))
 
 
+def auto_scale(data, imgsz, n=40):
+    """Pages up to ~1.6x the tile size are resized into one tile (like a whole-image resize); larger pages keep their
+    native resolution and are tiled, so thin lines survive. Already-tiled data is used as is."""
+    if _is_prepared(data):
+        return 1.0
+    import random
+
+    import cv2
+    import numpy as np
+
+    from vrdet.data.prepare import IMG_EXT, find_splits
+    _, splits = find_splits(data)
+    imgs = sorted(p for p in splits["train"].iterdir() if p.suffix.lower() in IMG_EXT)
+    sides = []
+    for p in random.Random(0).sample(imgs, min(n, len(imgs))):
+        im = cv2.imread(str(p), cv2.IMREAD_UNCHANGED)
+        if im is not None:
+            sides.append(max(im.shape[:2]))
+    if not sides:
+        return 1.0
+    med = float(np.median(sides))
+    scale = math.floor(imgsz / med * 1e4) / 1e4 if imgsz < med <= 1.6 * imgsz else 1.0   # page <= one tile
+    print(f"[vrdet] pages ~{med:.0f} px (median long side) -> scale {scale} "
+          f"({'one tile per page' if med * scale <= imgsz else 'tiled at native resolution'}; set scale= to override)")
+    return scale
+
+
 def _ckpt_args(path):
     import torch
     ck = torch.load(path, map_location="cpu", weights_only=False)
@@ -164,11 +192,10 @@ def train(data, model="s", epochs=50, batch=None, imgsz=None, project="runs", na
         inherited = {k: src_args[k] for k in ARCH_KEYS if k in src_args}
         size = inherited.pop("size", "s")
         imgsz = imgsz or extra.pop("img", None) or src_args.get("img", 1024)
-        scale = scale if scale is not None else src_args.get("scale", 1.0)
     else:
         raise SystemExit(f"model must be one of {SIZES} or an existing VRDet .pt checkpoint, got '{model}'")
     imgsz = int(imgsz or extra.pop("img", None) or 1024)
-    scale = 1.0 if scale is None else float(scale)
+    scale = auto_scale(data, imgsz) if scale in (None, "auto") else float(scale)
     if imgsz % 32:
         raise SystemExit("imgsz must be a multiple of 32")
     sd = SIZE_DEFAULTS[size]

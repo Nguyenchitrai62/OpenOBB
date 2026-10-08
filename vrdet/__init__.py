@@ -5,4 +5,9 @@
 """
 __version__ = "0.1.0"
 
-from vrdet.cli import Detector  # noqa: E402,F401
+
+def __getattr__(name):              # lazy: `python -m vrdet.cli` must not import vrdet.cli twice
+    if name == "Detector":
+        from vrdet.cli import Detector
+        return Detector
+    raise AttributeError(name)

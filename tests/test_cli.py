@@ -38,6 +38,14 @@ def _dataset(root, n_train=3, n_val=1, size=640):
     return root / "data.yaml"
 
 
+def test_auto_scale(tmp_path):
+    from vrdet.cli import auto_scale
+    data = _dataset(tmp_path / "ds", size=640)
+    assert auto_scale(str(data), 512) == 0.8              # 640 px pages -> one 512 tile
+    assert auto_scale(str(data), 1024) == 1.0             # page fits in a tile: native resolution
+    assert auto_scale(str(data), 256) == 1.0              # much larger than a tile: tiled at native resolution
+
+
 @pytest.mark.skipif(os.environ.get("VRDET_SLOW") != "1", reason="CPU smoke train (set VRDET_SLOW=1)")
 def test_train_val_predict_smoke(tmp_path):
     from vrdet.cli import Detector

@@ -2,7 +2,9 @@
 
 Dataset theo chuẩn OBB 8 điểm (cùng định dạng nhãn bản export "training dataset" của AI_Takeoff), dùng trực tiếp, không cần chuyển đổi.
 
-**Cách nhanh nhất là chạy notebook Colab [`colab/VRDet_train.ipynb`](../colab/VRDet_train.ipynb):** giải nén zip từ Drive, train, xem kết quả, dự đoán.
+**Cách nhanh nhất là chạy notebook Colab:**
+- [`colab/VRDet_wall_color.ipynb`](../colab/VRDet_wall_color.ipynb): bản gọn, chỉ cài, giải nén, `vrdet train`.
+- [`colab/VRDet_train.ipynb`](../colab/VRDet_train.ipynb): bản đầy đủ, có chọn dataset, biểu đồ và ảnh dự đoán.
 
 ## 0. Cài đặt
 
