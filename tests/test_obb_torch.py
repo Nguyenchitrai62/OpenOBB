@@ -72,3 +72,14 @@ def test_norm_le90():
     assert (n[:, 2] >= n[:, 3]).all()
     assert ((n[:, 4] >= -math.pi / 2) & (n[:, 4] < math.pi / 2)).all()
     assert torch.allclose(rotated_iou(a, n), torch.ones(500, dtype=a.dtype), atol=1e-9)
+
+
+def test_probiou_is_scale_invariant():
+    """Regression (2026-10-08): additive eps made ProbIoU ~1 for normalised boxes below ~100 px."""
+    from vrdet.ops.obb_torch import probiou
+    n = torch.tensor([1024.0, 1024.0, 1024.0, 1024.0, 1.0])
+    for side in (3.0, 12.0, 60.0, 400.0):
+        a = torch.tensor([[500.0, 500.0, side, side / 2, 0.3]])
+        for b in (a + torch.tensor([side, 0, 0, 0, 0]), a * torch.tensor([1, 1, 1.4, 1, 1]), a):
+            assert torch.allclose(probiou(a, b), probiou(a / n, b / n), atol=2e-3)   # float32 noise near identity
+        assert probiou(a / n, (a + torch.tensor([side, 0, 0, 0, 0])) / n).item() < 0.2     # neighbours are distinct
