@@ -49,6 +49,7 @@ SIZE_DEFAULTS = {          # lr, backbone lr multiplier, weight decay, batch, ~G
 # architecture flags a fine-tune inherits from its source checkpoint (weights only load into the same shape)
 ARCH_KEYS = ("size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_queries", "queries", "denoising",
              "no_rotate_sampling", "context")
+MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / per epoch on small datasets
 ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every"}
 IGNORED = ("amp", "device", "save_period", "plots", "cos_lr", "optimizer", "momentum", "lrf", "fliplr", "flipud",
            "degrees", "shear", "perspective", "mixup", "cutmix", "copy_paste", "cache", "rect", "multi_scale")
@@ -265,20 +266,29 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
         scale = auto_scale(data, imgsz) if tile_scale in (None, "auto") else float(tile_scale)
 
     sd = SIZE_DEFAULTS[size]
+    prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache, workers, seed, fit=fit)
+    n_train = _n_lines(Path(prepared) / "meta" / "train.jsonl")
     if batch is None:
-        batch = sd["batch"]
+        batch, why = sd["batch"], "default"
         mem = _gpu_mem_gb()
         if mem:                                      # fit the default batch to the GPU (measured ~GB per image)
             fitb = int((mem - 2.0) / (sd["gb"] * (imgsz / 1024) ** 2)) // 2 * 2
-            batch = max(2, min(batch, fitb))
-            print(f"[vrdet] batch {batch} (GPU {mem:.0f} GB; set batch= to override)")
-    prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache, workers, seed, fit=fit)
+            if fitb < batch:
+                batch, why = max(2, fitb), f"GPU {mem:.0f} GB"
+        # small datasets: keep >= ~MIN_STEPS_EPOCH optimizer steps per epoch (set-prediction training needs steps)
+        small = 2 ** int(math.log2(max(4, n_train // MIN_STEPS_EPOCH)))
+        if small < batch:
+            batch, why = max(4, small), f"{n_train} training images"
+        print(f"[vrdet] batch {batch} ({why}; set batch= to override)")
     save_dir, resuming = _run_dir(project, name, exist_ok, resume)
     save_dir.mkdir(parents=True, exist_ok=True)
     if resuming:
         print(f"[vrdet] resuming {save_dir} (use resume=False or a new name to start over)")
 
-    n_train = _n_lines(Path(prepared) / "meta" / "train.jsonl")
+    steps = max(1, n_train // int(batch)) * int(epochs)
+    if steps < MIN_STEPS:
+        print(f"[vrdet] WARNING: only {steps} optimizer steps ({max(1, n_train // int(batch))}/epoch x {epochs} epochs); this "
+              f"detector needs ~{MIN_STEPS}+ to converge: raise epochs or lower batch")
     opts = {"size": size, "img": imgsz, "scale": scale, "fit": fit, "epochs": int(epochs), "batch": int(batch),
             "lr": sd["lr"], "backbone_mult": sd["backbone_mult"], "wd": sd["wd"], "hsv": hsv,
             "eval_every": _eval_every(prepared, int(epochs)), "eval_images": 10**9, "patience": int(patience or 0),
@@ -303,8 +313,9 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
 
     from vrdet import train as trainer
     for attempt in range(4):
-        ipe = max(1, n_train // int(opts["batch"]))     # warmup in epochs (min 100 iterations, max 1000)
-        opts["warmup"] = opts["ema_warmups"] = int(min(1000, max(100, round(warmup_epochs * ipe))))
+        ipe = max(1, n_train // int(opts["batch"]))     # warmup in epochs: >= 100 its, <= 1000 and <= 10% of run
+        total = ipe * int(epochs)
+        opts["warmup"] = opts["ema_warmups"] = int(min(1000, max(20, total // 10), max(100, round(warmup_epochs * ipe))))
         argv = ["--data", str(prepared), "--out", str(save_dir)] + _to_argv(opts)
         (save_dir / "vrdet_args.json").write_text(json.dumps({"data": str(data), "prepared": str(prepared), **opts},
                                                              indent=1, default=str))
