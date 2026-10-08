@@ -71,6 +71,7 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - YOLO26 dùng AdamW (MuSGD chỉ bật khi trên 10k iteration).
 - **F16. Dense và decoder bù nhau** (e16): head dense kiểu YOLO mạnh ở vật nhỏ (PL, SV, SH, TC, ST ngang YOLO26s), decoder DETR
   mạnh ở vật lớn/ngữ cảnh (BD, BR, SBF, HA, dense kém 9–13). Hợp hai đầu ra: +0.66 mAP50 → cơ sở cho kiến trúc lai c2.
+  Chia theo kích thước (route 24–64 px) đều kém hơn chỉ dùng decoder (69.9–72.0) → quy tắc suy luận của kiến trúc lai là **hợp**.
 - **F13. Helicopter (HC) cực nhiễu và chi phối mAP DOTA:** chỉ 72 mẫu val; AP dao động 17–56 giữa các run VRDet; một class
   = 6.7% trọng số mAP. Không tính HC: VRDet-X q900 77.71 so với YOLO26x 78.66 (**−0.95**, so với −2.13 khi tính HC).
   Context (e3-ctx) +1.2 và mosaic (e10) +0.3 trên 14 class còn lại, chỉ HC sụp.
