@@ -233,6 +233,12 @@ def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num
         keep = set(image_ids)
         ds.items = [m for m in ds.items if m["src"] in keep]
     preds = predict_patches(model, ds, device, batch, workers, num_top, img_size, post=post)
+    for k, v in preds.items():                  # drop non-finite boxes (diverging training) before merge / eval
+        good = [d for d in v if np.isfinite(d[2]) and np.isfinite(np.asarray(d[3], dtype=np.float64)).all()]
+        if len(good) < len(v):
+            print(f"WARNING: {len(v) - len(good)} of {len(v)} {k} predictions are NaN/inf (training is diverging: "
+                  f"lower the learning rate)", flush=True)
+            preds[k] = good
     t1 = time.time()
     classes = dataset_classes(data_root)
     gts = load_gt_dir(f"{data_root}/gt/val", set(image_ids) if image_ids is not None else None)

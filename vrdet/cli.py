@@ -425,6 +425,10 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
     if opts.get("compile") and "compile" not in extra and n_train // int(opts["batch"]) * int(epochs) < 3000:
         opts["compile"] = False      # short runs: compile warm-up (1-2 min) costs more than it saves
     opts.update(extra)
+    if float(opts["lr"]) > 3 * sd["lr"]:
+        print(f"[vrdet] WARNING: lr0={opts['lr']:g} is {float(opts['lr']) / sd['lr']:.0f}x the default for VRDet-{size} "
+              f"({sd['lr']:g}). DETR-style detectors usually diverge (NaN boxes) above ~2e-4; the 1e-3 of one-stage "
+              f"detectors does not transfer.")
     saved_file.write_text(json.dumps({"data": str(data)}, indent=1))
     _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_ema)
     return _summary(save_dir)

@@ -45,7 +45,7 @@ def poly2obb(poly):
 
 def to_geoms(poly):
     """(N, 8) -> shapely polygons. Self-intersecting quads are replaced by their convex hull."""
-    p = np.asarray(poly, dtype=np.float64).reshape(-1, 4, 2)
+    p = np.nan_to_num(np.asarray(poly, dtype=np.float64).reshape(-1, 4, 2), nan=0.0, posinf=0.0, neginf=0.0)
     g = shapely.polygons(p)
     bad = ~shapely.is_valid(g)
     if bad.any():

@@ -188,3 +188,16 @@ def test_conf_thresholds():
     from vrdet.predict import conf_thresholds
     assert conf_thresholds(["a", "b"], {}, 0.4) == [0.4, 0.4]
     assert conf_thresholds(["a", "b"], {"conf_thr": {"a": 0.1}}, "auto") == [0.1, 0.25]
+
+
+def test_nan_predictions_do_not_crash_merge_or_eval():
+    from vrdet.eval.dota import evaluate, merge_patches
+    sq = np.array([0, 0, 10, 0, 10, 10, 0, 10], float)
+    bad = np.full(8, np.nan)
+    merged = merge_patches([("a__1.0__0___0", 0, 0.9, sq), ("a__1.0__0___0", 0, 0.8, bad),
+                            ("a__1.0__0___0", 0, float("nan"), sq + 30)], iou_thr=0.1)
+    assert len(merged[0][1]) == 1
+    gts = {"a": [(sq.tolist(), "door", False)]}
+    res = evaluate({"door": (["a", "a"], np.array([0.9, 0.5]), np.stack([sq, np.full(8, np.inf)]))}, gts,
+                   classes=("door",))
+    assert abs(res["classes"]["door"]["AP50"] - 1.0) < 1e-9

@@ -135,7 +135,7 @@ def plot_val_predictions(out, model, data_root, device, img_size, classes, num_t
         for p in obb2poly(gt):
             cv2.polylines(vis, [p.reshape(4, 2).round().astype(np.int32)], True, (0, 200, 0), 1, cv2.LINE_AA)
         for sc, c, p in zip(s, l, obb2poly(b)):
-            if sc >= conf:
+            if sc >= conf and np.isfinite(p).all():
                 pts = p.reshape(4, 2).round().astype(np.int32)
                 color = PALETTE[int(c) % len(PALETTE)]
                 cv2.polylines(vis, [pts], True, color, 2, cv2.LINE_AA)

@@ -108,8 +108,10 @@ def merge_patches(patch_dets, iou_thr=0.1, max_per_img=None):
     class-wise polygon NMS per image."""
     groups = defaultdict(list)
     for name, c, s, p in patch_dets:
-        img, rate, x0, y0 = parse_patch_name(name)
         q = np.asarray(p, dtype=np.float64).copy()
+        if not (np.isfinite(q).all() and np.isfinite(s)):     # diverged prediction: never reaches shapely
+            continue
+        img, rate, x0, y0 = parse_patch_name(name)
         q[0::2] = (q[0::2] + x0) / rate
         q[1::2] = (q[1::2] + y0) / rate
         groups[(img, int(c))].append((float(s), q))
@@ -177,7 +179,9 @@ def evaluate(dets, gts, classes=DOTA1_CLASSES, iou_thrs=None):
                 for img, objs in gts.items()}
         npos = int(sum((~d).sum() for _, d in gt_c.values()))
         ids, sc, pl = dets.get(c, ([], np.zeros(0), np.zeros((0, 8))))
-        ids = np.asarray(ids)
+        ids, sc, pl = np.asarray(ids), np.asarray(sc, dtype=np.float64), np.asarray(pl, dtype=np.float64).reshape(-1, 8)
+        fin = np.isfinite(sc) & np.isfinite(pl).all(1)
+        ids, sc, pl = ids[fin], sc[fin], pl[fin]
         valid = np.isin(ids, list(gts.keys())) if len(ids) else np.zeros(0, dtype=bool)
         ids, sc, pl = ids[valid], sc[valid], pl[valid]
         flags = np.zeros((len(iou_thrs), len(sc)), dtype=np.int8)
