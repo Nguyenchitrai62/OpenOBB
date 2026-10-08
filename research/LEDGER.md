@@ -175,6 +175,7 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
 |---|---|---|---|
+| 10-08 | Fine-tune Wall_Color VRDet-X với `lr0=0.001` (gấp 17 lần mặc định 6e-5): sinh box NaN/inf, bước ghép val crash trong shapely sau epoch 1 | run của user dừng | bỏ box không hữu hạn ở eval/merge/plot (có cảnh báo); CLI cảnh báo khi lr0 > 3 lần mặc định. Kiểu DETR không dùng được LR 1e-3 của YOLO |
 | 10-07 | Thumbnail đi qua backbone ở chế độ train, làm hỏng running stats của BN | e2-h6 vô hiệu | thumbnail chạy BN eval + no_grad |
 | 10-07 | `torch.compile` gắn trước khi copy EMA, nên eval EMA gọi nhầm model đang train | sub-mAP trước 20:35 của seed1 / ctx-fix / rfs thấp khoảng 7 điểm | compile sau khi tạo EMA |
 | 10-07 | Dense: NaN do sqrt(det) và exp không chặn | — | floor kích thước, chặn decode, bỏ qua bước không hữu hạn |
