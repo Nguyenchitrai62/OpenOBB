@@ -131,6 +131,9 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 (e12b, e17, e18, e13, e23, e24; spec giữ lại).
 - **c1 = gộp các phần tốt nhất SOTA:** RFS, nhóm query một-nhiều H-DETR (900), AQD (RHINO), loss góc (YOLO26),
   IoU-cost (Stable-DINO), 900 query khi suy luận; bản FPC có thêm vector + layer pooling (SymPoint-V2).
+- **c3 = box neo theo nét vector (đột phá chính, 10-08):** mỗi query chọn các nét CAD thuộc object (membership query × token);
+  box xoay tính chính xác từ toạ độ nét được chọn; phân loại dựa trên nét/layer/text. Nhắm F7 (định vị CAD) và ngữ nghĩa.
+  Chỉ benchmark FloorPlanCAD trước (user).
 - **c2 = kiến trúc lai dense–sparse (bước đột phá):** head dense kiểu YOLO26 (TAL một-nhiều) sinh đề xuất recall cao →
   decoder DETR suy luận quan hệ trên các đề xuất đó (DDQ/Co-DETR) + nhánh vector/text CAD. Phụ thuộc e16.
 
