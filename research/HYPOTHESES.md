@@ -185,6 +185,8 @@ Thiết kế (`vrdet/models/vector.py`):
 | `e10-dota-mosaic-s` | `--mosaic-p 0.5` (tắt ở 4 epoch cuối) | `e3-rfs-s` 72.35 | ≥ +1.0 |
 | `e10-fpc-vec-mosaic-s` | `--mosaic-p 0.5` | `e7-fpc-vec-s-24e` 76.80 | ≥ +1.0 |
 
+**`e10-fpc-vec-mosaic-s`: 72.92 / 61.89 (−3.88 / −5.78). Mosaic thu nhỏ 0.5× BÁC BỎ cho CAD.**
+
 ## Lỗi ProbIoU (phát hiện 2026-10-08): kết luận H4, H4c không hợp lệ
 
 - `probiou` không bất biến theo tỉ lệ. Với box chuẩn hoá nhỏ hơn khoảng 100 px, nó trả về 1.0 cho cả box kề nhau lẫn box sai kích thước.

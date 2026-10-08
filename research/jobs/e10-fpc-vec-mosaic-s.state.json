@@ -3,9 +3,9 @@
   "started": "2026-10-08 08:32:13",
   "session": "e10-fpc-vec-mosaic-s-1",
   "out": "/content/work/runs/e10-fpc-vec-mosaic-s",
-  "status": "running",
+  "status": "done",
   "launched": 1791423138.6742733,
-  "updated": "2026-10-08 09:16:20",
+  "updated": "2026-10-08 09:26:44",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,21 +13,37 @@
       1791423160
     ],
     "train.log": [
-      37658,
-      1791425701
+      40495,
+      1791425758
     ],
     "metrics.jsonl": [
-      5841,
-      1791425658
+      6908,
+      1791425762
     ],
     "train_progress.log": [
-      35634,
-      1791425701
+      38471,
+      1791425758
     ],
     "last.pt": [
       176175965,
-      1791425657
+      1791425751
+    ],
+    "eval_val.json": [
+      5590,
+      1791425758
+    ],
+    "exitcode": [
+      2,
+      1791425767
+    ],
+    "eval_val.txt": [
+      1913,
+      1791425758
+    ],
+    "train_done": [
+      2,
+      1791425762
     ]
   },
-  "tail": "=0.299 fgl=0.927 lr 1.15e-05 | 22.0 img/s data 0.351s crit 0.141s/it\n[02:14:29] ep 23 it 50/435 loss 16.045 mal=0.687 bbox=0.147 kld=0.209 fgl=0.976 lr 1.12e-05 | 70.5 img/s data 0.007s crit 0.059s/it\n[02:14:40] ep 23 it 100/435 loss 14.420 mal=0.574 bbox=0.089 kld=0.185 fgl=0.827 lr 1.09e-05 | 70.8 img/s data 0.004s crit 0.058s/it\n[02:14:51] ep 23 it 150/435 loss 15.613 mal=0.644 bbox=0.134 kld=0.247 fgl=0.912 lr 1.07e-05 | 72.4 img/s data 0.003s crit 0.057s/it\n[02:15:01] ep 23 it 200/435 loss 15.581 mal=0.608 bbox=0.117 kld=0.212 fgl=0.882 lr 1.04e-05 | 73.3 img/s data 0.002s crit 0.057s/it\n"
+  "tail": " 87.14\nbath                    258     3610  60.23    45.87  77.52\nbath-tub                 29     1633  84.34    73.04 100.00\nwashing-machine         141     2343  83.39    75.98  98.58\nsquat-toilet            242     2132  88.97    78.16  97.11\nurinal                  125     1588  89.43    74.73  99.20\ntoilet                  425     2337  89.77    78.92  97.65\nstairs                  562     8827  64.86    52.56  78.11\nelevator                365     3473  90.52    87.21  97.53\nescalator                35     3278  39.02    17.89  65.71\nmAP                                   72.92    61.89\n"
 }
