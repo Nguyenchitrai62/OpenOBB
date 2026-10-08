@@ -337,3 +337,4 @@
 [2026-10-08 10:10:08] e12-dota-o2m-s: launching attempt 1 on G4 as session e12-dota-o2m-s-1
 [2026-10-08 10:10:49] e12-dota-o2m-s: running
 [2026-10-08 10:10:51] queue: e13-dota-yoloaug-s waits (3 live sessions, cap 3)
+[2026-10-08 10:13:58] watch: balance=183.57 rate=37.3/h active=['e12-dota-o2m-s', 'e15-dota-o365-s', 'e16-dota-dense-fix-s'] ended=[]

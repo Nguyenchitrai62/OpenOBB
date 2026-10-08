@@ -5,7 +5,7 @@
   "out": "/content/work/runs/e15-dota-o365-s",
   "status": "running",
   "launched": 1791428285.6724403,
-  "updated": "2026-10-08 10:00:04",
+  "updated": "2026-10-08 10:12:18",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,9 +13,21 @@
       1791428316
     ],
     "train.log": [
-      28134,
-      1791428399
+      78538,
+      1791429062
+    ],
+    "metrics.jsonl": [
+      483,
+      1791428968
+    ],
+    "train_progress.log": [
+      7727,
+      1791429062
+    ],
+    "last.pt": [
+      165363829,
+      1791428968
     ]
   },
-  "tail": "[01:16<03:37, 12.91it/s]\nFetching 3738 files:  25%|\u2588\u2588\u258c       | 938/3738 [01:16<03:27, 13.48it/s]\nFetching 3738 files:  25%|\u2588\u2588\u258c       | 940/3738 [01:16<03:37, 12.84it/s]\nFetching 3738 files:  25%|\u2588\u2588\u258c       | 942/3738 [01:16<03:16, 14.23it/s]\nFetching 3738 files:  25%|\u2588\u2588\u258c       | 944/3738 [01:17<03:23, 13.70it/s]\nFetching 3738 files:  25%|\u2588\u2588\u258c       | 947/3738 [01:17<02:55, 15.91it/s]\nFetching 3738 files:  25%|\u2588\u2588\u258c       | 949/3738 [01:17<03:00, 15.41it/s]\nFetching 3738 files:  25%|\u2588\u2588\u258c       | 951/3738 [01:17<03:32, 13.10it/s]\nFetching 3738 files:  26%|\u2588\u2588\u258c       | 954/3738 [01:17<03:14, 14.32it/s]"
+  "tail": "kld=0.399 fgl=1.215 lr 1.00e-04 | 84.5 img/s data 0.001s crit 0.056s/it\n[03:10:35] ep 2 it 350/984 loss 20.993 mal=0.644 bbox=0.435 kld=0.549 fgl=0.973 lr 1.00e-04 | 84.5 img/s data 0.001s crit 0.057s/it\n[03:10:44] ep 2 it 400/984 loss 22.622 mal=0.835 bbox=0.454 kld=0.496 fgl=1.350 lr 1.00e-04 | 84.8 img/s data 0.001s crit 0.056s/it\n[03:10:53] ep 2 it 450/984 loss 22.328 mal=0.768 bbox=0.602 kld=0.650 fgl=1.035 lr 1.00e-04 | 85.0 img/s data 0.001s crit 0.056s/it\n[03:11:02] ep 2 it 500/984 loss 19.957 mal=0.792 bbox=0.212 kld=0.356 fgl=1.306 lr 1.00e-04 | 85.1 img/s data 0.001s crit 0.056s/it\n"
 }

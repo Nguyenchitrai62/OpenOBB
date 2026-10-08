@@ -7,7 +7,10 @@
 
 Nguồn chi tiết: `research/decisions.log` (nhật ký theo thời gian), `research/HYPOTHESES.md` (giả thuyết và tiêu chí pass), `python tools/summarize.py` (bảng số tự sinh từ `runs/`).
 
-Quy ước: toàn bộ là val, 24 epoch, ảnh 1024. DOTA cắt SS 1024/200, init COCO trừ khi ghi khác. Số dạng "mAP50 / mAP50:95". Latency đo ở batch 1, fp16, G4. Δ so với mốc ghi trong cột "So với".
+**Tiết kiệm CU (user, 2026-10-08):** sàng lọc ý tưởng ở **12 epoch**, so với mốc 12 epoch `e20-dota-base12-s`. Chỉ ý tưởng thắng mới chạy 24 epoch.
+G4 vẫn rẻ nhất trên mỗi ảnh: A100 khoảng 5.3 CU/h nhưng chậm khoảng 2 lần vì máy ít CPU, nên đắt hơn khoảng 1.6 lần mỗi ảnh.
+
+Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA cắt SS 1024/200, init COCO trừ khi ghi khác. Số dạng "mAP50 / mAP50:95". Latency đo ở batch 1, fp16, G4. Δ so với mốc ghi trong cột "So với".
 
 ## 1. Mốc so sánh (YOLO26, Ultralytics, chỉ để đo)
 

@@ -9,7 +9,7 @@
     "pip install -q -U huggingface_hub hf_xet shapely",
     "python -c \"import os,torch,shapely,scipy;print('cpus',os.cpu_count(),'torch',torch.__version__,'shapely',shapely.__version__,'scipy',scipy.__version__)\""
   ],
-  "cmd": "python -u colab/data/get_dota.py --root /content/datasets && python -u -m vrdet.train --data /content/datasets/dota1_1024 --out {out} --size s --epochs 24 --batch 16 --lr 1e-4 --workers 16 --eval-every 6 --eval-images 100 --channels-last --compile --rfs 0.1 --lsk --eval-queries 900",
+  "cmd": "python -u colab/data/get_dota.py --root /content/datasets && python -u -m vrdet.train --data /content/datasets/dota1_1024 --out {out} --size s --epochs 12 --batch 16 --lr 1e-4 --workers 16 --eval-every 4 --eval-images 100 --channels-last --compile --rfs 0.1 --lsk --eval-queries 900",
   "sync": [
     "*.log",
     "eval_val.json",
@@ -22,5 +22,5 @@
   ],
   "max_hours": 5,
   "max_retries": 3,
-  "est_cu": 11
+  "est_cu": 6
 }
