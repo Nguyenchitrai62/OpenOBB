@@ -20,7 +20,7 @@ import torch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from vrdet.predict import load_model, merge_dets, predict_image, to_label_lines  # noqa: E402
+from vrdet.predict import conf_thresholds, load_model, merge_dets, predict_image, to_label_lines  # noqa: E402
 
 MODEL_PATH = "models/best.pt"       # đường dẫn model: tuyệt đối, hoặc tương đối so với thư mục repo
 
@@ -69,7 +69,9 @@ def main():
         st.header("Ảnh")
         up = st.file_uploader("Kéo thả ảnh", type=("jpg", "jpeg", "png", "bmp", "tif", "tiff", "webp"))
         c1, c2 = st.columns(2)
-        conf = c1.slider("Confidence", 0.05, 1.0, 0.3, 0.05)
+        auto = st.checkbox("Ngưỡng tự động theo class (F2 tốt nhất trên val)", value=False,
+                           disabled=not targs.get("conf_thr"))
+        conf = c1.slider("Confidence", 0.05, 1.0, 0.3, 0.05, disabled=auto)
         iou = c2.slider("NMS IoU", 0.0, 1.0, 0.7 if targs.get("fit", False) else 0.1, 0.05,
                         help="gộp box trùng; 0.7 khi cả ảnh là 1 tile, 0.1 khi ghép nhiều tile")
         with st.expander("Kích thước ảnh"):
@@ -109,7 +111,9 @@ def main():
         right.info("Bấm **Detect**.")
         return
 
-    dets = [d for d in merge_dets(st.session_state["raw"], names, conf, iou) if d["class_id"] in selected]
+    thr = conf_thresholds(names, targs, "auto" if auto else conf)
+    raw = [d for d in st.session_state["raw"] if d[2] >= thr[d[1]]]
+    dets = [d for d in merge_dets(raw, names, 0.0, iou) if d["class_id"] in selected]
     right.image(draw(rgb, dets, names, thickness, show_text), caption=f"{len(dets)} objects · "
                 f"{st.session_state['ms']:.0f} ms ({device})")
 

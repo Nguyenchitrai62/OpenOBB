@@ -55,7 +55,7 @@ r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024, project="
 | Tham số | Mặc định | Ý nghĩa |
 |---|---|---|
 | `imgsz` | 1024 | cạnh dài ảnh đưa vào model (trang lớn nên 1280) |
-| `batch` | tự chọn theo VRAM | hết VRAM thì tự giảm một nửa và chạy lại |
+| `batch` | tự chọn (`-1`) | theo VRAM và cỡ dataset (≥ 25 bước/epoch); `0.6` = dùng 60% VRAM; hết VRAM ở epoch đầu thì tự giảm một nửa |
 | `mosaic` | 1.0 | ghép 4 ảnh, tắt ở `close_mosaic`=10 epoch cuối |
 | `scale` | 0.5 | zoom ngẫu nhiên 0.5–1.5 |
 | `translate` | 0.1 | dịch ngẫu nhiên ±10% |
@@ -64,14 +64,21 @@ r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024, project="
 | `lrf` | 0.01 | learning rate giảm tuyến tính từ `lr0` về `lr0 × lrf` ở cuối run (`cos_lr=True`: giảm theo cosine) |
 | `cache` | auto | giải mã ảnh train một lần vào RAM nếu chiếm dưới 25% RAM (`cache=False` để tắt) |
 | `patience` | 100 | dừng nếu mAP50-95 val không tăng sau N epoch |
-| `lr0` | 1e-4 (bản S) | learning rate (AdamW) |
+| `lr0` | 1e-4 (bản S) | learning rate (AdamW); kiểu DETR không nên dùng mức 1e-3 của YOLO |
+| `fliplr`, `flipud` | 0.5, 0.5 | xác suất lật ngang / dọc; `rot90=False` để tắt xoay 90° (symbol có chiều) |
+| `freeze` | – | `backbone`, `encoder` (chỉ train decoder) hoặc số stage backbone; hợp với data rất ít |
+| `time` | – | ngân sách giờ train; số epoch tự tính lại sau mỗi epoch để LR vẫn giảm hết |
 
 - Val chạy mỗi epoch khi tập val nhỏ (≤ 2000 ảnh/tile).
 - Số query tự tăng (600–900) khi ảnh dày object.
 - Kiến trúc mặc định là bản chốt (c6): adapter LSK, RFS, nhóm query một-nhiều, AQD, loss góc, IoU-cost.
   - `recipe=False` để tắt.
   - Mọi flag của `python -m vrdet.train` truyền được dạng `key=value`.
-- **Resume:** chạy lại đúng lệnh, run chưa xong sẽ train tiếp từ `last.pt`. `resume=False` hoặc tên mới để train lại từ đầu.
+- **Resume:** chạy lại đúng lệnh, run chưa xong sẽ train tiếp từ `last.pt` với **đúng tham số đã lưu**.
+  - Chỉ đổi được `workers`, `cache`, `patience`, `time`; tham số khác bị bỏ qua và có thông báo.
+  - Muốn train lại từ đầu: `resume=False` (sang thư mục mới), hoặc `resume=False exist_ok=True` (ghi đè thư mục cũ).
+- **Cache dữ liệu theo nội dung:** sửa ảnh hay nhãn thì lần sau tự chuẩn bị lại.
+- **Gõ sai tên tham số:** báo lỗi kèm gợi ý, ví dụ `'epoch' is not a valid VRDet argument. Similar: epochs`.
 
 **Màn hình** giống YOLO:
 
@@ -91,7 +98,8 @@ Khi xong, màn hình in bảng theo từng class của `best.pt`. Kết quả n�
 | `results.csv`, `results.png` | loss, P, R, mAP50, mAP50-95 theo epoch |
 | `labels.jpg` | số object theo class và phân bố cỡ box |
 | `val_pred.jpg` | dự đoán trên 4 ảnh val (xanh lá: nhãn, màu: dự đoán) |
-| `eval_val.txt`, `eval_val_q900.txt` | bảng P / R / mAP theo class |
+| `eval_val.txt`, `eval_val_q900.txt` | bảng P / R (một ngưỡng conf chung, như YOLO) / mAP / F2 theo class |
+| `train_batch0.jpg` | một batch sau augmentation kèm nhãn, để soát mosaic / zoom |
 | `train_progress.log` | log chi tiết từng vòng lặp |
 
 ## 3. Đánh giá và suy luận
@@ -102,6 +110,11 @@ vrdet predict model=runs/exp/best.pt source=pages/ conf=0.3 save_dir=preds
 ```
 
 - Ảnh được xử lý đúng như lúc train. `tile=True` để cắt tile ảnh rất lớn.
+- **`conf`:**
+  - `conf=auto` dùng ngưỡng riêng cho từng class, là ngưỡng cho F2 cao nhất trên val, được lưu trong `best.pt`.
+  - Bảng val có cột F2 theo class.
+- **`classes=`:** chỉ giữ các class này, theo id hoặc tên (ví dụ `classes=wall,door`). `names=` dùng cho checkpoint không có tên class.
+- `vrdet val model=best.pt` không cần `data=` nếu chạy trên cùng máy lúc train. Lệch thứ tự class giữa data và model thì báo lỗi.
 - Mỗi ảnh ra:
   - `<tên>.txt`: `class x1 y1 ... x4 y4 score`, chuẩn hoá theo ảnh;
   - `<tên>.json`: toạ độ pixel và tên class;

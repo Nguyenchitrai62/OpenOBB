@@ -5,6 +5,7 @@ or a dataset folder (images/{split} + labels/{split}, or {split}/images + {split
 Labels: 'class_id x1 y1 x2 y2 x3 y3 x4 y4' normalised to [0, 1]. Images are tiled SIZE x SIZE with GAP overlap;
 evaluation merges tiles back per original image. When no val split exists, VAL_FRAC of the train images is held out.
 """
+import hashlib
 import json
 import random
 import tempfile
@@ -75,36 +76,54 @@ def find_splits(data):
     return _names(cfg) if cfg else None, splits
 
 
+PREP_VERSION = 2             # bump when the prepared layout changes: old caches are rebuilt
+
+
+def _fingerprint(paths):
+    """Content fingerprint of a dataset: (name, size, mtime) of every image and label file, so edited or added labels
+    invalidate the prepared cache."""
+    h = hashlib.sha1()
+    for p in paths:
+        try:
+            st = p.stat()
+            h.update(f"{p}|{st.st_size}|{st.st_mtime_ns}\n".encode())
+        except OSError:
+            h.update(f"{p}|missing\n".encode())
+    return h.hexdigest()
+
+
 def _to_dota(img_paths, lbl_dir, names, out_dir):
-    """Normalised OBB txt labels -> polygon label files (pixels + class names); images are NOT copied."""
+    """Normalised OBB txt labels -> polygon label files (pixels + class names); images are NOT copied.
+    Unreadable images are skipped with a warning; duplicate label lines are removed."""
     out_dir.mkdir(parents=True, exist_ok=True)
     safe = [n.replace(" ", "_") for n in names]
     items, n_obj = [], 0
-    stats = {"backgrounds": 0, "missing labels": 0, "corrupt lines": 0}
+    stats = {"backgrounds": 0, "missing labels": 0, "corrupt lines": 0, "unreadable images": 0}
     for p in img_paths:
         lp = lbl_dir / f"{p.stem}.txt"
         dst = out_dir / f"{p.stem}.txt"
+        im = cv2.imread(str(p), cv2.IMREAD_COLOR)       # same decoding (EXIF orientation) as the tiling step
+        if im is None or min(im.shape[:2]) < 10:
+            stats["unreadable images"] += 1
+            print(f"[data] WARNING: skipping unreadable or tiny image {p}")
+            continue
+        h, w = im.shape[:2]
         lines = []
         if not lp.exists():
             stats["missing labels"] += 1
         else:
             rows = [r.split() for r in dict.fromkeys(r.strip() for r in lp.read_text().splitlines()) if r]
-            good = []
             for v in rows:                          # 'class x1 y1 ... x4 y4' with coordinates in [0, 1]
                 try:
                     c, xy = int(float(v[0])), [float(t) for t in v[1:9]]
                     ok = len(v) >= 9 and 0 <= c < len(safe) and all(-0.05 <= t <= 1.05 for t in xy)
                 except (ValueError, IndexError):
                     ok = False
-                if ok:
-                    good.append((c, xy))
-                else:
+                if not ok:
                     stats["corrupt lines"] += 1
-            if good:
-                h, w = cv2.imread(str(p), cv2.IMREAD_UNCHANGED).shape[:2]
-                for c, xy in good:
-                    poly = [min(max(xy[i], 0.0), 1.0) * (w if i % 2 == 0 else h) for i in range(8)]
-                    lines.append(" ".join(f"{t:.1f}" for t in poly) + f" {safe[c]} 0")
+                    continue
+                poly = [min(max(xy[i], 0.0), 1.0) * (w if i % 2 == 0 else h) for i in range(8)]
+                lines.append(" ".join(f"{t:.1f}" for t in poly) + f" {safe[c]} 0")
         if not lines:
             stats["backgrounds"] += 1
         dst.write_text("\n".join(lines) + ("\n" if lines else ""))
@@ -115,23 +134,30 @@ def _to_dota(img_paths, lbl_dir, names, out_dir):
 
 def prepare(data, out, size=1024, gap=200, val_frac=0.15, seed=0, names=None, workers=None, scale=1.0,
             fit=False, ext=".png"):
-    """Build the tiled layout in `out` (skipped if already built with the same settings). Returns `out`.
+    """Build the tiled layout in `out` (reused while the settings and the dataset files are unchanged).
     fit=True resizes each image so its long side = size (one tile per image, any resolution); otherwise `scale`
     resizes every image before tiling (e.g. 0.8: 1280 px pages -> one 1024 tile). Evaluation maps back."""
     out = Path(out)
-    stamp = {"data": str(Path(data).resolve()), "size": size, "gap": gap, "val_frac": val_frac, "seed": seed,
-             "scale": scale, "fit": fit, "ext": ext}
-    done = out / ".prepared.json"
-    if done.exists() and json.loads(done.read_text()) == stamp:
-        print(f"[data] reuse {out}")
-        return out
     yaml_names, splits = find_splits(data)
     names = list(names) if names else yaml_names
     if not names:
         raise SystemExit("class names unknown: provide data.yaml with 'names'")
     tr = sorted(p for p in splits["train"].iterdir() if p.suffix.lower() in IMG_EXT)
+    va = sorted(p for p in splits["val"].iterdir() if p.suffix.lower() in IMG_EXT) if splits["val"] else []
+    files = [q for d, imgs in ((splits["train"], tr), (splits["val"], va)) if d is not None
+             for p in imgs for q in (p, _labels_for(d) / f"{p.stem}.txt")]
+    stamp = {"data": str(Path(data).resolve()), "size": size, "gap": gap, "val_frac": val_frac, "seed": seed,
+             "scale": scale, "fit": fit, "ext": ext, "names": names, "version": PREP_VERSION,
+             "files": _fingerprint(files)}
+    done = out / ".prepared.json"
+    if done.exists():
+        old = json.loads(done.read_text())
+        if {k: v for k, v in old.items() if k != "summary"} == stamp:
+            for line in old.get("summary", []):
+                print(line)
+            print(f"[data] reuse {out}")
+            return out
     if splits["val"] is not None:
-        va = sorted(p for p in splits["val"].iterdir() if p.suffix.lower() in IMG_EXT)
         plan = {"train": (tr, _labels_for(splits["train"])), "val": (va, _labels_for(splits["val"]))}
     else:
         rng = random.Random(seed)
@@ -143,15 +169,18 @@ def prepare(data, out, size=1024, gap=200, val_frac=0.15, seed=0, names=None, wo
         plan = {"train": ([p for i, p in enumerate(tr) if i not in hold], lbl),
                 "val": ([p for i, p in enumerate(tr) if i in hold], lbl)}
         print(f"[data] no val split: holding out {n_val}/{len(tr)} train images")
+    summary = []
     with tempfile.TemporaryDirectory(prefix="vrdet_lbl_") as tmp:
         for split, (imgs, lbl_dir) in plan.items():
             items, safe, n_obj, st = _to_dota(imgs, lbl_dir, names, Path(tmp) / split)
-            print(f"[data] {split}: {len(imgs)} images, {n_obj} objects, " + ", ".join(f"{v} {k}" for k, v in st.items()))
+            summary.append(f"[data] {split}: {len(items)} images, {n_obj} objects, "
+                           + ", ".join(f"{v} {k}" for k, v in st.items()))
+            print(summary[-1])
             if st["corrupt lines"]:
                 print(f"[data] WARNING {split}: {st['corrupt lines']} label lines skipped (need 'class x1 y1 ... x4 y4', "
                       f"class < {len(safe)}, coordinates in [0, 1])")
             split_items(items, out, split, size, gap, (float(scale),), classes=tuple(safe), workers=workers, fit=fit,
                         ext=ext)
     (out / "classes.json").write_text(json.dumps([n.replace(" ", "_") for n in names]))
-    done.write_text(json.dumps(stamp))
+    done.write_text(json.dumps({**stamp, "summary": summary}))
     return out

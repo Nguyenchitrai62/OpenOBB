@@ -4,6 +4,7 @@
 python -u -m vrdet.train --data /content/datasets/dota1_1024 --out OUT --size s --epochs 24 --batch 32
 """
 import argparse
+import itertools
 import json
 import math
 import os
@@ -24,8 +25,8 @@ from vrdet.models.dense_head import DenseCriterion
 from vrdet.models.vrdet import VRDet, build_criterion, load_dfine_coco
 
 
-def get_args(argv=None):
-    ap = argparse.ArgumentParser()
+def build_parser():
+    ap = argparse.ArgumentParser(allow_abbrev=False)          # a typo must fail, not match another flag
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
@@ -46,6 +47,13 @@ def get_args(argv=None):
     ap.add_argument("--schedule", default="flatcos", choices=["flatcos", "linear", "cos"],
                     help="flatcos: flat then cosine (D-FINE); linear / cos: decay over the whole run to min-lr-ratio")
     ap.add_argument("--cache", action="store_true", help="decode training images once into RAM")
+    ap.add_argument("--fliplr", type=float, default=0.5, help="horizontal flip probability")
+    ap.add_argument("--flipud", type=float, default=0.5, help="vertical flip probability")
+    ap.add_argument("--no-rot90", action="store_true", help="no random 90-degree rotations")
+    ap.add_argument("--freeze", default="", help="fine-tuning: N (stem + first N backbone stages), 'backbone', or "
+                                                 "'encoder' (backbone + adapters + encoder: train the decoder only)")
+    ap.add_argument("--time", type=float, default=0.0,
+                    help="training budget in hours: epochs are re-planned after each epoch so the LR still decays")
     ap.add_argument("--clip", type=float, default=0.1)
     ap.add_argument("--ema", type=float, default=0.9998)
     ap.add_argument("--ema-warmups", type=int, default=1000)
@@ -118,7 +126,11 @@ def get_args(argv=None):
                     help="stop when val mAP50-95 has not improved for N epochs (needs full-val each epoch; 0 = off)")
     ap.add_argument("--verbose", action="store_true",
                     help="print the detailed per-iteration log instead of the compact progress table")
-    return ap.parse_args(argv)
+    return ap
+
+
+def get_args(argv=None):
+    return build_parser().parse_args(argv)
 
 
 def main(argv=None):
@@ -176,11 +188,11 @@ def main(argv=None):
         # shape-tolerant copy of a VRDet checkpoint; class rows are matched by name (new classes start fresh)
         src_cls = list(torch.load(a.weights, map_location="cpu", weights_only=False).get("classes") or [])
         cmap = {i: src_cls.index(c) for i, c in enumerate(classes) if c in src_cls}
-        load_dfine_coco(model, a.weights, log=log, class_map=cmap)
+        load_dfine_coco(model, a.weights, log=lambda m: log(m, console=True), class_map=cmap)
         log(f"[init] fine-tuning from {a.weights} ({len(cmap)}/{len(classes)} classes carried over)")
         init_desc = f"fine-tune from {a.weights} ({len(cmap)}/{len(classes)} classes carried over)"
     elif not last.exists() and not a.no_pretrained:
-        load_dfine_coco(model, a.size, class_names=classes, log=log, init=a.init)
+        load_dfine_coco(model, a.size, class_names=classes, log=lambda m: log(m, console=True), init=a.init)
         init_desc = "D-FINE COCO weights (Apache-2.0)"
     else:
         init_desc = "resume" if last.exists() else "random"
@@ -195,7 +207,26 @@ def main(argv=None):
                      rotate_p=a.rotate_p, mosaic_p=a.mosaic_p, context=a.context, ctx_dropout=a.ctx_dropout,
                      vectors=a.vectors, max_tokens=a.max_tokens, scale_jitter=a.scale_jitter,
                      translate=a.translate, mosaic_mode=a.mosaic_mode, layer_drop=a.layer_drop, aug_iof=a.aug_iof,
-                     cache=a.cache)
+                     cache=a.cache, fliplr=a.fliplr, flipud=a.flipud, rot90=not a.no_rot90)
+    frozen = []
+    if a.freeze:                                # fine-tuning on small data: keep the pretrained early layers fixed
+        f = str(a.freeze).lower()
+        if f.isdigit():
+            frozen = [model.backbone.stem] + list(model.backbone.stages[:int(f)])
+        elif f == "backbone":
+            frozen = [model.backbone]
+        elif f == "encoder":
+            frozen = [model.backbone, model.encoder] + [m for m in (model.lsk, getattr(model, "p2_proj", None))
+                                                        if m is not None]
+        else:
+            raise SystemExit(f"--freeze must be an integer, 'backbone' or 'encoder', got {a.freeze!r}")
+        for m in frozen:
+            for prm in m.parameters():
+                prm.requires_grad_(False)
+        n_fr = sum(prm.numel() for m in frozen for prm in m.parameters()) / 1e6
+        if not any(prm.requires_grad for prm in model.parameters()):
+            raise SystemExit("--freeze left nothing to train")
+        log(f"freeze={a.freeze}: {n_fr:.2f}M parameters frozen", console=True)
     if a.batch > len(ds):
         log(f"batch {a.batch} > {len(ds)} training samples: using batch {len(ds)}", console=True)
         a.batch = len(ds)
@@ -282,12 +313,17 @@ def main(argv=None):
         os.replace(out / "best.tmp", out / "best.pt")
         log(f"best.pt <- epoch {epoch} (val mAP50:95 {score:.4f})")
 
-    for epoch in range(start_epoch, a.epochs):
+    t_train = time.time()
+    for epoch in itertools.count(start_epoch):
+        if epoch >= a.epochs:                  # a.epochs may be re-planned by --time
+            break
         if ds.mosaic_p and epoch >= a.epochs - a.mosaic_off:
             ds.mosaic_p = 0.0                   # workers hold dataset copies: rebuild the loader to apply it
             dl = make_loader()
             log(f"epoch {epoch}: mosaic off for the last {a.mosaic_off} epochs")
         model.train()
+        for m in frozen:                        # frozen parts keep their BatchNorm statistics
+            m.eval()
         t_ep, t_data, t_loss = time.time(), 0.0, 0.0
         sums, n = {}, 0
         tick = time.time()
@@ -409,6 +445,17 @@ def main(argv=None):
         jlog(rec)
         append_results(out, rec, res)
         plot_results(out)
+        if a.time:                              # re-plan the run so it ends inside the time budget
+            done = epoch + 1 - start_epoch
+            per_ep = (time.time() - t_train) / done
+            new_epochs = max(epoch + 1, start_epoch + int(a.time * 3600 / per_ep))
+            if new_epochs != a.epochs:
+                a.epochs = new_epochs
+                total_iters = iters_per_epoch * a.epochs
+                log(f"time={a.time}h: {per_ep:.0f}s/epoch -> {a.epochs} epochs", console=True)
+            if time.time() - t_train + per_ep > a.time * 3600 * 1.02 and epoch + 1 < a.epochs:
+                say(f"Stopping: time budget of {a.time} h reached.")
+                break
         if a.patience and full_val and best_epoch >= 0 and epoch - best_epoch >= a.patience:
             say(f"Stopping early: no improvement in val mAP50-95 for {a.patience} epochs "
                 f"(best {best_score:.4f} at epoch {best_epoch + 1}).")
@@ -447,6 +494,12 @@ def main(argv=None):
         ema.module.decoder.num_queries = a.queries
     final = rq if a.eval_queries and a.eval_queries != a.queries else res
     say(summary_table(final, classes))
+    if not a.eval_only and (out / "best.pt").exists():  # per-class confidence (best F2) for predict conf=auto
+        ck = torch.load(out / "best.pt", map_location="cpu", weights_only=False)
+        ck["conf_thr"] = {c: round(final["classes"][c].get("conf_f2", 0.25), 3) for c in classes}
+        ck["conf_f1"] = final.get("conf_f1")
+        torch.save(ck, out / "best.tmp")
+        os.replace(out / "best.tmp", out / "best.pt")
     try:
         plot_val_predictions(out, ema.module, a.data, device, a.img, classes, num_top=a.num_top)
     except Exception as e:  # noqa: BLE001 - a report must never fail the run

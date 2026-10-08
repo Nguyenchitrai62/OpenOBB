@@ -57,6 +57,7 @@ def load_model(ckpt_path, device, queries=None, classes=None):
     m.load_state_dict(sd)
     if queries:
         m.decoder.num_queries = queries
+    a = dict(a, conf_thr=ck.get("conf_thr"))
     return m.to(device).eval(), list(names), a
 
 
@@ -103,6 +104,16 @@ def predict_image(model, img, size, gap, batch, device, num_top, vec=None, amp=T
     return dets
 
 
+def conf_thresholds(names, targs, conf):
+    """Per-class score thresholds: one value, or conf="auto" for the per-class best-F2 values saved in best.pt."""
+    if str(conf).lower() == "auto":
+        saved = targs.get("conf_thr") or {}
+        if not saved:
+            print("[vrdet] checkpoint has no per-class thresholds: using conf 0.25")
+        return [float(saved.get(n, 0.25)) for n in names]
+    return [float(conf)] * len(names)
+
+
 def merge_dets(dets, names, conf=0.25, iou=0.1):
     """Tile detections (predict_image) -> per-image list [{"class", "class_id", "score", "poly" (8 pixel coords)}]
     after the score threshold and class-wise polygon NMS across tiles."""
@@ -125,17 +136,22 @@ def to_label_lines(js, shape, with_score=False):
     return rows
 
 
-def run(ckpt, source, out=None, conf=0.25, classes=None, size=None, gap=200, queries=900, batch=8, vis=False,
-        vectors_dir=None, device=None, verbose=True, scale=None, tile=None):
+def run(ckpt, source, out=None, conf=0.25, names=None, size=None, gap=200, queries=900, batch=8, vis=False,
+        vectors_dir=None, device=None, verbose=True, scale=None, tile=None, classes=None):
     """Predict every image in `source` (file or folder). Images are resized like in training: long side = tile size
     for models trained with whole-image resize (default), or tiled at `scale` (tile=True / tiled models).
     Returns {image_path: [{"class", "class_id", "score", "poly"}]} with pixel polygons; with `out`, also writes
     {stem}.txt / {stem}.json (and {stem}_vis.jpg)."""
     device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
-    if isinstance(classes, str):
-        p = Path(classes)
-        classes = json.loads(p.read_text()) if p.exists() else [c.strip() for c in classes.split(",")]
-    model, names, targs = load_model(ckpt, device, queries, classes)
+    if isinstance(names, str):
+        p = Path(names)
+        names = json.loads(p.read_text()) if p.exists() else [c.strip() for c in names.split(",")]
+    model, names, targs = load_model(ckpt, device, queries, names)
+    keep = None
+    if classes is not None:                         # filter: class ids and/or names
+        cl = classes if isinstance(classes, (list, tuple)) else str(classes).split(",")
+        keep = {int(c) if str(c).strip().isdigit() else names.index(str(c).strip()) for c in cl}
+    thr = conf_thresholds(names, targs, conf)
     size = size or targs.get("img", 1024)
     scale = scale or targs.get("scale", 1.0)
     fit = targs.get("fit", False) if tile is None else not tile
@@ -156,7 +172,9 @@ def run(ckpt, source, out=None, conf=0.25, classes=None, size=None, gap=200, que
             vec = dict(np.load(vp)) if vp.exists() else None
         dets = predict_image(model, img, size, gap, batch, device, queries, vec,
                              scale=size / max(img.shape[:2]) if fit else scale)
-        js = merge_dets(dets, names, conf, iou=0.7 if fit else 0.1)
+        js = merge_dets([d for d in dets if d[2] >= thr[d[1]]], names, 0.0, iou=0.7 if fit else 0.1)
+        if keep is not None:
+            js = [d for d in js if d["class_id"] in keep]
         results[str(f)] = js
         if out is not None:
             rows = to_label_lines(js, img.shape[:2], with_score=True)
@@ -184,18 +202,19 @@ def main(argv=None):
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--src", required=True, help="image file or directory")
     ap.add_argument("--out", required=True)
-    ap.add_argument("--classes", default=None, help="classes.json or comma-separated names (if not in ckpt)")
+    ap.add_argument("--names", default=None, help="classes.json or comma-separated names (if not in ckpt)")
+    ap.add_argument("--classes", default=None, help="keep only these class ids / names (comma-separated)")
     ap.add_argument("--vectors-dir", default=None, help="per-image vector npz from tools/pdf_vectors.py")
     ap.add_argument("--size", type=int, default=None, help="tile size (default: training img size)")
     ap.add_argument("--gap", type=int, default=200)
     ap.add_argument("--queries", type=int, default=900, help="inference queries (900 measured best)")
-    ap.add_argument("--conf", type=float, default=0.25)
+    ap.add_argument("--conf", default="0.25", help="score threshold, or 'auto' (per-class best F2 from best.pt)")
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--vis", action="store_true")
     ap.add_argument("--tile", action="store_true", help="tile at native resolution instead of the training resize")
     a = ap.parse_args(argv)
-    run(a.ckpt, a.src, a.out, a.conf, a.classes, a.size, a.gap, a.queries, a.batch, a.vis, a.vectors_dir,
-        tile=True if a.tile else None)
+    run(a.ckpt, a.src, a.out, a.conf if a.conf == "auto" else float(a.conf), a.names, a.size, a.gap, a.queries,
+        a.batch, a.vis, a.vectors_dir, tile=True if a.tile else None, classes=a.classes)
 
 
 if __name__ == "__main__":

@@ -70,7 +70,8 @@ class DotaPatches(Dataset):
     def __init__(self, root, split, size=1024, augment=False, filter_empty=False, min_size=2.0,
                  hsv=(0.015, 0.5, 0.3), rot90=True, flip=True, limit=None, keep_difficult=True, rotate_p=0.0,
                  mosaic_p=0.0, context=False, thumb=512, ctx_dropout=0.0, vectors=False, max_tokens=4096,
-                 scale_jitter=0.0, translate=0.0, mosaic_mode="half", layer_drop=0.0, aug_iof=0.7, cache=False):
+                 scale_jitter=0.0, translate=0.0, mosaic_mode="half", layer_drop=0.0, aug_iof=0.7, cache=False,
+                 fliplr=0.5, flipud=0.5):
         self.root, self.split, self.size = Path(root), split, size
         # H11 (YOLO recipe idea): random scale in [1 - scale_jitter, 1 + scale_jitter] and translation of
         # +-translate x size on every training sample; mosaic_mode "yolo" = 4 full-resolution patches around a
@@ -84,6 +85,7 @@ class DotaPatches(Dataset):
         self.context, self.thumb, self.ctx_dropout = context, thumb, ctx_dropout
         self.rotate_p, self.mosaic_p = rotate_p, mosaic_p
         self.augment, self.min_size, self.hsv, self.rot90, self.flip = augment, min_size, hsv, rot90, flip
+        self.fliplr, self.flipud = (fliplr, flipud) if flip else (0.0, 0.0)
         items = [json.loads(l) for l in open(self.root / "meta" / f"{split}.jsonl")]
         items.sort(key=lambda m: m["name"])
         if filter_empty:
@@ -285,7 +287,7 @@ class DotaPatches(Dataset):
         vp = vec["pts"] if vec is not None else np.zeros((0, 16), np.float32)
         S = img.shape[0]
         T = ctx["thumb"].shape[0] if ctx is not None else 0
-        if self.flip and random.random() < 0.5:
+        if random.random() < self.fliplr:
             img = img[:, ::-1]
             polys[:, 0::2] = S - polys[:, 0::2]
             vp[:, 0::2] = S - vp[:, 0::2]
@@ -293,7 +295,7 @@ class DotaPatches(Dataset):
                 ctx["thumb"] = ctx["thumb"][:, ::-1]
                 x0, y0, x1, y1 = ctx["tile"]
                 ctx["tile"] = np.array([T - x1, y0, T - x0, y1], np.float32)
-        if self.flip and random.random() < 0.5:
+        if random.random() < self.flipud:
             img = img[::-1]
             polys[:, 1::2] = S - polys[:, 1::2]
             vp[:, 1::2] = S - vp[:, 1::2]

@@ -52,8 +52,8 @@ ARCH_KEYS = ("size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_quer
              "no_rotate_sampling", "context")
 MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / per epoch on small datasets
 ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every", "lrf": "min_lr_ratio"}
-IGNORED = ("amp", "device", "save_period", "plots", "optimizer", "momentum", "fliplr", "flipud", "degrees", "shear",
-           "perspective", "mixup", "cutmix", "copy_paste", "rect", "multi_scale")
+IGNORED = ("save_period", "plots", "optimizer", "momentum", "degrees", "shear", "perspective", "mixup", "cutmix",
+           "copy_paste", "rect", "multi_scale", "warmup_bias_lr", "warmup_momentum", "nbs", "dropout", "cls_pw")
 
 
 def _value(v):
@@ -129,7 +129,7 @@ def _run_dir(project, name, exist_ok, resume):
     while True:
         d = base / (name if k == 1 else f"{name}{k}")
         if exist_ok or not d.exists() or not any(d.iterdir()):
-            return d, (d / "last.pt").exists() and not (d / "train_done").exists()
+            return d, bool(resume) and (d / "last.pt").exists() and not (d / "train_done").exists()
         if resume and (d / "last.pt").exists() and not (d / "train_done").exists():
             return d, True
         k += 1
@@ -180,7 +180,7 @@ def page_stats(data, n=40):
     lbl_dir = _labels_for(splits["train"])
     sides, longs, shorts = [], [], []
     for p in random.Random(0).sample(imgs, min(n, len(imgs))):
-        im = cv2.imread(str(p), cv2.IMREAD_UNCHANGED)
+        im = cv2.imread(str(p), cv2.IMREAD_COLOR)
         if im is None:
             continue
         h, w = im.shape[:2]
@@ -235,10 +235,86 @@ def _to_argv(opts):
     return argv
 
 
+RESUME_OK = ("workers", "cache", "patience", "eval_every", "verbose", "time")   # may change when resuming
+RUN_FILES = ("last.pt", "best.pt", "train_done", "results.csv", "metrics.jsonl", "train_progress.log", "eval_val.txt",
+             "eval_val.json", "exitcode")
+
+
+def _known_keys():
+    import inspect
+
+    from vrdet.train import build_parser
+    keys = set(inspect.signature(train).parameters) - {"extra"}
+    keys |= set(ALIASES) | set(IGNORED) | set(AUGMENT) | {"hsv_h", "hsv_s", "hsv_v", "amp", "rot90"}
+    keys |= {a.dest for a in build_parser()._actions}
+    return keys
+
+
+def check_keys(kv):
+    """Unknown argument -> error with the closest valid names (typos must not pass silently)."""
+    import difflib
+    known = _known_keys()
+    for k in kv:
+        if k not in known:
+            near = difflib.get_close_matches(k, sorted(known), n=3, cutoff=0.6)
+            raise SystemExit(f"'{k}' is not a valid VRDet argument." + (f" Similar: {', '.join(near)}" if near else ""))
+
+
+def _batch_from(batch, sd, imgsz, n_train):
+    """batch=None/-1: default fitted to the GPU and to the dataset size; 0 < batch < 1: that fraction of VRAM."""
+    frac = float(batch) if batch is not None and 0 < float(batch) < 1 else None
+    if batch is not None and frac is None and int(batch) > 0:
+        return int(batch)
+    batch, why = sd["batch"], "default"
+    mem = _gpu_mem_gb()
+    if mem:                                          # measured ~GB per image at 1024 px, scaled by area
+        per = sd["gb"] * (imgsz / 1024) ** 2
+        fitb = int(((mem * frac) if frac else (mem - 2.0)) / per) // 2 * 2
+        if frac or fitb < batch:
+            batch, why = max(2, fitb), f"{int(frac * 100)}% of {mem:.0f} GB" if frac else f"GPU {mem:.0f} GB"
+    small = 2 ** int(math.log2(max(4, n_train // MIN_STEPS_EPOCH)))   # small data: >= ~25 optimizer steps / epoch
+    if small < batch:
+        batch, why = max(4, small), f"{n_train} training images"
+    print(f"[vrdet] batch {batch} ({why}; set batch= to override)")
+    return batch
+
+
+def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_ema):
+    """Run the trainer; on CUDA out-of-memory before the first epoch is saved, halve the batch and retry."""
+    from vrdet import train as trainer
+    for attempt in range(4):
+        ipe = max(1, n_train // int(opts["batch"]))
+        total = ipe * int(epochs)
+        # warmup = warmup_epochs epochs of steps (at most epochs - 1), as in the usual one-stage trainer
+        opts["warmup"] = opts["ema_warmups"] = max(1, round(min(warmup_epochs, max(int(epochs) - 1, 0)) * ipe))
+        if not user_ema:                             # EMA half-life ~5% of the run (>= 1 epoch, >= 50 steps)
+            opts["ema"] = round(min(0.9998, 0.5 ** (1 / max(ipe, total // 20, 50))), 6)
+        argv = ["--data", str(prepared), "--out", str(save_dir)] + _to_argv(opts)
+        args_file = save_dir / "vrdet_args.json"
+        saved = json.loads(args_file.read_text()) if args_file.exists() else {}
+        args_file.write_text(json.dumps({**saved, "prepared": str(prepared), **opts}, indent=1, default=str))
+        if opts.get("verbose"):
+            print("[vrdet] python -m vrdet.train " + " ".join(argv))
+        try:
+            trainer.main(argv)
+            return
+        except RuntimeError as e:                    # torch.OutOfMemoryError is a RuntimeError
+            if ("out of memory" not in str(e).lower() or int(opts["batch"]) <= 2 or attempt == 3
+                    or (save_dir / "last.pt").exists()):
+                raise
+        gc.collect()
+        import torch
+        torch.cuda.empty_cache()
+        old = int(opts["batch"])
+        opts["batch"] = max(2, old // 2)
+        print(f"[vrdet] WARNING: CUDA out of memory with batch={old}. Reducing to batch={opts['batch']} and retrying.")
+
+
 def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", name="exp", exist_ok=False,
           resume=True, tile=False, tile_scale=None, gap=200, val_frac=0.15, cache="auto", cache_dir=None, workers=None,
           device=None, recipe=True, warmup_epochs=3, patience=100, lrf=0.01, cos_lr=False, seed=0, **extra):
     """Train (or fine-tune when `model` is a .pt path). Returns SimpleNamespace(save_dir, best, last, metrics)."""
+    check_keys(extra)
     _set_device(device)
     for k in list(extra):
         if k in ALIASES:
@@ -246,6 +322,43 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
         elif k in IGNORED:
             extra.pop(k)
             print(f"[vrdet] '{k}' is not used by VRDet (ignored)")
+    if extra.pop("amp", True) is False:
+        extra["no_amp"] = True
+    if extra.pop("rot90", True) is False:
+        extra["no_rot90"] = True
+    if batch is not None and float(batch) <= 0:
+        batch = None                                 # batch=-1: automatic
+    user_ema = "ema" in extra
+
+    # ---- resume: the run's saved settings win; only a few may change (like the usual trainer)
+    save_dir, resuming = _run_dir(project, name, exist_ok, resume)
+    save_dir.mkdir(parents=True, exist_ok=True)
+    saved_file = save_dir / "vrdet_args.json"
+    if resuming and saved_file.exists():
+        saved = json.loads(saved_file.read_text())
+        prepared = Path(saved.get("prepared", ""))
+        if not _is_prepared(prepared):               # new machine / VM: rebuild the same prepared data
+            prepared = prepare_data(saved.get("data", data), saved["img"], gap, val_frac, saved.get("scale", 1.0),
+                                    cache_dir, workers, seed, fit=saved.get("fit", True))
+        opts = {k: v for k, v in saved.items() if k not in ("data", "prepared", "warmup", "ema_warmups")}
+        given = {"batch": batch, "imgsz": imgsz, **extra, **({"epochs": epochs} if epochs != 100 else {})}
+        ignored = [k for k, v in given.items() if v is not None and k not in RESUME_OK
+                   and str(opts.get(ALIASES.get(k, k), v)) != str(v)]
+        if ignored:
+            print(f"[vrdet] resuming {save_dir}: keeps its saved settings, ignores {ignored} "
+                  f"(resume=False or a new name to start over)")
+        else:
+            print(f"[vrdet] resuming {save_dir}")
+        opts.update({k: extra[k] for k in RESUME_OK if k in extra})
+        if workers is not None:
+            opts["workers"] = int(workers)
+        n_train = _n_lines(Path(prepared) / "meta" / "train.jsonl")
+        _run_trainer(save_dir, prepared, opts, n_train, opts["epochs"], warmup_epochs, user_ema=True)
+        return _summary(save_dir)
+    if not resuming:                                 # exist_ok=True on an old run: start over in place
+        for f in RUN_FILES:
+            (save_dir / f).unlink(missing_ok=True)
+
     aug = {k: extra.pop(k, v) for k, v in AUGMENT.items()}
     hsv = [extra.pop(k, d) for k, d in (("hsv_h", 0.015), ("hsv_s", 0.5), ("hsv_v", 0.3))]
     weights = None
@@ -262,7 +375,8 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
         raise SystemExit(f"model must be one of {SIZES} or an existing VRDet .pt checkpoint, got '{model}'")
     imgsz = int(imgsz or extra.pop("img", None) or 1024)
     if imgsz % 32:
-        raise SystemExit("imgsz must be a multiple of 32")
+        imgsz = int(math.ceil(imgsz / 32) * 32)
+        print(f"[vrdet] imgsz must be a multiple of 32: using {imgsz}")
 
     fit = not tile and tile_scale is None
     if fit:
@@ -282,25 +396,10 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
     n_train = _n_lines(Path(prepared) / "meta" / "train.jsonl")
     if cache == "auto":                              # decoded uint8 images in RAM when they take < 25% of it
         cache = n_train * imgsz * imgsz * 3 < 0.25 * _ram_bytes()
-    if batch is None:
-        batch, why = sd["batch"], "default"
-        mem = _gpu_mem_gb()
-        if mem:                                      # fit the default batch to the GPU (measured ~GB per image)
-            fitb = int((mem - 2.0) / (sd["gb"] * (imgsz / 1024) ** 2)) // 2 * 2
-            if fitb < batch:
-                batch, why = max(2, fitb), f"GPU {mem:.0f} GB"
-        # small datasets: keep >= ~MIN_STEPS_EPOCH optimizer steps per epoch (set-prediction training needs steps)
-        small = 2 ** int(math.log2(max(4, n_train // MIN_STEPS_EPOCH)))
-        if small < batch:
-            batch, why = max(4, small), f"{n_train} training images"
-        print(f"[vrdet] batch {batch} ({why}; set batch= to override)")
-    save_dir, resuming = _run_dir(project, name, exist_ok, resume)
-    save_dir.mkdir(parents=True, exist_ok=True)
-    if resuming:
-        print(f"[vrdet] resuming {save_dir} (use resume=False or a new name to start over)")
+    batch = _batch_from(batch, sd, imgsz, n_train)
 
     steps = max(1, n_train // int(batch)) * int(epochs)
-    if steps < MIN_STEPS:
+    if steps < MIN_STEPS and not extra.get("time"):
         print(f"[vrdet] WARNING: only {steps} optimizer steps ({max(1, n_train // int(batch))}/epoch x {epochs} epochs); this "
               f"detector needs ~{MIN_STEPS}+ to converge: raise epochs or lower batch")
     opts = {"size": size, "img": imgsz, "scale": scale, "fit": fit, "epochs": int(epochs), "batch": int(batch),
@@ -310,7 +409,7 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
             "eval_every": _eval_every(prepared, int(epochs)), "eval_images": 10**9, "patience": int(patience or 0),
             "seed": seed}
     q = _queries_for(prepared)
-    if q > 300 and "queries" not in inherited:
+    if q > 300:
         opts.update(queries=q, num_top=q)
         print(f"[vrdet] dense images (p99 objects/image > 240): {q} queries")
     if workers is not None:
@@ -326,33 +425,8 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
     if opts.get("compile") and "compile" not in extra and n_train // int(opts["batch"]) * int(epochs) < 3000:
         opts["compile"] = False      # short runs: compile warm-up (1-2 min) costs more than it saves
     opts.update(extra)
-
-    from vrdet import train as trainer
-    for attempt in range(4):
-        ipe = max(1, n_train // int(opts["batch"]))
-        total = ipe * int(epochs)
-        # warmup = warmup_epochs epochs of steps (at most epochs - 1), as in the usual one-stage trainer
-        opts["warmup"] = opts["ema_warmups"] = max(1, round(min(warmup_epochs, max(int(epochs) - 1, 0)) * ipe))
-        # EMA half-life ~5% of the run (>= 1 epoch, >= 50 steps): a fixed 0.9998 averaged most of a short run
-        half = max(ipe, total // 20, 50)
-        opts.setdefault("ema", round(min(0.9998, 0.5 ** (1 / half)), 6))
-        argv = ["--data", str(prepared), "--out", str(save_dir)] + _to_argv(opts)
-        (save_dir / "vrdet_args.json").write_text(json.dumps({"data": str(data), "prepared": str(prepared), **opts},
-                                                             indent=1, default=str))
-        if extra.get("verbose"):
-            print("[vrdet] python -m vrdet.train " + " ".join(argv))
-        try:
-            trainer.main(argv)
-            break
-        except RuntimeError as e:                    # torch.OutOfMemoryError is a RuntimeError
-            if "out of memory" not in str(e).lower() or int(opts["batch"]) <= 2 or attempt == 3:
-                raise
-        gc.collect()
-        import torch
-        torch.cuda.empty_cache()
-        old = int(opts["batch"])
-        opts["batch"] = max(2, old // 2)
-        print(f"[vrdet] WARNING: CUDA out of memory with batch={old}. Reducing to batch={opts['batch']} and retrying.")
+    saved_file.write_text(json.dumps({"data": str(data)}, indent=1))
+    _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_ema)
     return _summary(save_dir)
 
 
@@ -369,9 +443,10 @@ def _summary(save_dir):
                            metrics=metrics)
 
 
-def val(model, data, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, batch=8, workers=8, queries=900,
+def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, batch=8, workers=8, queries=900,
         cache_dir=None, device=None, seed=0):
-    """DOTA-protocol mAP of a checkpoint on the val split of `data` (same hold-out and resizing as training)."""
+    """DOTA-protocol mAP of a checkpoint on the val split of `data` (same hold-out and resizing as training).
+    Without `data`, the checkpoint's own prepared data is used when it is available."""
     _set_device(device)
     import torch
 
@@ -384,10 +459,16 @@ def val(model, data, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, batch=
     imgsz = int(imgsz or targs.get("img", 1024))
     fit = bool(targs.get("fit", False)) and tile_scale is None
     scale = float(tile_scale if tile_scale is not None else targs.get("scale", 1.0))
-    prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, seed, fit=fit)
+    if data is None:
+        if not _is_prepared(targs.get("data", "")):
+            raise SystemExit("val needs data=<data.yaml> (the checkpoint's prepared data is not on this machine)")
+        prepared = Path(targs["data"])
+    else:
+        prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, targs.get("seed", seed),
+                                fit=fit)
     classes = list(dataset_classes(prepared))
-    if classes != list(names):
-        print(f"[vrdet] WARNING: dataset classes {classes} differ from the model's {list(names)}")
+    if classes != list(names):                       # class ids are positional: a different order means wrong mAP
+        raise SystemExit(f"dataset classes {classes} do not match the model's {list(names)} (same names, same order)")
     res, _ = eval_dota(net, prepared, dev, None, batch=batch, workers=workers, num_top=queries, img_size=imgsz,
                        merge_iou=0.7 if fit else 0.1,
                        post=targs.get("post", "flat"))
@@ -396,13 +477,15 @@ def val(model, data, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, batch=
 
 
 def predict(model, source, conf=0.25, save_dir="runs/predict", vis=True, imgsz=None, tile=None, tile_scale=None,
-            gap=200, queries=900, batch=8, device=None, classes=None):
+            gap=200, queries=900, batch=8, device=None, classes=None, names=None):
     """Detections per image {path: [{"class", "class_id", "score", "poly" (8 pixel coords)}]}; files in save_dir.
-    Images are resized exactly as in training; tile=True forces tiling at native resolution (tile_scale)."""
+    Images are resized exactly as in training; tile=True forces tiling at native resolution (tile_scale).
+    conf="auto" uses the per-class thresholds (best F2 on val) stored in best.pt; classes= keeps only these class
+    ids or names; names= supplies class names for checkpoints that lack them."""
     _set_device(device)
     from vrdet.predict import run
-    return run(model, source, save_dir, conf, classes, imgsz, gap, queries, batch, bool(vis) and save_dir is not None,
-               scale=tile_scale, tile=True if tile_scale is not None else tile)
+    return run(model, source, save_dir, conf, names, imgsz, gap, queries, batch, bool(vis) and save_dir is not None,
+               scale=tile_scale, tile=True if tile_scale is not None else tile, classes=classes)
 
 
 class Detector:
@@ -433,6 +516,16 @@ def main(argv=None):
         print(__doc__)
         return 0 if (not argv or argv[0] in ("-h", "--help", "help")) else 2
     mode, kv = argv[0], parse_kv(argv[1:])
+    if mode in ("val", "predict"):
+        import inspect
+        fn = val if mode == "val" else predict
+        ok = set(inspect.signature(fn).parameters) | {"save"}
+        bad = [k for k in kv if k not in ok]
+        if bad:
+            import difflib
+            near = difflib.get_close_matches(bad[0], sorted(ok), n=3, cutoff=0.6)
+            raise SystemExit(f"'{bad[0]}' is not a valid argument for vrdet {mode}."
+                             + (f" Similar: {', '.join(near)}" if near else ""))
     if mode == "train":
         if "data" not in kv:
             raise SystemExit("vrdet train needs data=<data.yaml or dataset folder>")

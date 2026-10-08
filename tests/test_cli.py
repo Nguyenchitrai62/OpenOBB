@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -153,3 +154,37 @@ def test_dataset_ram_cache(tmp_path):
     out = prepare(str(_dataset(tmp_path / "ds")), tmp_path / "prep", size=512, fit=True, workers=1)
     a, b = DotaPatches(out, "train"), DotaPatches(out, "train", cache=True)
     assert len(b.cache) == len(b.items) and (a[0][0] == b[0][0]).all()
+
+
+def test_typo_and_resume_rules(tmp_path, monkeypatch):
+    import json as _json
+
+    import vrdet.train as trainer
+    from vrdet.cli import check_keys, train
+    with pytest.raises(SystemExit, match="Similar: epochs"):
+        check_keys({"epoch": 10})
+    check_keys({"freeze": "backbone", "time": 1.0, "fliplr": 0.0, "rot90": False, "lr0": 1e-4})
+    calls = []
+
+    def fake_main(argv):
+        calls.append(argv)
+        out = Path(argv[argv.index("--out") + 1])
+        (out / "last.pt").write_text("x")            # a run that stopped mid-way
+
+    monkeypatch.setattr(trainer, "main", fake_main)
+    data = _dataset(tmp_path / "ds")
+    kw = dict(project=str(tmp_path / "runs"), name="r", cache_dir=str(tmp_path / "cache"), workers=1)
+    train(str(data), epochs=10, batch=4, imgsz=512, **kw)
+    saved = _json.loads((tmp_path / "runs" / "r" / "vrdet_args.json").read_text())
+    assert saved["batch"] == 4 and saved["epochs"] == 10
+    train(str(data), epochs=20, batch=8, imgsz=512, patience=5, **kw)        # resume keeps batch / epochs
+    second = " ".join(calls[-1])
+    assert "--batch 4" in second and "--epochs 10" in second
+    train(str(data), epochs=20, batch=8, imgsz=512, resume=False, exist_ok=True, **kw)   # start over in place
+    assert "--epochs 20" in " ".join(calls[-1]) and "--batch 8" in " ".join(calls[-1])
+
+
+def test_conf_thresholds():
+    from vrdet.predict import conf_thresholds
+    assert conf_thresholds(["a", "b"], {}, 0.4) == [0.4, 0.4]
+    assert conf_thresholds(["a", "b"], {"conf_thr": {"a": 0.1}}, "auto") == [0.1, 0.25]

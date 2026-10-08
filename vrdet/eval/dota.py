@@ -170,6 +170,8 @@ def evaluate(dets, gts, classes=DOTA1_CLASSES, iou_thrs=None):
     Images present in `gts` define the evaluation set; detections on other images are dropped."""
     iou_thrs = np.round(np.arange(0.5, 0.96, 0.05), 2) if iou_thrs is None else np.asarray(iou_thrs)
     res = {"classes": {}, "n_images": len(gts)}
+    grid = np.linspace(0, 1, 101)                         # confidence thresholds for the P / R / F curves
+    curves = {}
     for c in classes:
         gt_c = {img: ([o[0] for o in objs if o[1] == c], np.array([o[2] for o in objs if o[1] == c], dtype=bool))
                 for img, objs in gts.items()}
@@ -190,7 +192,6 @@ def evaluate(dets, gts, classes=DOTA1_CLASSES, iou_thrs=None):
         order = np.argsort(-sc, kind="stable")
         i50 = int(np.argmin(np.abs(iou_thrs - 0.5)))
         aps07, aps = [], []
-        p_f1 = r_f1 = 0.0
         for t, thr in enumerate(iou_thrs):
             f = flags[t, order]
             f = f[f >= 0]                                  # drop detections on difficult objects
@@ -200,34 +201,56 @@ def evaluate(dets, gts, classes=DOTA1_CLASSES, iou_thrs=None):
             prec = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
             aps07.append(voc_ap(rec, prec, True) if npos else 0.0)
             aps.append(voc_ap(rec, prec, False) if npos else 0.0)
-            if t == i50 and npos and len(f):               # precision / recall at the best-F1 score threshold
-                j = int(np.argmax(2 * prec * rec / np.maximum(prec + rec, 1e-12)))
-                p_f1, r_f1 = float(prec[j]), float(rec[j])
+            if t == i50 and npos:                         # P(conf), R(conf) curves at IoU 0.5
+                if len(f):
+                    s_ord = sc[order][flags[t, order] >= 0]
+                    k = np.searchsorted(-s_ord, -grid, side="right")             # detections with score >= conf
+                    tp_k = np.where(k > 0, tp[np.maximum(k - 1, 0)], 0)
+                    curves[c] = (np.where(k > 0, tp_k / np.maximum(k, 1), 1.0), tp_k / npos)
+                else:
+                    curves[c] = (np.zeros_like(grid), np.zeros_like(grid))
         res["classes"][c] = {"npos": npos, "ndet": int(len(sc)), "AP50": aps07[i50],
                              "AP50_all": aps[i50], "AP50_95": float(np.mean(aps)),
                              "recall50": float((flags[i50] == 1).sum() / max(npos, 1)),
-                             "P": p_f1, "R": r_f1, "images": int(sum(1 for _, d in gt_c.values() if (~d).any()))}
+                             "images": int(sum(1 for _, d in gt_c.values() if (~d).any()))}
     cls_with_gt = [c for c in classes if res["classes"][c]["npos"] > 0]
+    # P / R reported at ONE confidence threshold shared by all classes (max mean F1); per class, the threshold that
+    # maximises F2 (recall-weighted, the product metric) is kept for inference (conf=auto)
+    f1 = np.mean([2 * curves[c][0] * curves[c][1] / np.maximum(curves[c][0] + curves[c][1], 1e-12)
+                  for c in cls_with_gt], 0) if cls_with_gt else np.zeros_like(grid)
+    j1 = int(np.argmax(f1))
+    res["conf_f1"] = float(grid[j1])
+    for c in classes:
+        r = res["classes"][c]
+        if c not in curves:
+            r.update(P=0.0, R=0.0, F2=0.0, conf_f2=0.25)
+            continue
+        P, Rc = curves[c]
+        f2 = 5 * P * Rc / np.maximum(4 * P + Rc, 1e-12)
+        j2 = int(np.argmax(f2))
+        r.update(P=float(P[j1]), R=float(Rc[j1]), F2=float(f2[j2]), conf_f2=float(grid[j2]))
 
     def mean(key):
         return float(np.mean([res["classes"][c][key] for c in cls_with_gt])) if cls_with_gt else 0.0
     res["mAP50"], res["mAP50_95"], res["mAP50_allpt"] = mean("AP50"), mean("AP50_95"), mean("AP50_all")
-    res["P"], res["R"] = mean("P"), mean("R")
+    res["P"], res["R"], res["F2"] = mean("P"), mean("R"), mean("F2")
     res["n_instances"] = int(sum(res["classes"][c]["npos"] for c in classes))
     return res
 
 
 def summary_table(res, classes=DOTA1_CLASSES, per_class=True):
-    """Console table: Class / Images / Instances / P / R (best-F1 point) / mAP50 (VOC07) / mAP50-95."""
-    head = f"{'Class':>22}{'Images':>11}{'Instances':>11}{'P':>11}{'R':>11}{'mAP50':>11}{'mAP50-95':>11}"
+    """Console table: Class / Images / Instances / P / R (one shared conf, max mean F1) / mAP50 (VOC07) / mAP50-95 /
+    F2 (per-class best conf)."""
+    head = (f"{'Class':>22}{'Images':>11}{'Instances':>11}{'P':>11}{'R':>11}{'mAP50':>11}{'mAP50-95':>11}"
+            f"{'F2':>11}")
     rows = [head, f"{'all':>22}{res.get('n_images', 0):>11}{res.get('n_instances', 0):>11}{res.get('P', 0):>11.3f}"
-                  f"{res.get('R', 0):>11.3f}{res['mAP50']:>11.3f}{res['mAP50_95']:>11.3f}"]
+                  f"{res.get('R', 0):>11.3f}{res['mAP50']:>11.3f}{res['mAP50_95']:>11.3f}{res.get('F2', 0):>11.3f}"]
     if per_class:
         for c in classes:
             r = res["classes"][c]
             if r["npos"]:
                 rows.append(f"{c[:22]:>22}{r.get('images', 0):>11}{r['npos']:>11}{r.get('P', 0):>11.3f}"
-                            f"{r.get('R', 0):>11.3f}{r['AP50']:>11.3f}{r['AP50_95']:>11.3f}")
+                            f"{r.get('R', 0):>11.3f}{r['AP50']:>11.3f}{r['AP50_95']:>11.3f}{r.get('F2', 0):>11.3f}")
     return "\n".join(rows)
 
 
