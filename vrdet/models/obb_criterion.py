@@ -218,6 +218,25 @@ class OBBCriterion(nn.Module):
             loss = loss * weight.float()
         return loss.sum() / avg_factor if avg_factor is not None else loss.sum()
 
+    # ---------------------------------------------------------------- H17 primitive membership
+    def loss_members(self, outputs, targets, indices):
+        from .vector import members_from_boxes
+        logits, pts, vmask = outputs['pred_members'], outputs['vec_pts'], outputs['vec_mask']
+        bce, dice, n = logits.sum() * 0, logits.sum() * 0, 0
+        for b, (qi, gi) in enumerate(indices):
+            valid = vmask[b]
+            if len(qi) == 0 or not bool(valid.any()):
+                continue
+            p = pts[b][valid].view(-1, 8, 2)
+            tgt = members_from_boxes(p, targets[b]['boxes'][gi].float()).float()       # (k, M_valid)
+            lg = logits[b][qi][:, valid]
+            bce = bce + F.binary_cross_entropy_with_logits(lg, tgt, reduction='none').mean(1).sum()
+            pr = lg.sigmoid()
+            dice = dice + (1 - (2 * (pr * tgt).sum(1) + 1) / (pr.sum(1) + tgt.sum(1) + 1)).sum()
+            n += len(qi)
+        n = max(n, 1)
+        return {'loss_member_bce': bce / n, 'loss_member_dice': dice / n}
+
     # ---------------------------------------------------------------- driver
     def get_loss(self, loss, outputs, targets, indices, num_boxes):
         return {'boxes': self.loss_boxes, 'mal': self.loss_mal, 'local': self.loss_local}[loss](
@@ -342,6 +361,8 @@ class OBBCriterion(nn.Module):
                     ind = indices_dn_cls if loss == 'mal' else indices_dn
                     losses.update(self._weighted(self.get_loss(loss, outputs['dn_pre_outputs'], targets, ind,
                                                                dn_num_boxes), '_dn_pre'))
+        if 'pred_members' in outputs and 'loss_member_bce' in self.weight_dict:
+            losses.update(self._weighted(self.loss_members(outputs, targets, indices)))
         if 'o2m_outputs' in outputs:           # H10: one-to-many group, one assignment (last layer) for all layers
             ind_o2m = dev(self.matcher.one_to_many(outputs['o2m_outputs'][-1], targets, self.o2m_k))
             n_o2m = max(float(sum(len(x[0]) for x in ind_o2m)), 1.0)

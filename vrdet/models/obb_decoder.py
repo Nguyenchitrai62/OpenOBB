@@ -235,7 +235,7 @@ class OBBTransformerDecoder(nn.Module):
             ref_detach = box.detach()
             output_detach = output.detach()
         return (torch.stack(dec_boxes), torch.stack(dec_logits), torch.stack(dec_corners), torch.stack(dec_refs),
-                pre_boxes, pre_scores)
+                pre_boxes, pre_scores, output)
 
 
 def obb_denoising_group(targets, num_classes, num_queries, class_embed, num_denoising=100,
@@ -496,9 +496,13 @@ class OBBDFINETransformer(nn.Module):
             full[:n_main, n_main:] = True
             full[n_main:, :n_main] = True
             attn_mask = full
-        out_boxes, out_logits, out_corners, out_refs, pre_boxes, pre_logits = self.decoder(
+        out_boxes, out_logits, out_corners, out_refs, pre_boxes, pre_logits, hs = self.decoder(
             content, ref_unact, memory, spatial_shapes, self.dec_bbox_head, self.dec_score_head,
             self.query_pos_head, self.pre_bbox_head, self.up, self.reg_scale, attn_mask=attn_mask)
+        if n_o2m:
+            hs = hs[:, :hs.shape[1] - n_o2m]
+        if self.training and dn_meta is not None:
+            hs = hs[:, dn_meta['dn_num_split'][0]:]
         if n_o2m:
             sp = [out_logits.shape[2] - n_o2m, n_o2m]
             pre_logits, o2m_pre_logits = torch.split(pre_logits, sp, dim=1)
@@ -515,9 +519,9 @@ class OBBDFINETransformer(nn.Module):
             dn_out_corners, out_corners = torch.split(out_corners, dn_meta['dn_num_split'], dim=2)
             dn_out_refs, out_refs = torch.split(out_refs, dn_meta['dn_num_split'], dim=2)
         if not self.training:
-            return {'pred_logits': out_logits[-1], 'pred_boxes': out_boxes[-1]}
+            return {'pred_logits': out_logits[-1], 'pred_boxes': out_boxes[-1], 'pred_hs': hs}
         out = {'pred_logits': out_logits[-1], 'pred_boxes': out_boxes[-1], 'pred_corners': out_corners[-1],
-               'ref_points': out_refs[-1], 'up': self.up, 'reg_scale': self.reg_scale}
+               'ref_points': out_refs[-1], 'up': self.up, 'reg_scale': self.reg_scale, 'pred_hs': hs}
         if self.aux_loss:
             out['aux_outputs'] = self._aux2(out_logits[:-1], out_boxes[:-1], out_corners[:-1], out_refs[:-1],
                                             out_corners[-1], out_logits[-1])

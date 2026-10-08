@@ -15,7 +15,7 @@ from .obb_criterion import OBBCriterion, OBBHungarianMatcher
 from .context import GlobalContext
 from .dense_head import DenseRotatedHead
 from .obb_decoder import OBBDFINETransformer
-from .vector import VectorBranch
+from .vector import MemberHead, VectorBranch
 
 DFINE_URL = "https://github.com/Peterande/storage/releases/download/dfinev1.0/dfine_{}_coco.pth"
 # Objects365 -> COCO checkpoints (what YOLO26's yolo26*.pt also starts from: Objects365 then COCO). D-FINE notes
@@ -98,7 +98,7 @@ class VRDet(nn.Module):
     def __init__(self, size="s", num_classes=15, num_queries=300, img_size=1024, rotate_sampling=True,
                  num_denoising=100, dense=False, dense_width=128, strip_k=0, ortho_heads=False, context=False,
                  dense_queries=False, vectors=False, vec_dim=128, vec_layers=2, o2m_queries=0, lsk=False,
-                 vec_lfe=False, **overrides):
+                 vec_lfe=False, vec_ground=False, **overrides):
         super().__init__()
         cfg = copy.deepcopy(CONFIGS[size])
         for k, v in overrides.items():          # e.g. decoder=dict(num_layers=4)
@@ -122,6 +122,7 @@ class VRDet(nn.Module):
         self.dense_queries = dense_queries
         self.vector = VectorBranch(cfg["encoder"]["in_channels"], d=vec_dim, layers=vec_layers,
                                    lfe=vec_lfe) if vectors else None
+        self.member = MemberHead(cfg["decoder"]["hidden_dim"], vec_dim) if (vectors and vec_ground) else None
 
     def forward(self, x, targets=None, ctx=None):
         fn = None
@@ -131,8 +132,9 @@ class VRDet(nn.Module):
         feats = self.backbone(x)
         if self.lsk is not None:
             feats = [m(f) for m, f in zip(self.lsk, feats)]
+        tok = None
         if ctx is not None and self.vector is not None and "vec" in ctx:
-            feats = self.vector(feats, ctx["vec"], ctx["vec_mask"])
+            feats, tok = self.vector(feats, ctx["vec"], ctx["vec_mask"], return_tokens=True)
         feats = self.encoder(feats, ctx_fn=fn)
         if self.context is not None:
             feats = [m(f) for m, f in zip(self.context, feats)]
@@ -140,16 +142,22 @@ class VRDet(nn.Module):
         out = self.decoder(feats, targets, dense=dense if self.dense_queries else None)
         if dense is not None:
             out.update(dense)
+        if self.member is not None and tok is not None:     # H17: which primitives belong to each query's object
+            out["pred_members"] = self.member(out["pred_hs"], tok)
+            out["vec_pts"] = ctx["vec"][..., 1:17].float()
+            out["vec_mask"] = ctx["vec_mask"]
         return out
 
 
 def build_criterion(num_classes=15, reg_max=32, box_loss="kld", weights=None, cost=None, o2m_k=6, aqd=False,
-                    angle_weight=0.0, cost_iou=0.0):
+                    angle_weight=0.0, cost_iou=0.0, member_weight=0.0):
     """box_loss: 'kld' (O2-DETR / RiO-DETR) or 'probiou' (PP-YOLOE-R, YOLO26); used in both cost and loss."""
     cost = cost or dict(cost_class=2.0, cost_chamfer=5.0, cost_kld=2.0)
     weights = weights or {'loss_mal': 1, 'loss_bbox': 5, 'loss_kld': 2, 'loss_fgl': 0.15, 'loss_ddf': 1.5}
     if angle_weight:
         weights = dict(weights, loss_angle=angle_weight)
+    if member_weight:
+        weights = dict(weights, loss_member_bce=member_weight, loss_member_dice=member_weight)
     return OBBCriterion(OBBHungarianMatcher(**cost, gauss=box_loss, cost_iou=cost_iou), weights, num_classes=num_classes,
                         reg_max=reg_max, gauss=box_loss, o2m_k=o2m_k, aqd=aqd)
 
@@ -206,7 +214,7 @@ def load_dfine_coco(model, ckpt_or_size, class_names=None, log=print, init="coco
 
 
 @torch.no_grad()
-def postprocess(outputs, num_top=300, img_size=1024, mode="flat"):
+def postprocess(outputs, num_top=300, img_size=1024, mode="flat", return_query=False):
     """-> scores (B, K), labels (B, K), boxes (B, K, 5) in pixels (cx, cy, w, h, theta).
     mode "flat": top-K over (query x class) pairs (DETR default; one query may emit several classes);
     "argmax": one class per query (removes cross-class duplicates such as plane queries scoring helicopter)."""
@@ -225,4 +233,28 @@ def postprocess(outputs, num_top=300, img_size=1024, mode="flat"):
         q = idx // C
     b = boxes.gather(1, q.unsqueeze(-1).expand(-1, -1, 5)).clone()
     b[..., :4] *= img_size
+    if return_query:
+        return s, labels, b, q
     return s, labels, b
+
+
+def snap_boxes(member_logits, pts, valid, q, polys, img_size, thr=0.5, iou_gate=0.5, min_side=2.0):
+    """H17 for one image: polygon of every output whose query selected >= 1 primitive becomes the min-area rectangle
+    of those primitives' points (exact CAD geometry), when it agrees with the regressed box (IoU >= iou_gate).
+    member_logits (Q, M), pts (M, 16) normalised, valid (M,), q (K,) query per output, polys (K, 8) px."""
+    import cv2
+    import numpy as np
+    from vrdet.ops.obb import poly_iou
+    out = polys.copy()
+    prob = 1 / (1 + np.exp(-member_logits))
+    P = pts.reshape(-1, 8, 2) * img_size
+    for qq in np.unique(q):
+        sel = (prob[qq] > thr) & valid
+        if not sel.any():
+            continue
+        (cx, cy), (w, h), a = cv2.minAreaRect(P[sel].reshape(-1, 2).astype(np.float32))
+        snapped = cv2.boxPoints(((cx, cy), (max(w, min_side), max(h, min_side)), a)).reshape(-1)
+        rows = np.nonzero(q == qq)[0]
+        if poly_iou(snapped[None].astype(np.float64), out[rows[:1]].astype(np.float64))[0, 0] >= iou_gate:
+            out[rows] = snapped
+    return out

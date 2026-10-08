@@ -364,3 +364,9 @@
 [2026-10-08 11:37:46] e15-dota-o365-s: finished with status done; stopping VM
 [2026-10-08 11:37:49] watch: balance=139.23 rate=32.0/h active=['c1-fpc-combo-s', 'c2-dota-hybrid-s', 'e15-dota-o365-s'] ended=[('e15-dota-o365-s', 'done')]
 [2026-10-08 11:42:35] queue: ['e8-fpc-yolo26x-24e']
+[2026-10-08 11:46:40] c2-fpc-hybrid-s: launching attempt 1 on G4 as session c2-fpc-hybrid-s-1
+[2026-10-08 11:47:09] c2-fpc-hybrid-s: running
+[2026-10-08 11:47:14] e8-fpc-yolo26x-24e: launching attempt 1 on G4 as session e8-fpc-yolo26x-24e-1
+[2026-10-08 11:47:45] e8-fpc-yolo26x-24e: running
+[2026-10-08 11:49:27] watch: balance=136.49 rate=26.7/h active=['c1-fpc-combo-s', 'c2-fpc-hybrid-s', 'e8-fpc-yolo26x-24e'] ended=[]
+[2026-10-08 11:52:39] queue: ['c3-fpc-ground-s']

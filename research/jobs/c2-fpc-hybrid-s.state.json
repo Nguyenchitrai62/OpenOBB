@@ -1,0 +1,25 @@
+{
+  "attempts": 1,
+  "started": "2026-10-08 11:46:40",
+  "session": "c2-fpc-hybrid-s-1",
+  "out": "/content/work/runs/c2-fpc-hybrid-s",
+  "status": "running",
+  "launched": 1791434805.4048796,
+  "updated": "2026-10-08 11:49:15",
+  "fails": 0,
+  "synced": {
+    "train_progress.log": [
+      606,
+      1791434875
+    ],
+    "setup.log": [
+      350,
+      1791434825
+    ],
+    "train.log": [
+      2031,
+      1791434875
+    ]
+  },
+  "tail": ":48] [init] D-FINE coco: 770 full, 13 partial, 219 new tensors\n[04:47:49] RFS repeat factors: single=1.0 double=1.0 slidin=1.0 foldin=3.9 revolv=13.2 rollin=8.8 window=1.0 bay-wi=2.1 blind-=1.1 openin=1.6 sofa=1.4 bed=1.1 chair=1.0 table=1.0 tv-cab=1.3 wardro=1.3 cabine=1.0 gas-st=1.0 sink=1.0 refrig=1.0 aircon=1.0 bath=1.0 bath-t=1.4 washin=1.1 squat-=1.3 urinal=1.4 toilet=1.0 stairs=1.0 elevat=1.0 escala=1.9\n[04:47:55] torch.compile enabled for backbone + encoder (training model only)\n[04:47:55] VRDet-s 11.37M params | train patches 6965 | 435 it/epoch x 24 | batch 16 | device cuda amp=True\n"
+}

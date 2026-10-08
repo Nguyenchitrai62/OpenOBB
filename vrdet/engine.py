@@ -113,11 +113,22 @@ def predict_patches(model, ds, device, batch=32, workers=8, num_top=300, img_siz
         ctx = ctx_batch(tg, device)
         with torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=amp and device.type == "cuda"):
             o = model(x, ctx=ctx) if ctx is not None else model(x)
-        s, l, b = postprocess(o, num_top, img_size, mode=post)
-        s, l, b = s.cpu().numpy(), l.cpu().numpy(), b.cpu().numpy()
+        s, l, b, qi = postprocess(o, num_top, img_size, mode=post, return_query=True)
+        s, l, b, qi = s.cpu().numpy(), l.cpu().numpy(), b.cpu().numpy(), qi.cpu().numpy()
+        grounded = "pred_members" in o
+        if grounded:                           # H17: snap boxes to the selected CAD primitives
+            from vrdet.models.vrdet import snap_boxes
+            out.setdefault("snap", [])
+            mem = o["pred_members"].float().cpu().numpy()
+            vp, vm = o["vec_pts"].cpu().numpy(), o["vec_mask"].cpu().numpy()
         for i, t in enumerate(tg):
-            for sc, lab, p in zip(s[i], l[i], obb2poly(b[i])):
+            polys = obb2poly(b[i])
+            for sc, lab, p in zip(s[i], l[i], polys):
                 out["dec"].append((t["name"], int(lab), float(sc), p))
+            if grounded:
+                sp = snap_boxes(mem[i], vp[i], vm[i], qi[i], polys, img_size)
+                for sc, lab, p in zip(s[i], l[i], sp):
+                    out["snap"].append((t["name"], int(lab), float(sc), p))
         if has_dense:
             for t, (ds_, dl_, db_) in zip(tg, dense_predict(o, img_size=img_size)):
                 for sc, lab, p in zip(ds_.cpu().numpy(), dl_.cpu().numpy(), obb2poly(db_.cpu().numpy())):
@@ -132,6 +143,8 @@ def _max_side(p):
 def fusion_sets(preds, route=(32, 64)):
     """Inference-time ways to combine the decoder (sparse) and dense outputs; all go through the same merge NMS."""
     sets = {"dec": preds["dec"]}
+    if "snap" in preds:
+        sets["snap"] = preds["snap"]
     if "dense" in preds:
         sets["dense"] = preds["dense"]
         sets["union"] = preds["dec"] + preds["dense"]

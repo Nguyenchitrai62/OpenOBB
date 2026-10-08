@@ -45,6 +45,30 @@ class LayerPool(nn.Module):
         return out
 
 
+class MemberHead(nn.Module):
+    """H17 vector-grounded decoding: logit that primitive m belongs to the object of query q = <proj(q), proj(m)>."""
+
+    def __init__(self, d_query, d_token, d=128):
+        super().__init__()
+        self.q, self.t, self.scale = nn.Linear(d_query, d), nn.Linear(d_token, d), d ** -0.5
+        self.bias = nn.Parameter(torch.tensor(-2.0))       # most primitives are not members
+
+    def forward(self, hs, tok):
+        return torch.einsum("bqd,bmd->bqm", self.q(hs.float()), self.t(tok.float())) * self.scale + self.bias
+
+
+def members_from_boxes(pts, boxes, tol=3 / 1024):
+    """Geometric membership (works for any OBB-labelled data): primitive m belongs to box j if its 8 points lie
+    inside box j expanded by tol. pts (M, 8, 2), boxes (N, 5) normalised -> (N, M) bool."""
+    cx, cy, w, h, t = boxes.unbind(-1)
+    c, s = torch.cos(t), torch.sin(t)
+    dx = pts[None, :, :, 0] - cx[:, None, None]
+    dy = pts[None, :, :, 1] - cy[:, None, None]
+    u = dx * c[:, None, None] + dy * s[:, None, None]
+    v = -dx * s[:, None, None] + dy * c[:, None, None]
+    return ((u.abs() <= w[:, None, None] / 2 + tol) & (v.abs() <= h[:, None, None] / 2 + tol)).all(-1)
+
+
 class VectorBranch(nn.Module):
     def __init__(self, out_channels, d=128, layers=2, heads=4, nfreq=8, densify=2, lfe=False):
         super().__init__()
@@ -86,8 +110,13 @@ class VectorBranch(nn.Module):
             x = self.lfe[1](x, layer, mask)
         return x
 
-    def forward(self, feats, vec, mask):
+    def forward(self, feats, vec, mask, return_tokens=False):
         tok = self.tokens(vec, mask)
+        if return_tokens:
+            return self.splat(feats, tok, vec, mask), tok
+        return self.splat(feats, tok, vec, mask)
+
+    def splat(self, feats, tok, vec, mask):
         B, M, d = tok.shape
         p = vec[..., 1:17].float().view(B, M, 8, 2)
         if self.densify > 1:            # extra points between samples so long strokes cover every cell they cross

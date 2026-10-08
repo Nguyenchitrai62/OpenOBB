@@ -55,3 +55,26 @@ def test_dataset_keeps_layers_through_mosaic(tmp_path):
     ids = t["vec"][:, 21]
     known = ids[ids > 0]
     assert len(set(known.tolist())) == 8                            # 4 copies x 2 layers, never merged
+
+
+def test_snap_boxes_recovers_exact_primitive_rectangle():
+    import cv2
+    from vrdet.models.vrdet import snap_boxes
+    from vrdet.ops.obb import poly_iou
+    S = 1024
+    true = cv2.boxPoints(((500.0, 400.0), (120.0, 40.0), 25.0))            # the CAD object's exact rectangle
+    pts = np.zeros((6, 16), np.float32)
+    for k in range(4):                                                     # its 4 strokes
+        a, b = true[k], true[(k + 1) % 4]
+        pts[k] = (np.linspace(a, b, 8) / S).reshape(-1)
+    pts[4] = (np.linspace([100, 100], [200, 120], 8) / S).reshape(-1)     # unrelated strokes
+    pts[5] = (np.linspace([480, 380], [700, 380], 8) / S).reshape(-1)
+    logits = np.full((3, 6), -5.0, np.float32)
+    logits[1, :4] = 5.0                                                    # query 1 selected the 4 strokes
+    regressed = cv2.boxPoints(((505.0, 398.0), (110.0, 46.0), 20.0)).reshape(1, 8)   # imprecise prediction
+    q = np.array([1])
+    out = snap_boxes(logits, pts, np.ones(6, bool), q, regressed.astype(np.float64), S)
+    assert poly_iou(out.astype(np.float64), true.reshape(1, 8).astype(np.float64))[0, 0] > 0.98
+    far = cv2.boxPoints(((900.0, 900.0), (50.0, 50.0), 0.0)).reshape(1, 8)  # disagreeing box is left untouched
+    out2 = snap_boxes(logits, pts, np.ones(6, bool), q, far.astype(np.float64), S)
+    assert np.allclose(out2, far)

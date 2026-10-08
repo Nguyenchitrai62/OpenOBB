@@ -78,6 +78,8 @@ def get_args(argv=None):
     ap.add_argument("--vec-layers", type=int, default=2)
     ap.add_argument("--max-tokens", type=int, default=4096)
     ap.add_argument("--vec-lfe", action="store_true", help="H16: per-CAD-layer pooling in the vector branch")
+    ap.add_argument("--vec-ground", type=float, default=0.0,
+                    help="H17: weight of the query->primitive membership loss (vector-grounded boxes); 0 = off")
     ap.add_argument("--layer-drop", type=float, default=0.0, help="H16: chance to merge all layers of a sample")
     ap.add_argument("--rotate-p", type=float, default=0.0, help="H8: arbitrary-angle rotation prob")
     ap.add_argument("--mosaic-p", type=float, default=0.0, help="H8: oriented mosaic prob")
@@ -132,7 +134,7 @@ def main(argv=None):
                   rotate_sampling=not a.no_rotate_sampling, num_denoising=a.denoising, dense=a.dense,
                   strip_k=a.strip_k, ortho_heads=a.ortho_heads, context=a.context,
                   dense_queries=a.dense_queries, vectors=a.vectors, vec_dim=a.vec_dim, vec_layers=a.vec_layers,
-                  o2m_queries=a.o2m_queries, lsk=a.lsk, vec_lfe=a.vec_lfe)
+                  o2m_queries=a.o2m_queries, lsk=a.lsk, vec_lfe=a.vec_lfe, vec_ground=a.vec_ground > 0)
     last = out / "last.pt"
     if not last.exists() and not a.no_pretrained:
         load_dfine_coco(model, a.size, class_names=classes, log=log, init=a.init)
@@ -140,7 +142,7 @@ def main(argv=None):
     if a.channels_last:
         model.to(memory_format=torch.channels_last)
     crit = build_criterion(num_classes=len(classes), box_loss=a.box_loss, o2m_k=a.o2m_k, aqd=a.aqd,
-                           angle_weight=a.angle_weight, cost_iou=a.cost_iou)
+                           angle_weight=a.angle_weight, cost_iou=a.cost_iou, member_weight=a.vec_ground)
     a.dense = a.dense or a.dense_queries
     dense_crit = DenseCriterion() if a.dense else None
     ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,
@@ -292,7 +294,7 @@ def main(argv=None):
     if a.skip_final_eval:
         return
     res, dets = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.num_top,
-                          img_size=a.img, log=log, fusion=a.dense, variants=["dec", "dense", "union"],
+                          img_size=a.img, log=log, fusion=a.dense or a.vec_ground > 0, variants=["dec", "dense", "union", "snap"],
                           save_preds_to=(out / "val_preds.npz") if a.dense else None, context=a.context,
                           vectors=a.vectors, post=a.post)
     table = format_table(res, classes)
