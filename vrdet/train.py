@@ -48,6 +48,7 @@ def get_args(argv=None):
                     help="H10: training-only one-to-many query group (e.g. 1500); dropped at inference")
     ap.add_argument("--o2m-k", type=int, default=6, help="H10: queries assigned per target in the o2m group")
     ap.add_argument("--aqd", action="store_true", help="H12: adaptive query denoising (RHINO idea)")
+    ap.add_argument("--lsk", action="store_true", help="H14: selective large-kernel adapters on backbone maps")
     ap.add_argument("--angle-weight", type=float, default=0.0, help="H13: square-aware angle loss on the decoder")
     ap.add_argument("--eval-queries", type=int, default=0,
                     help="H9: also evaluate the final EMA model with N queries / top-N (queries have no parameters)")
@@ -127,7 +128,7 @@ def main(argv=None):
                   rotate_sampling=not a.no_rotate_sampling, num_denoising=a.denoising, dense=a.dense,
                   strip_k=a.strip_k, ortho_heads=a.ortho_heads, context=a.context,
                   dense_queries=a.dense_queries, vectors=a.vectors, vec_dim=a.vec_dim, vec_layers=a.vec_layers,
-                  o2m_queries=a.o2m_queries)
+                  o2m_queries=a.o2m_queries, lsk=a.lsk)
     last = out / "last.pt"
     if not last.exists() and not a.no_pretrained:
         load_dfine_coco(model, a.size, class_names=classes, log=log, init=a.init)

@@ -69,10 +69,36 @@ class StripContext(nn.Module):
         return x + self.pw(nn.functional.silu(y))
 
 
+class SelectiveKernel(nn.Module):
+    """H14: per-location adaptive receptive field on the backbone maps (idea: LSKNet's large selective kernel, read
+    from the paper; VRDet's own implementation). A near branch (depthwise 5x5) and a far branch (then depthwise 7x7,
+    dilation 3: ~23 px field) are mixed by a spatial gate built from channel mean/max; the result modulates the input
+    multiplicatively through a zero-initialised projection, so the block starts as identity."""
+
+    def __init__(self, c):
+        super().__init__()
+        self.near = nn.Conv2d(c, c, 5, padding=2, groups=c)
+        self.far = nn.Conv2d(c, c, 7, padding=9, dilation=3, groups=c)
+        self.pn, self.pf = nn.Conv2d(c, c // 2, 1), nn.Conv2d(c, c // 2, 1)
+        self.gate = nn.Conv2d(2, 2, 7, padding=3)
+        self.out = nn.Conv2d(c // 2, c, 1)
+        nn.init.zeros_(self.out.weight)
+        nn.init.zeros_(self.out.bias)
+
+    def forward(self, x):
+        a = self.near(x)
+        b = self.far(a)
+        a, b = self.pn(a), self.pf(b)
+        cat = torch.cat([a, b], 1)
+        g = self.gate(torch.cat([cat.mean(1, keepdim=True), cat.amax(1, keepdim=True)], 1)).sigmoid()
+        return x + x * self.out(a * g[:, :1] + b * g[:, 1:])
+
+
 class VRDet(nn.Module):
     def __init__(self, size="s", num_classes=15, num_queries=300, img_size=1024, rotate_sampling=True,
                  num_denoising=100, dense=False, dense_width=128, strip_k=0, ortho_heads=False, context=False,
-                 dense_queries=False, vectors=False, vec_dim=128, vec_layers=2, o2m_queries=0, **overrides):
+                 dense_queries=False, vectors=False, vec_dim=128, vec_layers=2, o2m_queries=0, lsk=False,
+                 **overrides):
         super().__init__()
         cfg = copy.deepcopy(CONFIGS[size])
         for k, v in overrides.items():          # e.g. decoder=dict(num_layers=4)
@@ -88,6 +114,7 @@ class VRDet(nn.Module):
                                            o2m_queries=o2m_queries, **cfg["decoder"])
         hid = cfg["encoder"]["hidden_dim"]
         self.context = nn.ModuleList([StripContext(hid, strip_k) for _ in range(3)]) if strip_k else None
+        self.lsk = nn.ModuleList([SelectiveKernel(c) for c in cfg["encoder"]["in_channels"]]) if lsk else None
         self.global_ctx = GlobalContext(self.backbone, cfg["encoder"]["in_channels"][-1], hid,
                                         p5_size=img_size // 32) if context else None
         self.dense_head = DenseRotatedHead(cfg["encoder"]["hidden_dim"], num_classes, (8, 16, 32), dense_width,
@@ -101,6 +128,8 @@ class VRDet(nn.Module):
             def fn(p5, pos):
                 return self.global_ctx(p5, pos, ctx)
         feats = self.backbone(x)
+        if self.lsk is not None:
+            feats = [m(f) for m, f in zip(self.lsk, feats)]
         if ctx is not None and self.vector is not None and "vec" in ctx:
             feats = self.vector(feats, ctx["vec"], ctx["vec_mask"])
         feats = self.encoder(feats, ctx_fn=fn)

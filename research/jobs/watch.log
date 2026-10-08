@@ -327,3 +327,8 @@
 [2026-10-08 09:38:54] watch: balance=201.27 rate=32.0/h active=['e10-dota-mosaic-s', 'e14-dota-post-eval', 'e16-dota-dense-fix-s'] ended=[]
 [2026-10-08 09:46:57] queue: e15-dota-o365-s waits (3 live sessions, cap 3)
 [2026-10-08 09:48:23] e14-dota-post-eval: finished with status done; stopping VM
+[2026-10-08 09:49:54] watch: balance=195.5 rate=37.3/h active=['e10-dota-mosaic-s', 'e14-dota-post-eval', 'e16-dota-dense-fix-s'] ended=[('e14-dota-post-eval', 'done')]
+[2026-10-08 09:58:00] e15-dota-o365-s: launching attempt 1 on G4 as session e15-dota-o365-s-1
+[2026-10-08 09:58:41] e15-dota-o365-s: running
+[2026-10-08 09:58:42] queue: e12-dota-o2m-s waits (3 live sessions, cap 3)
+[2026-10-08 09:59:26] queue: ['e12-dota-o2m-s', 'e13-dota-yoloaug-s', 'e17-dota-aqd-s', 'e18-dota-angle-s', 'e19-dota-lsk-s']

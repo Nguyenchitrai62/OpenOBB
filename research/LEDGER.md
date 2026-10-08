@@ -103,4 +103,5 @@ Quy ước: toàn bộ là val, 24 epoch, ảnh 1024. DOTA cắt SS 1024/200, in
 | 10 | Tắt mosaic ở 50% số epoch (DEIM) | DEIM | thấp | sau #5 |
 | 11 | Copy-paste class hiếm (HC, SBF, BC, SP) | F2, F3 | trung bình | chưa làm |
 | 12 | Gộp các thành phần có lợi lên X: DOTA và FPC (so YOLO26x) | — | khoảng 45 + 45 CU | sau #1–#5 |
+| 14 | Adapter chọn vùng nhìn kiểu LSKNet (trước encoder) | LSKNet / PKINet / Strip R-CNN mạnh trên DOTA (backbone pretrain ImageNet, two-stage); H3 strip sau encoder −0.13 | 11 CU | đã code (`--lsk`); e19 xếp hàng |
 | 13 | Token text và layer cho PDF thật (sản phẩm) | AI_Takeoff: FP/TP chỉ phân biệt được bằng text | code local | sau khi kiến trúc thắng |
