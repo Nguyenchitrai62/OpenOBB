@@ -3,7 +3,63 @@
   "started": "2026-10-08 09:29:42",
   "session": "e14-dota-post-eval-1",
   "out": "/content/work/runs/e14-dota-post-eval",
-  "status": "running",
+  "status": "done",
   "launched": 1791426588.1402376,
-  "updated": "2026-10-08 09:34:15"
+  "updated": "2026-10-08 09:48:23",
+  "fails": 0,
+  "synced": {
+    "ckpt_x.pt": [
+      251572305,
+      1791426839
+    ],
+    "setup.log": [
+      1162,
+      1791426851
+    ],
+    "ckpt_s.pt": [
+      165363445,
+      1791426699
+    ],
+    "train.log": [
+      63945,
+      1791427477
+    ],
+    "exitcode": [
+      2,
+      1791427489
+    ],
+    "x-argmax/eval_val.json": [
+      3024,
+      1791427477
+    ],
+    "x-argmax/metrics.jsonl": [
+      542,
+      1791427488
+    ],
+    "x-argmax/train_progress.log": [
+      1271,
+      1791427477
+    ],
+    "x-argmax/eval_val.txt": [
+      1013,
+      1791427477
+    ],
+    "s-argmax/eval_val.json": [
+      3026,
+      1791427227
+    ],
+    "s-argmax/metrics.jsonl": [
+      544,
+      1791427234
+    ],
+    "s-argmax/train_progress.log": [
+      1271,
+      1791427227
+    ],
+    "s-argmax/eval_val.txt": [
+      1013,
+      1791427227
+    ]
+  },
+  "tail": " 93.38\nship                   8861   131984  88.62    64.38  98.21\ntennis-court            739    18431  90.80    88.26  96.62\nbasketball-court        124     2150  73.75    60.63  84.68\nstorage-tank           1869   184094  89.18    66.74  97.22\nsoccer-ball-field        87     4312  72.08    61.65  89.66\nroundabout              164    45976  71.39    40.39  86.59\nharbor                 2065   249182  80.36    48.87  90.07\nswimming-pool           366    52140  61.34    27.22  79.23\nhelicopter               72      523  54.10    23.74  73.61\nmAP                                   75.91    52.64\n"
 }

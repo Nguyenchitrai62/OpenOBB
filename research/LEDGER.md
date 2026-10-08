@@ -37,6 +37,7 @@ Quy ước: toàn bộ là val, 24 epoch, ảnh 1024. DOTA cắt SS 1024/200, in
 | 10-08 | e6-vrdet-x-dota-24e | DOTA | X | VRDet-X + RFS | YOLO26x | 75.60 / 52.31 | −2.81 | dung tích không tự đóng khoảng cách | 36 |
 | 10-08 | e11-dota-x-qinfer | DOTA | X | 900 query khi suy luận | e6 | **76.29 / 52.84** | +0.69 | so YOLO26x: −2.13 / −0.26 | 3 |
 | 10-08 | e10-fpc-vec-mosaic-s | FPC | S | mosaic thu nhỏ 0.5×, p 0.5 | e7 | 72.92 / 61.89 | −3.88 | **BÁC BỎ** cho CAD | 7 |
+| 10-08 | e14-dota-post-eval | DOTA | S+X | argmax post, 900 query | flat q900 | S 72.79 / 48.66; X 75.91 / 52.64 | −0.16 / −0.38 | **BÁC BỎ**: giữ flat; HC cũng giảm (54.1 so với 56.4) | 3 |
 | 10-08 | e10-dota-mosaic-s | DOTA | S | mosaic thu nhỏ 0.5×, p 0.5 | e3 | đang chạy | | | |
 
 Đang xếp hàng (2026-10-08 09:30):
@@ -49,7 +50,8 @@ Quy ước: toàn bộ là val, 24 epoch, ảnh 1024. DOTA cắt SS 1024/200, in
 ## 3. Phát hiện (có bằng chứng)
 
 - **F1. Khoảng cách cùng điều kiện:** lõi DETR kém YOLO26 khoảng 2 mAP50 ở cả S lẫn X (24 epoch). Định vị gần ngang: ở X với 900 query, mAP50:95 chỉ kém 0.26 (e11 so với e5).
-- **F2. Lỗi nằm ở xếp hạng điểm (precision), không phải recall.** VRDet-X có R50 ≥ YOLO26x ở 13/15 class. HC: R50 93.1 so với 88.9 nhưng AP 56.4 so với 75.0. SP là class duy nhất thiếu recall (80.1 so với 86.6). Nghi phạm: top-K trên (query × class) cho phép một query phát nhiều class, đang kiểm bằng e14.
+- **F2. Lỗi nằm ở xếp hạng điểm (precision), không phải recall.** VRDet-X có R50 ≥ YOLO26x ở 13/15 class. HC: R50 93.1 so với 88.9 nhưng AP 56.4 so với 75.0. SP là class duy nhất thiếu recall (80.1 so với 86.6). Nghi phạm "phát nhiều class" đã bị e14 bác bỏ (argmax kém hơn). HC thua chủ yếu vì định vị: AP50:95 là 25 so với 37.
+  Hướng xử lý: loss góc (e18), AQD (e17), nhánh dense (e16).
 - **F3. Class hiếm:** lấy mẫu RFS cho +2.45 (HC +15.8, RA +7.7, SBF +7.6). One-to-one matching cho quá ít mẫu dương ở lịch 24 epoch.
 - **F4. Trần 300 query:** 68/5297 patch DOTA val bão hoà, chứa 28.5% số SV, 46% số SH và 17% số LV được phát hiện. Suy luận 600–900 query cho +0.7 mà không chậm hơn.
 - **F5. Dung tích không tự đóng khoảng cách:** S kém −2.4, X kém −2.8 (300 query).
@@ -89,7 +91,7 @@ Quy ước: toàn bộ là val, 24 epoch, ảnh 1024. DOTA cắt SS 1024/200, in
 
 | # | Hướng | Bằng chứng | Chi phí | Trạng thái |
 |---|---|---|---|---|
-| 1 | Argmax post (một class mỗi query) | F2 | 3 CU | e14 xếp hàng |
+| 1 | Argmax post (một class mỗi query) | F2 | 3 CU | **xong: bác bỏ** |
 | 2 | Head dense kiểu YOLO26 làm giám sát một-nhiều cho encoder | Co-DETR +1.6–2.4, RT-DETRv3 +1.6 ở lịch ngắn; lần thử trước bị lỗi F10 | 13 CU | e16 xếp hàng |
 | 3 | Init Objects365 → COCO (ngang YOLO) | F9; D-FINE X +3.5 COCO AP | 10 CU | e15 xếp hàng |
 | 4 | Nhóm query một-nhiều (H-DETR) | H-DETR, MS-DETR | 12 CU | e12 xếp hàng |
