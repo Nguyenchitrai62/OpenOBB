@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from vrdet.predict import conf_thresholds, load_model, merge_dets, predict_image, to_label_lines  # noqa: E402
 
-MODEL_PATH = "models/best.pt"       # đường dẫn model: tuyệt đối, hoặc tương đối so với thư mục repo
+MODEL_PATH = r"F:\Source_code\NEW_architecture\models\best_v1.pt"       # đường dẫn model: tuyệt đối, hoặc tương đối so với thư mục repo
 
 PALETTE = [(230, 25, 75), (60, 180, 75), (0, 130, 200), (245, 130, 48), (145, 30, 180), (70, 240, 240),
            (240, 50, 230), (210, 245, 60), (250, 190, 212), (0, 128, 128), (170, 110, 40), (128, 0, 0),
@@ -56,7 +56,10 @@ def main():
 
     with st.sidebar:
         st.header("Model")
-        model_path = st.text_input("Model (.pt)", MODEL_PATH)
+        local = sorted((ROOT / "models").glob("*.pt"), key=lambda f: f.stat().st_mtime, reverse=True)
+        default = MODEL_PATH if (ROOT / MODEL_PATH).exists() or not local else str(local[0].relative_to(ROOT))
+        model_path = st.text_input("Model (.pt)", default, help="đường dẫn tuyệt đối, hoặc tương đối so với thư mục repo; "
+                                   "mặc định lấy file .pt mới nhất trong models/")
         p = Path(model_path)
         p = p if p.is_absolute() else ROOT / p
         if not p.exists():
