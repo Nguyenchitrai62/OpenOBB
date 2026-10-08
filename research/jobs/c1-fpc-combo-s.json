@@ -1,0 +1,25 @@
+{
+  "id": "c1-fpc-combo-s",
+  "gpu": "G4",
+  "bundle": [
+    "vrdet",
+    "colab"
+  ],
+  "setup": [
+    "pip install -q -U gdown shapely"
+  ],
+  "cmd": "python -u colab/data/floorplancad.py --root /content/datasets && python -u -m vrdet.train --data /content/datasets/floorplancad_1024 --out {out} --size s --epochs 24 --batch 16 --lr 1e-4 --workers 16 --eval-every 6 --eval-images 100 --channels-last --compile --rfs 0.1 --vectors --vec-lfe --layer-drop 0.1 --o2m-queries 900 --o2m-k 6 --aqd --angle-weight 1.0 --cost-iou 0.5 --eval-queries 900",
+  "sync": [
+    "*.log",
+    "eval_val.json",
+    "eval_val.txt",
+    "eval_val_q900.json",
+    "eval_val_q900.txt",
+    "last.pt",
+    "metrics.jsonl",
+    "train_done"
+  ],
+  "max_hours": 4,
+  "max_retries": 3,
+  "est_cu": 10
+}

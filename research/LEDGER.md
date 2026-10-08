@@ -118,6 +118,14 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 
 ## 6. Hướng mở, xếp theo bằng chứng
 
+**Ưu tiên của user (10-08, 11:15): tập trung vào KIẾN TRÚC MỚI.** Tạm dừng các thí nghiệm đơn lẻ chỉ là tinh chỉnh nhỏ trên nền D-FINE
+(e12b, e17, e18, e13, e23, e24; spec giữ lại).
+- **c1 = gộp các phần tốt nhất SOTA:** RFS, nhóm query một-nhiều H-DETR (900), AQD (RHINO), loss góc (YOLO26),
+  IoU-cost (Stable-DINO), 900 query khi suy luận; bản FPC có thêm vector + layer pooling (SymPoint-V2).
+- **c2 = kiến trúc lai dense–sparse (bước đột phá):** head dense kiểu YOLO26 (TAL một-nhiều) sinh đề xuất recall cao →
+  decoder DETR suy luận quan hệ trên các đề xuất đó (DDQ/Co-DETR) + nhánh vector/text CAD. Phụ thuộc e16.
+
+
 | # | Hướng | Bằng chứng | Chi phí | Trạng thái |
 |---|---|---|---|---|
 | 1 | Argmax post (một class mỗi query) | F2 | 3 CU | **xong: bác bỏ** |

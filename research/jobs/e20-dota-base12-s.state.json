@@ -5,21 +5,29 @@
   "out": "/content/work/runs/e20-dota-base12-s",
   "status": "running",
   "launched": 1791430297.137341,
-  "updated": "2026-10-08 10:35:08",
+  "updated": "2026-10-08 11:11:36",
   "fails": 0,
   "synced": {
     "train_progress.log": [
-      67,
-      1791430503
+      32988,
+      1791432634
     ],
     "setup.log": [
       1371,
       1791430331
     ],
     "train.log": [
-      67414,
-      1791430503
+      100682,
+      1791432634
+    ],
+    "metrics.jsonl": [
+      2812,
+      1791432633
+    ],
+    "last.pt": [
+      165363957,
+      1791432633
     ]
   },
-  "tail": "<00:00, 24.77it/s] \n[get_dota] train: 1411 images, 1411 label files\n[get_dota] val: 458 images, 458 label files\n[get_dota] source ready in 152s: /content/datasets/dota_raw/DOTA_V1.0\n[split] train: 1411 images -> 15749 patches, 190149 objects\n[get_dota] split train in 9s\n[split] val: 458 images -> 5297 patches, 55804 objects\n[get_dota] split val in 3s\n[get_dota] all done in 164s\nDownloading: \"https://github.com/Peterande/storage/releases/download/dfinev1.0/dfine_s_coco.pth\" to /root/.cache/torch/hub/checkpoints/dfine_s_coco.pth\n[03:35:03] [init] D-FINE coco: 770 full, 22 partial, 0 new tensors\n"
+  "tail": "05 | 86.2 img/s data 0.000s crit 0.054s/it\n[04:10:27] ep 10 it 950/984 loss 17.240 mal=0.656 bbox=0.119 kld=0.257 fgl=1.241 lr 1.64e-05 | 86.4 img/s data 0.000s crit 0.054s/it\n[04:10:33] epoch 10 done in 3.0 min: {\"epoch\": 10, \"iter\": 10824, \"lr\": 1.6040834879332445e-05, \"epoch_s\": 182.0, \"img_s\": 86.5, \"crit_s_per_it\": 0.054, \"data_s_per_it\": 0.0, \"max_mem_gb\": 20.3, \"loss_mal\": 0.7092, \"loss_bbox\": 0.1757, \"loss_kld\": 0.3185, \"loss_fgl\": 1.2294, \"total\": 18.401}\n[04:10:34] ep 11 it 0/984 loss 19.237 mal=0.812 bbox=0.130 kld=0.288 fgl=1.253 lr 1.60e-05 | 23.6 img/s data 0.346s crit 0.121s/it\n"
 }

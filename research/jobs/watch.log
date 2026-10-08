@@ -346,3 +346,8 @@
 [2026-10-08 10:32:15] queue: e24-fpc-vec-lfe-s waits (3 live sessions, cap 3)
 [2026-10-08 10:35:08] watch: balance=171.87 rate=37.3/h active=['e15-dota-o365-s', 'e16-dota-dense-fix-s', 'e20-dota-base12-s'] ended=[]
 [2026-10-08 10:43:10] queue: e24-fpc-vec-lfe-s waits (3 live sessions, cap 3)
+[2026-10-08 10:47:01] watch: balance=165.94 rate=37.3/h active=['e15-dota-o365-s', 'e16-dota-dense-fix-s', 'e20-dota-base12-s'] ended=[]
+[2026-10-08 10:55:04] queue: e24-fpc-vec-lfe-s waits (3 live sessions, cap 3)
+[2026-10-08 10:58:46] watch: balance=157.48 rate=37.3/h active=['e15-dota-o365-s', 'e16-dota-dense-fix-s', 'e20-dota-base12-s'] ended=[]
+[2026-10-08 11:06:48] queue: e24-fpc-vec-lfe-s waits (3 live sessions, cap 3)
+[2026-10-08 11:11:36] watch: balance=151.25 rate=32.0/h active=['e15-dota-o365-s', 'e16-dota-dense-fix-s', 'e20-dota-base12-s'] ended=[]
