@@ -152,6 +152,19 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     - NMS 0.1 cả khi 1 tile/ảnh. Sửa: 0.7.
   - **Chưa làm:** tích luỹ gradient tới batch danh nghĩa; P/R tại một ngưỡng conf chung; fallback fp16 cho T4; cache ảnh trong RAM.
 
+- **F20. Wall_Color (user tự chạy, G4, cả trang resize 1280, batch 8, 400 query): chững ở khoảng 0.43 / 0.20.**
+  - **Đợt 1:** 40 epoch.
+  - **Đợt 2:** train tiếp từ best.pt.
+    - 11 epoch: mAP50 0.399 → 0.431, mAP50-95 0.183 → 0.197, P ≈ R ≈ 0.5.
+    - Loss đi ngang. 10.5 s/epoch, 62 GB.
+  - **Tham chiếu YOLO26x** (từ `wall_300kaggle.pt` = đã học tường, cách chấm của Ultralytics): 0.66–0.72 / 0.42–0.46. Chưa so công bằng.
+  - **Giả thuyết, chưa đo:**
+    - (a) Thiếu query: R 0.5 trong khi trang tới khoảng 400 object → thử 900.
+    - (b) Box kém khít với vật mảnh (F18): tỉ lệ mAP50-95/mAP50 = 0.46.
+    - (c) Train hai đợt ngắn: mỗi đợt lại warmup.
+    - (d) Mosaic/zoom kiểu YOLO chưa đo trên CAD.
+  - **Cần:** bảng AP theo class; mốc YOLO26x từ COCO chấm bằng evaluator của mình.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
