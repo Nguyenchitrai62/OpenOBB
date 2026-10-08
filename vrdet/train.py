@@ -441,6 +441,7 @@ def main(argv=None):
         res = None
         if val_subset and ((epoch + 1) % a.eval_every == 0 or epoch + 1 == a.epochs) and (epoch + 1 < a.epochs or full_val):
             t_val = time.time()
+            ema.repair(model, log=lambda m: log(m, console=True))
             res, _ = eval_dota(ema.module, a.data, device, val_subset, batch=a.batch, workers=a.workers,
                                num_top=a.num_top, img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post, merge_iou=a.merge_iou)
             if not a.verbose:

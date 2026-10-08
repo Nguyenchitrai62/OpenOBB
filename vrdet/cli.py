@@ -37,7 +37,7 @@ SIZES = ("s", "m", "l", "x")
 # adapters (LSK), repeat-factor sampling, one-to-many query group, adaptive query denoising, square-aware angle loss,
 # IoU-aware matching, 900 inference queries.
 RECIPE = {"lsk": True, "rfs": 0.1, "o2m_queries": 900, "o2m_k": 6, "aqd": True, "angle_weight": 1.0, "cost_iou": 0.5,
-          "eval_queries": 900, "channels_last": True, "compile": True}
+          "eval_queries": 900, "channels_last": True}     # compile=True to opt in to torch.compile
 # augmentation (names as in the common one-stage trainers) -> trainer flags
 AUGMENT = {"mosaic": 1.0, "scale": 0.5, "translate": 0.1, "close_mosaic": 10}
 AUG_FLAGS = {"mosaic": "mosaic_p", "scale": "scale_jitter", "translate": "translate", "close_mosaic": "mosaic_off"}
@@ -422,8 +422,6 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
     opts.update(inherited)
     if weights:
         opts["weights"] = weights
-    if opts.get("compile") and "compile" not in extra and n_train // int(opts["batch"]) * int(epochs) < 3000:
-        opts["compile"] = False      # short runs: compile warm-up (1-2 min) costs more than it saves
     opts.update(extra)
     if float(opts["lr"]) > 3 * sd["lr"]:
         print(f"[vrdet] WARNING: lr0={opts['lr']:g} is {float(opts['lr']) / sd['lr']:.0f}x the default for VRDet-{size} "

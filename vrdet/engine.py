@@ -20,26 +20,38 @@ class ModelEMA:
         for p in self.module.parameters():
             p.requires_grad_(False)
         self.decay, self.warmups, self.updates = decay, warmups, 0
-        self._pairs = None
 
     @torch.no_grad()
     def update(self, model):
+        # fresh state_dict every step: caching the tensor references once gave an all-NaN EMA together with
+        # torch.compile on GPU (Wall_Color fine-tune, 2026-10-08)
         self.updates += 1
         d = self.decay * (1 - math.exp(-self.updates / self.warmups))
-        if self._pairs is None:                 # state_dict tensors share storage with the live parameters/buffers
-            msd = model.state_dict()
-            fl, other = ([], []), []
-            for k, v in self.module.state_dict().items():
-                if v.dtype.is_floating_point:
-                    fl[0].append(v)
-                    fl[1].append(msd[k].detach())
-                else:
-                    other.append((v, msd[k]))
-            self._pairs = (fl, other)
-        (fl_e, fl_m), other = self._pairs
-        for v, m in other:
-            v.copy_(m)
+        msd = model.state_dict()
+        fl_e, fl_m = [], []
+        for k, v in self.module.state_dict().items():
+            if v.dtype.is_floating_point:
+                fl_e.append(v)
+                fl_m.append(msd[k].detach())
+            else:
+                v.copy_(msd[k])
         torch._foreach_lerp_(fl_e, fl_m, 1 - d)
+
+    @torch.no_grad()
+    def repair(self, model, log=print):
+        """Non-finite EMA tensors are re-synced from the live model (reported, never silently evaluated)."""
+        msd = model.state_dict()
+        bad = [k for k, v in self.module.state_dict().items()
+               if v.dtype.is_floating_point and not torch.isfinite(v).all()]
+        if bad:
+            live_bad = [k for k in bad if not torch.isfinite(msd[k]).all()]
+            log(f"WARNING: {len(bad)} EMA tensors are NaN/inf (e.g. {bad[:3]}); re-synced from the training model"
+                + (f"; {len(live_bad)} are non-finite in the training model too (e.g. {live_bad[:3]})" if live_bad else ""))
+            sd = self.module.state_dict()
+            for k in bad:
+                sd[k].copy_(torch.nan_to_num(msd[k], nan=0.0, posinf=0.0, neginf=0.0)
+                            if "running_var" not in k else torch.nan_to_num(msd[k], nan=1.0, posinf=1.0, neginf=1.0))
+        return bad
 
     def state_dict(self):
         return {"module": self.module.state_dict(), "updates": self.updates}

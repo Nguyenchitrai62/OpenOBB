@@ -201,3 +201,17 @@ def test_nan_predictions_do_not_crash_merge_or_eval():
     res = evaluate({"door": (["a", "a"], np.array([0.9, 0.5]), np.stack([sq, np.full(8, np.inf)]))}, gts,
                    classes=("door",))
     assert abs(res["classes"]["door"]["AP50"] - 1.0) < 1e-9
+
+
+def test_ema_repair_resyncs_non_finite():
+    import torch
+
+    from vrdet.engine import ModelEMA
+    net = torch.nn.Sequential(torch.nn.Linear(3, 2), torch.nn.BatchNorm1d(2))
+    ema = ModelEMA(net, decay=0.9, warmups=1)
+    with torch.no_grad():
+        ema.module[0].weight.fill_(float("nan"))
+        ema.module[1].running_var.fill_(float("inf"))
+    bad = ema.repair(net, log=lambda m: None)
+    assert len(bad) == 2 and torch.isfinite(ema.module[0].weight).all()
+    assert torch.equal(ema.module[0].weight, net[0].weight) and torch.isfinite(ema.module[1].running_var).all()
