@@ -387,3 +387,4 @@
 [2026-10-08 13:06:47] watch: balance=106.53 rate=17.8/h active=['c2-fpc-hybrid-s', 'c3-fpc-ground-s'] ended=[('c2-fpc-hybrid-s', 'done')]
 [2026-10-08 13:15:54] watch: balance=104.3 rate=8.9/h active=['c3-fpc-ground-s'] ended=[]
 [2026-10-08 13:16:06] queue: ['c4-fpc-raster-s']
+[2026-10-08 13:19:09] queue: ['c4-fpc-raster-s', 'c5-fpc-raster-p2-s']
