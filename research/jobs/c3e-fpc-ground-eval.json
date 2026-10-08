@@ -1,0 +1,22 @@
+{
+  "id": "c3e-fpc-ground-eval",
+  "gpu": "G4",
+  "bundle": [
+    "vrdet",
+    "colab"
+  ],
+  "setup": [
+    "pip install -q -U gdown shapely"
+  ],
+  "cmd": "python -u colab/data/floorplancad.py --root /content/datasets && mkdir -p {out} && ln -sf {out}/ckpt.pt {out}/last.pt && python -u -m vrdet.train --data /content/datasets/floorplancad_1024 --out {out} --size s --epochs 24 --batch 16 --lr 1e-4 --workers 16 --eval-every 6 --eval-images 100 --channels-last --compile --rfs 0.1 --vectors --vec-lfe --vec-ground 1.0 --layer-drop 0.1 --o2m-queries 900 --o2m-k 6 --aqd --angle-weight 1.0 --cost-iou 0.5 --eval-queries 900 --eval-only",
+  "sync": [
+    "ckpt.pt",
+    "metrics.jsonl",
+    "*.log",
+    "eval_val.json",
+    "eval_val.txt"
+  ],
+  "max_hours": 1,
+  "max_retries": 3,
+  "est_cu": 2
+}

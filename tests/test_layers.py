@@ -78,3 +78,23 @@ def test_snap_boxes_recovers_exact_primitive_rectangle():
     far = cv2.boxPoints(((900.0, 900.0), (50.0, 50.0), 0.0)).reshape(1, 8)  # disagreeing box is left untouched
     out2 = snap_boxes(logits, pts, np.ones(6, bool), q, far.astype(np.float64), S)
     assert np.allclose(out2, far)
+
+
+def test_snap_box_gate_ignores_far_primitives():
+    import cv2
+    from vrdet.models.vrdet import snap_boxes
+    from vrdet.ops.obb import poly_iou
+    S = 1024
+    true = cv2.boxPoints(((500.0, 400.0), (120.0, 40.0), 25.0))
+    pts = np.zeros((5, 16), np.float32)
+    for k in range(4):
+        a, b = true[k], true[(k + 1) % 4]
+        pts[k] = (np.linspace(a, b, 8) / S).reshape(-1)
+    pts[4] = (np.linspace([800, 800], [900, 820], 8) / S).reshape(-1)     # far stroke wrongly selected
+    logits = np.full((2, 5), 5.0, np.float32)
+    regressed = cv2.boxPoints(((505.0, 398.0), (110.0, 46.0), 20.0)).reshape(1, 8).astype(np.float64)
+    q = np.array([0])
+    loose = snap_boxes(logits, pts, np.ones(5, bool), q, regressed, S)
+    gated = snap_boxes(logits, pts, np.ones(5, bool), q, regressed, S, box_gate=0.2)
+    assert np.allclose(loose, regressed)                                 # far stroke ruins the snap -> IoU gate keeps it
+    assert poly_iou(gated, true.reshape(1, 8).astype(np.float64))[0, 0] > 0.98

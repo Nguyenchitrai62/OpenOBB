@@ -238,7 +238,7 @@ def postprocess(outputs, num_top=300, img_size=1024, mode="flat", return_query=F
     return s, labels, b
 
 
-def snap_boxes(member_logits, pts, valid, q, polys, img_size, thr=0.5, iou_gate=0.5, min_side=2.0):
+def snap_boxes(member_logits, pts, valid, q, polys, img_size, thr=0.5, iou_gate=0.5, min_side=2.0, box_gate=None):
     """H17 for one image: polygon of every output whose query selected >= 1 primitive becomes the min-area rectangle
     of those primitives' points (exact CAD geometry), when it agrees with the regressed box (IoU >= iou_gate).
     member_logits (Q, M), pts (M, 16) normalised, valid (M,), q (K,) query per output, polys (K, 8) px."""
@@ -250,6 +250,18 @@ def snap_boxes(member_logits, pts, valid, q, polys, img_size, thr=0.5, iou_gate=
     P = pts.reshape(-1, 8, 2) * img_size
     for qq in np.unique(q):
         sel = (prob[qq] > thr) & valid
+        if box_gate is not None and sel.any():
+            # only primitives lying inside the regressed box (expanded by box_gate) may be members
+            r = np.nonzero(q == qq)[0][0]
+            quad = out[r].reshape(4, 2)
+            c = quad.mean(0)
+            big = (quad - c) * (1 + box_gate) + c
+            e1, e2 = big[1] - big[0], big[3] - big[0]
+            d = P - big[0]
+            u = (d @ e1) / max(float(e1 @ e1), 1e-9)
+            v = (d @ e2) / max(float(e2 @ e2), 1e-9)
+            inside = ((u >= -0.01) & (u <= 1.01) & (v >= -0.01) & (v <= 1.01)).all(1)
+            sel &= inside
         if not sel.any():
             continue
         (cx, cy), (w, h), a = cv2.minAreaRect(P[sel].reshape(-1, 2).astype(np.float32))
