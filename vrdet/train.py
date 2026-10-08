@@ -147,9 +147,11 @@ def main(argv=None):
     start_epoch, it = 0, 0
     if last.exists():
         ck = torch.load(last, map_location="cpu", weights_only=False)
-        model.load_state_dict(ck["model"])
+        if "model" in ck:                       # eval-only checkpoints may carry the EMA weights alone
+            model.load_state_dict(ck["model"])
         ema.load_state_dict(ck["ema"])
-        opt.load_state_dict(ck["opt"])
+        if "opt" in ck:
+            opt.load_state_dict(ck["opt"])
         start_epoch, it = ck["epoch"] + 1, ck["iter"]
         log(f"resumed from epoch {ck['epoch']} (iter {it})")
     # Compile AFTER the EMA deep copy: compiled forwards are bound methods of the live model, and a copy made

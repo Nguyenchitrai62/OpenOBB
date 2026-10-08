@@ -1,0 +1,22 @@
+{
+  "id": "e11-dota-x-qinfer",
+  "gpu": "G4",
+  "bundle": [
+    "vrdet",
+    "colab"
+  ],
+  "setup": [
+    "pip install -q -U huggingface_hub hf_xet shapely"
+  ],
+  "cmd": "python -u colab/data/get_dota.py --root /content/datasets && for q in 600 900; do mkdir -p {out}/q$q && ln -sf {out}/ckpt.pt {out}/q$q/last.pt && python -u -m vrdet.train --data /content/datasets/dota1_1024 --out {out}/q$q --size x --eval-only --queries $q --num-top $q --workers 16 || exit 1; done",
+  "sync": [
+    "ckpt.pt",
+    "metrics.jsonl",
+    "*.log",
+    "eval_val.json",
+    "eval_val.txt"
+  ],
+  "max_hours": 1,
+  "max_retries": 2,
+  "est_cu": 4
+}
