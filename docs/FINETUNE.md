@@ -64,7 +64,8 @@ r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024, project="
 | `lrf` | 0.01 | learning rate giảm tuyến tính từ `lr0` về `lr0 × lrf` ở cuối run (`cos_lr=True`: giảm theo cosine) |
 | `cache` | auto | giải mã ảnh train một lần vào RAM nếu chiếm dưới 25% RAM (`cache=False` để tắt) |
 | `patience` | 100 | dừng nếu mAP50-95 val không tăng sau N epoch |
-| `lr0` | 1e-4 (bản S) | learning rate (AdamW); kiểu DETR không nên dùng mức 1e-3 của YOLO |
+| `optimizer` | auto | như YOLO: `auto` **bỏ qua `lr0`** và dùng LR đã đo cho từng cỡ (S 1e-4, X 6e-5); `optimizer=AdamW` để dùng `lr0` của bạn |
+| `lr0` | theo cỡ model | chỉ có tác dụng khi `optimizer=AdamW`; kiểu DETR không nên dùng mức 1e-3 của YOLO |
 | `fliplr`, `flipud` | 0.5, 0.5 | xác suất lật ngang / dọc; `rot90=False` để tắt xoay 90° (symbol có chiều) |
 | `freeze` | – | `backbone`, `encoder` (chỉ train decoder) hoặc số stage backbone; hợp với data rất ít |
 | `time` | – | ngân sách giờ train; số epoch tự tính lại sau mỗi epoch để LR vẫn giảm hết |
@@ -77,6 +78,7 @@ r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024, project="
 - **Resume:** chạy lại đúng lệnh, run chưa xong sẽ train tiếp từ `last.pt` với **đúng tham số đã lưu**.
   - Chỉ đổi được `workers`, `cache`, `patience`, `time`; tham số khác bị bỏ qua và có thông báo.
   - Muốn train lại từ đầu: `resume=False` (sang thư mục mới), hoặc `resume=False exist_ok=True` (ghi đè thư mục cũ).
+- **Tự phục hồi khi diverge:** epoch có nhiều bước NaN hoặc thống kê BatchNorm hỏng thì tự nạp lại `last.pt` của epoch trước và giảm LR một nửa (tối đa 3 lần, như YOLO).
 - **Cache dữ liệu theo nội dung:** sửa ảnh hay nhãn thì lần sau tự chuẩn bị lại.
 - **Gõ sai tên tham số:** báo lỗi kèm gợi ý, ví dụ `'epoch' is not a valid VRDet argument. Similar: epochs`.
 

@@ -52,7 +52,7 @@ ARCH_KEYS = ("size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_quer
              "no_rotate_sampling", "context")
 MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / per epoch on small datasets
 ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every", "lrf": "min_lr_ratio"}
-IGNORED = ("save_period", "plots", "optimizer", "momentum", "degrees", "shear", "perspective", "mixup", "cutmix",
+IGNORED = ("save_period", "plots", "momentum", "degrees", "shear", "perspective", "mixup", "cutmix",
            "copy_paste", "rect", "multi_scale", "warmup_bias_lr", "warmup_momentum", "nbs", "dropout", "cls_pw")
 
 
@@ -312,7 +312,8 @@ def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_
 
 def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", name="exp", exist_ok=False,
           resume=True, tile=False, tile_scale=None, gap=200, val_frac=0.15, cache="auto", cache_dir=None, workers=None,
-          device=None, recipe=True, warmup_epochs=3, patience=100, lrf=0.01, cos_lr=False, seed=0, **extra):
+          device=None, recipe=True, warmup_epochs=3, patience=100, lrf=0.01, cos_lr=False, seed=0, optimizer="auto",
+          **extra):
     """Train (or fine-tune when `model` is a .pt path). Returns SimpleNamespace(save_dir, best, last, metrics)."""
     check_keys(extra)
     _set_device(device)
@@ -392,6 +393,12 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
         scale = auto_scale(data, imgsz) if tile_scale in (None, "auto") else float(tile_scale)
 
     sd = SIZE_DEFAULTS[size]
+    if str(optimizer).lower() == "auto":            # like the usual trainer: auto picks the measured LR, ignores lr0
+        if "lr" in extra:
+            print(f"[vrdet] optimizer=auto: ignoring lr0={extra.pop('lr'):g}, using AdamW lr={sd['lr']:g} (measured for "
+                  f"VRDet-{size}); set optimizer=AdamW to use your own lr0")
+    elif str(optimizer).lower() != "adamw":
+        raise SystemExit("optimizer must be 'auto' or 'AdamW'")
     prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, seed, fit=fit)
     n_train = _n_lines(Path(prepared) / "meta" / "train.jsonl")
     if cache == "auto":                              # decoded uint8 images in RAM when they take < 25% of it

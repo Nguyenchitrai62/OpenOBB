@@ -64,6 +64,13 @@ class ModelEMA:
         self.updates = sd["updates"]
 
 
+def batchnorm_finite(model):
+    """False when any BatchNorm running statistic is NaN/inf (a diverging run)."""
+    return all(torch.isfinite(m.running_var).all() and torch.isfinite(m.running_mean).all()
+               for m in model.modules()
+               if isinstance(m, torch.nn.modules.batchnorm._BatchNorm) and m.running_var is not None)
+
+
 @torch.no_grad()
 def sanitize_batchnorm(model, limit=1e10, log=print):
     """BatchNorm running statistics that are NaN/inf or absurdly large (an earlier run diverged; training-mode BN

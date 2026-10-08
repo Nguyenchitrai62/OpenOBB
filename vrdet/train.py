@@ -17,7 +17,8 @@ import torch
 from torch.utils.data import DataLoader
 
 from vrdet.data.dota import DotaPatches, collate, dataset_classes
-from vrdet.engine import ModelEMA, eval_dota, lr_factor, param_groups, sanitize_batchnorm, to_device
+from vrdet.engine import (ModelEMA, batchnorm_finite, eval_dota, lr_factor, param_groups, sanitize_batchnorm,
+                          to_device)
 from vrdet.console import EpochBar, val_rows
 from vrdet.report import append_results, plot_labels, plot_results, plot_train_batch, plot_val_predictions
 from vrdet.eval.dota import DOTA1_CLASSES, format_table, summary_table, write_task1
@@ -253,6 +254,7 @@ def main(argv=None):
     base_lrs = [g["lr"] for g in opt.param_groups]
     ema = ModelEMA(model, a.ema, a.ema_warmups)
     start_epoch, it, best_score, best_epoch = 0, 0, -1.0, -1
+    recoveries, lr_scale = 0, 1.0               # divergence recovery: reload last.pt, halve the LR (<= 3 times)
     if last.exists():
         ck = torch.load(last, map_location="cpu", weights_only=False)
         if "model" in ck:                       # eval-only checkpoints may carry the EMA weights alone
@@ -262,6 +264,8 @@ def main(argv=None):
             opt.load_state_dict(ck["opt"])
         start_epoch, it = ck["epoch"] + 1, ck["iter"]
         best_score, best_epoch = ck.get("best_score", -1.0), ck.get("best_epoch", -1)
+        recoveries, lr_scale = ck.get("recoveries", 0), ck.get("lr_scale", 1.0)
+        base_lrs = [b * lr_scale for b in base_lrs]
         sanitize_batchnorm(model, log=lambda m: log(m, console=True))       # exploded stats saved in last.pt
         sanitize_batchnorm(ema.module, log=lambda m: log(m))
         log(f"resumed from epoch {ck['epoch']} (iter {it})")
@@ -342,7 +346,7 @@ def main(argv=None):
         for m in frozen:                        # frozen parts keep their BatchNorm statistics
             m.eval()
         t_ep, t_data, t_loss = time.time(), 0.0, 0.0
-        sums, n = {}, 0
+        sums, n, bad = {}, 0, 0
         tick = time.time()
         if device.type == "cuda":
             torch.cuda.reset_peak_memory_stats()
@@ -388,6 +392,7 @@ def main(argv=None):
             if not torch.isfinite(loss):
                 log(f"non-finite loss at iter {it}: {[(k, float(v)) for k, v in losses.items() if not torch.isfinite(v)]}",
                     console=True)
+                bad += 1
                 opt.zero_grad(set_to_none=True)
                 it += 1
                 tick = time.time()
@@ -404,6 +409,7 @@ def main(argv=None):
                     scaler.update()             # fp16 overflow: lower the loss scale, skip the step
                 else:
                     log(f"non-finite grad norm at iter {it}; step skipped", console=True)
+                    bad += 1
                 opt.zero_grad(set_to_none=True)
                 it += 1
                 tick = time.time()
@@ -437,6 +443,24 @@ def main(argv=None):
             tick = time.time()
         if bar is not None:
             bar.close()
+        if bad > max(2, iters_per_epoch // 10) or not batchnorm_finite(model):
+            # diverging (like the usual trainer's NaN recovery): back to the last good epoch with half the LR
+            if recoveries >= 3 or not last.exists():
+                raise SystemExit(f"training diverged ({bad} non-finite steps in epoch {epoch + 1}) and cannot recover"
+                                 f"{' after 3 retries' if recoveries >= 3 else ''}: lower the learning rate (lr0)")
+            ck = torch.load(last, map_location="cpu", weights_only=False)
+            model.load_state_dict(ck["model"])
+            ema.load_state_dict(ck["ema"])
+            opt.load_state_dict(ck["opt"])
+            it = ck["iter"]
+            recoveries += 1
+            lr_scale *= 0.5
+            base_lrs = [b * 0.5 for b in base_lrs]
+            sanitize_batchnorm(model, log=lambda m: log(m))
+            sanitize_batchnorm(ema.module, log=lambda m: log(m))
+            say(f"WARNING: training diverged in epoch {epoch + 1} ({bad} non-finite steps); reloaded last.pt "
+                f"(epoch {ck['epoch'] + 1}) and halved the learning rate (now x{lr_scale:g}), recovery {recoveries}/3")
+            continue
         dt = time.time() - t_ep
         rec = {"epoch": epoch, "iter": it, "lr": opt.param_groups[-1]["lr"], "epoch_s": round(dt, 1),
                "img_s": round(n * a.batch / max(dt, 1e-9), 1), "crit_s_per_it": round(t_loss / max(n, 1), 3),
@@ -458,7 +482,7 @@ def main(argv=None):
                 save_best(best_score, epoch)
         torch.save({"model": model.state_dict(), "ema": ema.state_dict(), "opt": opt.state_dict(), "epoch": epoch,
                     "iter": it, "args": vars(a), "classes": list(classes), "best_score": best_score,
-                    "best_epoch": best_epoch}, out / "last.tmp")
+                    "best_epoch": best_epoch, "recoveries": recoveries, "lr_scale": lr_scale}, out / "last.tmp")
         os.replace(out / "last.tmp", last)
         jlog(rec)
         append_results(out, rec, res)

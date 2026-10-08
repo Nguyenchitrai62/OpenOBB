@@ -229,3 +229,16 @@ def test_inf_batchnorm_stats_never_become_nan():
     assert not torch.isnan(ema.module[1].running_var).any()
     assert sanitize_batchnorm(net, log=lambda m: None) == ["1"]
     assert torch.isfinite(net[1].running_var).all() and float(net[1].running_var.max()) == 1.0
+
+
+def test_optimizer_auto_ignores_lr0(tmp_path, monkeypatch):
+    import vrdet.train as trainer
+    from vrdet.cli import train
+    calls = []
+    monkeypatch.setattr(trainer, "main", lambda argv: calls.append(" ".join(argv)))
+    data = _dataset(tmp_path / "ds")
+    kw = dict(epochs=10, batch=4, imgsz=512, project=str(tmp_path / "runs"), cache_dir=str(tmp_path / "c"), workers=1)
+    train(str(data), name="a", lr0=0.001, **kw)
+    assert "--lr 0.0001 " in calls[-1]                      # auto: measured default for VRDet-s
+    train(str(data), name="b", lr0=0.0002, optimizer="AdamW", **kw)
+    assert "--lr 0.0002 " in calls[-1]
