@@ -287,3 +287,4 @@
 [2026-10-08 04:29:10] e6-vrdet-x-dota-24e: finished with status done; stopping VM
 [2026-10-08 04:29:13] watch: balance=225.55 rate=8.9/h active=['e6-vrdet-x-dota-24e'] ended=[('e6-vrdet-x-dota-24e', 'done')]
 [2026-10-08 04:37:14] watch: no active jobs
+[2026-10-08 07:37:45] queue: ['e11-dota-x-qinfer', 'e10-dota-mosaic-s', 'e10-fpc-vec-mosaic-s']
