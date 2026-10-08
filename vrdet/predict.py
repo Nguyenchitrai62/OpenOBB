@@ -22,6 +22,7 @@ import torch
 
 from vrdet.data.vectors import cut_tile
 from vrdet.eval.dota import merge_patches
+from vrdet.models.dense_head import dense_predict
 from vrdet.models.vrdet import VRDet, postprocess
 from vrdet.ops.obb import obb2poly
 
@@ -59,8 +60,10 @@ def load_model(ckpt_path, device, queries=None, classes=None):
 
 
 @torch.no_grad()
-def predict_image(model, img, size, gap, batch, device, num_top, vec=None, amp=True):
-    """-> list of (patch_name, cls, score, poly8 in tile pixels) with patch names carrying the tile offsets."""
+def predict_image(model, img, size, gap, batch, device, num_top, vec=None, amp=True, union=True):
+    """-> list of (patch_name, cls, score, poly8 in tile pixels) with patch names carrying the tile offsets.
+    Hybrid models (dense head present): decoder + dense outputs are pooled ("union", the measured best rule) and
+    de-duplicated by the class-wise NMS of the tile merge."""
     H, W = img.shape[:2]
     tiles = [(x, y) for y in windows(H, size, gap) for x in windows(W, size, gap)]
     dets = []
@@ -88,6 +91,10 @@ def predict_image(model, img, size, gap, batch, device, num_top, vec=None, amp=T
         for j, (x0, y0) in enumerate(chunk):
             for sc, lab, p in zip(s[j], l[j], obb2poly(b[j])):
                 dets.append((f"img__1.0__{x0}___{y0}", int(lab), float(sc), p))
+        if union and "dense_logits" in out:
+            for (x0, y0), (ds, dl, db) in zip(chunk, dense_predict(out, img_size=size)):
+                for sc, lab, p in zip(ds.cpu().numpy(), dl.cpu().numpy(), obb2poly(db.cpu().numpy())):
+                    dets.append((f"img__1.0__{x0}___{y0}", int(lab), float(sc), p))
     return dets
 
 
