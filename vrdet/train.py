@@ -302,6 +302,18 @@ def main(argv=None):
         say(f"train   {a.epochs} epochs x {iters_per_epoch} it, batch {a.batch}, AdamW lr {a.lr:g} -> "
             f"{a.lr * a.min_lr_ratio:g} ({a.schedule}), warmup {a.warmup} it | "
             f"val every {a.eval_every} epoch(s) on {'all' if full_val else len(val_subset or [])} val images")
+        aug = []
+        if a.mosaic_p:
+            aug.append(f"mosaic {a.mosaic_p:g} (off last {a.mosaic_off})")
+        if a.scale_jitter:
+            aug.append(f"zoom {1 - a.scale_jitter:g}-{1 + a.scale_jitter:g}")
+        if a.translate:
+            aug.append(f"translate {a.translate:g}")
+        aug.append(f"flip lr {a.fliplr:g} / ud {a.flipud:g}")
+        if not a.no_rot90:
+            aug.append("rot90")
+        aug.append("hsv " + "/".join(f"{v:g}" for v in a.hsv))
+        say("augment " + ", ".join(aug) + (f" | freeze {a.freeze}" if a.freeze else ""))
         say(f"save    {out}  (best.pt, last.pt, results.csv/png, labels.jpg, val_pred.jpg, train_progress.log)")
         if start_epoch == 0:
             plot_labels(out, ds.items, classes, a.img)
