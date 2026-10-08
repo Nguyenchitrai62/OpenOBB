@@ -156,7 +156,7 @@ def run(ckpt, source, out=None, conf=0.25, classes=None, size=None, gap=200, que
             vec = dict(np.load(vp)) if vp.exists() else None
         dets = predict_image(model, img, size, gap, batch, device, queries, vec,
                              scale=size / max(img.shape[:2]) if fit else scale)
-        js = merge_dets(dets, names, conf)
+        js = merge_dets(dets, names, conf, iou=0.7 if fit else 0.1)
         results[str(f)] = js
         if out is not None:
             rows = to_label_lines(js, img.shape[:2], with_score=True)

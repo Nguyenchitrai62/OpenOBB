@@ -88,7 +88,7 @@ def _to_dota(img_paths, lbl_dir, names, out_dir):
         if not lp.exists():
             stats["missing labels"] += 1
         else:
-            rows = [r.split() for r in lp.read_text().splitlines() if r.strip()]
+            rows = [r.split() for r in dict.fromkeys(r.strip() for r in lp.read_text().splitlines()) if r]
             good = []
             for v in rows:                          # 'class x1 y1 ... x4 y4' with coordinates in [0, 1]
                 try:
@@ -114,13 +114,13 @@ def _to_dota(img_paths, lbl_dir, names, out_dir):
 
 
 def prepare(data, out, size=1024, gap=200, val_frac=0.15, seed=0, names=None, workers=None, scale=1.0,
-            fit=False):
+            fit=False, ext=".png"):
     """Build the tiled layout in `out` (skipped if already built with the same settings). Returns `out`.
     fit=True resizes each image so its long side = size (one tile per image, any resolution); otherwise `scale`
     resizes every image before tiling (e.g. 0.8: 1280 px pages -> one 1024 tile). Evaluation maps back."""
     out = Path(out)
     stamp = {"data": str(Path(data).resolve()), "size": size, "gap": gap, "val_frac": val_frac, "seed": seed,
-             "scale": scale, "fit": fit}
+             "scale": scale, "fit": fit, "ext": ext}
     done = out / ".prepared.json"
     if done.exists() and json.loads(done.read_text()) == stamp:
         print(f"[data] reuse {out}")
@@ -150,7 +150,8 @@ def prepare(data, out, size=1024, gap=200, val_frac=0.15, seed=0, names=None, wo
             if st["corrupt lines"]:
                 print(f"[data] WARNING {split}: {st['corrupt lines']} label lines skipped (need 'class x1 y1 ... x4 y4', "
                       f"class < {len(safe)}, coordinates in [0, 1])")
-            split_items(items, out, split, size, gap, (float(scale),), classes=tuple(safe), workers=workers, fit=fit)
+            split_items(items, out, split, size, gap, (float(scale),), classes=tuple(safe), workers=workers, fit=fit,
+                        ext=ext)
     (out / "classes.json").write_text(json.dumps([n.replace(" ", "_") for n in names]))
     done.write_text(json.dumps(stamp))
     return out

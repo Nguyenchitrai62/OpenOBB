@@ -70,7 +70,8 @@ def main():
         up = st.file_uploader("Kéo thả ảnh", type=("jpg", "jpeg", "png", "bmp", "tif", "tiff", "webp"))
         c1, c2 = st.columns(2)
         conf = c1.slider("Confidence", 0.05, 1.0, 0.3, 0.05)
-        iou = c2.slider("NMS IoU", 0.0, 1.0, 0.1, 0.05, help="gộp box trùng (giữa các tile)")
+        iou = c2.slider("NMS IoU", 0.0, 1.0, 0.7 if targs.get("fit", False) else 0.1, 0.05,
+                        help="gộp box trùng; 0.7 khi cả ảnh là 1 tile, 0.1 khi ghép nhiều tile")
         with st.expander("Kích thước ảnh"):
             size = st.number_input("imgsz", 256, 2048, int(targs.get("img", 1024)), 32,
                                    help="cạnh dài ảnh đưa vào model (mặc định = lúc train)")

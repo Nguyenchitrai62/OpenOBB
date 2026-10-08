@@ -43,7 +43,7 @@ def _fmt_rate(r):
     return f"{r:g}" if r != 1 else "1.0"
 
 
-def split_image(item, out, split, size, gap, rates, iof_thr, classes, quality, fit=False):
+def split_image(item, out, split, size, gap, rates, iof_thr, classes, quality, fit=False, ext=".jpg"):
     img_path, lbl_path = item
     name = Path(img_path).stem
     img0 = cv2.imread(str(img_path), cv2.IMREAD_COLOR)
@@ -100,26 +100,29 @@ def split_image(item, out, split, size, gap, rates, iof_thr, classes, quality, f
                             q[1::2] = np.clip(q[1::2] - y0, 0, ph)
                             kept.append([cls_idx[objs0[k][1]], int(objs0[k][2]), trunc] + [round(v, 2) for v in q])
                             seen.add(int(k))
-                cv2.imwrite(str(out / "images" / split / f"{pname}.jpg"), patch, [cv2.IMWRITE_JPEG_QUALITY, quality])
+                if ext == ".png":                   # lossless: JPEG chroma subsampling smears thin coloured lines
+                    cv2.imwrite(str(out / "images" / split / f"{pname}.png"), patch, [cv2.IMWRITE_PNG_COMPRESSION, 1])
+                else:
+                    cv2.imwrite(str(out / "images" / split / f"{pname}.jpg"), patch, [cv2.IMWRITE_JPEG_QUALITY, quality])
                 with open(out / "labels" / split / f"{pname}.txt", "w") as fh:
                     for o in kept:
                         fh.write(f"{o[0]} " + " ".join(f"{v / size:.6f}" for v in o[3:]) + "\n")
                 metas.append({"name": pname, "src": name, "rate": rate, "x0": x0, "y0": y0, "w": pw, "h": ph,
-                              "img_w": W0, "img_h": H0, "objs": kept})
+                              "img_w": W0, "img_h": H0, "objs": kept, "file": pname + ext})
     if metas:
         metas[0]["lost"] = len(objs0) - len(seen)   # objects too large to be >= iof_thr inside any tile
     return metas, None
 
 
 def split_items(items, out, split, size=1024, gap=200, rates=(1.0,), iof_thr=0.7, classes=(), workers=None,
-                quality=95, fit=False):
+                quality=95, fit=False, ext=".jpg"):
     """items: list of (image_path, dota_label_path or None). Returns the number of tiles written."""
     out = Path(out)
     for d in ("images", "labels", "thumbs", "gt"):
         (out / d / split).mkdir(parents=True, exist_ok=True)
     (out / "meta").mkdir(parents=True, exist_ok=True)
     fn = partial(split_image, out=out, split=split, size=size, gap=gap, rates=tuple(rates),
-                 iof_thr=iof_thr, classes=tuple(classes), quality=quality, fit=fit)
+                 iof_thr=iof_thr, classes=tuple(classes), quality=quality, fit=fit, ext=ext)
     n_patch = n_obj = n_lost = 0
     with Pool(workers or os.cpu_count()) as pool, open(out / "meta" / f"{split}.jsonl", "w") as mf:
         for metas, err in pool.imap_unordered(fn, items, chunksize=2):

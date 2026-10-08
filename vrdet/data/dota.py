@@ -41,6 +41,9 @@ def clip_to_window(polys, labels, S, iof_thr=0.7):
     of their visible part (same rule as colab/data/split_dota.py)."""
     if len(polys) == 0:
         return polys, labels
+    inside = (polys >= 0).all(1) & (polys <= S).all(1)
+    if inside.all():
+        return polys.astype(np.float32), labels
     g = shapely.polygons(polys.reshape(-1, 4, 2).astype(np.float64))
     bad = ~shapely.is_valid(g)
     if bad.any():
@@ -48,6 +51,7 @@ def clip_to_window(polys, labels, S, iof_thr=0.7):
     area = shapely.area(g)
     inter = shapely.intersection(g, shapely.box(0, 0, S, S))
     iof = np.where(area > 0, shapely.area(inter) / np.maximum(area, 1e-9), 0)
+    iof[inside] = 1.0
     out_p, out_l = [], []
     for k in np.nonzero(iof >= iof_thr)[0]:
         if iof[k] > 0.999:
@@ -66,12 +70,15 @@ class DotaPatches(Dataset):
     def __init__(self, root, split, size=1024, augment=False, filter_empty=False, min_size=2.0,
                  hsv=(0.015, 0.5, 0.3), rot90=True, flip=True, limit=None, keep_difficult=True, rotate_p=0.0,
                  mosaic_p=0.0, context=False, thumb=512, ctx_dropout=0.0, vectors=False, max_tokens=4096,
-                 scale_jitter=0.0, translate=0.0, mosaic_mode="half", layer_drop=0.0):
+                 scale_jitter=0.0, translate=0.0, mosaic_mode="half", layer_drop=0.0, aug_iof=0.7):
         self.root, self.split, self.size = Path(root), split, size
         # H11 (YOLO recipe idea): random scale in [1 - scale_jitter, 1 + scale_jitter] and translation of
         # +-translate x size on every training sample; mosaic_mode "yolo" = 4 full-resolution patches around a
         # random centre on a 2S canvas, then the same scale/translate warp to S (objects keep their size)
         self.scale_jitter, self.translate, self.mosaic_mode = scale_jitter, translate, mosaic_mode
+        # visible fraction an object cut by a mosaic/zoom crop needs to keep its label (a visible but unlabelled
+        # part is trained as background; the one-stage recipe keeps even small pieces)
+        self.aug_iof = aug_iof
         self.layer_drop = layer_drop    # H16: chance to merge all CAD layers into one (do not over-rely on layers)
         self.vectors, self.max_tokens = vectors, max_tokens
         self.context, self.thumb, self.ctx_dropout = context, thumb, ctx_dropout
@@ -177,7 +184,7 @@ class DotaPatches(Dataset):
             vec["attr"][:, 4] *= s
         if len(polys):
             pts = polys.reshape(-1, 2) @ M[:, :2].T + M[:, 2]
-            polys, labels = clip_to_window(pts.reshape(-1, 8).astype(np.float32), labels, S)
+            polys, labels = clip_to_window(pts.reshape(-1, 8).astype(np.float32), labels, S, self.aug_iof)
         return img, polys, labels
 
     def _mosaic_yolo(self, i):
@@ -222,7 +229,7 @@ class DotaPatches(Dataset):
         vec = ({"pts": np.concatenate([v["pts"] for v in V]), "attr": np.concatenate([v["attr"] for v in V])}
                if V else None)
         if len(polys):                          # objects cut by the patch borders inside the canvas
-            polys, labels = clip_to_window(polys, labels, 2 * S)
+            polys, labels = clip_to_window(polys, labels, 2 * S, self.aug_iof)
         img, polys, labels = self._warp(canvas, polys, labels, vec, src_centre=S)
         return img, polys, labels, vec
 
@@ -332,8 +339,11 @@ class DotaPatches(Dataset):
                     if ctx is not None:
                         ctx["valid"] = False     # the thumbnail tile box does not follow the warp
         obb = polys_to_obb(polys)
-        keep = (obb[:, 2] >= self.min_size) & (obb[:, 3] >= self.min_size) if len(obb) else np.zeros(0, bool)
+        # thin lines (1-2 px walls/pipes) keep their label with the short side clamped to min_size; only boxes
+        # that vanished in both directions are dropped (deleting them made them permanent misses at eval)
+        keep = np.maximum(obb[:, 2], obb[:, 3]) >= self.min_size if len(obb) else np.zeros(0, bool)
         obb, labels = obb[keep], labels[keep]
+        obb[:, 2:4] = np.maximum(obb[:, 2:4], self.min_size)
         obb[:, :4] /= self.size
         img = np.ascontiguousarray(img[..., ::-1].transpose(2, 0, 1))      # BGR HWC -> RGB CHW
         tgt = {"labels": torch.from_numpy(labels), "boxes": torch.from_numpy(obb), "name": m["name"]}

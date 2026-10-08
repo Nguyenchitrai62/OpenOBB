@@ -107,6 +107,10 @@ def get_args(argv=None):
     ap.add_argument("--eval-only", action="store_true", help="evaluate EMA weights of {out}/last.pt, no training")
     ap.add_argument("--ctx-dropout", type=float, default=0.0, help="H6: drop the context with this prob")
     ap.add_argument("--threads", type=int, default=0, help="torch CPU threads (0 = default)")
+    ap.add_argument("--aug-iof", type=float, default=0.7,
+                    help="visible fraction a crop-cut object needs to keep its label after mosaic / zoom")
+    ap.add_argument("--merge-iou", type=float, default=0.1,
+                    help="class-wise polygon NMS IoU when merging detections (0.1 = DOTA tile merge)")
     ap.add_argument("--patience", type=int, default=0,
                     help="stop when val mAP50-95 has not improved for N epochs (needs full-val each epoch; 0 = off)")
     ap.add_argument("--verbose", action="store_true",
@@ -184,7 +188,10 @@ def main(argv=None):
     ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,
                      rotate_p=a.rotate_p, mosaic_p=a.mosaic_p, context=a.context, ctx_dropout=a.ctx_dropout,
                      vectors=a.vectors, max_tokens=a.max_tokens, scale_jitter=a.scale_jitter,
-                     translate=a.translate, mosaic_mode=a.mosaic_mode, layer_drop=a.layer_drop)
+                     translate=a.translate, mosaic_mode=a.mosaic_mode, layer_drop=a.layer_drop, aug_iof=a.aug_iof)
+    if a.batch > len(ds):
+        log(f"batch {a.batch} > {len(ds)} training samples: using batch {len(ds)}", console=True)
+        a.batch = len(ds)
     sampler = None
     if a.rfs > 0:
         from vrdet.data.dota import repeat_factors
@@ -357,7 +364,7 @@ def main(argv=None):
         if val_subset and ((epoch + 1) % a.eval_every == 0 or epoch + 1 == a.epochs) and (epoch + 1 < a.epochs or full_val):
             t_val = time.time()
             res, _ = eval_dota(ema.module, a.data, device, val_subset, batch=a.batch, workers=a.workers,
-                               num_top=a.num_top, img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post)
+                               num_top=a.num_top, img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post, merge_iou=a.merge_iou)
             if not a.verbose:
                 val_rows(res, time.time() - t_val)
             rec["sub_mAP50"] = round(res["mAP50"], 4)
@@ -392,7 +399,7 @@ def main(argv=None):
     res, dets = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.num_top,
                           img_size=a.img, log=log, fusion=a.dense or a.vec_ground > 0, variants=["dec", "dense", "union", "snap", "snapg"],
                           save_preds_to=(out / "val_preds.npz") if a.dense else None, context=a.context,
-                          vectors=a.vectors, post=a.post)
+                          vectors=a.vectors, post=a.post, merge_iou=a.merge_iou)
     if not a.eval_only and not full_val:
         save_best(res["mAP50_95"], a.epochs - 1)
     table = summary_table(res, classes)
@@ -403,7 +410,7 @@ def main(argv=None):
     if a.eval_queries and a.eval_queries != a.queries:       # extra eval, main numbers stay at --queries
         ema.module.decoder.num_queries = a.eval_queries
         rq, _ = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.eval_queries,
-                          img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post)
+                          img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post, merge_iou=a.merge_iou)
         (out / f"eval_val_q{a.eval_queries}.txt").write_text(summary_table(rq, classes) + "\n")
         (out / f"eval_val_q{a.eval_queries}.json").write_text(json.dumps(rq, indent=1))
         jlog({"final_q": a.eval_queries, "mAP50": rq["mAP50"], "mAP50_95": rq["mAP50_95"]})

@@ -47,7 +47,7 @@ SIZE_DEFAULTS = {          # lr, backbone lr multiplier, weight decay, batch, ~G
     "x": dict(lr=6e-5, backbone_mult=0.1, wd=1.25e-4, batch=8, gb=4.0),
 }
 # architecture flags a fine-tune inherits from its source checkpoint (weights only load into the same shape)
-ARCH_KEYS = ("size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_queries", "queries", "denoising",
+ARCH_KEYS = ("size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_queries", "denoising",
              "no_rotate_sampling", "context")
 MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / per epoch on small datasets
 ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every"}
@@ -290,6 +290,7 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
         print(f"[vrdet] WARNING: only {steps} optimizer steps ({max(1, n_train // int(batch))}/epoch x {epochs} epochs); this "
               f"detector needs ~{MIN_STEPS}+ to converge: raise epochs or lower batch")
     opts = {"size": size, "img": imgsz, "scale": scale, "fit": fit, "epochs": int(epochs), "batch": int(batch),
+            "aug_iof": 0.25, "merge_iou": 0.7 if fit else 0.1,
             "lr": sd["lr"], "backbone_mult": sd["backbone_mult"], "wd": sd["wd"], "hsv": hsv,
             "eval_every": _eval_every(prepared, int(epochs)), "eval_images": 10**9, "patience": int(patience or 0),
             "seed": seed}
@@ -313,9 +314,13 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
 
     from vrdet import train as trainer
     for attempt in range(4):
-        ipe = max(1, n_train // int(opts["batch"]))     # warmup in epochs: >= 100 its, <= 1000 and <= 10% of run
+        ipe = max(1, n_train // int(opts["batch"]))
         total = ipe * int(epochs)
-        opts["warmup"] = opts["ema_warmups"] = int(min(1000, max(20, total // 10), max(100, round(warmup_epochs * ipe))))
+        # warmup = warmup_epochs epochs of steps (at most epochs - 1), as in the usual one-stage trainer
+        opts["warmup"] = opts["ema_warmups"] = max(1, round(min(warmup_epochs, max(int(epochs) - 1, 0)) * ipe))
+        # EMA half-life ~5% of the run (>= 1 epoch, >= 50 steps): a fixed 0.9998 averaged most of a short run
+        half = max(ipe, total // 20, 50)
+        opts.setdefault("ema", round(min(0.9998, 0.5 ** (1 / half)), 6))
         argv = ["--data", str(prepared), "--out", str(save_dir)] + _to_argv(opts)
         (save_dir / "vrdet_args.json").write_text(json.dumps({"data": str(data), "prepared": str(prepared), **opts},
                                                              indent=1, default=str))
@@ -369,6 +374,7 @@ def val(model, data, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, batch=
     if classes != list(names):
         print(f"[vrdet] WARNING: dataset classes {classes} differ from the model's {list(names)}")
     res, _ = eval_dota(net, prepared, dev, None, batch=batch, workers=workers, num_top=queries, img_size=imgsz,
+                       merge_iou=0.7 if fit else 0.1,
                        post=targs.get("post", "flat"))
     print(summary_table(res, classes))
     return res

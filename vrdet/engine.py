@@ -210,7 +210,7 @@ def load_preds(path):
 
 def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num_top=300, img_size=1024,
               merge_workers=16, log=print, fusion=False, variants=None, save_preds_to=None, context=False,
-              vectors=False, post="flat"):
+              vectors=False, post="flat", merge_iou=0.1):
     """DOTA-protocol eval of the decoder output (primary). With fusion=True and a dense head, also scores
     the dense-only / union / size-routed variants (res["fusion"])."""
     t0 = time.time()
@@ -229,7 +229,7 @@ def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num
         sets = {k: v for k, v in sets.items() if k in variants}
     results, primary_dets = {}, None
     for name, pd in sets.items():
-        merged = merge_parallel(pd, 0.1, merge_workers)
+        merged = merge_parallel(pd, merge_iou, merge_workers)
         dets = {classes[c]: v for c, v in merged.items()}
         results[name] = evaluate(dets, gts, classes)
         if name == "dec":
