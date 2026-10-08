@@ -18,6 +18,7 @@ from torch.utils.data import DataLoader
 from vrdet.data.dota import DotaPatches, collate, dataset_classes
 from vrdet.engine import ModelEMA, eval_dota, lr_factor, param_groups, to_device
 from vrdet.console import EpochBar, val_rows
+from vrdet.report import append_results, plot_labels, plot_results, plot_val_predictions
 from vrdet.eval.dota import DOTA1_CLASSES, format_table, summary_table, write_task1
 from vrdet.models.dense_head import DenseCriterion
 from vrdet.models.vrdet import VRDet, build_criterion, load_dfine_coco
@@ -31,6 +32,9 @@ def get_args(argv=None):
     ap.add_argument("--img", type=int, default=1024)
     ap.add_argument("--scale", type=float, default=1.0,
                     help="image scale the data was tiled at (recorded for inference; set by vrdet.data.prepare)")
+    ap.add_argument("--fit", action="store_true",
+                    help="data was prepared with each image resized to long side = img (one tile per image); "
+                         "recorded so inference does the same")
     ap.add_argument("--epochs", type=int, default=24)
     ap.add_argument("--batch", type=int, default=32)
     ap.add_argument("--lr", type=float, default=2e-4)
@@ -103,6 +107,8 @@ def get_args(argv=None):
     ap.add_argument("--eval-only", action="store_true", help="evaluate EMA weights of {out}/last.pt, no training")
     ap.add_argument("--ctx-dropout", type=float, default=0.0, help="H6: drop the context with this prob")
     ap.add_argument("--threads", type=int, default=0, help="torch CPU threads (0 = default)")
+    ap.add_argument("--patience", type=int, default=0,
+                    help="stop when val mAP50-95 has not improved for N epochs (needs full-val each epoch; 0 = off)")
     ap.add_argument("--verbose", action="store_true",
                     help="print the detailed per-iteration log instead of the compact progress table")
     return ap.parse_args(argv)
@@ -196,7 +202,7 @@ def main(argv=None):
     opt = torch.optim.AdamW(param_groups(model, a.lr, a.backbone_mult, a.wd), lr=a.lr, betas=(0.9, 0.999))
     base_lrs = [g["lr"] for g in opt.param_groups]
     ema = ModelEMA(model, a.ema, a.ema_warmups)
-    start_epoch, it, best_score = 0, 0, -1.0
+    start_epoch, it, best_score, best_epoch = 0, 0, -1.0, -1
     if last.exists():
         ck = torch.load(last, map_location="cpu", weights_only=False)
         if "model" in ck:                       # eval-only checkpoints may carry the EMA weights alone
@@ -205,7 +211,7 @@ def main(argv=None):
         if "opt" in ck:
             opt.load_state_dict(ck["opt"])
         start_epoch, it = ck["epoch"] + 1, ck["iter"]
-        best_score = ck.get("best_score", -1.0)
+        best_score, best_epoch = ck.get("best_score", -1.0), ck.get("best_epoch", -1)
         log(f"resumed from epoch {ck['epoch']} (iter {it})")
         if not a.eval_only:
             say(f"Resuming {out} from epoch {ck['epoch'] + 1}/{a.epochs}")
@@ -241,10 +247,13 @@ def main(argv=None):
             f"AMP {'bf16' if amp else 'off'} | compile {'on' if a.compile and device.type == 'cuda' else 'off'}")
         say(f"model   VRDet-{a.size}{' + ' + ' + '.join(extras) if extras else ''}, {n_par:.2f}M params, "
             f"{a.queries} queries | init: {init_desc}")
-        say(f"data    {len(ds)} train tiles, {n_val} val images, {len(classes)} classes | tile {a.img}, scale {a.scale}")
+        mode = f"whole image, long side {a.img}" if a.fit else f"tiles {a.img}, scale {a.scale}"
+        say(f"data    {len(ds)} train tiles, {n_val} val images, {len(classes)} classes | {mode}")
         say(f"train   {a.epochs} epochs x {iters_per_epoch} it, batch {a.batch}, AdamW lr {a.lr:g} | "
             f"val every {a.eval_every} epoch(s) on {'all' if full_val else len(val_subset or [])} val images")
-        say(f"save    {out}  (best.pt, last.pt, metrics.jsonl, train_progress.log)")
+        say(f"save    {out}  (best.pt, last.pt, results.csv/png, labels.jpg, val_pred.jpg, train_progress.log)")
+        if start_epoch == 0:
+            plot_labels(out, ds.items, classes, a.img)
 
     def save_best(score, epoch):
         # compact deployable checkpoint: EMA weights + args + classes (no optimiser state)
@@ -344,7 +353,8 @@ def main(argv=None):
                "data_s_per_it": round(t_data / max(n, 1), 3),
                "max_mem_gb": round(torch.cuda.max_memory_allocated() / 2**30, 1) if device.type == "cuda" else None}
         rec.update({k: round(float(v) / max(n, 1), 4) for k, v in sums.items()})
-        if val_subset and ((epoch + 1) % a.eval_every == 0) and epoch + 1 < a.epochs:
+        res = None
+        if val_subset and ((epoch + 1) % a.eval_every == 0 or epoch + 1 == a.epochs) and (epoch + 1 < a.epochs or full_val):
             t_val = time.time()
             res, _ = eval_dota(ema.module, a.data, device, val_subset, batch=a.batch, workers=a.workers,
                                num_top=a.num_top, img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post)
@@ -353,25 +363,37 @@ def main(argv=None):
             rec["sub_mAP50"] = round(res["mAP50"], 4)
             rec["sub_mAP50_95"] = round(res["mAP50_95"], 4)
             if full_val and res["mAP50_95"] > best_score:
-                best_score = res["mAP50_95"]
+                best_score, best_epoch = res["mAP50_95"], epoch
                 save_best(best_score, epoch)
         torch.save({"model": model.state_dict(), "ema": ema.state_dict(), "opt": opt.state_dict(), "epoch": epoch,
-                    "iter": it, "args": vars(a), "classes": list(classes), "best_score": best_score},
-                   out / "last.tmp")
+                    "iter": it, "args": vars(a), "classes": list(classes), "best_score": best_score,
+                    "best_epoch": best_epoch}, out / "last.tmp")
         os.replace(out / "last.tmp", last)
         jlog(rec)
+        append_results(out, rec, res)
+        plot_results(out)
+        if a.patience and full_val and best_epoch >= 0 and epoch - best_epoch >= a.patience:
+            say(f"Stopping early: no improvement in val mAP50-95 for {a.patience} epochs "
+                f"(best {best_score:.4f} at epoch {best_epoch + 1}).")
+            break
         log(f"epoch {epoch} done in {dt / 60:.1f} min: " + json.dumps(rec))
 
     if a.skip_final_eval:
         if not (out / "best.pt").exists():
             save_best(-1.0, a.epochs - 1)
         return
-    say(f"\n{a.epochs - start_epoch} epochs completed. Validating the final EMA model on all val images...")
+    weights = "ema_last"
+    if full_val and best_score >= 0 and (out / "best.pt").exists() and not a.eval_only:
+        ema.module.load_state_dict(torch.load(out / "best.pt", map_location="cpu", weights_only=False)["model"])
+        weights = "best"
+        say(f"\nTraining finished. Validating best.pt (epoch {best_epoch + 1}) on all val images...")
+    else:
+        say(f"\nTraining finished. Validating the final EMA model on all val images...")
     res, dets = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.num_top,
                           img_size=a.img, log=log, fusion=a.dense or a.vec_ground > 0, variants=["dec", "dense", "union", "snap", "snapg"],
                           save_preds_to=(out / "val_preds.npz") if a.dense else None, context=a.context,
                           vectors=a.vectors, post=a.post)
-    if not a.eval_only and (not full_val or res["mAP50_95"] >= best_score):
+    if not a.eval_only and not full_val:
         save_best(res["mAP50_95"], a.epochs - 1)
     table = summary_table(res, classes)
     log("\n" + table)
@@ -386,6 +408,12 @@ def main(argv=None):
         (out / f"eval_val_q{a.eval_queries}.json").write_text(json.dumps(rq, indent=1))
         jlog({"final_q": a.eval_queries, "mAP50": rq["mAP50"], "mAP50_95": rq["mAP50_95"]})
         ema.module.decoder.num_queries = a.queries
+    final = rq if a.eval_queries and a.eval_queries != a.queries else res
+    say(summary_table(final, classes))
+    try:
+        plot_val_predictions(out, ema.module, a.data, device, a.img, classes, num_top=a.num_top)
+    except Exception as e:  # noqa: BLE001 - a report must never fail the run
+        log(f"val_pred.jpg skipped: {e}")
     lat = None
     if device.type == "cuda":
         m = ema.module.eval()
@@ -404,7 +432,10 @@ def main(argv=None):
                 m(x, ctx=side)
             torch.cuda.synchronize()
         lat = (time.time() - t) / 100 * 1000
-    jlog({"final": True, "split": "val", "weights": "ema_last", "mAP50": res["mAP50"], "mAP50_95": res["mAP50_95"],
+    if lat is not None:
+        say(f"Speed: {lat:.1f} ms per {a.img}px tile (batch 1, fp16, PyTorch)")
+    say(f"Results saved to {out}\n  best.pt (deploy / fine-tune), last.pt (resume), results.csv/png, val_pred.jpg")
+    jlog({"final": True, "split": "val", "weights": weights, "mAP50": res["mAP50"], "mAP50_95": res["mAP50_95"],
           "per_class_AP50": {c: round(r["AP50"], 4) for c, r in res["classes"].items()},
           "latency_ms_pt_fp16_bs1": lat, "fusion": {k: round(v["mAP50"], 4) for k, v in res.get("fusion", {}).items()}})
     (out / "train_done").write_text("ok")

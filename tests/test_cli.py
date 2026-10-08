@@ -51,7 +51,7 @@ def test_train_val_predict_smoke(tmp_path):
     from vrdet.cli import Detector
     data = _dataset(tmp_path / "ds")
     m = Detector("s")
-    r = m.train(data=str(data), epochs=1, batch=2, imgsz=512, scale=0.8, project=str(tmp_path / "runs"),
+    r = m.train(data=str(data), epochs=1, batch=2, imgsz=512, tile_scale=0.8, project=str(tmp_path / "runs"),
                 name="t", cache=str(tmp_path / "cache"), workers=0, recipe=False, no_pretrained=True,
                 max_iters=1, threads=1)
     assert os.path.exists(r.best) and m.model == r.best
@@ -86,3 +86,40 @@ def test_console_rows():
     val_rows(res, 3.0, stream=buf)
     out = buf.getvalue()
     assert "1/10" in out and "21.5G" in out and "100%" in out and "e-12" not in out and "mAP50-95" in out
+
+
+def test_fit_mode_one_tile_per_image(tmp_path):
+    import json as _json
+
+    from vrdet.data.prepare import prepare
+    from vrdet.eval.dota import merge_patches
+    data = _dataset(tmp_path / "ds", size=640)
+    out = prepare(str(data), tmp_path / "prep", size=512, fit=True, workers=1)
+    metas = [_json.loads(l) for l in (out / "meta" / "val.jsonl").read_text().splitlines()]
+    assert len(metas) == 1 and abs(metas[0]["rate"] - 0.8) < 1e-9             # 640 px page -> long side 512
+    poly = np.array(metas[0]["objs"][0][3:])
+    assert np.allclose(poly, [80, 80, 208, 80, 208, 112, 80, 112], atol=0.5)
+    merged = merge_patches([(metas[0]["name"], 0, 0.9, poly)])               # back to original pixels
+    assert np.allclose(merged[0][2][0], [100, 100, 260, 100, 260, 140, 100, 140], atol=0.7)
+
+
+def test_train_flags_and_oom_retry(tmp_path, monkeypatch):
+    import vrdet.train as trainer
+    from vrdet.cli import train
+    calls = []
+
+    def fake_main(argv):
+        calls.append(argv)
+        if len(calls) == 1:
+            raise RuntimeError("CUDA out of memory. Tried to allocate 2.00 GiB")
+
+    monkeypatch.setattr(trainer, "main", fake_main)
+    data = _dataset(tmp_path / "ds")
+    train(str(data), epochs=10, batch=8, imgsz=512, project=str(tmp_path / "runs"), name="t",
+          cache=str(tmp_path / "cache"), workers=1)
+    assert len(calls) == 2
+    first, second = (" ".join(c) for c in calls)
+    for flag in ("--fit", "--lsk", "--mosaic-p 1.0", "--mosaic-mode yolo", "--scale-jitter 0.5", "--translate 0.1",
+                 "--mosaic-off 10", "--patience 100", "--warmup 100", "--eval-every 1", "--batch 8"):
+        assert flag in first, flag
+    assert "--batch 4" in second                                             # halved after the OOM

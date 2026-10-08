@@ -195,6 +195,15 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
 - (bổ sung 13:35, 2026-10-08) **BỎ nhánh vector.** Chỉ làm OBB detection trên ảnh (raster). Code vector (`--vectors`,
   layer pooling, box neo theo nét c3) giữ trong repo nhưng ngoài phạm vi; c3 đã dừng giữa chừng để tiết kiệm CU.
 
+- (bổ sung 16:30, 2026-10-08) **Bộ khung train/infer phải tiện như YOLO; lấy triệt để ý tưởng của YOLO** (ý tưởng không bị
+  bản quyền; code tự viết, không chép Ultralytics). Kiến trúc model là của VRDet.
+  - Mặc định: mỗi ảnh resize về cạnh dài `imgsz`. Mosaic 1.0, scale 0.5, translate 0.1, close_mosaic 10 (mosaic kiểu YOLO
+    trên CAD chưa đo).
+  - Warmup 3 epoch, patience 100, tự giảm batch khi OOM, val mỗi epoch.
+  - Báo cáo: `results.csv/png`, `labels.jpg`, `val_pred.jpg`. Kiểm tra nhãn lúc nạp.
+  - Cắt tile giờ chỉ là tuỳ chọn `tile=True`.
+  - Data Wall_Color: user tự train trên Colab bằng `colab/VRDet_wall_color.ipynb`.
+
 Câu hỏi còn mở:
 - Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.
 

@@ -1,7 +1,8 @@
 """Run a trained VRDet checkpoint on images of any size (e.g. full drawing pages rendered from PDF).
 
-Each image is cut into SIZE x SIZE tiles with GAP overlap (same protocol as training), tiles are predicted in
-batches, and detections are merged back per image with class-wise polygon NMS. Optional vector tokens
+Images are prepared exactly as in training: resized so the long side = SIZE (default, whole image per forward pass),
+or, for models trained with tile=True, cut into SIZE x SIZE tiles with GAP overlap. Tiles are predicted in batches and
+detections are merged back per image with class-wise polygon NMS. Optional vector tokens
 (tools/pdf_vectors.py output: {vectors_dir}/{stem}.npz in full-image pixels) are cut per tile for models trained
 with --vectors.
 
@@ -65,7 +66,9 @@ def predict_image(model, img, size, gap, batch, device, num_top, vec=None, amp=T
     Hybrid models (dense head present): decoder + dense outputs are pooled ("union", the measured best rule) and
     de-duplicated by the class-wise NMS of the tile merge."""
     if scale != 1.0:
-        img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR)
+        h0, w0 = img.shape[:2]
+        img = cv2.resize(img, (max(1, round(w0 * scale)), max(1, round(h0 * scale))),
+                         interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR)
     H, W = img.shape[:2]
     tiles = [(x, y) for y in windows(H, size, gap) for x in windows(W, size, gap)]
     dets = []
@@ -123,9 +126,11 @@ def to_label_lines(js, shape, with_score=False):
 
 
 def run(ckpt, source, out=None, conf=0.25, classes=None, size=None, gap=200, queries=900, batch=8, vis=False,
-        vectors_dir=None, device=None, verbose=True, scale=None):
-    """Predict every image in `source` (file or folder). Returns {image_path: [{"class", "class_id", "score",
-    "poly"}]} with pixel polygons; with `out`, also writes {stem}.txt / {stem}.json (and {stem}_vis.jpg)."""
+        vectors_dir=None, device=None, verbose=True, scale=None, tile=None):
+    """Predict every image in `source` (file or folder). Images are resized like in training: long side = tile size
+    for models trained with whole-image resize (default), or tiled at `scale` (tile=True / tiled models).
+    Returns {image_path: [{"class", "class_id", "score", "poly"}]} with pixel polygons; with `out`, also writes
+    {stem}.txt / {stem}.json (and {stem}_vis.jpg)."""
     device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
     if isinstance(classes, str):
         p = Path(classes)
@@ -133,6 +138,7 @@ def run(ckpt, source, out=None, conf=0.25, classes=None, size=None, gap=200, que
     model, names, targs = load_model(ckpt, device, queries, classes)
     size = size or targs.get("img", 1024)
     scale = scale or targs.get("scale", 1.0)
+    fit = targs.get("fit", False) if tile is None else not tile
     src = Path(source)
     files = [src] if src.is_file() else sorted(p for p in src.iterdir() if p.suffix.lower() in IMG_EXT)
     if out is not None:
@@ -148,7 +154,8 @@ def run(ckpt, source, out=None, conf=0.25, classes=None, size=None, gap=200, que
         if vectors_dir and targs.get("vectors"):
             vp = Path(vectors_dir) / f"{f.stem}.npz"
             vec = dict(np.load(vp)) if vp.exists() else None
-        dets = predict_image(model, img, size, gap, batch, device, queries, vec, scale=scale)
+        dets = predict_image(model, img, size, gap, batch, device, queries, vec,
+                             scale=size / max(img.shape[:2]) if fit else scale)
         js = merge_dets(dets, names, conf)
         results[str(f)] = js
         if out is not None:
@@ -185,8 +192,10 @@ def main(argv=None):
     ap.add_argument("--conf", type=float, default=0.25)
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--vis", action="store_true")
+    ap.add_argument("--tile", action="store_true", help="tile at native resolution instead of the training resize")
     a = ap.parse_args(argv)
-    run(a.ckpt, a.src, a.out, a.conf, a.classes, a.size, a.gap, a.queries, a.batch, a.vis, a.vectors_dir)
+    run(a.ckpt, a.src, a.out, a.conf, a.classes, a.size, a.gap, a.queries, a.batch, a.vis, a.vectors_dir,
+        tile=True if a.tile else None)
 
 
 if __name__ == "__main__":

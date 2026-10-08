@@ -71,11 +71,13 @@ def main():
         c1, c2 = st.columns(2)
         conf = c1.slider("Confidence", 0.05, 1.0, 0.3, 0.05)
         iou = c2.slider("NMS IoU", 0.0, 1.0, 0.1, 0.05, help="gộp box trùng (giữa các tile)")
-        with st.expander("Tile / scale"):
-            size = st.number_input("Tile size", 256, 2048, int(targs.get("img", 1024)), 32)
-            scale = st.number_input("Scale", 0.1, 4.0, float(targs.get("scale", 1.0)), 0.05,
-                                    help="giống lúc train; 1.0 = độ phân giải gốc")
-            gap = st.number_input("Tile overlap (px)", 0, 512, 200, 8)
+        with st.expander("Kích thước ảnh"):
+            size = st.number_input("imgsz", 256, 2048, int(targs.get("img", 1024)), 32,
+                                   help="cạnh dài ảnh đưa vào model (mặc định = lúc train)")
+            tile = st.checkbox("Cắt tile ở độ phân giải gốc", value=not targs.get("fit", False),
+                               help="cho trang rất lớn có object rất nhỏ; mặc định resize cả ảnh như lúc train")
+            scale = st.number_input("tile_scale", 0.1, 4.0, float(targs.get("scale", 1.0)), 0.05, disabled=not tile)
+            gap = st.number_input("Tile overlap (px)", 0, 512, 200, 8, disabled=not tile)
         st.subheader("Class")
         selected = [i for i, n in enumerate(names) if st.checkbox(n, value=True, key=f"cls_{i}")]
         thickness = st.slider("Độ dày nét", 1, 8, 2)
@@ -92,11 +94,12 @@ def main():
         return
     rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-    key = (up.name, len(data), str(p), queries, int(size), float(scale), int(gap))
+    run_scale = float(scale) if tile else int(size) / max(img.shape[:2])     # whole image: long side = imgsz
+    key = (up.name, len(data), str(p), queries, int(size), run_scale, int(gap))
     if detect:
         t = time.time()
         with st.spinner("Detecting..."):
-            raw = predict_image(model, img, int(size), int(gap), 8, device, queries, scale=float(scale))
+            raw = predict_image(model, img, int(size), int(gap), 8, device, queries, scale=run_scale)
         st.session_state.update(raw=raw, key=key, ms=(time.time() - t) * 1000)
 
     left, right = st.columns(2)

@@ -80,30 +80,47 @@ def _to_dota(img_paths, lbl_dir, names, out_dir):
     out_dir.mkdir(parents=True, exist_ok=True)
     safe = [n.replace(" ", "_") for n in names]
     items, n_obj = [], 0
+    stats = {"backgrounds": 0, "missing labels": 0, "corrupt lines": 0}
     for p in img_paths:
         lp = lbl_dir / f"{p.stem}.txt"
         dst = out_dir / f"{p.stem}.txt"
         lines = []
-        if lp.exists():
-            rows = [r.split() for r in lp.read_text().splitlines() if len(r.split()) >= 9]
-            if rows:
+        if not lp.exists():
+            stats["missing labels"] += 1
+        else:
+            rows = [r.split() for r in lp.read_text().splitlines() if r.strip()]
+            good = []
+            for v in rows:                          # 'class x1 y1 ... x4 y4' with coordinates in [0, 1]
+                try:
+                    c, xy = int(float(v[0])), [float(t) for t in v[1:9]]
+                    ok = len(v) >= 9 and 0 <= c < len(safe) and all(-0.05 <= t <= 1.05 for t in xy)
+                except (ValueError, IndexError):
+                    ok = False
+                if ok:
+                    good.append((c, xy))
+                else:
+                    stats["corrupt lines"] += 1
+            if good:
                 h, w = cv2.imread(str(p), cv2.IMREAD_UNCHANGED).shape[:2]
-                for v in rows:
-                    xy = [float(t) for t in v[1:9]]
-                    poly = [xy[i] * (w if i % 2 == 0 else h) for i in range(8)]
-                    lines.append(" ".join(f"{t:.1f}" for t in poly) + f" {safe[int(v[0])]} 0")
+                for c, xy in good:
+                    poly = [min(max(xy[i], 0.0), 1.0) * (w if i % 2 == 0 else h) for i in range(8)]
+                    lines.append(" ".join(f"{t:.1f}" for t in poly) + f" {safe[c]} 0")
+        if not lines:
+            stats["backgrounds"] += 1
         dst.write_text("\n".join(lines) + ("\n" if lines else ""))
         items.append((str(p), str(dst)))
         n_obj += len(lines)
-    return items, safe, n_obj
+    return items, safe, n_obj, stats
 
 
-def prepare(data, out, size=1024, gap=200, val_frac=0.15, seed=0, names=None, workers=None, scale=1.0):
+def prepare(data, out, size=1024, gap=200, val_frac=0.15, seed=0, names=None, workers=None, scale=1.0,
+            fit=False):
     """Build the tiled layout in `out` (skipped if already built with the same settings). Returns `out`.
-    scale resizes every image before tiling (e.g. 0.8: 1280 px pages -> one 1024 tile); evaluation maps back."""
+    fit=True resizes each image so its long side = size (one tile per image, any resolution); otherwise `scale`
+    resizes every image before tiling (e.g. 0.8: 1280 px pages -> one 1024 tile). Evaluation maps back."""
     out = Path(out)
     stamp = {"data": str(Path(data).resolve()), "size": size, "gap": gap, "val_frac": val_frac, "seed": seed,
-             "scale": scale}
+             "scale": scale, "fit": fit}
     done = out / ".prepared.json"
     if done.exists() and json.loads(done.read_text()) == stamp:
         print(f"[data] reuse {out}")
@@ -128,9 +145,12 @@ def prepare(data, out, size=1024, gap=200, val_frac=0.15, seed=0, names=None, wo
         print(f"[data] no val split: holding out {n_val}/{len(tr)} train images")
     with tempfile.TemporaryDirectory(prefix="vrdet_lbl_") as tmp:
         for split, (imgs, lbl_dir) in plan.items():
-            items, safe, n_obj = _to_dota(imgs, lbl_dir, names, Path(tmp) / split)
-            print(f"[data] {split}: {len(imgs)} images, {n_obj} objects")
-            split_items(items, out, split, size, gap, (float(scale),), classes=tuple(safe), workers=workers)
+            items, safe, n_obj, st = _to_dota(imgs, lbl_dir, names, Path(tmp) / split)
+            print(f"[data] {split}: {len(imgs)} images, {n_obj} objects, " + ", ".join(f"{v} {k}" for k, v in st.items()))
+            if st["corrupt lines"]:
+                print(f"[data] WARNING {split}: {st['corrupt lines']} label lines skipped (need 'class x1 y1 ... x4 y4', "
+                      f"class < {len(safe)}, coordinates in [0, 1])")
+            split_items(items, out, split, size, gap, (float(scale),), classes=tuple(safe), workers=workers, fit=fit)
     (out / "classes.json").write_text(json.dumps([n.replace(" ", "_") for n in names]))
     done.write_text(json.dumps(stamp))
     return out

@@ -10,6 +10,9 @@ Output (per split):
 
 Object -> tile rule: keep the object if area(obj & tile) / area(obj) >= iof_thr (0.7); truncated objects become
 the minimum-area rectangle of their visible part (trunc=1).
+
+fit=True: every image is first resized so its long side equals `size` (one tile per image, any input resolution);
+the per-image rate is in the tile name, so evaluation maps detections back to original pixels.
 """
 import json
 import os
@@ -40,7 +43,7 @@ def _fmt_rate(r):
     return f"{r:g}" if r != 1 else "1.0"
 
 
-def split_image(item, out, split, size, gap, rates, iof_thr, classes, quality):
+def split_image(item, out, split, size, gap, rates, iof_thr, classes, quality, fit=False):
     img_path, lbl_path = item
     name = Path(img_path).stem
     img0 = cv2.imread(str(img_path), cv2.IMREAD_COLOR)
@@ -55,8 +58,9 @@ def split_image(item, out, split, size, gap, rates, iof_thr, classes, quality):
     cv2.imwrite(str(out / "thumbs" / split / f"{name}.jpg"), thumb, [cv2.IMWRITE_JPEG_QUALITY, 92])
     metas = []
     seen = set()                                    # objects kept (whole or truncated) in at least one tile
-    for rate in rates:
-        img = img0 if rate == 1 else cv2.resize(img0, None, fx=rate, fy=rate, interpolation=cv2.INTER_LINEAR)
+    for rate in ((size / max(H0, W0),) if fit else rates):
+        img = img0 if rate == 1 else cv2.resize(img0, (max(1, round(W0 * rate)), max(1, round(H0 * rate))),
+                                                interpolation=cv2.INTER_AREA if rate < 1 else cv2.INTER_LINEAR)
         H, W = img.shape[:2]
         if objs0:
             polys = np.array([o[0] for o in objs0], dtype=np.float64) * rate
@@ -108,14 +112,14 @@ def split_image(item, out, split, size, gap, rates, iof_thr, classes, quality):
 
 
 def split_items(items, out, split, size=1024, gap=200, rates=(1.0,), iof_thr=0.7, classes=(), workers=None,
-                quality=95):
+                quality=95, fit=False):
     """items: list of (image_path, dota_label_path or None). Returns the number of tiles written."""
     out = Path(out)
     for d in ("images", "labels", "thumbs", "gt"):
         (out / d / split).mkdir(parents=True, exist_ok=True)
     (out / "meta").mkdir(parents=True, exist_ok=True)
     fn = partial(split_image, out=out, split=split, size=size, gap=gap, rates=tuple(rates),
-                 iof_thr=iof_thr, classes=tuple(classes), quality=quality)
+                 iof_thr=iof_thr, classes=tuple(classes), quality=quality, fit=fit)
     n_patch = n_obj = n_lost = 0
     with Pool(workers or os.cpu_count()) as pool, open(out / "meta" / f"{split}.jsonl", "w") as mf:
         for metas, err in pool.imap_unordered(fn, items, chunksize=2):
