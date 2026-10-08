@@ -3,9 +3,9 @@
   "started": "2026-10-08 10:10:08",
   "session": "e12-dota-o2m-s-1",
   "out": "/content/work/runs/e12-dota-o2m-s",
-  "status": "running",
+  "status": "stopped",
   "launched": 1791429014.0483515,
-  "updated": "2026-10-08 10:23:11",
+  "updated": "2026-10-08 10:31:12",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,20 +13,20 @@
       1791429046
     ],
     "train.log": [
-      67614,
-      1791429710
+      78008,
+      1791430197
     ],
     "metrics.jsonl": [
-      555,
-      1791429611
+      1106,
+      1791429934
     ],
     "train_progress.log": [
-      9859,
-      1791429710
+      20253,
+      1791430197
     ],
     "last.pt": [
       165363829,
-      1791429611
+      1791429934
     ]
   },
   "tail": "0.481 kld=0.562 fgl=1.164 mal_o2m_0=0.892 bbox_o2m_0=0.516 kld_o2m_0=0.542 fgl_o2m_0=1.266 mal_o2m_1=0.880 bbox_o2m_1=0.500 kld_o2m_1=0.534 fgl_o2m_1=1.254 mal_o2m_2=0.877 bbox_o2m_2=0.375 kld_o2m_2=0.480 fgl_o2m_2=1.295 lr 1.00e-04 | 48.7 img/s data 0.001s crit 0.130s/it\n[03:21:50] ep 1 it 300/984 loss 36.734 mal=1.052 bbox=0.531 kld=0.425 fgl=1.244 mal_o2m_0=1.128 bbox_o2m_0=0.465 kld_o2m_0=0.399 fgl_o2m_0=1.336 mal_o2m_1=1.055 bbox_o2m_1=0.446 kld_o2m_1=0.383 fgl_o2m_1=1.310 mal_o2m_2=1.023 bbox_o2m_2=0.390 kld_o2m_2=0.358 fgl_o2m_2=1.315 lr 1.00e-04 | 48.7 img/s data 0.001s crit 0.129s/it\n"

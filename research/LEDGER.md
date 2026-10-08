@@ -123,7 +123,7 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 | 1 | Argmax post (một class mỗi query) | F2 | 3 CU | **xong: bác bỏ** |
 | 2 | Head dense kiểu YOLO26 làm giám sát một-nhiều cho encoder | Co-DETR +1.6–2.4, RT-DETRv3 +1.6 ở lịch ngắn; lần thử trước bị lỗi F10 | 13 CU | e16 xếp hàng |
 | 3 | Init Objects365 → COCO (ngang YOLO) | F9; D-FINE X +3.5 COCO AP | 10 CU | e15 xếp hàng |
-| 4 | Nhóm query một-nhiều (H-DETR) | H-DETR, MS-DETR | 12 CU | e12 xếp hàng |
+| 4 | Nhóm query một-nhiều (H-DETR) | H-DETR, MS-DETR; LW-DETR Group-DETR +2.9 | 10 CU | e12 (24ep) dừng vì tốn (40 ảnh/s); e12b 12ep xếp hàng |
 | 5 | Công thức augmentation YOLO (mosaic giữ tỉ lệ, scale, translate) | F9 | 11 CU | e13 xếp hàng |
 | 6 | Adaptive query denoising (RHINO) | DOTA val +1.9 AP50 (DINO); nhắm vào F2 | trung bình | đã code (`--aqd`); e17 xếp hàng |
 | 7 | ProgLoss: giảm dần trọng số nhánh một-nhiều | YOLO26 +0.3 AP | thấp | chưa làm |
