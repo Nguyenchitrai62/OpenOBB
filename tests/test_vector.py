@@ -54,7 +54,7 @@ def test_vector_points_follow_every_augmentation(tmp_path):
         for _ in range(12):
             _, t = ds[0]
             vec, boxes = t["vec"].numpy(), t["boxes"].numpy().copy()
-            assert vec.shape[1] == 21
+            assert vec.shape[1] == 22
             boxes[:, :4] *= S
             lines = vec[vec[:, 0] == 0]
             moved = kw.get("rotate_p") or kw.get("scale_jitter")         # primitives may leave the image
@@ -101,4 +101,4 @@ def test_ctx_batch_pads_vectors(tmp_path):
     imgs, tg = collate([ds[0], ds[0]])
     tg[1]["vec"] = tg[1]["vec"][:2]
     c = ctx_batch(tg, torch.device("cpu"))
-    assert c["vec"].shape == (2, 5, 21) and c["vec_mask"].sum().item() == 7 and "thumb" not in c
+    assert c["vec"].shape == (2, 5, 22) and c["vec_mask"].sum().item() == 7 and "thumb" not in c

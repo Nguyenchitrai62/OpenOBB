@@ -136,7 +136,7 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 | 15 | IoU trong chi phí matching (p^(1−g)·IoU^g) | Rank-DETR, Stable-DINO +0.4 AP; nhắm F2 | 5 CU | đã code (`--cost-iou`); e23 xếp hàng |
 | 16 | Ortho attention heads (RiO-DETR) | +0.56 AP50 DIOR-R; hướng object vuông | 5 CU | đã code từ trước; e22 xếp hàng |
 | 17 | Chẩn đoán từng lớp decoder → SQR nếu lớp giữa tốt hơn | SQR +1.4–2.8 AP (Deformable-DETR) | 3 CU | e21 xếp hàng |
-| 18 | **Layer token + gộp theo layer (LFE) cho nhánh vector** | SymPoint-V2 +6.5 PQ, VecFormer +2.7 | thấp | **đang code** |
+| 18 | **Layer token + gộp theo layer (LFE) cho nhánh vector** | SymPoint-V2 +6.5 PQ, VecFormer +2.7 | thấp | đã code (`--vec-lfe --layer-drop`); e24 xếp hàng |
 | 19 | Token hình học kiểu VecFormer (tâm, độ dài, hướng) + bias quan hệ hình học (GAT-CADNet) | VecFormer, GAT-CADNet +5 PQ | thấp | chưa làm |
 | 20 | Fusion 2 chiều + decoder cross-attend token vector (Grounding DINO) | Grounding DINO: decoder cross-attn +0.6 COCO / +1.8 LVIS | trung bình | chưa làm |
 | 21 | Co-DETR positive queries từ head dense (nếu e16 dương) | Co-DETR Deformable 12ep +3.4 | trung bình | chờ e16 |

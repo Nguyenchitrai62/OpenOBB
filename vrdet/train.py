@@ -77,6 +77,8 @@ def get_args(argv=None):
     ap.add_argument("--vec-dim", type=int, default=128)
     ap.add_argument("--vec-layers", type=int, default=2)
     ap.add_argument("--max-tokens", type=int, default=4096)
+    ap.add_argument("--vec-lfe", action="store_true", help="H16: per-CAD-layer pooling in the vector branch")
+    ap.add_argument("--layer-drop", type=float, default=0.0, help="H16: chance to merge all layers of a sample")
     ap.add_argument("--rotate-p", type=float, default=0.0, help="H8: arbitrary-angle rotation prob")
     ap.add_argument("--mosaic-p", type=float, default=0.0, help="H8: oriented mosaic prob")
     ap.add_argument("--mosaic-mode", default="half", choices=["half", "yolo"],
@@ -130,7 +132,7 @@ def main(argv=None):
                   rotate_sampling=not a.no_rotate_sampling, num_denoising=a.denoising, dense=a.dense,
                   strip_k=a.strip_k, ortho_heads=a.ortho_heads, context=a.context,
                   dense_queries=a.dense_queries, vectors=a.vectors, vec_dim=a.vec_dim, vec_layers=a.vec_layers,
-                  o2m_queries=a.o2m_queries, lsk=a.lsk)
+                  o2m_queries=a.o2m_queries, lsk=a.lsk, vec_lfe=a.vec_lfe)
     last = out / "last.pt"
     if not last.exists() and not a.no_pretrained:
         load_dfine_coco(model, a.size, class_names=classes, log=log, init=a.init)
@@ -144,7 +146,7 @@ def main(argv=None):
     ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,
                      rotate_p=a.rotate_p, mosaic_p=a.mosaic_p, context=a.context, ctx_dropout=a.ctx_dropout,
                      vectors=a.vectors, max_tokens=a.max_tokens, scale_jitter=a.scale_jitter,
-                     translate=a.translate, mosaic_mode=a.mosaic_mode)
+                     translate=a.translate, mosaic_mode=a.mosaic_mode, layer_drop=a.layer_drop)
     sampler = None
     if a.rfs > 0:
         from vrdet.data.dota import repeat_factors

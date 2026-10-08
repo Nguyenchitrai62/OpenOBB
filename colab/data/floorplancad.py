@@ -73,10 +73,24 @@ def arc_points(x1, y1, rx, ry, phi, fa, fs, x2, y2, n=12):
     return np.stack([cx + rx * np.cos(t) * cp - ry * np.sin(t) * sp, cy + rx * np.cos(t) * sp + ry * np.sin(t) * cp], 1)
 
 
+def _elements_with_layer(root):
+    """(element, layer) pairs: every top-level <g> of a FloorPlanCAD SVG is one CAD layer (ids only, names stripped;
+    SymPoint-V2 uses the same grouping). Elements outside any group get layer -1."""
+    layer = 0
+    for child in root:
+        if child.tag.split("}")[-1] == "g":
+            for el in child.iter():
+                yield el, layer
+            layer += 1
+        else:
+            for el in child.iter():
+                yield el, -1
+
+
 def parse_svg(path):
-    """-> list of dict(type, pts (k,2) in viewBox units, rgb, width, sem, inst)."""
+    """-> list of dict(type, pts (k,2) in viewBox units, rgb, width, sem, inst, layer)."""
     prims = []
-    for el in ET.parse(path).iter():
+    for el, layer in _elements_with_layer(ET.parse(path).getroot()):
         tag = el.tag.split("}")[-1]
         if tag not in ("path", "circle", "ellipse"):
             continue
@@ -86,7 +100,7 @@ def parse_svg(path):
         width = float(a.get("stroke-width", 0.1))
         sem = int(a.get("semanticId", 0) or 0)
         inst = int(a.get("instanceId", -1) or -1)
-        base = dict(rgb=rgb, width=width, sem=sem, inst=inst)
+        base = dict(rgb=rgb, width=width, sem=sem, inst=inst, layer=layer)
         if tag == "path":
             toks = re.findall(r"[MLA]|" + NUM, a.get("d", ""))
             i, cur, start = 0, None, None
@@ -171,7 +185,8 @@ def convert_one(svg, out, split, size):
     objs = objects(prims, size)
     cv2.imwrite(str(out / "images" / split / f"{name}.png"), img, [cv2.IMWRITE_PNG_COMPRESSION, 3])
     cv2.imwrite(str(out / "thumbs" / split / f"{name}.jpg"), cv2.resize(img, (512, 512), interpolation=cv2.INTER_AREA))
-    np.savez_compressed(out / "vectors" / split / f"{name}.npz", tokens=vector_tokens(prims))
+    np.savez_compressed(out / "vectors" / split / f"{name}.npz", tokens=vector_tokens(prims),
+                        layer=np.array([p["layer"] for p in prims], np.int32))
     with open(out / "labels" / split / f"{name}.txt", "w") as f:
         for c, q in objs:
             f.write(f"{c} " + " ".join(f"{v / size:.6f}" for v in q) + "\n")

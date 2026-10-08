@@ -98,7 +98,7 @@ class VRDet(nn.Module):
     def __init__(self, size="s", num_classes=15, num_queries=300, img_size=1024, rotate_sampling=True,
                  num_denoising=100, dense=False, dense_width=128, strip_k=0, ortho_heads=False, context=False,
                  dense_queries=False, vectors=False, vec_dim=128, vec_layers=2, o2m_queries=0, lsk=False,
-                 **overrides):
+                 vec_lfe=False, **overrides):
         super().__init__()
         cfg = copy.deepcopy(CONFIGS[size])
         for k, v in overrides.items():          # e.g. decoder=dict(num_layers=4)
@@ -120,7 +120,8 @@ class VRDet(nn.Module):
         self.dense_head = DenseRotatedHead(cfg["encoder"]["hidden_dim"], num_classes, (8, 16, 32), dense_width,
                                            img_size) if (dense or dense_queries) else None
         self.dense_queries = dense_queries
-        self.vector = VectorBranch(cfg["encoder"]["in_channels"], d=vec_dim, layers=vec_layers) if vectors else None
+        self.vector = VectorBranch(cfg["encoder"]["in_channels"], d=vec_dim, layers=vec_layers,
+                                   lfe=vec_lfe) if vectors else None
 
     def forward(self, x, targets=None, ctx=None):
         fn = None

@@ -5,29 +5,29 @@
   "out": "/content/work/runs/e16-dota-dense-fix-s",
   "status": "running",
   "launched": 1791426865.3287413,
-  "updated": "2026-10-08 10:13:58",
+  "updated": "2026-10-08 10:25:57",
   "fails": 0,
   "synced": {
     "train_progress.log": [
-      35972,
-      1791429139
+      49758,
+      1791429877
     ],
     "setup.log": [
       1372,
       1791426895
     ],
     "train.log": [
-      109760,
-      1791429139
+      123546,
+      1791429877
     ],
     "metrics.jsonl": [
-      2598,
-      1791428941
+      3922,
+      1791429821
     ],
     "last.pt": [
       170880677,
-      1791428941
+      1791429807
     ]
   },
-  "tail": "0 lr 1.00e-04 | 72.7 img/s data 0.001s crit 0.074s/it\n[03:11:57] ep 8 it 800/984 loss 19.444 mal=0.673 bbox=0.189 kld=0.374 fgl=1.291 dense_cls=0.138 dense_box=0.328 dense_angle=0.013 lr 1.00e-04 | 72.8 img/s data 0.001s crit 0.074s/it\n[03:12:08] ep 8 it 850/984 loss 19.095 mal=0.669 bbox=0.240 kld=0.439 fgl=1.149 dense_cls=0.107 dense_box=0.312 dense_angle=0.005 lr 1.00e-04 | 72.9 img/s data 0.000s crit 0.074s/it\n[03:12:19] ep 8 it 900/984 loss 21.000 mal=0.839 bbox=0.260 kld=0.387 fgl=1.307 dense_cls=0.198 dense_box=0.343 dense_angle=0.058 lr 1.00e-04 | 72.9 img/s data 0.000s crit 0.074s/it\n"
+  "tail": "r 1.00e-04 | 68.6 img/s data 0.003s crit 0.077s/it\n[03:24:15] ep 12 it 150/984 loss 19.473 mal=0.763 bbox=0.218 kld=0.349 fgl=1.341 dense_cls=0.139 dense_box=0.326 dense_angle=0.024 lr 1.00e-04 | 69.7 img/s data 0.002s crit 0.077s/it\n[03:24:26] ep 12 it 200/984 loss 17.185 mal=0.596 bbox=0.206 kld=0.280 fgl=1.133 dense_cls=0.107 dense_box=0.243 dense_angle=0.012 lr 9.99e-05 | 70.3 img/s data 0.001s crit 0.077s/it\n[03:24:37] ep 12 it 250/984 loss 19.535 mal=0.821 bbox=0.213 kld=0.313 fgl=1.280 dense_cls=0.198 dense_box=0.331 dense_angle=0.028 lr 9.99e-05 | 70.9 img/s data 0.001s crit 0.076s/it\n"
 }

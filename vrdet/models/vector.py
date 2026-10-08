@@ -13,13 +13,42 @@ import math
 import torch
 import torch.nn as nn
 
-VEC_DIM = 21        # type, 8 x (x, y) in [0, 1] of the image, r, g, b in [0, 1], line width / image size
+VEC_DIM = 22        # type, 8 x (x, y) in [0, 1] of the image, r, g, b in [0, 1], line width / image size, layer
 NUM_TYPES = 8       # 0 line, 1 arc, 2 circle, 3 ellipse (FloorPlanCAD); 4.. reserved (bezier, rect, text, ...)
 
 
-class VectorBranch(nn.Module):
-    def __init__(self, out_channels, d=128, layers=2, heads=4, nfreq=8, densify=2):
+class LayerPool(nn.Module):
+    """H16 (idea: SymPoint-V2's layer feature encoder): mean + max of the tokens of each CAD layer of each image, fed
+    back to every token of that layer through a zero-initialised MLP. Layer ids only group tokens (per-drawing indices
+    with no meaning across drawings); id 0 = unknown layer, left untouched."""
+
+    def __init__(self, d):
         super().__init__()
+        self.mlp = nn.Sequential(nn.Linear(2 * d, d), nn.GELU(), nn.Linear(d, d))
+        nn.init.zeros_(self.mlp[-1].weight)
+        nn.init.zeros_(self.mlp[-1].bias)
+
+    def forward(self, x, layer, mask):
+        B, M, d = x.shape
+        valid = mask & (layer > 0)
+        if not bool(valid.any()):
+            return x
+        pairs = torch.stack([torch.arange(B, device=x.device)[:, None].expand(B, M), layer], -1)[valid]
+        key = torch.unique(pairs, dim=0, return_inverse=True)[1]
+        xv = x[valid].float()
+        G = int(key.max()) + 1
+        cnt = torch.zeros(G, 1, device=x.device).index_add_(0, key, torch.ones_like(xv[:, :1]))
+        mean = torch.zeros(G, d, device=x.device).index_add_(0, key, xv) / cnt
+        mx = torch.full((G, d), -1e4, device=x.device).scatter_reduce(0, key[:, None].expand(-1, d), xv, "amax")
+        out = x.clone()
+        out[valid] = x[valid] + self.mlp(torch.cat([mean[key], mx[key]], -1)).to(x.dtype)
+        return out
+
+
+class VectorBranch(nn.Module):
+    def __init__(self, out_channels, d=128, layers=2, heads=4, nfreq=8, densify=2, lfe=False):
+        super().__init__()
+        self.lfe = nn.ModuleList([LayerPool(d), LayerPool(d)]) if lfe else None
         self.densify = densify
         self.register_buffer("freqs", (2.0 ** torch.arange(nfreq)) * math.pi, persistent=False)
         self.type_emb = nn.Embedding(NUM_TYPES, d)
@@ -47,9 +76,15 @@ class VectorBranch(nn.Module):
         attr = torch.cat([vec[..., 17:20].float(), torch.log1p(vec[..., 20:21].float() * 1024.0)], -1)
         typ = vec[..., 0].long().clamp(0, NUM_TYPES - 1)
         x = self.geo(g) + self.attr(attr) + self.type_emb(typ)
+        layer = vec[..., 21].long() if vec.shape[-1] > 21 else torch.zeros_like(typ)
+        if self.lfe is not None:            # layer context before and after the drawing-level attention
+            x = self.lfe[0](x, layer, mask)
         x = torch.cat([self.reg.expand(B, -1, -1).to(x.dtype), x], 1)
         keep = torch.cat([mask.new_ones(B, 1), mask], 1)
-        return self.blocks(self.norm(x), src_key_padding_mask=~keep)[:, 1:]
+        x = self.blocks(self.norm(x), src_key_padding_mask=~keep)[:, 1:]
+        if self.lfe is not None:
+            x = self.lfe[1](x, layer, mask)
+        return x
 
     def forward(self, feats, vec, mask):
         tok = self.tokens(vec, mask)

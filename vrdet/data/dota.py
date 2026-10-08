@@ -3,8 +3,9 @@
 Targets per image: dict(labels=int64 (N,), boxes=float32 (N, 5) = (cx, cy, w, h, theta) with
 cx, cy, w, h normalised by the (square) patch size and theta in le90 radians).
 Images are returned as uint8 CHW RGB tensors; normalisation happens on the GPU.
-With vectors=True (CAD data with {root}/vectors/{split}/{name}.npz) the target also carries "vec" (M, 21):
-type, 8 points / image size, rgb, width / image size, transformed together with the image by every augmentation.
+With vectors=True (CAD data with {root}/vectors/{split}/{name}.npz) the target also carries "vec" (M, 22):
+type, 8 points / image size, rgb, width / image size, CAD layer id (0 = unknown), transformed together with the
+image by every augmentation.
 """
 import json
 import math
@@ -65,12 +66,13 @@ class DotaPatches(Dataset):
     def __init__(self, root, split, size=1024, augment=False, filter_empty=False, min_size=2.0,
                  hsv=(0.015, 0.5, 0.3), rot90=True, flip=True, limit=None, keep_difficult=True, rotate_p=0.0,
                  mosaic_p=0.0, context=False, thumb=512, ctx_dropout=0.0, vectors=False, max_tokens=4096,
-                 scale_jitter=0.0, translate=0.0, mosaic_mode="half"):
+                 scale_jitter=0.0, translate=0.0, mosaic_mode="half", layer_drop=0.0):
         self.root, self.split, self.size = Path(root), split, size
         # H11 (YOLO recipe idea): random scale in [1 - scale_jitter, 1 + scale_jitter] and translation of
         # +-translate x size on every training sample; mosaic_mode "yolo" = 4 full-resolution patches around a
         # random centre on a 2S canvas, then the same scale/translate warp to S (objects keep their size)
         self.scale_jitter, self.translate, self.mosaic_mode = scale_jitter, translate, mosaic_mode
+        self.layer_drop = layer_drop    # H16: chance to merge all CAD layers into one (do not over-rely on layers)
         self.vectors, self.max_tokens = vectors, max_tokens
         self.context, self.thumb, self.ctx_dropout = context, thumb, ctx_dropout
         self.rotate_p, self.mosaic_p = rotate_p, mosaic_p
@@ -95,16 +97,17 @@ class DotaPatches(Dataset):
         return img, polys, labels
 
     def _load_vec(self, m):
-        """Primitive tokens in pixel units: pts (M, 16) and attr (M, 5) = type, r, g, b, width."""
+        """Primitive tokens in pixel units: pts (M, 16) and attr (M, 6) = type, r, g, b, width, layer id."""
         z = np.load(self.root / "vectors" / self.split / f"{m['name']}.npz")
         t = z["tokens"].astype(np.float32)
         view = float(z["view"]) if "view" in z.files else 140.0     # FloorPlanCAD: widths in viewBox units
         S = self.size
-        attr = np.concatenate([t[:, :1], t[:, 17:20], t[:, 20:21] / view * S], 1)
+        layer = z["layer"].astype(np.float32)[:, None] + 1 if "layer" in z.files else np.zeros((len(t), 1), np.float32)
+        attr = np.concatenate([t[:, :1], t[:, 17:20], t[:, 20:21] / view * S, np.maximum(layer, 0)], 1)
         return {"pts": t[:, 1:17] * S, "attr": attr}
 
     def _vec_out(self, vec):
-        """Drop primitives that left the image, cap the count, normalise -> (M, 21) float32 tensor."""
+        """Drop primitives that left the image, cap the count, normalise -> (M, 22) float32 tensor."""
         S = self.size
         pts, attr = vec["pts"], vec["attr"]
         x, y = pts[:, 0::2], pts[:, 1::2]
@@ -114,8 +117,8 @@ class DotaPatches(Dataset):
             sel = (np.sort(np.random.choice(len(pts), self.max_tokens, replace=False)) if self.augment
                    else np.arange(self.max_tokens))
             pts, attr = pts[sel], attr[sel]
-        out = np.concatenate([attr[:, :1], pts / S, attr[:, 1:4], attr[:, 4:5] / S], 1).astype(np.float32)
-        return torch.from_numpy(out.reshape(-1, 21))
+        out = np.concatenate([attr[:, :1], pts / S, attr[:, 1:4], attr[:, 4:5] / S, attr[:, 5:6]], 1)
+        return torch.from_numpy(out.astype(np.float32).reshape(-1, 22))
 
     def _load_ctx(self, m):
         """Whole-image thumbnail on a THUMB x THUMB canvas + the tile's box on that canvas (global context, H6)."""
@@ -206,6 +209,7 @@ class DotaPatches(Dataset):
             if vec is not None:
                 vec["pts"][:, 0::2] += ox
                 vec["pts"][:, 1::2] += oy
+                vec["attr"][:, 5] += q * 10000 * (vec["attr"][:, 5] > 0)     # keep the 4 sources' layers apart
                 V.append(vec)
             if len(polys):
                 pp = polys.copy()
@@ -238,6 +242,7 @@ class DotaPatches(Dataset):
                 vp[:, 0::2] += ox
                 vp[:, 1::2] += oy
                 vec["attr"][:, 4] *= 0.5
+                vec["attr"][:, 5] += q * 10000 * (vec["attr"][:, 5] > 0)
                 V.append({"pts": vp, "attr": vec["attr"]})
             canvas[oy:oy + h, ox:ox + h] = cv2.resize(np.ascontiguousarray(img), (h, h), interpolation=cv2.INTER_AREA)
             if len(polys):
@@ -337,6 +342,8 @@ class DotaPatches(Dataset):
             tgt["tile"] = torch.from_numpy(np.asarray(ctx["tile"], np.float32))
             tgt["ctx_valid"] = bool(ctx["valid"])
         if self.vectors:
+            if self.augment and self.layer_drop and random.random() < self.layer_drop:
+                vec["attr"][:, 5] = np.minimum(vec["attr"][:, 5], 1.0)
             tgt["vec"] = self._vec_out(vec)
         return torch.from_numpy(img), tgt
 
