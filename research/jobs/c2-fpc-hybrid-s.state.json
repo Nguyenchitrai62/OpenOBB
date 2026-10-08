@@ -3,31 +3,59 @@
   "started": "2026-10-08 11:46:40",
   "session": "c2-fpc-hybrid-s-1",
   "out": "/content/work/runs/c2-fpc-hybrid-s",
-  "status": "running",
+  "status": "done",
   "launched": 1791434805.4048796,
-  "updated": "2026-10-08 12:54:58",
+  "updated": "2026-10-08 13:05:49",
   "fails": 0,
   "synced": {
     "train_progress.log": [
-      106411,
-      1791438813
+      117687,
+      1791439202
     ],
     "setup.log": [
       350,
       1791434825
     ],
     "train.log": [
-      108183,
-      1791438813
+      119459,
+      1791439202
     ],
     "metrics.jsonl": [
-      16544,
-      1791438812
+      18997,
+      1791439207
     ],
     "last.pt": [
       181712573,
-      1791438812
+      1791439160
+    ],
+    "eval_val.json": [
+      8122,
+      1791439184
+    ],
+    "val_preds.npz": [
+      7172693,
+      1791439167
+    ],
+    "exitcode": [
+      2,
+      1791439212
+    ],
+    "eval_val_q900.json": [
+      5571,
+      1791439202
+    ],
+    "eval_val.txt": [
+      1913,
+      1791439184
+    ],
+    "train_done": [
+      2,
+      1791439207
+    ],
+    "eval_val_q900.txt": [
+      1913,
+      1791439202
     ]
   },
-  "tail": "1609, \"loss_angle_o2m_2\": 0.0195, \"loss_fgl_o2m_2\": 0.8476, \"loss_dense_cls\": 0.1074, \"loss_dense_box\": 0.1756, \"loss_dense_angle\": 0.0106, \"total\": 20.6315}\n[05:53:33] ep 22 it 0/435 loss 20.844 mal=0.575 bbox=0.065 kld=0.138 angle=0.013 fgl=0.922 mal_o2m_0=0.654 bbox_o2m_0=0.119 kld_o2m_0=0.173 angle_o2m_0=0.033 fgl_o2m_0=1.003 mal_o2m_1=0.612 bbox_o2m_1=0.099 kld_o2m_1=0.145 angle_o2m_1=0.028 fgl_o2m_1=0.918 mal_o2m_2=0.596 bbox_o2m_2=0.066 kld_o2m_2=0.142 angle_o2m_2=0.012 fgl_o2m_2=0.902 dense_cls=0.081 dense_box=0.156 dense_angle=0.047 lr 1.60e-05 | 14.7 img/s data 0.416s crit 0.354s/it\n"
+  "tail": "    29      955  89.47    79.21 100.00\nwashing-machine         141     2006  85.17    78.67  96.45\nsquat-toilet            242     1592  88.12    78.85  99.59\nurinal                  125     1173  93.05    78.60 100.00\ntoilet                  425     1998  90.13    84.79  97.41\nstairs                  562     6254  67.32    58.16  80.78\nelevator                365     2345  90.66    89.68  97.26\nescalator                35     2519  56.76    39.01  82.86\nmAP                                   77.97    68.76\n[06:00:02] [eval] 810 patches / 810 images: predict 7s, merge+eval 11s, dec mAP50 78.16\n"
 }

@@ -383,3 +383,4 @@
 [2026-10-08 12:53:38] c3-fpc-ground-s: running
 [2026-10-08 12:56:13] e8-fpc-yolo26x-24e: finished with status done; stopping VM
 [2026-10-08 12:56:16] watch: balance=109.72 rate=26.7/h active=['c2-fpc-hybrid-s', 'c3-fpc-ground-s', 'e8-fpc-yolo26x-24e'] ended=[('e8-fpc-yolo26x-24e', 'done')]
+[2026-10-08 13:05:49] c2-fpc-hybrid-s: finished with status done; stopping VM
