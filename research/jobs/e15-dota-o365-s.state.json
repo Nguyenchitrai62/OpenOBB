@@ -5,7 +5,7 @@
   "out": "/content/work/runs/e15-dota-o365-s",
   "status": "running",
   "launched": 1791428285.6724403,
-  "updated": "2026-10-08 10:12:18",
+  "updated": "2026-10-08 10:24:34",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,21 +13,21 @@
       1791428316
     ],
     "train.log": [
-      78538,
-      1791429062
+      90059,
+      1791429792
     ],
     "metrics.jsonl": [
-      483,
-      1791428968
+      1488,
+      1791429716
     ],
     "train_progress.log": [
-      7727,
-      1791429062
+      19248,
+      1791429792
     ],
     "last.pt": [
       165363829,
-      1791428968
+      1791429705
     ]
   },
-  "tail": "kld=0.399 fgl=1.215 lr 1.00e-04 | 84.5 img/s data 0.001s crit 0.056s/it\n[03:10:35] ep 2 it 350/984 loss 20.993 mal=0.644 bbox=0.435 kld=0.549 fgl=0.973 lr 1.00e-04 | 84.5 img/s data 0.001s crit 0.057s/it\n[03:10:44] ep 2 it 400/984 loss 22.622 mal=0.835 bbox=0.454 kld=0.496 fgl=1.350 lr 1.00e-04 | 84.8 img/s data 0.001s crit 0.056s/it\n[03:10:53] ep 2 it 450/984 loss 22.328 mal=0.768 bbox=0.602 kld=0.650 fgl=1.035 lr 1.00e-04 | 85.0 img/s data 0.001s crit 0.056s/it\n[03:11:02] ep 2 it 500/984 loss 19.957 mal=0.792 bbox=0.212 kld=0.356 fgl=1.306 lr 1.00e-04 | 85.1 img/s data 0.001s crit 0.056s/it\n"
+  "tail": "kld=0.333 fgl=1.250 lr 1.00e-04 | 84.3 img/s data 0.002s crit 0.058s/it\n[03:22:44] ep 6 it 250/984 loss 18.684 mal=0.765 bbox=0.145 kld=0.274 fgl=1.278 lr 1.00e-04 | 83.5 img/s data 0.001s crit 0.058s/it\n[03:22:53] ep 6 it 300/984 loss 21.496 mal=0.898 bbox=0.359 kld=0.395 fgl=1.334 lr 1.00e-04 | 83.9 img/s data 0.001s crit 0.058s/it\n[03:23:02] ep 6 it 350/984 loss 21.011 mal=0.845 bbox=0.244 kld=0.443 fgl=1.045 lr 1.00e-04 | 84.2 img/s data 0.001s crit 0.057s/it\n[03:23:12] ep 6 it 400/984 loss 19.241 mal=0.762 bbox=0.163 kld=0.349 fgl=1.219 lr 1.00e-04 | 84.5 img/s data 0.001s crit 0.057s/it\n"
 }

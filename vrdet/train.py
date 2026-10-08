@@ -49,6 +49,8 @@ def get_args(argv=None):
     ap.add_argument("--o2m-k", type=int, default=6, help="H10: queries assigned per target in the o2m group")
     ap.add_argument("--aqd", action="store_true", help="H12: adaptive query denoising (RHINO idea)")
     ap.add_argument("--lsk", action="store_true", help="H14: selective large-kernel adapters on backbone maps")
+    ap.add_argument("--cost-iou", type=float, default=0.0, help="H15: IoU exponent in the matching class cost")
+    ap.add_argument("--eval-layer", type=int, default=-1, help="eval-only diagnostic: use decoder layer k's output")
     ap.add_argument("--angle-weight", type=float, default=0.0, help="H13: square-aware angle loss on the decoder")
     ap.add_argument("--eval-queries", type=int, default=0,
                     help="H9: also evaluate the final EMA model with N queries / top-N (queries have no parameters)")
@@ -136,7 +138,7 @@ def main(argv=None):
     if a.channels_last:
         model.to(memory_format=torch.channels_last)
     crit = build_criterion(num_classes=len(classes), box_loss=a.box_loss, o2m_k=a.o2m_k, aqd=a.aqd,
-                           angle_weight=a.angle_weight)
+                           angle_weight=a.angle_weight, cost_iou=a.cost_iou)
     a.dense = a.dense or a.dense_queries
     dense_crit = DenseCriterion() if a.dense else None
     ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,
@@ -182,6 +184,9 @@ def main(argv=None):
             log(f"torch.compile unavailable, eager mode: {e}")
     if a.eval_only:
         start_epoch = a.epochs                  # skip training: evaluate the EMA weights of last.pt
+        if a.eval_layer >= 0:                   # layer-wise diagnostic (SQR indicator): stop the decoder at layer k
+            ema.module.decoder.decoder.eval_idx = a.eval_layer
+            log(f"eval-only on decoder layer {a.eval_layer}")
     n_par = sum(p.numel() for p in model.parameters()) / 1e6
     log(f"VRDet-{a.size} {n_par:.2f}M params | train patches {len(ds)} | {iters_per_epoch} it/epoch x {a.epochs} "
         f"| batch {a.batch} | device {device} amp={amp}")

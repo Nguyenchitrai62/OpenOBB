@@ -85,6 +85,21 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Góc là đầu ra thô trong [−45°, 135°). Loss góc ω·sin²(2Δθ) với ω = exp(−ln²(w/h)/9).
   - TAL: top-k 10, α = 1, β = 6.
 
+- **F15. Báo cáo 3 sub-agent (10-08)** — kiến trúc SOTA, ngữ nghĩa CAD, dataset:
+  - **FloorPlanCAD có layer:** mỗi nhóm `<g>` của SVG là một layer CAD (có id, không tên). Parser của ta đang bỏ mất.
+    SymPoint-V2 gộp đặc trưng theo layer (LFE): **+6.5 PQ**; VecFormer: +2.7 PQ.
+  - FloorPlanCAD bản 15.6k (11/2021) có thể có text (TextCAD dùng nó; TextCAD: text gated cross-attention 88.1 → 91.1 PQ).
+  - Phần VRDet đã có sẵn: GDQE, LQE 5 phân phối, cost Chamfer (tương đương Hausdorff của RHINO), decoupled angle.
+    MAL tương đương IA-BCE/GCL/position-supervised loss.
+  - Matcher chưa có IoU (Rank/Stable-DINO +0.4) → e23. Ortho heads (RiO +0.56 AP50) đã code nhưng chưa chạy → e22.
+  - Dataset pretrain OBB (HF đã kiểm): DOTA-v2 `nilsleh/dotaV2_patched`, FAIR1M `LittleCollections/FAIR1M1|2`,
+    SODA-A `satellite-image-deep-learning/SODA-A`, DroneVehicle `McCheng/DroneVehicle`, ShipRSImageNet `insomnia7/ShipRSImageNet`,
+    STAR `Zhuzi24/STAR`, CODrone `huseyincavus/codrone`; HRSC2016 trên Kaggle `guofeng/hrsc2016`.
+    Pretrain thêm dữ liệu viễn thám giúp DIOR-R/HRSC nhiều (+2–4) nhưng DOTA-v1 ít (+0.2–1.5) (MTP, RTMDet-R).
+  - Dataset CAD: ArchCAD-400K (HF `jackluoluo/ArchCAD`, cần user chấp nhận điều khoản), SESYD (HTTP),
+    PID2Graph (Zenodo 14803338), ResPlan (CC BY), CubiCasa5K (Zenodo). Không có dataset MEP mở → synthetic từ thư viện symbol.
+  - Foundation backbone viễn thám (MTP, RVSA, SkySense) không đáng ở quy mô này (DOTA-v1 gần như không tăng, quá chậm).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
@@ -118,4 +133,14 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 | 11 | Copy-paste class hiếm (HC, SBF, BC, SP) | F2, F3 | trung bình | chưa làm |
 | 12 | Gộp các thành phần có lợi lên X: DOTA và FPC (so YOLO26x) | — | khoảng 45 + 45 CU | sau #1–#5 |
 | 14 | Adapter chọn vùng nhìn kiểu LSKNet (trước encoder) | LSKNet / PKINet / Strip R-CNN mạnh trên DOTA (backbone pretrain ImageNet, two-stage); H3 strip sau encoder −0.13 | 11 CU | đã code (`--lsk`); e19 xếp hàng |
+| 15 | IoU trong chi phí matching (p^(1−g)·IoU^g) | Rank-DETR, Stable-DINO +0.4 AP; nhắm F2 | 5 CU | đã code (`--cost-iou`); e23 xếp hàng |
+| 16 | Ortho attention heads (RiO-DETR) | +0.56 AP50 DIOR-R; hướng object vuông | 5 CU | đã code từ trước; e22 xếp hàng |
+| 17 | Chẩn đoán từng lớp decoder → SQR nếu lớp giữa tốt hơn | SQR +1.4–2.8 AP (Deformable-DETR) | 3 CU | e21 xếp hàng |
+| 18 | **Layer token + gộp theo layer (LFE) cho nhánh vector** | SymPoint-V2 +6.5 PQ, VecFormer +2.7 | thấp | **đang code** |
+| 19 | Token hình học kiểu VecFormer (tâm, độ dài, hướng) + bias quan hệ hình học (GAT-CADNet) | VecFormer, GAT-CADNet +5 PQ | thấp | chưa làm |
+| 20 | Fusion 2 chiều + decoder cross-attend token vector (Grounding DINO) | Grounding DINO: decoder cross-attn +0.6 COCO / +1.8 LVIS | trung bình | chưa làm |
+| 21 | Co-DETR positive queries từ head dense (nếu e16 dương) | Co-DETR Deformable 12ep +3.4 | trung bình | chờ e16 |
+| 22 | DDQ distinct queries (H4c chạy lại sau sửa ProbIoU) | DDQ +1.5 (aux loss), CrowdHuman | trung bình | chờ e16 |
+| 23 | Pretrain đa dataset OBB (DOTA-v2, FAIR1M, SODA-A, DIOR-R, ...) cho nền sản phẩm | MTP/RTMDet-R; DIOR-R/HRSC +2–4 | khoảng 75 CU | sau khi chốt kiến trúc |
+| 24 | Pretrain nhánh vector/text (ArchCAD-400K, SESYD, PID2Graph, synthetic MEP) | DPSS: gấp đôi dữ liệu ArchCAD +6.4 PQ | cao | sau #18–#20 |
 | 13 | Token text và layer cho PDF thật (sản phẩm) | AI_Takeoff: FP/TP chỉ phân biệt được bằng text | code local | sau khi kiến trúc thắng |

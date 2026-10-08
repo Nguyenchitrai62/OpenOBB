@@ -338,3 +338,5 @@
 [2026-10-08 10:10:49] e12-dota-o2m-s: running
 [2026-10-08 10:10:51] queue: e13-dota-yoloaug-s waits (3 live sessions, cap 3)
 [2026-10-08 10:13:58] watch: balance=183.57 rate=37.3/h active=['e12-dota-o2m-s', 'e15-dota-o365-s', 'e16-dota-dense-fix-s'] ended=[]
+[2026-10-08 10:22:00] queue: e20-dota-base12-s waits (3 live sessions, cap 3)
+[2026-10-08 10:24:25] queue: ['e20-dota-base12-s', 'e13-dota-yoloaug-s', 'e17-dota-aqd-s', 'e18-dota-angle-s', 'e19-dota-lsk-s', 'e21-dota-layer-diag', 'e22-dota-ortho-s', 'e23-dota-iocost-s']

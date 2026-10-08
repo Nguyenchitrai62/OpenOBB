@@ -24,15 +24,21 @@ N_DIST = 5
 
 
 class OBBHungarianMatcher(nn.Module):
-    def __init__(self, cost_class=2.0, cost_chamfer=5.0, cost_kld=2.0, alpha=0.25, gamma=2.0, gauss="kld"):
+    def __init__(self, cost_class=2.0, cost_chamfer=5.0, cost_kld=2.0, alpha=0.25, gamma=2.0, gauss="kld",
+                 cost_iou=0.0):
         super().__init__()
         self.cost_class, self.cost_chamfer, self.cost_kld = cost_class, cost_chamfer, cost_kld
+        # H15 (Stable-DINO / Rank-DETR idea): class cost on p^(1-g) * IoU^g so the one-to-one positive is the
+        # best-localised query and scores learn to rank by localisation quality (ProbIoU as the IoU proxy)
+        self.cost_iou = cost_iou
         self.alpha, self.gamma, self.gauss = alpha, gamma, gauss
 
     def pair_cost(self, logits, boxes, tgt_ids, tgt_box):
         """(N, C) logits, (N, 5) boxes vs (M,) labels, (M, 5) boxes -> (N, M) matching cost."""
         p = logits.float().sigmoid()[:, tgt_ids]
         boxes = boxes.float()
+        if self.cost_iou > 0:
+            p = p.pow(1 - self.cost_iou) * probiou(boxes[:, None, :], tgt_box[None, :, :].float()).clamp(0, 1).pow(self.cost_iou)
         neg = (1 - self.alpha) * (p ** self.gamma) * (-(1 - p + 1e-8).log())
         pos = self.alpha * ((1 - p) ** self.gamma) * (-(p + 1e-8).log())
         C = self.cost_class * (pos - neg) + self.cost_chamfer * chamfer_matrix(boxes, tgt_box.float())
@@ -78,6 +84,8 @@ class OBBHungarianMatcher(nn.Module):
         tgt_ids = torch.cat([t["labels"] for t in targets])
         tgt_box = torch.cat([t["boxes"] for t in targets]).float()
         p = prob[:, tgt_ids]
+        if self.cost_iou > 0:
+            p = p.pow(1 - self.cost_iou) * probiou(boxes[:, None, :], tgt_box[None, :, :]).clamp(0, 1).pow(self.cost_iou)
         neg = (1 - self.alpha) * (p ** self.gamma) * (-(1 - p + 1e-8).log())
         pos = self.alpha * ((1 - p) ** self.gamma) * (-(p + 1e-8).log())
         C = self.cost_class * (pos - neg)

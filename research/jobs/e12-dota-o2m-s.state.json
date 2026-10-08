@@ -5,7 +5,7 @@
   "out": "/content/work/runs/e12-dota-o2m-s",
   "status": "running",
   "launched": 1791429014.0483515,
-  "updated": "2026-10-08 10:11:01",
+  "updated": "2026-10-08 10:23:11",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,9 +13,21 @@
       1791429046
     ],
     "train.log": [
-      2342,
-      1791429056
+      67614,
+      1791429710
+    ],
+    "metrics.jsonl": [
+      555,
+      1791429611
+    ],
+    "train_progress.log": [
+      9859,
+      1791429710
+    ],
+    "last.pt": [
+      165363829,
+      1791429611
     ]
   },
-  "tail": "47/3738 [00:05<07:06,  8.66it/s]\nFetching 3738 files:   1%|\u258f         | 51/3738 [00:05<05:04, 12.12it/s]\nFetching 3738 files:   1%|\u258f         | 53/3738 [00:05<05:14, 11.72it/s]\nFetching 3738 files:   1%|\u258f         | 55/3738 [00:06<04:48, 12.78it/s]\nFetching 3738 files:   2%|\u258f         | 57/3738 [00:06<04:31, 13.54it/s]\nFetching 3738 files:   2%|\u258f         | 59/3738 [00:06<04:12, 14.57it/s]\nFetching 3738 files:   2%|\u258f         | 61/3738 [00:06<03:55, 15.63it/s]\nFetching 3738 files:   2%|\u258f         | 63/3738 [00:06<04:10, 14.64it/s]\nFetching 3738 files:   2%|\u258f         | 65/3738 [00:06<03:55, 15.61it/s]"
+  "tail": "0.481 kld=0.562 fgl=1.164 mal_o2m_0=0.892 bbox_o2m_0=0.516 kld_o2m_0=0.542 fgl_o2m_0=1.266 mal_o2m_1=0.880 bbox_o2m_1=0.500 kld_o2m_1=0.534 fgl_o2m_1=1.254 mal_o2m_2=0.877 bbox_o2m_2=0.375 kld_o2m_2=0.480 fgl_o2m_2=1.295 lr 1.00e-04 | 48.7 img/s data 0.001s crit 0.130s/it\n[03:21:50] ep 1 it 300/984 loss 36.734 mal=1.052 bbox=0.531 kld=0.425 fgl=1.244 mal_o2m_0=1.128 bbox_o2m_0=0.465 kld_o2m_0=0.399 fgl_o2m_0=1.336 mal_o2m_1=1.055 bbox_o2m_1=0.446 kld_o2m_1=0.383 fgl_o2m_1=1.310 mal_o2m_2=1.023 bbox_o2m_2=0.390 kld_o2m_2=0.358 fgl_o2m_2=1.315 lr 1.00e-04 | 48.7 img/s data 0.001s crit 0.129s/it\n"
 }
