@@ -401,3 +401,5 @@
 [2026-10-08 13:38:54] watch: balance=97.51 rate=26.7/h active=['c4-fpc-raster-s', 'c5-fpc-raster-p2-s', 'c6-fpc-raster-lsk-s'] ended=[]
 [2026-10-08 13:46:55] queue: c7-fpc-raster-strip-s waits (3 live sessions, cap 3)
 [2026-10-08 13:51:04] watch: balance=93.23 rate=26.7/h active=['c4-fpc-raster-s', 'c5-fpc-raster-p2-s', 'c6-fpc-raster-lsk-s'] ended=[]
+[2026-10-08 14:02:52] watch: balance=88.77 rate=26.7/h active=['c4-fpc-raster-s', 'c5-fpc-raster-p2-s', 'c6-fpc-raster-lsk-s'] ended=[]
+[2026-10-08 14:14:42] watch: balance=82.07 rate=26.7/h active=['c4-fpc-raster-s', 'c5-fpc-raster-p2-s', 'c6-fpc-raster-lsk-s'] ended=[]
