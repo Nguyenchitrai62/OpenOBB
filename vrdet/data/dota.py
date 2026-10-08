@@ -79,13 +79,6 @@ class DotaPatches(Dataset):
         # visible fraction an object cut by a mosaic/zoom crop needs to keep its label (a visible but unlabelled
         # part is trained as background; the one-stage recipe keeps even small pieces)
         self.aug_iof = aug_iof
-        self.cache = {}
-        if cache:                               # decode once in the main process; forked workers share the pages
-            from concurrent.futures import ThreadPoolExecutor
-            files = [self.root / "images" / self.split / m.get("file", f"{m['name']}.jpg") for m in self.items]
-            with ThreadPoolExecutor(8) as ex:
-                imgs = list(ex.map(lambda f: cv2.imread(str(f), cv2.IMREAD_COLOR), files))
-            self.cache = {m["name"]: im for m, im in zip(self.items, imgs)}
         self.layer_drop = layer_drop    # H16: chance to merge all CAD layers into one (do not over-rely on layers)
         self.vectors, self.max_tokens = vectors, max_tokens
         self.context, self.thumb, self.ctx_dropout = context, thumb, ctx_dropout
@@ -98,6 +91,13 @@ class DotaPatches(Dataset):
         if limit:
             items = items[:limit]
         self.items = items
+        self.cache = {}
+        if cache:                               # decode once in the main process; forked workers share the pages
+            from concurrent.futures import ThreadPoolExecutor
+            files = [self.root / "images" / self.split / m.get("file", f"{m['name']}.jpg") for m in self.items]
+            with ThreadPoolExecutor(8) as ex:
+                imgs = list(ex.map(lambda f: cv2.imread(str(f), cv2.IMREAD_COLOR), files))
+            self.cache = {m["name"]: im for m, im in zip(self.items, imgs)}
         self.keep_difficult = keep_difficult
 
     def __len__(self):
