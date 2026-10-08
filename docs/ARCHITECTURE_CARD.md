@@ -1,8 +1,6 @@
 # Thẻ kiến trúc VRDet (bản 2026-10-08)
 
-VRDet là detector box xoay (OBB) kiểu DETR thời gian thực, có thêm nhánh đọc nét vector CAD. Thẻ này trả lời bốn câu hỏi:
-chỉ số đạt được, các lớp của kiến trúc, phần dùng lại lấy từ đâu, và rủi ro bản quyền. Mục 6 là cấu hình đề xuất cho
-dataset riêng; sẽ cập nhật khi các thí nghiệm đang chạy (`research/LEDGER.md` §2) có kết quả.
+Chỉ nói về kiến trúc model: chỉ số, các lớp, phần dùng lại và nguồn, rủi ro bản quyền của kiến trúc.
 
 ## 1. Sơ đồ
 
@@ -45,8 +43,6 @@ dataset riêng; sẽ cập nhật khi các thí nghiệm đang chạy (`research
   (helicopter). Độ khít box (mAP50:95) gần ngang.
 - VRDet thắng ở class lớn cần ngữ cảnh: harbor +4.7, baseball-diamond +1.6 so với YOLO26x.
 - Nhánh vector: +0.84 mAP50 / +2.51 mAP50:95 trên FloorPlanCAD (cửa đơn +3.6, bay-window +5.7, thang cuốn +6.3).
-- Đang đo (kết quả vào sổ cái): layer CAD (e24), head dense đã sửa lỗi (e16), init Objects365 (e15), nhóm query
-  một-nhiều (e12b), AQD (e17), loss góc (e18), augmentation YOLO (e13), IoU trong matching (e23).
 
 ## 3. Các lớp
 
@@ -82,15 +78,12 @@ dataset riêng; sẽ cập nhật khi các thí nghiệm đang chạy (`research
 
 - Denoising có hướng (100 query nhiễu); matching Hungarian (focal + Chamfer góc + KLD).
 - Loss: MAL với nhãn mềm = IoU xoay chính xác, L1 (căn theo góc), KLD, FGL/DDF trên phân phối cạnh và góc.
-- Lấy mẫu RFS cho class hiếm; EMA; LR phẳng rồi cosine.
-- Tuỳ chọn đang thử: nhóm query một-nhiều, AQD, loss góc vuông, head dense phụ.
 
 ## 4. Phần dùng lại: bao nhiêu và lấy từ đâu
 
 | Thước đo | Dùng lại gần nguyên | Viết lại trên khung có sẵn | Tự viết |
 |---|---|---|---|
 | Tham số (X) | 86% (backbone 53% + encoder 33%) | 14% (decoder OBB) | 1.4% (nhánh vector) |
-| Dòng code (6.3k trong `vrdet/`, `colab/data/`, `tools/`) | 19% (1.2k) | 17% (1.1k) | 64% (4.0k) |
 
 | Thành phần | Nguồn | License | Cách dùng |
 |---|---|---|---|
@@ -98,34 +91,15 @@ dataset riêng; sẽ cập nhật khi các thí nghiệm đang chạy (`research
 | Hybrid encoder (AIFI + CCFM) | DEIM / D-FINE / RT-DETR | Apache-2.0 | chép, thêm hook |
 | Deformable attention core, tiện ích, FrozenBN | DEIM / D-FINE / RT-DETR / DETR | Apache-2.0 | chép |
 | Cấu trúc decoder, hàm FDR, LQE, denoising, matcher, khung loss MAL/FGL/DDF | D-FINE, DEIM | Apache-2.0 | viết lại cho box xoay |
-| Phần box xoay (FDR + góc, sampling xoay, cost Chamfer/KLD, IoU xoay, denoising có hướng), nhánh vector, gộp layer, head dense, AQD, nhóm một-nhiều, loss góc, IoU-cost, evaluator DOTA, data, trainer, công cụ | tự viết; ý tưởng từ paper: RiO-DETR, O2-DETR, RHINO, YOLO26, SymPoint-V2, VecFormer, H-DETR, Stable-DINO, Rank-DETR, LSKNet | — | chỉ lấy ý tưởng, không chép code |
-| Weights khởi tạo | D-FINE COCO (`dfine_{s,m,l,x}_coco.pth`) | repo Apache-2.0 | khởi tạo |
+| Phần box xoay (phân phối cạnh + góc, sampling xoay, cost Chamfer/KLD, IoU xoay, denoising có hướng), nhánh vector, gộp layer | tự viết; ý tưởng từ paper: RiO-DETR, O2-DETR, RHINO, YOLO26, SymPoint-V2, VecFormer | — | chỉ lấy ý tưởng, không chép code |
 
-Danh sách đầy đủ: `THIRD_PARTY_NOTICES.md`, license gốc: `LICENSES/`.
+License gốc của phần chép: `LICENSES/`.
 
-## 5. Rủi ro bản quyền (đánh giá kỹ thuật, không phải tư vấn pháp lý)
+## 5. Rủi ro bản quyền của kiến trúc (đánh giá kỹ thuật, không phải tư vấn pháp lý)
 
-| Hạng mục | Rủi ro | Lý do / việc cần làm |
+| Phần | Rủi ro | Lý do |
 |---|---|---|
-| Code chép từ D-FINE/DEIM | **Thấp** | Apache-2.0 cho phép bán, sửa, đóng mã. Phải giữ file LICENSE + NOTICE và ghi rõ file đã sửa (đã làm). |
-| Ý tưởng lấy từ paper/repo NC hoặc AGPL (YOLO26, RHINO, LSKNet...) | **Thấp** | Bản quyền bảo vệ code, không bảo vệ ý tưởng; VRDet không chép code. Rủi ro còn lại là bằng sáng chế (hiếm với các kỹ thuật học thuật này); nếu thương mại lớn nên cho luật sư rà. |
-| Ultralytics (AGPL) | **Không** (nếu giữ quy tắc) | Chỉ dùng ở `colab/baselines/` để đo; `tests/test_license_guard.py` chặn mọi import vào `vrdet/`. Không được đóng gói vào sản phẩm. |
-| PyMuPDF (AGPL) | **Trung bình nếu ship** | Chỉ ở `tools/pdf_vectors.py` (tuỳ chọn). Sản phẩm nên dùng pypdfium2 (Apache/BSD) hoặc pdfminer.six (MIT), hoặc mua license Artifex (AI_Takeoff đã dùng PyMuPDF). |
-| Weights init D-FINE COCO | **Thấp** | Repo Apache-2.0; COCO là chuẩn ngành cho init. |
-| Weights init Objects365→COCO | **Trung bình** | D-FINE lưu ý có thể chịu điều khoản Objects365: chỉ dùng để benchmark, không dùng cho model thương mại. |
-| Weights đã train trên DOTA / FloorPlanCAD | **Cao nếu ship** | Dataset chỉ cho học thuật / CC BY-NC: chỉ để nghiên cứu. Model thương mại: train từ init COCO trên data riêng của bạn. |
-| Thư viện nền (PyTorch, OpenCV, numpy, scipy, shapely) | **Thấp** | BSD / Apache. |
-
-## 6. Cấu hình đề xuất cho dataset riêng (YOLO-OBB)
-
-Tạm thời, sẽ cập nhật sau khi các thí nghiệm đang chạy xong:
-
-```bash
-python -m vrdet.train --data <dataset_vrdet> --out runs/<tên> --size s --epochs 24 --batch 16 --lr 1e-4 \
-  --rfs 0.1 --channels-last --compile --eval-queries 900
-```
-
-- `--size x --batch 8 --lr 6e-5 --backbone-mult 0.1 --wd 1.25e-4` khi cần chính xác hơn (khoảng 2× thời gian suy luận).
-- `--vectors` (và sau e24: `--vec-lfe --layer-drop 0.1`) khi có vector PDF (`tools/pdf_vectors.py`).
-- Suy luận: `python -m vrdet.predict --ckpt runs/<tên>/last.pt --src <ảnh trang> --out <thư mục> --queries 900`.
-- Hướng dẫn đầy đủ: `docs/FINETUNE.md`.
+| Backbone, encoder, lõi attention chép từ D-FINE/DEIM | **Thấp** | Apache-2.0 cho phép bán, sửa, đóng mã; chỉ cần giữ LICENSE + NOTICE và ghi file đã sửa (đã làm). |
+| Decoder OBB viết lại trên khung D-FINE | **Thấp** | Khung gốc Apache-2.0; phần box xoay là code riêng. |
+| Phần tự viết theo ý tưởng paper (kể cả paper có code NC/AGPL như RHINO, YOLO26, LSKNet) | **Thấp** | Bản quyền bảo vệ code, không bảo vệ ý tưởng; không chép code. Rủi ro còn lại là bằng sáng chế (hiếm với các kỹ thuật học thuật này). |
+| Nhánh vector CAD | **Rất thấp** | Code và thiết kế riêng. |
