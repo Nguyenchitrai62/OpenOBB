@@ -1,0 +1,9 @@
+# VRDet runtime (all permissive licences: BSD / Apache / MIT)
+torch>=2.3
+numpy
+opencv-python-headless
+shapely>=2.0
+scipy
+pyyaml
+# optional: PDF vector extraction (tools/pdf_vectors.py) - PyMuPDF is AGPL/commercial, not part of the model
+# pymupdf
