@@ -140,6 +140,18 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     - Phần còn lại vẫn chủ yếu là độ khít box: window −12.9, sliding-door −16.0, blind-window −13.2 AP50:95.
   - Hướng kế tiếp: loss IoU xoay trực tiếp + lấy mẫu dọc trục dài, train dài hơn, cỡ M/X trên FPC, mosaic giữ độ phân giải (e13).
 
+- **F19. Bộ khung fine-tune trên data riêng (Wall_Color: 250 trang khoảng 2381 px, khoảng 54 object/trang).** Đối chiếu với source Ultralytics:
+  - **Cắt tile ở độ phân giải gốc:** khoảng 7 tile/trang, nên mỗi epoch chậm hơn YOLO khoảng 3 lần. Tính trên mỗi ảnh, VRDet-S vẫn nhanh hơn YOLO26x. Mặc định đổi sang resize cả ảnh.
+  - **Quá ít bước:** 250 ảnh, batch 32, 30 epoch chỉ có 210 bước, warmup chiếm một nửa; mAP = 0 tới epoch 10.
+    - Kiểu DETR cần khoảng 2000 bước trở lên.
+    - Sửa: batch tự giữ ≥ 25 bước/epoch, warmup = 3 epoch, EMA bán rã khoảng 5% run (0.9998 cũ bán rã khoảng 3500 bước).
+  - **Pipeline làm hại nét mảnh (chưa đo Δ):**
+    - Box có cạnh ngắn < 2 px bị xoá khỏi target. Sửa: kẹp lên 2 px.
+    - Sau crop, mảnh object cần iof ≥ 0.7 mới giữ nhãn. Sửa: 0.25 khi augment.
+    - Tile lưu JPEG q95. Sửa: PNG.
+    - NMS 0.1 cả khi 1 tile/ảnh. Sửa: 0.7.
+  - **Chưa làm:** tích luỹ gradient tới batch danh nghĩa; P/R tại một ngưỡng conf chung; fallback fp16 cho T4; cache ảnh trong RAM.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
