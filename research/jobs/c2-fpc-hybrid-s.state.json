@@ -5,29 +5,29 @@
   "out": "/content/work/runs/c2-fpc-hybrid-s",
   "status": "running",
   "launched": 1791434805.4048796,
-  "updated": "2026-10-08 12:28:32",
+  "updated": "2026-10-08 12:54:58",
   "fails": 0,
   "synced": {
     "train_progress.log": [
-      60203,
-      1791437147
+      106411,
+      1791438813
     ],
     "setup.log": [
       350,
       1791434825
     ],
     "train.log": [
-      61975,
-      1791437147
+      108183,
+      1791438813
     ],
     "metrics.jsonl": [
-      8948,
-      1791437066
+      16544,
+      1791438812
     ],
     "last.pt": [
       181712573,
-      1791437064
+      1791438812
     ]
   },
-  "tail": "103 kld_o2m_2=0.161 angle_o2m_2=0.038 fgl_o2m_2=0.897 dense_cls=0.108 dense_box=0.184 dense_angle=0.012 lr 9.98e-05 | 39.5 img/s data 0.003s crit 0.191s/it\n[05:25:47] ep 12 it 200/435 loss 22.187 mal=0.634 bbox=0.095 kld=0.158 angle=0.037 fgl=0.875 mal_o2m_0=0.910 bbox_o2m_0=0.106 kld_o2m_0=0.188 angle_o2m_0=0.032 fgl_o2m_0=0.970 mal_o2m_1=0.848 bbox_o2m_1=0.092 kld_o2m_1=0.156 angle_o2m_1=0.032 fgl_o2m_1=0.866 mal_o2m_2=0.759 bbox_o2m_2=0.089 kld_o2m_2=0.149 angle_o2m_2=0.031 fgl_o2m_2=0.855 dense_cls=0.138 dense_box=0.177 dense_angle=0.009 lr 9.97e-05 | 39.7 img/s data 0.002s crit 0.190s/it\n"
+  "tail": "1609, \"loss_angle_o2m_2\": 0.0195, \"loss_fgl_o2m_2\": 0.8476, \"loss_dense_cls\": 0.1074, \"loss_dense_box\": 0.1756, \"loss_dense_angle\": 0.0106, \"total\": 20.6315}\n[05:53:33] ep 22 it 0/435 loss 20.844 mal=0.575 bbox=0.065 kld=0.138 angle=0.013 fgl=0.922 mal_o2m_0=0.654 bbox_o2m_0=0.119 kld_o2m_0=0.173 angle_o2m_0=0.033 fgl_o2m_0=1.003 mal_o2m_1=0.612 bbox_o2m_1=0.099 kld_o2m_1=0.145 angle_o2m_1=0.028 fgl_o2m_1=0.918 mal_o2m_2=0.596 bbox_o2m_2=0.066 kld_o2m_2=0.142 angle_o2m_2=0.012 fgl_o2m_2=0.902 dense_cls=0.081 dense_box=0.156 dense_angle=0.047 lr 1.60e-05 | 14.7 img/s data 0.416s crit 0.354s/it\n"
 }

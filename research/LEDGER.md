@@ -20,7 +20,8 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 |---|---|---|---|---|
 | e1-yolo26s-dota-24e | DOTA | 74.77 / 49.49 | 8.9 ms | AdamW (auto), init Objects365→COCO, mosaic 1.0 (tắt 10 ep cuối), scale 0.5, translate 0.1 |
 | e5-yolo26x-dota-24e | DOTA | **78.42 / 53.10** | 12.8 ms | như trên, batch 16 |
-| e4-fpc-yolo26s-24e | FloorPlanCAD | 78.51 / 70.54 | 7.8 ms | như trên |
+| e4-fpc-yolo26s-24e | FloorPlanCAD | 78.51 / 70.54 | 7.8 ms | như trên (chỉ còn là lịch sử) |
+| e8-fpc-yolo26x-24e | FloorPlanCAD | **80.16 / 74.96** | 11.6 ms | **mốc CAD**, batch 16 |
 
 ## 2. Thí nghiệm VRDet
 
@@ -55,7 +56,7 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 | 10-08 | e16-dota-dense-fix-s | DOTA | S | RFS + dense (sau sửa ProbIoU) | e3 | dec 72.29 / 47.90; **dense 69.08**; hợp 72.93 | dense: +19.3 so với bản lỗi | dense ngang YOLO26s ở class nhỏ, kém ở class lớn → bù cho decoder; ủng hộ kiến trúc lai | 13 |
 | 10-08 | e20-dota-base12-s | DOTA | S | mốc 12 epoch | – | 68.21 / 44.17 (q900 69.36) | – | mốc cho sàng lọc 12ep | 5 |
 | 10-08 | e15-dota-o365-s | DOTA | S | init Objects365→COCO | e3 | 70.29 / 46.86 | −2.05 (không tính HC −0.98) | **BÁC BỎ**: giữ init COCO | 10 |
-| 10-08 | c1-fpc-combo-s | FPC | S | gộp SOTA: vector + layer pooling + o2m 900 + AQD + loss góc + IoU-cost (+900 query) | e7 | **78.21 / 69.31** (q900) | +1.41 / +1.64 | gộp có lợi; so YOLO26x chờ e8 | 9 |
+| 10-08 | c1-fpc-combo-s | FPC | S | gộp SOTA: vector + layer pooling + o2m 900 + AQD + loss góc + IoU-cost (+900 query) | e7 | **78.21 / 69.31** (q900) | +1.41 / +1.64 | gộp có lợi; so YOLO26x: −1.95 / −5.65 (khoảng cách chính là độ khít box) | 9 |
 
 ## 3. Phát hiện (có bằng chứng)
 

@@ -378,3 +378,8 @@
 [2026-10-08 12:31:26] watch: balance=121.58 rate=26.7/h active=['c1-fpc-combo-s', 'c2-fpc-hybrid-s', 'e8-fpc-yolo26x-24e'] ended=[]
 [2026-10-08 12:39:28] queue: c3-fpc-ground-s waits (3 live sessions, cap 3)
 [2026-10-08 12:40:56] c1-fpc-combo-s: finished with status done; stopping VM
+[2026-10-08 12:45:03] watch: balance=114.86 rate=26.7/h active=['c1-fpc-combo-s', 'c2-fpc-hybrid-s', 'e8-fpc-yolo26x-24e'] ended=[('c1-fpc-combo-s', 'done')]
+[2026-10-08 12:53:09] c3-fpc-ground-s: launching attempt 1 on G4 as session c3-fpc-ground-s-1
+[2026-10-08 12:53:38] c3-fpc-ground-s: running
+[2026-10-08 12:56:13] e8-fpc-yolo26x-24e: finished with status done; stopping VM
+[2026-10-08 12:56:16] watch: balance=109.72 rate=26.7/h active=['c2-fpc-hybrid-s', 'c3-fpc-ground-s', 'e8-fpc-yolo26x-24e'] ended=[('e8-fpc-yolo26x-24e', 'done')]
