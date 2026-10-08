@@ -188,7 +188,9 @@ def evaluate(dets, gts, classes=DOTA1_CLASSES, iou_thrs=None):
             for t, thr in enumerate(iou_thrs):
                 flags[t, idx] = _match_image(iou, gdiff, thr)
         order = np.argsort(-sc, kind="stable")
+        i50 = int(np.argmin(np.abs(iou_thrs - 0.5)))
         aps07, aps = [], []
+        p_f1 = r_f1 = 0.0
         for t, thr in enumerate(iou_thrs):
             f = flags[t, order]
             f = f[f >= 0]                                  # drop detections on difficult objects
@@ -198,15 +200,35 @@ def evaluate(dets, gts, classes=DOTA1_CLASSES, iou_thrs=None):
             prec = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
             aps07.append(voc_ap(rec, prec, True) if npos else 0.0)
             aps.append(voc_ap(rec, prec, False) if npos else 0.0)
-        i50 = int(np.argmin(np.abs(iou_thrs - 0.5)))
+            if t == i50 and npos and len(f):               # precision / recall at the best-F1 score threshold
+                j = int(np.argmax(2 * prec * rec / np.maximum(prec + rec, 1e-12)))
+                p_f1, r_f1 = float(prec[j]), float(rec[j])
         res["classes"][c] = {"npos": npos, "ndet": int(len(sc)), "AP50": aps07[i50],
                              "AP50_all": aps[i50], "AP50_95": float(np.mean(aps)),
-                             "recall50": float((flags[i50] == 1).sum() / max(npos, 1))}
+                             "recall50": float((flags[i50] == 1).sum() / max(npos, 1)),
+                             "P": p_f1, "R": r_f1, "images": int(sum(1 for _, d in gt_c.values() if (~d).any()))}
     cls_with_gt = [c for c in classes if res["classes"][c]["npos"] > 0]
-    res["mAP50"] = float(np.mean([res["classes"][c]["AP50"] for c in cls_with_gt])) if cls_with_gt else 0.0
-    res["mAP50_95"] = float(np.mean([res["classes"][c]["AP50_95"] for c in cls_with_gt])) if cls_with_gt else 0.0
-    res["mAP50_allpt"] = float(np.mean([res["classes"][c]["AP50_all"] for c in cls_with_gt])) if cls_with_gt else 0.0
+
+    def mean(key):
+        return float(np.mean([res["classes"][c][key] for c in cls_with_gt])) if cls_with_gt else 0.0
+    res["mAP50"], res["mAP50_95"], res["mAP50_allpt"] = mean("AP50"), mean("AP50_95"), mean("AP50_all")
+    res["P"], res["R"] = mean("P"), mean("R")
+    res["n_instances"] = int(sum(res["classes"][c]["npos"] for c in classes))
     return res
+
+
+def summary_table(res, classes=DOTA1_CLASSES, per_class=True):
+    """Console table: Class / Images / Instances / P / R (best-F1 point) / mAP50 (VOC07) / mAP50-95."""
+    head = f"{'Class':>22}{'Images':>11}{'Instances':>11}{'P':>11}{'R':>11}{'mAP50':>11}{'mAP50-95':>11}"
+    rows = [head, f"{'all':>22}{res.get('n_images', 0):>11}{res.get('n_instances', 0):>11}{res.get('P', 0):>11.3f}"
+                  f"{res.get('R', 0):>11.3f}{res['mAP50']:>11.3f}{res['mAP50_95']:>11.3f}"]
+    if per_class:
+        for c in classes:
+            r = res["classes"][c]
+            if r["npos"]:
+                rows.append(f"{c[:22]:>22}{r.get('images', 0):>11}{r['npos']:>11}{r.get('P', 0):>11.3f}"
+                            f"{r.get('R', 0):>11.3f}{r['AP50']:>11.3f}{r['AP50_95']:>11.3f}")
+    return "\n".join(rows)
 
 
 def format_table(res, classes=DOTA1_CLASSES):

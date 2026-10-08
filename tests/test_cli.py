@@ -65,3 +65,24 @@ def test_train_val_predict_smoke(tmp_path):
     r2 = Detector(r.best).train(data=str(data), epochs=1, batch=2, project=str(tmp_path / "runs"), name="ft",
                                 cache=str(tmp_path / "cache"), workers=0, recipe=False, max_iters=1, threads=1)
     assert os.path.exists(r2.best)
+
+
+def test_console_rows():
+    import io
+
+    from vrdet.console import EpochBar, val_rows
+    from vrdet.eval.dota import evaluate, summary_table
+    sq = np.array([0, 0, 10, 0, 10, 10, 0, 10], float)
+    gts = {"a": [(sq.tolist(), "door", False)], "b": [((sq + 50).tolist(), "door", False)]}
+    dets = {"door": (["a", "b", "b"], np.array([0.9, 0.8, 0.3]), np.stack([sq, sq + 50, sq + 20]))}
+    res = evaluate(dets, gts, classes=("door", "window"))
+    assert res["P"] == 1.0 and res["R"] == 1.0 and res["classes"]["door"]["images"] == 2
+    table = summary_table(res, ("door", "window")).splitlines()
+    assert len(table) == 3 and table[1].split()[:3] == ["all", "2", "2"]          # window has no GT: not listed
+    buf = io.StringIO()
+    bar = EpochBar(0, 10, 4, 1024, stream=buf)
+    bar.update(4, {"loss_mal": 0.5, "loss_angle": 1e-12}, 37, 21.5, force=True)
+    bar.close()
+    val_rows(res, 3.0, stream=buf)
+    out = buf.getvalue()
+    assert "1/10" in out and "21.5G" in out and "100%" in out and "e-12" not in out and "mAP50-95" in out

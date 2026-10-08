@@ -123,6 +123,13 @@ def _run_dir(project, name, exist_ok, resume):
         k += 1
 
 
+def _eval_every(prepared, epochs):
+    """Validate every epoch (like the usual training loop) unless the val split is large."""
+    p = Path(prepared) / "meta" / "val.jsonl"
+    n = sum(1 for _ in open(p)) if p.exists() else 0
+    return 1 if n <= 2000 else max(1, round(epochs / 10))
+
+
 def _queries_for(prepared):
     """Decoder queries for training: 300 (D-FINE default) unless dense tiles need more (one-to-one matching cannot
     supervise more objects than queries; 300 saturated on dense DOTA tiles, research/LEDGER.md F4)."""
@@ -134,9 +141,10 @@ def _queries_for(prepared):
     return 300 if p99 <= 240 else int(min(900, np.ceil(p99 * 1.5 / 100) * 100))
 
 
-def auto_scale(data, imgsz, n=40):
-    """Pages up to ~1.6x the tile size are resized into one tile (like a whole-image resize); larger pages keep their
-    native resolution and are tiled, so thin lines survive. Already-tiled data is used as is."""
+def auto_scale(data, imgsz, n=40, fit=0.7):
+    """Pick the page scale before tiling. Native resolution keeps thin lines, but every object must still fit (>= 70%)
+    inside one tile or it is lost from training. Rule: the largest scale <= 1 at which the 99th-percentile object
+    fits in `fit` x tile; if the scaled page is then at most ~1.6 tiles, the whole page goes into one tile."""
     if _is_prepared(data):
         return 1.0
     import random
@@ -144,20 +152,35 @@ def auto_scale(data, imgsz, n=40):
     import cv2
     import numpy as np
 
-    from vrdet.data.prepare import IMG_EXT, find_splits
+    from vrdet.data.prepare import IMG_EXT, _labels_for, find_splits
     _, splits = find_splits(data)
     imgs = sorted(p for p in splits["train"].iterdir() if p.suffix.lower() in IMG_EXT)
-    sides = []
+    lbl_dir = _labels_for(splits["train"])
+    sides, objs = [], []
     for p in random.Random(0).sample(imgs, min(n, len(imgs))):
         im = cv2.imread(str(p), cv2.IMREAD_UNCHANGED)
-        if im is not None:
-            sides.append(max(im.shape[:2]))
+        if im is None:
+            continue
+        h, w = im.shape[:2]
+        sides.append(max(h, w))
+        lp = lbl_dir / f"{p.stem}.txt"
+        if lp.exists():
+            for row in lp.read_text().splitlines():
+                v = row.split()
+                if len(v) >= 9:
+                    q = np.array([float(t) for t in v[1:9]]).reshape(4, 2) * [w, h]
+                    objs.append(max(np.linalg.norm(q[1] - q[0]), np.linalg.norm(q[2] - q[1])))
     if not sides:
         return 1.0
     med = float(np.median(sides))
-    scale = math.floor(imgsz / med * 1e4) / 1e4 if imgsz < med <= 1.6 * imgsz else 1.0   # page <= one tile
-    print(f"[vrdet] pages ~{med:.0f} px (median long side) -> scale {scale} "
-          f"({'one tile per page' if med * scale <= imgsz else 'tiled at native resolution'}; set scale= to override)")
+    big = float(np.percentile(objs, 99)) if objs else 0.0
+    scale = min(1.0, fit * imgsz / big) if big > 0 else 1.0
+    if med * scale <= 1.6 * imgsz:
+        scale = min(1.0, imgsz / med)                   # whole page in one tile
+    scale = math.floor(scale * 1e4) / 1e4
+    how = "one tile per page" if med * scale <= imgsz else f"~{math.ceil((med * scale - 200) / (imgsz - 200)) ** 2} tiles per page"
+    print(f"[vrdet] pages ~{med:.0f} px, objects up to ~{big:.0f} px (p99) -> scale {scale}, {how} "
+          f"(set scale= to override)")
     return scale
 
 
@@ -214,7 +237,7 @@ def train(data, model="s", epochs=50, batch=None, imgsz=None, project="runs", na
 
     opts = {"size": size, "img": imgsz, "scale": scale, "epochs": int(epochs), "batch": int(batch),
             "lr": sd["lr"], "backbone_mult": sd["backbone_mult"], "wd": sd["wd"],
-            "eval_every": max(1, round(int(epochs) / 8)), "eval_images": 10**9, "seed": seed}
+            "eval_every": _eval_every(prepared, int(epochs)), "eval_images": 10**9, "seed": seed}
     q = _queries_for(prepared)
     if q > 300 and "queries" not in inherited:
         opts.update(queries=q, num_top=q)
@@ -240,7 +263,8 @@ def train(data, model="s", epochs=50, batch=None, imgsz=None, project="runs", na
             argv += [flag, str(v)]
     (save_dir / "vrdet_args.json").write_text(json.dumps({"data": str(data), "prepared": str(prepared), **opts},
                                                          indent=1, default=str))
-    print("[vrdet] python -m vrdet.train " + " ".join(argv))
+    if extra.get("verbose"):
+        print("[vrdet] python -m vrdet.train " + " ".join(argv))
     from vrdet import train as trainer
     trainer.main(argv)
     return _summary(save_dir)
@@ -271,7 +295,7 @@ def val(model, data, imgsz=None, scale=None, gap=200, val_frac=0.15, batch=8, wo
 
     from vrdet.data.dota import dataset_classes
     from vrdet.engine import eval_dota
-    from vrdet.eval.dota import format_table
+    from vrdet.eval.dota import summary_table
     from vrdet.predict import load_model
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net, names, targs = load_model(model, dev, queries)
@@ -283,7 +307,7 @@ def val(model, data, imgsz=None, scale=None, gap=200, val_frac=0.15, batch=8, wo
         print(f"[vrdet] WARNING: dataset classes {classes} differ from the model's {list(names)}")
     res, _ = eval_dota(net, prepared, dev, None, batch=batch, workers=workers, num_top=queries, img_size=imgsz,
                        post=targs.get("post", "flat"))
-    print(format_table(res, classes))
+    print(summary_table(res, classes))
     return res
 
 

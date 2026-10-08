@@ -17,7 +17,8 @@ from torch.utils.data import DataLoader
 
 from vrdet.data.dota import DotaPatches, collate, dataset_classes
 from vrdet.engine import ModelEMA, eval_dota, lr_factor, param_groups, to_device
-from vrdet.eval.dota import DOTA1_CLASSES, format_table, write_task1
+from vrdet.console import EpochBar, val_rows
+from vrdet.eval.dota import DOTA1_CLASSES, format_table, summary_table, write_task1
 from vrdet.models.dense_head import DenseCriterion
 from vrdet.models.vrdet import VRDet, build_criterion, load_dfine_coco
 
@@ -102,6 +103,8 @@ def get_args(argv=None):
     ap.add_argument("--eval-only", action="store_true", help="evaluate EMA weights of {out}/last.pt, no training")
     ap.add_argument("--ctx-dropout", type=float, default=0.0, help="H6: drop the context with this prob")
     ap.add_argument("--threads", type=int, default=0, help="torch CPU threads (0 = default)")
+    ap.add_argument("--verbose", action="store_true",
+                    help="print the detailed per-iteration log instead of the compact progress table")
     return ap.parse_args(argv)
 
 
@@ -114,10 +117,19 @@ def main(argv=None):
         return
     logf = open(out / "train_progress.log", "a")
 
-    def log(msg):
+    def log(msg, console=False):
+        """Detailed log -> train_progress.log; also to the console with --verbose (or console=True)."""
         line = f"[{time.strftime('%H:%M:%S')}] {msg}"
-        print(line, flush=True)
+        if a.verbose or console:
+            print(line, flush=True)
         logf.write(line + "\n")
+        logf.flush()
+
+    def say(msg):
+        """Compact console output (also kept in the log file)."""
+        if not a.verbose:
+            print(msg, flush=True)
+        logf.write(msg + "\n")
         logf.flush()
 
     def jlog(rec):
@@ -150,8 +162,12 @@ def main(argv=None):
         cmap = {i: src_cls.index(c) for i, c in enumerate(classes) if c in src_cls}
         load_dfine_coco(model, a.weights, log=log, class_map=cmap)
         log(f"[init] fine-tuning from {a.weights} ({len(cmap)}/{len(classes)} classes carried over)")
+        init_desc = f"fine-tune from {a.weights} ({len(cmap)}/{len(classes)} classes carried over)"
     elif not last.exists() and not a.no_pretrained:
         load_dfine_coco(model, a.size, class_names=classes, log=log, init=a.init)
+        init_desc = "D-FINE COCO weights (Apache-2.0)"
+    else:
+        init_desc = "resume" if last.exists() else "random"
     model.to(device)
     if a.channels_last:
         model.to(memory_format=torch.channels_last)
@@ -191,6 +207,8 @@ def main(argv=None):
         start_epoch, it = ck["epoch"] + 1, ck["iter"]
         best_score = ck.get("best_score", -1.0)
         log(f"resumed from epoch {ck['epoch']} (iter {it})")
+        if not a.eval_only:
+            say(f"Resuming {out} from epoch {ck['epoch'] + 1}/{a.epochs}")
     # Compile AFTER the EMA deep copy: compiled forwards are bound methods of the live model, and a copy made
     # afterwards kept calling the live (training-mode) backbone/encoder at eval time (bug seen 2026-10-07:
     # identical train losses, ~7 points lower EMA eval).
@@ -200,7 +218,7 @@ def main(argv=None):
             model.encoder.forward = torch.compile(model.encoder.forward, dynamic=False)
             log("torch.compile enabled for backbone + encoder (training model only)")
         except Exception as e:  # noqa: BLE001
-            log(f"torch.compile unavailable, eager mode: {e}")
+            log(f"torch.compile unavailable, eager mode: {e}", console=True)
     if a.eval_only:
         start_epoch = a.epochs                  # skip training: evaluate the EMA weights of last.pt
         if a.eval_layer >= 0:                   # layer-wise diagnostic (SQR indicator): stop the decoder at layer k
@@ -214,6 +232,19 @@ def main(argv=None):
         gts = sorted(p.stem for p in (Path(a.data) / "gt" / "val").glob("*.txt"))
         val_subset = sorted(random.Random(0).sample(gts, min(a.eval_images, len(gts))))
         full_val = len(val_subset) == len(gts)      # periodic scores comparable with the final one
+    if not a.eval_only and start_epoch < a.epochs:
+        gpu = (f"{torch.cuda.get_device_name(0)} ({torch.cuda.get_device_properties(0).total_memory / 2**30:.0f} GB)"
+               if device.type == "cuda" else "CPU")
+        extras = [n for n, on in (("LSK", a.lsk), ("P2", a.p2), ("dense", a.dense)) if on]
+        n_val = len(list((Path(a.data) / "gt" / "val").glob("*.txt")))
+        say(f"VRDet {__import__('vrdet').__version__} | torch {torch.__version__} | {gpu} | "
+            f"AMP {'bf16' if amp else 'off'} | compile {'on' if a.compile and device.type == 'cuda' else 'off'}")
+        say(f"model   VRDet-{a.size}{' + ' + ' + '.join(extras) if extras else ''}, {n_par:.2f}M params, "
+            f"{a.queries} queries | init: {init_desc}")
+        say(f"data    {len(ds)} train tiles, {n_val} val images, {len(classes)} classes | tile {a.img}, scale {a.scale}")
+        say(f"train   {a.epochs} epochs x {iters_per_epoch} it, batch {a.batch}, AdamW lr {a.lr:g} | "
+            f"val every {a.eval_every} epoch(s) on {'all' if full_val else len(val_subset or [])} val images")
+        say(f"save    {out}  (best.pt, last.pt, metrics.jsonl, train_progress.log)")
 
     def save_best(score, epoch):
         # compact deployable checkpoint: EMA weights + args + classes (no optimiser state)
@@ -234,6 +265,7 @@ def main(argv=None):
         if device.type == "cuda":
             torch.cuda.reset_peak_memory_stats()
         prof = None
+        bar = EpochBar(epoch, a.epochs, iters_per_epoch, a.img) if not a.verbose else None
         for bi, (imgs, targets) in enumerate(dl):
             if bi >= iters_per_epoch:
                 break
@@ -266,7 +298,8 @@ def main(argv=None):
             loss = sum(losses.values())
             t_loss += time.time() - t0
             if not torch.isfinite(loss):
-                log(f"non-finite loss at iter {it}: {[(k, float(v)) for k, v in losses.items() if not torch.isfinite(v)]}")
+                log(f"non-finite loss at iter {it}: {[(k, float(v)) for k, v in losses.items() if not torch.isfinite(v)]}",
+                    console=True)
                 opt.zero_grad(set_to_none=True)
                 it += 1
                 tick = time.time()
@@ -275,7 +308,7 @@ def main(argv=None):
             loss.backward()
             gn = torch.nn.utils.clip_grad_norm_(model.parameters(), a.clip if a.clip > 0 else 1e9)
             if not torch.isfinite(gn):          # never let one bad batch poison the weights
-                log(f"non-finite grad norm at iter {it}; step skipped")
+                log(f"non-finite grad norm at iter {it}; step skipped", console=True)
                 opt.zero_grad(set_to_none=True)
                 it += 1
                 tick = time.time()
@@ -290,13 +323,21 @@ def main(argv=None):
                 sums[k] = sums[k] + v if k in sums else v.clone()
             n += 1
             it += 1
+            if bar is not None:
+                bar.update(bi + 1, {k: float(sums[k]) / n for k in sums if k in ("loss_mal", "loss_bbox", "loss_kld",
+                                                                             "loss_angle", "loss_fgl")},
+                           sum(len(t["labels"]) for t in targets),
+                           torch.cuda.memory_reserved() / 2**30 if device.type == "cuda" else None,
+                           force=bi + 1 == iters_per_epoch)
             if bi % a.log_every == 0:
                 el = time.time() - t_ep
-                log(f"ep {epoch} it {bi}/{iters_per_epoch} loss {float(loss):.3f} "
+                log(f"ep {epoch} it {bi}/{iters_per_epoch} loss {float(loss.detach()):.3f} "
                     + " ".join(f"{k[5:]}={float(v):.3f}" for k, v in main.items() if k.startswith("loss_"))
                     + f" lr {opt.param_groups[-1]['lr']:.2e} | {(bi + 1) * a.batch / max(el, 1e-9):.1f} img/s"
                     f" data {t_data / (bi + 1):.3f}s crit {t_loss / (bi + 1):.3f}s/it")
             tick = time.time()
+        if bar is not None:
+            bar.close()
         dt = time.time() - t_ep
         rec = {"epoch": epoch, "iter": it, "lr": opt.param_groups[-1]["lr"], "epoch_s": round(dt, 1),
                "img_s": round(n * a.batch / max(dt, 1e-9), 1), "crit_s_per_it": round(t_loss / max(n, 1), 3),
@@ -304,8 +345,11 @@ def main(argv=None):
                "max_mem_gb": round(torch.cuda.max_memory_allocated() / 2**30, 1) if device.type == "cuda" else None}
         rec.update({k: round(float(v) / max(n, 1), 4) for k, v in sums.items()})
         if val_subset and ((epoch + 1) % a.eval_every == 0) and epoch + 1 < a.epochs:
+            t_val = time.time()
             res, _ = eval_dota(ema.module, a.data, device, val_subset, batch=a.batch, workers=a.workers,
                                num_top=a.num_top, img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post)
+            if not a.verbose:
+                val_rows(res, time.time() - t_val)
             rec["sub_mAP50"] = round(res["mAP50"], 4)
             rec["sub_mAP50_95"] = round(res["mAP50_95"], 4)
             if full_val and res["mAP50_95"] > best_score:
@@ -322,13 +366,14 @@ def main(argv=None):
         if not (out / "best.pt").exists():
             save_best(-1.0, a.epochs - 1)
         return
+    say(f"\n{a.epochs - start_epoch} epochs completed. Validating the final EMA model on all val images...")
     res, dets = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.num_top,
                           img_size=a.img, log=log, fusion=a.dense or a.vec_ground > 0, variants=["dec", "dense", "union", "snap", "snapg"],
                           save_preds_to=(out / "val_preds.npz") if a.dense else None, context=a.context,
                           vectors=a.vectors, post=a.post)
     if not a.eval_only and (not full_val or res["mAP50_95"] >= best_score):
         save_best(res["mAP50_95"], a.epochs - 1)
-    table = format_table(res, classes)
+    table = summary_table(res, classes)
     log("\n" + table)
     (out / "eval_val.txt").write_text(table + "\n")
     (out / "eval_val.json").write_text(json.dumps(res, indent=1))
@@ -337,7 +382,7 @@ def main(argv=None):
         ema.module.decoder.num_queries = a.eval_queries
         rq, _ = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.eval_queries,
                           img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post)
-        (out / f"eval_val_q{a.eval_queries}.txt").write_text(format_table(rq, classes) + "\n")
+        (out / f"eval_val_q{a.eval_queries}.txt").write_text(summary_table(rq, classes) + "\n")
         (out / f"eval_val_q{a.eval_queries}.json").write_text(json.dumps(rq, indent=1))
         jlog({"final_q": a.eval_queries, "mAP50": rq["mAP50"], "mAP50_95": rq["mAP50_95"]})
         ema.module.decoder.num_queries = a.queries

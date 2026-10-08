@@ -54,6 +54,7 @@ def split_image(item, out, split, size, gap, rates, iof_thr, classes, quality):
     thumb = cv2.resize(img0, (max(1, round(W0 * ts)), max(1, round(H0 * ts))), interpolation=cv2.INTER_AREA)
     cv2.imwrite(str(out / "thumbs" / split / f"{name}.jpg"), thumb, [cv2.IMWRITE_JPEG_QUALITY, 92])
     metas = []
+    seen = set()                                    # objects kept (whole or truncated) in at least one tile
     for rate in rates:
         img = img0 if rate == 1 else cv2.resize(img0, None, fx=rate, fy=rate, interpolation=cv2.INTER_LINEAR)
         H, W = img.shape[:2]
@@ -94,12 +95,15 @@ def split_image(item, out, split, size, gap, rates, iof_thr, classes, quality):
                             q[0::2] = np.clip(q[0::2] - x0, 0, pw)
                             q[1::2] = np.clip(q[1::2] - y0, 0, ph)
                             kept.append([cls_idx[objs0[k][1]], int(objs0[k][2]), trunc] + [round(v, 2) for v in q])
+                            seen.add(int(k))
                 cv2.imwrite(str(out / "images" / split / f"{pname}.jpg"), patch, [cv2.IMWRITE_JPEG_QUALITY, quality])
                 with open(out / "labels" / split / f"{pname}.txt", "w") as fh:
                     for o in kept:
                         fh.write(f"{o[0]} " + " ".join(f"{v / size:.6f}" for v in o[3:]) + "\n")
                 metas.append({"name": pname, "src": name, "rate": rate, "x0": x0, "y0": y0, "w": pw, "h": ph,
                               "img_w": W0, "img_h": H0, "objs": kept})
+    if metas:
+        metas[0]["lost"] = len(objs0) - len(seen)   # objects too large to be >= iof_thr inside any tile
     return metas, None
 
 
@@ -112,12 +116,13 @@ def split_items(items, out, split, size=1024, gap=200, rates=(1.0,), iof_thr=0.7
     (out / "meta").mkdir(parents=True, exist_ok=True)
     fn = partial(split_image, out=out, split=split, size=size, gap=gap, rates=tuple(rates),
                  iof_thr=iof_thr, classes=tuple(classes), quality=quality)
-    n_patch = n_obj = 0
+    n_patch = n_obj = n_lost = 0
     with Pool(workers or os.cpu_count()) as pool, open(out / "meta" / f"{split}.jsonl", "w") as mf:
         for metas, err in pool.imap_unordered(fn, items, chunksize=2):
             if err:
                 print("WARN", err, flush=True)
             for m in metas:
+                n_lost += m.pop("lost", 0)
                 mf.write(json.dumps(m) + "\n")
                 n_patch += 1
                 n_obj += len(m["objs"])
@@ -125,4 +130,8 @@ def split_items(items, out, split, size=1024, gap=200, rates=(1.0,), iof_thr=0.7
         if lbl and Path(lbl).exists():
             shutil.copy(lbl, out / "gt" / split / f"{Path(img).stem}.txt")
     print(f"[split] {split}: {len(items)} images -> {n_patch} tiles, {n_obj} objects", flush=True)
+    if n_lost:
+        print(f"[split] WARNING {split}: {n_lost} objects are too long/large to be >= {iof_thr:.0%} inside any "
+              f"{size}px tile and are missing from this split; use a larger tile (imgsz) or a smaller scale",
+              flush=True)
     return n_patch
