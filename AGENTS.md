@@ -179,6 +179,9 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
   Bỏ e19 (LSK), e21 (chẩn đoán lớp), e22 (ortho). Không chạy run gộp cỡ X (khoảng 40 CU) vì thiếu ngân sách.
   Session A100 của người dùng chung cũng trừ vào số dư (khoảng 10 CU/giờ).
 
+- (bổ sung 11:45, 2026-10-08) **Chỉ so với YOLO mạnh nhất (YOLO26x).** VRDet được phép nhỏ hơn; không bao giờ so với bản
+  không phải SOTA như YOLO26s. Mỗi benchmark cần một run YOLO26x cùng điều kiện (FloorPlanCAD: `e8-fpc-yolo26x-24e`).
+
 Câu hỏi còn mở:
 - Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.
 

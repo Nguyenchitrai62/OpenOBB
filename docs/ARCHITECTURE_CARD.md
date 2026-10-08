@@ -27,22 +27,22 @@ Chỉ nói về kiến trúc model: chỉ số, các lớp, phần dùng lại v
               ghép tile về trang bằng NMS đa giác IoU 0.1 theo class
 ```
 
-## 2. Chỉ số (val, 24 epoch, ảnh 1024, cùng điều kiện với YOLO)
+## 2. Chỉ số (val, 24 epoch, ảnh 1024, cùng điều kiện; mốc duy nhất: YOLO26x, YOLO mạnh nhất)
 
-| Benchmark | Model | mAP50 | mAP50:95 | Latency (bs1, fp16, RTX PRO 6000) |
-|---|---|---|---|---|
-| DOTA-v1.0 | YOLO26x | **78.42** | **53.10** | 12.8 ms |
-| DOTA-v1.0 | **VRDet-X** (900 query) | 76.29 | 52.84 | 20.0 ms (64% FPS) |
-| DOTA-v1.0, không tính helicopter | YOLO26x / VRDet-X | 78.66 / 77.71 | | |
-| DOTA-v1.0 | YOLO26s | 74.77 | 49.49 | 8.9 ms |
-| DOTA-v1.0 | **VRDet-S** (900 query) | 72.95 | 48.90 | 9.4 ms |
-| FloorPlanCAD (CAD, 30 class) | YOLO26s | **78.51** | **70.54** | 7.8 ms |
-| FloorPlanCAD | **VRDet-S + vector** | 76.80 | 67.67 | 11.5 ms |
+| Benchmark | Model | Tham số | mAP50 | mAP50:95 | Latency (bs1, fp16, RTX PRO 6000) |
+|---|---|---|---|---|---|
+| DOTA-v1.0 | YOLO26x (mốc) | khoảng 58M | **78.42** | **53.10** | 12.8 ms |
+| DOTA-v1.0 | VRDet-X (900 query) | 63.4M | 76.29 | 52.84 | 20.0 ms |
+| DOTA-v1.0 | VRDet-S (900 query) | 10.9M | 72.95 | 48.90 | **9.4 ms** |
+| DOTA-v1.0, không tính helicopter | YOLO26x / VRDet-X | | 78.66 / 77.71 | | |
+| FloorPlanCAD (CAD, 30 class) | YOLO26x (mốc) | khoảng 58M | đang chạy (e8) | | |
+| FloorPlanCAD | VRDet-S + vector | 10.9M | 76.80 | 67.67 | 11.5 ms |
 
-- VRDet có recall bằng hoặc cao hơn YOLO26x ở 13/15 class DOTA; phần còn kém là xếp hạng điểm và object gần vuông
-  (helicopter). Độ khít box (mAP50:95) gần ngang.
-- VRDet thắng ở class lớn cần ngữ cảnh: harbor +4.7, baseball-diamond +1.6 so với YOLO26x.
+- VRDet-X: recall bằng hoặc cao hơn YOLO26x ở 13/15 class DOTA; phần còn kém là xếp hạng điểm và object gần vuông (helicopter).
+  Độ khít box (mAP50:95) gần ngang. Thắng ở class lớn cần ngữ cảnh: harbor +4.7, baseball-diamond +1.6.
+- VRDet-S nhỏ hơn khoảng 5 lần và nhanh hơn YOLO26x.
 - Nhánh vector: +0.84 mAP50 / +2.51 mAP50:95 trên FloorPlanCAD (cửa đơn +3.6, bay-window +5.7, thang cuốn +6.3).
+- Đang chạy: c2 kiến trúc lai dense–sparse (DOTA), c1 bản gộp có vector + layer (FloorPlanCAD), YOLO26x trên FloorPlanCAD.
 
 ## 3. Các lớp
 

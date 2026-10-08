@@ -86,6 +86,28 @@ def to_dota_raw(src, split, names, raw, files=None):
     return safe
 
 
+def write_tile_vectors(vdir, out, splits, size):
+    """Cut every page's vector tokens into the tiles written by split_set ({out}/vectors/{split}/{patch}.npz)."""
+    import numpy as np
+    from vrdet.data.vectors import tile_npz
+    for split in splits:
+        (out / "vectors" / split).mkdir(parents=True, exist_ok=True)
+        pages, n, missing = {}, 0, set()
+        for line in (out / "meta" / f"{split}.jsonl").read_text().splitlines():
+            m = json.loads(line)
+            src = m["src"]
+            if src not in pages:
+                f = vdir / f"{src}.npz"
+                pages[src] = dict(np.load(f)) if f.exists() else None
+            page = pages[src]
+            if page is None:
+                missing.add(src)
+                page = {"tokens": np.zeros((0, 21), np.float32), "layer": np.zeros(0, np.int32)}
+            tile_npz(page, m["x0"], m["y0"], size, out / "vectors" / split / f"{m['name']}.npz")
+            n += 1
+        print(f"[import] {split}: vectors for {n} tiles" + (f", no vector file for {len(missing)} pages" if missing else ""))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", required=True)
@@ -98,6 +120,8 @@ def main():
     ap.add_argument("--val-frac", type=float, default=0.15,
                     help="when the source has no val images, hold out this fraction of train images (whole pages)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--vectors-dir", default=None,
+                    help="page vector npz per image stem (tools/pdf_vectors.py); cut into tiles for --vectors training")
     a = ap.parse_args()
     names = class_names(a.src, a.names)
     out = Path(a.out)
@@ -124,6 +148,8 @@ def main():
             safe = to_dota_raw(a.src, split, names, raw, files=plan[split])
             split_set(raw, out, split, a.size, a.gap, (1.0,), classes=tuple(safe), workers=a.workers)
     (out / "classes.json").write_text(json.dumps(safe))
+    if a.vectors_dir:
+        write_tile_vectors(Path(a.vectors_dir), out, splits, a.size)
     print(f"[import] done: {out} ({len(safe)} classes). Fine-tune: python -m vrdet.train --data {out} --size x ...")
 
 

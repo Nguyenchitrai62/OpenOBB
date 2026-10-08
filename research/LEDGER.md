@@ -3,7 +3,9 @@
 **Luật (bắt buộc với mọi agent):**
 1. Mỗi job xong: thêm 1 dòng vào §2, kèm số liệu và kết luận.
 2. Mỗi phát hiện mới, lỗi mới hay hướng bị bác bỏ: thêm vào §3, §4 hoặc §5 kèm bằng chứng. Không xoá dòng cũ; nếu sai thì gạch hoặc ghi "VÔ HIỆU" và lý do.
-3. Chọn thí nghiệm kế tiếp từ §6 (hướng mở, xếp theo bằng chứng). Cập nhật §6 sau mỗi kết quả.
+3. **So sánh chỉ với YOLO26x** (YOLO mạnh nhất; user, 10-08). VRDet có thể nhỏ hơn. Không trình bày so sánh với YOLO-s
+   (các dòng YOLO26s cũ chỉ còn là lịch sử).
+4. Chọn thí nghiệm kế tiếp từ §6 (hướng mở, xếp theo bằng chứng). Cập nhật §6 sau mỗi kết quả.
 
 Nguồn chi tiết: `research/decisions.log` (nhật ký theo thời gian), `research/HYPOTHESES.md` (giả thuyết và tiêu chí pass), `python tools/summarize.py` (bảng số tự sinh từ `runs/`).
 
