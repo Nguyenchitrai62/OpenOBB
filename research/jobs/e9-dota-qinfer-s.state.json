@@ -1,0 +1,77 @@
+{
+  "attempts": 1,
+  "started": "2026-10-08 01:40:30",
+  "session": "e9-dota-qinfer-s-1",
+  "out": "/content/work/runs/e9-dota-qinfer-s",
+  "status": "done",
+  "launched": 1791398436.2787402,
+  "updated": "2026-10-08 01:51:50",
+  "fails": 0,
+  "synced": {
+    "setup.log": [
+      1162,
+      1791398543
+    ],
+    "exitcode": [
+      2,
+      1791398992
+    ],
+    "ckpt.pt": [
+      165363445,
+      1791398533
+    ],
+    "q300/eval_val.json": [
+      3016,
+      1791398771
+    ],
+    "q300/metrics.jsonl": [
+      543,
+      1791398776
+    ],
+    "q300/train_progress.log": [
+      1270,
+      1791398771
+    ],
+    "q300/eval_val.txt": [
+      1013,
+      1791398771
+    ],
+    "q600/eval_val.json": [
+      3018,
+      1791398856
+    ],
+    "q600/metrics.jsonl": [
+      544,
+      1791398862
+    ],
+    "q600/train_progress.log": [
+      1270,
+      1791398856
+    ],
+    "q600/eval_val.txt": [
+      1013,
+      1791398856
+    ],
+    "q900/eval_val.json": [
+      3031,
+      1791398984
+    ],
+    "q900/metrics.jsonl": [
+      544,
+      1791398991
+    ],
+    "q900/train_progress.log": [
+      1270,
+      1791398984
+    ],
+    "q900/eval_val.txt": [
+      1013,
+      1791398984
+    ],
+    "train.log": [
+      71875,
+      1791398984
+    ]
+  },
+  "tail": " 96.34\nship                   8861   110320  88.54    60.46  97.58\ntennis-court            739    91373  90.69    86.19  96.62\nbasketball-court        124    99264  65.11    53.70  86.29\nstorage-tank           1869   254392  88.94    65.03  97.38\nsoccer-ball-field        87    52449  66.99    55.21  93.10\nroundabout              164   119910  65.38    36.92  84.76\nharbor                 2065   159793  75.78    37.06  85.13\nswimming-pool           366    79957  56.61    25.23  84.43\nhelicopter               72    25925  55.35    27.51  88.89\nmAP                                   72.95    48.90\n"
+}

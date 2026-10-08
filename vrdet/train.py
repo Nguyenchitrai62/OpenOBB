@@ -41,6 +41,8 @@ def get_args(argv=None):
     ap.add_argument("--ema-warmups", type=int, default=1000)
     ap.add_argument("--queries", type=int, default=300)
     ap.add_argument("--num-top", type=int, default=300)
+    ap.add_argument("--eval-queries", type=int, default=0,
+                    help="H9: also evaluate the final EMA model with N queries / top-N (queries have no parameters)")
     ap.add_argument("--denoising", type=int, default=100)
     ap.add_argument("--no-rotate-sampling", action="store_true")
     ap.add_argument("--no-pretrained", action="store_true")
@@ -66,6 +68,7 @@ def get_args(argv=None):
     ap.add_argument("--max-tokens", type=int, default=4096)
     ap.add_argument("--rotate-p", type=float, default=0.0, help="H8: arbitrary-angle rotation prob")
     ap.add_argument("--mosaic-p", type=float, default=0.0, help="H8: oriented mosaic prob")
+    ap.add_argument("--mosaic-off", type=int, default=4, help="H8: no mosaic in the last N epochs (YOLO/DEIM practice)")
     ap.add_argument("--context", action="store_true", help="H6: whole-image context tokens for each tile")
     ap.add_argument("--profile", type=int, default=0, help="profile N iterations after 10 warm-up ones, then exit")
     ap.add_argument("--channels-last", action="store_true", help="NHWC convs/BN (profiling: BN was ~42% of GPU time)")
@@ -130,10 +133,12 @@ def main(argv=None):
         w, f, r = repeat_factors(ds.items, len(classes), a.rfs)
         sampler = torch.utils.data.WeightedRandomSampler(torch.as_tensor(w, dtype=torch.double), len(ds), replacement=True)
         log("RFS repeat factors: " + " ".join(f"{c[:6]}={x:.1f}" for c, x in zip(classes, r)))
-    dl = DataLoader(ds, batch_size=a.batch, shuffle=sampler is None, sampler=sampler, num_workers=a.workers,
-                    collate_fn=collate,
-                    pin_memory=True, drop_last=True, persistent_workers=a.workers > 0,
-                    prefetch_factor=4 if a.workers > 0 else None)
+    def make_loader():
+        return DataLoader(ds, batch_size=a.batch, shuffle=sampler is None, sampler=sampler, num_workers=a.workers,
+                          collate_fn=collate,
+                          pin_memory=True, drop_last=True, persistent_workers=a.workers > 0,
+                          prefetch_factor=4 if a.workers > 0 else None)
+    dl = make_loader()
     iters_per_epoch = len(dl) if a.max_iters is None else min(len(dl), a.max_iters)
     total_iters = iters_per_epoch * a.epochs
     opt = torch.optim.AdamW(param_groups(model, a.lr, a.backbone_mult, a.wd), lr=a.lr, betas=(0.9, 0.999))
@@ -168,6 +173,10 @@ def main(argv=None):
         val_subset = sorted(random.Random(0).sample(gts, min(a.eval_images, len(gts))))
 
     for epoch in range(start_epoch, a.epochs):
+        if ds.mosaic_p and epoch >= a.epochs - a.mosaic_off:
+            ds.mosaic_p = 0.0                   # workers hold dataset copies: rebuild the loader to apply it
+            dl = make_loader()
+            log(f"epoch {epoch}: mosaic off for the last {a.mosaic_off} epochs")
         model.train()
         t_ep, t_data, t_loss = time.time(), 0.0, 0.0
         sums, n = {}, 0
@@ -266,6 +275,14 @@ def main(argv=None):
     (out / "eval_val.txt").write_text(table + "\n")
     (out / "eval_val.json").write_text(json.dumps(res, indent=1))
     write_task1(dets, out / "val_task1", classes)
+    if a.eval_queries and a.eval_queries != a.queries:       # extra eval, main numbers stay at --queries
+        ema.module.decoder.num_queries = a.eval_queries
+        rq, _ = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.eval_queries,
+                          img_size=a.img, log=log, context=a.context, vectors=a.vectors)
+        (out / f"eval_val_q{a.eval_queries}.txt").write_text(format_table(rq, classes) + "\n")
+        (out / f"eval_val_q{a.eval_queries}.json").write_text(json.dumps(rq, indent=1))
+        jlog({"final_q": a.eval_queries, "mAP50": rq["mAP50"], "mAP50_95": rq["mAP50_95"]})
+        ema.module.decoder.num_queries = a.queries
     lat = None
     if device.type == "cuda":
         m = ema.module.eval()
