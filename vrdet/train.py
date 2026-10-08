@@ -41,6 +41,9 @@ def get_args(argv=None):
     ap.add_argument("--ema-warmups", type=int, default=1000)
     ap.add_argument("--queries", type=int, default=300)
     ap.add_argument("--num-top", type=int, default=300)
+    ap.add_argument("--init", default="coco", choices=["coco", "obj2coco"],
+                    help="D-FINE init: COCO-only (commercially clean) or Objects365->COCO (benchmark parity with YOLO26)")
+    ap.add_argument("--post", default="flat", choices=["flat", "argmax"], help="eval post-processing")
     ap.add_argument("--o2m-queries", type=int, default=0,
                     help="H10: training-only one-to-many query group (e.g. 1500); dropped at inference")
     ap.add_argument("--o2m-k", type=int, default=6, help="H10: queries assigned per target in the o2m group")
@@ -125,7 +128,7 @@ def main(argv=None):
                   o2m_queries=a.o2m_queries)
     last = out / "last.pt"
     if not last.exists() and not a.no_pretrained:
-        load_dfine_coco(model, a.size, class_names=classes, log=log)
+        load_dfine_coco(model, a.size, class_names=classes, log=log, init=a.init)
     model.to(device)
     if a.channels_last:
         model.to(memory_format=torch.channels_last)
@@ -269,7 +272,7 @@ def main(argv=None):
         os.replace(out / "last.tmp", last)
         if val_subset and ((epoch + 1) % a.eval_every == 0) and epoch + 1 < a.epochs:
             res, _ = eval_dota(ema.module, a.data, device, val_subset, batch=a.batch, workers=a.workers,
-                               num_top=a.num_top, img_size=a.img, log=log, context=a.context, vectors=a.vectors)
+                               num_top=a.num_top, img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post)
             rec["sub_mAP50"] = round(res["mAP50"], 4)
             rec["sub_mAP50_95"] = round(res["mAP50_95"], 4)
         jlog(rec)
@@ -280,7 +283,7 @@ def main(argv=None):
     res, dets = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.num_top,
                           img_size=a.img, log=log, fusion=a.dense, variants=["dec", "dense"],
                           save_preds_to=(out / "val_preds.npz") if a.dense else None, context=a.context,
-                          vectors=a.vectors)
+                          vectors=a.vectors, post=a.post)
     table = format_table(res, classes)
     log("\n" + table)
     (out / "eval_val.txt").write_text(table + "\n")
@@ -289,7 +292,7 @@ def main(argv=None):
     if a.eval_queries and a.eval_queries != a.queries:       # extra eval, main numbers stay at --queries
         ema.module.decoder.num_queries = a.eval_queries
         rq, _ = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.eval_queries,
-                          img_size=a.img, log=log, context=a.context, vectors=a.vectors)
+                          img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post)
         (out / f"eval_val_q{a.eval_queries}.txt").write_text(format_table(rq, classes) + "\n")
         (out / f"eval_val_q{a.eval_queries}.json").write_text(json.dumps(rq, indent=1))
         jlog({"final_q": a.eval_queries, "mAP50": rq["mAP50"], "mAP50_95": rq["mAP50_95"]})

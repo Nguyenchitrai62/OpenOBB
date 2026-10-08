@@ -1,0 +1,23 @@
+{
+  "id": "e14-dota-post-eval",
+  "gpu": "G4",
+  "bundle": [
+    "vrdet",
+    "colab"
+  ],
+  "setup": [
+    "pip install -q -U huggingface_hub hf_xet shapely"
+  ],
+  "cmd": "python -u colab/data/get_dota.py --root /content/datasets && for sz in s x; do d={out}/$sz-argmax; mkdir -p $d && ln -sf {out}/ckpt_$sz.pt $d/last.pt && python -u -m vrdet.train --data /content/datasets/dota1_1024 --out $d --size $sz --eval-only --queries 900 --num-top 900 --post argmax --workers 16 || exit 1; done",
+  "sync": [
+    "ckpt_s.pt",
+    "ckpt_x.pt",
+    "metrics.jsonl",
+    "*.log",
+    "eval_val.json",
+    "eval_val.txt"
+  ],
+  "max_hours": 1,
+  "max_retries": 2,
+  "est_cu": 3
+}

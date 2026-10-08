@@ -18,6 +18,10 @@ from .obb_decoder import OBBDFINETransformer
 from .vector import VectorBranch
 
 DFINE_URL = "https://github.com/Peterande/storage/releases/download/dfinev1.0/dfine_{}_coco.pth"
+# Objects365 -> COCO checkpoints (what YOLO26's yolo26*.pt also starts from: Objects365 then COCO). D-FINE notes
+# these may fall under Objects365 terms: benchmarking / research init only (user decision 2026-10-08).
+DFINE_O365_FILES = {"s": "dfine_s_obj2coco.pth", "m": "dfine_m_obj2coco.pth", "l": "dfine_l_obj2coco_e25.pth",
+                    "x": "dfine_x_obj2coco.pth"}
 
 CONFIGS = {
     "s": dict(backbone=dict(name='B0', use_lab=True, return_idx=[1, 2, 3]),
@@ -117,10 +121,11 @@ def build_criterion(num_classes=15, reg_max=32, box_loss="kld", weights=None, co
                         reg_max=reg_max, gauss=box_loss, o2m_k=o2m_k)
 
 
-def load_dfine_coco(model, ckpt_or_size, class_names=None, log=print):
-    """Initialise from a D-FINE COCO checkpoint; shape-mismatched tensors are copied on their overlap."""
+def load_dfine_coco(model, ckpt_or_size, class_names=None, log=print, init="coco"):
+    """Initialise from a D-FINE COCO (or Objects365->COCO) checkpoint; shape-mismatched tensors are copied on
+    their overlap."""
     if isinstance(ckpt_or_size, str) and len(ckpt_or_size) == 1:
-        url = DFINE_URL.format(ckpt_or_size)
+        url = DFINE_URL.format(ckpt_or_size) if init == "coco" else             DFINE_URL.rsplit("/", 1)[0] + "/" + DFINE_O365_FILES[ckpt_or_size]
         ck = torch.hub.load_state_dict_from_url(url, map_location="cpu", progress=False)
     else:
         ck = torch.load(ckpt_or_size, map_location="cpu")
@@ -161,22 +166,30 @@ def load_dfine_coco(model, ckpt_or_size, class_names=None, log=print):
             v[sl].copy_(s[sl])
             partial += 1
     model.load_state_dict(dst)
-    msg = f"[init] D-FINE COCO: {full} full, {partial} partial, {len(skipped)} new tensors"
+    msg = f"[init] D-FINE {init}: {full} full, {partial} partial, {len(skipped)} new tensors"
     log(msg)
     logging.info(msg)
     return skipped
 
 
 @torch.no_grad()
-def postprocess(outputs, num_top=300, img_size=1024):
-    """-> scores (B, K), labels (B, K), boxes (B, K, 5) in pixels (cx, cy, w, h, theta)."""
+def postprocess(outputs, num_top=300, img_size=1024, mode="flat"):
+    """-> scores (B, K), labels (B, K), boxes (B, K, 5) in pixels (cx, cy, w, h, theta).
+    mode "flat": top-K over (query x class) pairs (DETR default; one query may emit several classes);
+    "argmax": one class per query (removes cross-class duplicates such as plane queries scoring helicopter)."""
     logits, boxes = outputs['pred_logits'].float(), outputs['pred_boxes'].float()
     B, Q, C = logits.shape
-    scores = logits.sigmoid().flatten(1)
-    k = min(num_top, scores.shape[1])
-    s, idx = scores.topk(k, dim=1)
-    labels = idx % C
-    q = idx // C
+    if mode == "argmax":
+        sc, lab = logits.sigmoid().max(-1)
+        k = min(num_top, Q)
+        s, q = sc.topk(k, dim=1)
+        labels = lab.gather(1, q)
+    else:
+        scores = logits.sigmoid().flatten(1)
+        k = min(num_top, scores.shape[1])
+        s, idx = scores.topk(k, dim=1)
+        labels = idx % C
+        q = idx // C
     b = boxes.gather(1, q.unsqueeze(-1).expand(-1, -1, 5)).clone()
     b[..., :4] *= img_size
     return s, labels, b

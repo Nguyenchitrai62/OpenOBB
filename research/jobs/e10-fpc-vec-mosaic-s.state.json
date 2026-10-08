@@ -5,7 +5,7 @@
   "out": "/content/work/runs/e10-fpc-vec-mosaic-s",
   "status": "running",
   "launched": 1791423138.6742733,
-  "updated": "2026-10-08 09:06:06",
+  "updated": "2026-10-08 09:16:20",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,21 +13,21 @@
       1791423160
     ],
     "train.log": [
-      28147,
-      1791425081
+      37658,
+      1791425701
     ],
     "metrics.jsonl": [
-      4256,
-      1791425068
+      5841,
+      1791425658
     ],
     "train_progress.log": [
-      26123,
-      1791425081
+      35634,
+      1791425701
     ],
     "last.pt": [
       176175965,
-      1791425068
+      1791425657
     ]
   },
-  "tail": "6e-05 | 68.0 img/s data 0.002s crit 0.070s/it\n[02:04:28] epoch 16 done in 1.7 min: {\"epoch\": 16, \"iter\": 7395, \"lr\": 6.667301479356419e-05, \"epoch_s\": 102.1, \"img_s\": 68.2, \"crit_s_per_it\": 0.07, \"data_s_per_it\": 0.002, \"max_mem_gb\": 15.5, \"loss_mal\": 0.6253, \"loss_bbox\": 0.122, \"loss_kld\": 0.2643, \"loss_fgl\": 0.916, \"total\": 16.2846}\n[02:04:29] ep 17 it 0/435 loss 15.742 mal=0.694 bbox=0.073 kld=0.210 fgl=0.950 lr 6.66e-05 | 17.5 img/s data 0.584s crit 0.086s/it\n[02:04:41] ep 17 it 50/435 loss 17.518 mal=0.815 bbox=0.117 kld=0.350 fgl=0.848 lr 6.53e-05 | 63.7 img/s data 0.012s crit 0.074s/it\n"
+  "tail": "=0.299 fgl=0.927 lr 1.15e-05 | 22.0 img/s data 0.351s crit 0.141s/it\n[02:14:29] ep 23 it 50/435 loss 16.045 mal=0.687 bbox=0.147 kld=0.209 fgl=0.976 lr 1.12e-05 | 70.5 img/s data 0.007s crit 0.059s/it\n[02:14:40] ep 23 it 100/435 loss 14.420 mal=0.574 bbox=0.089 kld=0.185 fgl=0.827 lr 1.09e-05 | 70.8 img/s data 0.004s crit 0.058s/it\n[02:14:51] ep 23 it 150/435 loss 15.613 mal=0.644 bbox=0.134 kld=0.247 fgl=0.912 lr 1.07e-05 | 72.4 img/s data 0.003s crit 0.057s/it\n[02:15:01] ep 23 it 200/435 loss 15.581 mal=0.608 bbox=0.117 kld=0.212 fgl=0.882 lr 1.04e-05 | 73.3 img/s data 0.002s crit 0.057s/it\n"
 }

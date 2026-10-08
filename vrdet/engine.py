@@ -99,7 +99,7 @@ def to_device(imgs, targets, device):
 
 
 @torch.no_grad()
-def predict_patches(model, ds, device, batch=32, workers=8, num_top=300, img_size=1024, amp=True):
+def predict_patches(model, ds, device, batch=32, workers=8, num_top=300, img_size=1024, amp=True, post="flat"):
     """-> {"dec": [(patch, cls, score, poly8)], "dense": [...] (only if the model has a dense head)}."""
     from vrdet.models.dense_head import dense_predict
     model.eval()
@@ -113,7 +113,7 @@ def predict_patches(model, ds, device, batch=32, workers=8, num_top=300, img_siz
         ctx = ctx_batch(tg, device)
         with torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=amp and device.type == "cuda"):
             o = model(x, ctx=ctx) if ctx is not None else model(x)
-        s, l, b = postprocess(o, num_top, img_size)
+        s, l, b = postprocess(o, num_top, img_size, mode=post)
         s, l, b = s.cpu().numpy(), l.cpu().numpy(), b.cpu().numpy()
         for i, t in enumerate(tg):
             for sc, lab, p in zip(s[i], l[i], obb2poly(b[i])):
@@ -192,7 +192,7 @@ def load_preds(path):
 
 def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num_top=300, img_size=1024,
               merge_workers=16, log=print, fusion=False, variants=None, save_preds_to=None, context=False,
-              vectors=False):
+              vectors=False, post="flat"):
     """DOTA-protocol eval of the decoder output (primary). With fusion=True and a dense head, also scores
     the dense-only / union / size-routed variants (res["fusion"])."""
     t0 = time.time()
@@ -200,7 +200,7 @@ def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num
     if image_ids is not None:
         keep = set(image_ids)
         ds.items = [m for m in ds.items if m["src"] in keep]
-    preds = predict_patches(model, ds, device, batch, workers, num_top, img_size)
+    preds = predict_patches(model, ds, device, batch, workers, num_top, img_size, post=post)
     t1 = time.time()
     classes = dataset_classes(data_root)
     gts = load_gt_dir(f"{data_root}/gt/val", set(image_ids) if image_ids is not None else None)

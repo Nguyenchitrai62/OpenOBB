@@ -312,3 +312,5 @@
 [2026-10-08 09:03:46] queue: e12-dota-o2m-s waits (3 live sessions, cap 3)
 [2026-10-08 09:06:06] watch: balance=213.58 rate=23.1/h active=['e10-dota-mosaic-s', 'e10-fpc-vec-mosaic-s'] ended=[]
 [2026-10-08 09:08:55] queue: ['e12-dota-o2m-s', 'e13-dota-yoloaug-s']
+[2026-10-08 09:14:08] queue: e12-dota-o2m-s waits (3 live sessions, cap 3)
+[2026-10-08 09:16:20] watch: balance=209.7 rate=23.1/h active=['e10-dota-mosaic-s', 'e10-fpc-vec-mosaic-s'] ended=[]
