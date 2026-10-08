@@ -28,6 +28,8 @@ def get_args(argv=None):
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
     ap.add_argument("--img", type=int, default=1024)
+    ap.add_argument("--scale", type=float, default=1.0,
+                    help="image scale the data was tiled at (recorded for inference; set by vrdet.data.prepare)")
     ap.add_argument("--epochs", type=int, default=24)
     ap.add_argument("--batch", type=int, default=32)
     ap.add_argument("--lr", type=float, default=2e-4)
@@ -41,6 +43,9 @@ def get_args(argv=None):
     ap.add_argument("--ema-warmups", type=int, default=1000)
     ap.add_argument("--queries", type=int, default=300)
     ap.add_argument("--num-top", type=int, default=300)
+    ap.add_argument("--weights", default=None,
+                    help="fine-tune: initialise from a VRDet checkpoint (last.pt); class heads are re-used when the "
+                         "class list matches, otherwise re-initialised")
     ap.add_argument("--init", default="coco", choices=["coco", "obj2coco"],
                     help="D-FINE init: COCO-only (commercially clean) or Objects365->COCO (benchmark parity with YOLO26)")
     ap.add_argument("--post", default="flat", choices=["flat", "argmax"], help="eval post-processing")
@@ -126,6 +131,8 @@ def main(argv=None):
     if a.threads:
         torch.set_num_threads(a.threads)   # CPU debug runs: torch 2.12 CPU kernels race with many threads
     amp = (not a.no_amp) and device.type == "cuda"
+    if amp and not torch.cuda.is_bf16_supported():
+        amp = False                     # bf16 autocast needs Ampere+ (T4/V100: train in fp32)
     torch.backends.cudnn.benchmark = True
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
@@ -137,7 +144,13 @@ def main(argv=None):
                   dense_queries=a.dense_queries, vectors=a.vectors, vec_dim=a.vec_dim, vec_layers=a.vec_layers,
                   o2m_queries=a.o2m_queries, lsk=a.lsk, vec_lfe=a.vec_lfe, vec_ground=a.vec_ground > 0, p2=a.p2)
     last = out / "last.pt"
-    if not last.exists() and not a.no_pretrained:
+    if not last.exists() and a.weights:
+        # shape-tolerant copy of a VRDet checkpoint; class rows are matched by name (new classes start fresh)
+        src_cls = list(torch.load(a.weights, map_location="cpu", weights_only=False).get("classes") or [])
+        cmap = {i: src_cls.index(c) for i, c in enumerate(classes) if c in src_cls}
+        load_dfine_coco(model, a.weights, log=log, class_map=cmap)
+        log(f"[init] fine-tuning from {a.weights} ({len(cmap)}/{len(classes)} classes carried over)")
+    elif not last.exists() and not a.no_pretrained:
         load_dfine_coco(model, a.size, class_names=classes, log=log, init=a.init)
     model.to(device)
     if a.channels_last:
@@ -167,7 +180,7 @@ def main(argv=None):
     opt = torch.optim.AdamW(param_groups(model, a.lr, a.backbone_mult, a.wd), lr=a.lr, betas=(0.9, 0.999))
     base_lrs = [g["lr"] for g in opt.param_groups]
     ema = ModelEMA(model, a.ema, a.ema_warmups)
-    start_epoch, it = 0, 0
+    start_epoch, it, best_score = 0, 0, -1.0
     if last.exists():
         ck = torch.load(last, map_location="cpu", weights_only=False)
         if "model" in ck:                       # eval-only checkpoints may carry the EMA weights alone
@@ -176,6 +189,7 @@ def main(argv=None):
         if "opt" in ck:
             opt.load_state_dict(ck["opt"])
         start_epoch, it = ck["epoch"] + 1, ck["iter"]
+        best_score = ck.get("best_score", -1.0)
         log(f"resumed from epoch {ck['epoch']} (iter {it})")
     # Compile AFTER the EMA deep copy: compiled forwards are bound methods of the live model, and a copy made
     # afterwards kept calling the live (training-mode) backbone/encoder at eval time (bug seen 2026-10-07:
@@ -195,10 +209,18 @@ def main(argv=None):
     n_par = sum(p.numel() for p in model.parameters()) / 1e6
     log(f"VRDet-{a.size} {n_par:.2f}M params | train patches {len(ds)} | {iters_per_epoch} it/epoch x {a.epochs} "
         f"| batch {a.batch} | device {device} amp={amp}")
-    val_subset = None
+    val_subset, full_val = None, False
     if a.eval_images:
         gts = sorted(p.stem for p in (Path(a.data) / "gt" / "val").glob("*.txt"))
         val_subset = sorted(random.Random(0).sample(gts, min(a.eval_images, len(gts))))
+        full_val = len(val_subset) == len(gts)      # periodic scores comparable with the final one
+
+    def save_best(score, epoch):
+        # compact deployable checkpoint: EMA weights + args + classes (no optimiser state)
+        torch.save({"model": ema.module.state_dict(), "epoch": epoch, "args": vars(a), "classes": list(classes),
+                    "val_mAP50_95": score}, out / "best.tmp")
+        os.replace(out / "best.tmp", out / "best.pt")
+        log(f"best.pt <- epoch {epoch} (val mAP50:95 {score:.4f})")
 
     for epoch in range(start_epoch, a.epochs):
         if ds.mosaic_p and epoch >= a.epochs - a.mosaic_off:
@@ -281,23 +303,31 @@ def main(argv=None):
                "data_s_per_it": round(t_data / max(n, 1), 3),
                "max_mem_gb": round(torch.cuda.max_memory_allocated() / 2**30, 1) if device.type == "cuda" else None}
         rec.update({k: round(float(v) / max(n, 1), 4) for k, v in sums.items()})
-        torch.save({"model": model.state_dict(), "ema": ema.state_dict(), "opt": opt.state_dict(), "epoch": epoch,
-                    "iter": it, "args": vars(a), "classes": list(classes)}, out / "last.tmp")
-        os.replace(out / "last.tmp", last)
         if val_subset and ((epoch + 1) % a.eval_every == 0) and epoch + 1 < a.epochs:
             res, _ = eval_dota(ema.module, a.data, device, val_subset, batch=a.batch, workers=a.workers,
                                num_top=a.num_top, img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post)
             rec["sub_mAP50"] = round(res["mAP50"], 4)
             rec["sub_mAP50_95"] = round(res["mAP50_95"], 4)
+            if full_val and res["mAP50_95"] > best_score:
+                best_score = res["mAP50_95"]
+                save_best(best_score, epoch)
+        torch.save({"model": model.state_dict(), "ema": ema.state_dict(), "opt": opt.state_dict(), "epoch": epoch,
+                    "iter": it, "args": vars(a), "classes": list(classes), "best_score": best_score},
+                   out / "last.tmp")
+        os.replace(out / "last.tmp", last)
         jlog(rec)
         log(f"epoch {epoch} done in {dt / 60:.1f} min: " + json.dumps(rec))
 
     if a.skip_final_eval:
+        if not (out / "best.pt").exists():
+            save_best(-1.0, a.epochs - 1)
         return
     res, dets = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.num_top,
                           img_size=a.img, log=log, fusion=a.dense or a.vec_ground > 0, variants=["dec", "dense", "union", "snap", "snapg"],
                           save_preds_to=(out / "val_preds.npz") if a.dense else None, context=a.context,
                           vectors=a.vectors, post=a.post)
+    if not a.eval_only and (not full_val or res["mAP50_95"] >= best_score):
+        save_best(res["mAP50_95"], a.epochs - 1)
     table = format_table(res, classes)
     log("\n" + table)
     (out / "eval_val.txt").write_text(table + "\n")

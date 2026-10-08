@@ -5,29 +5,29 @@
   "out": "/content/work/runs/c6-fpc-raster-lsk-s",
   "status": "running",
   "launched": 1791441350.47218,
-  "updated": "2026-10-08 14:14:42",
+  "updated": "2026-10-08 14:37:32",
   "fails": 0,
   "synced": {
     "train_progress.log": [
-      55192,
-      1791443600
+      92060,
+      1791444970
     ],
     "setup.log": [
       350,
       1791441374
     ],
     "train.log": [
-      57454,
-      1791443600
+      94322,
+      1791444970
     ],
     "metrics.jsonl": [
-      8012,
-      1791443453
+      14149,
+      1791444896
     ],
     "last.pt": [
       200995173,
-      1791443451
+      1791444896
     ]
   },
-  "tail": "799 bbox_o2m_1=0.076 kld_o2m_1=0.204 angle_o2m_1=0.010 fgl_o2m_1=0.931 mal_o2m_2=0.763 bbox_o2m_2=0.080 kld_o2m_2=0.199 angle_o2m_2=0.015 fgl_o2m_2=0.917 lr 9.90e-05 | 43.4 img/s data 0.001s crit 0.142s/it\n[07:13:20] ep 12 it 400/435 loss 27.369 mal=0.729 bbox=0.209 kld=0.296 angle=0.062 fgl=0.972 mal_o2m_0=0.796 bbox_o2m_0=0.234 kld_o2m_0=0.344 angle_o2m_0=0.075 fgl_o2m_0=0.983 mal_o2m_1=0.787 bbox_o2m_1=0.177 kld_o2m_1=0.292 angle_o2m_1=0.054 fgl_o2m_1=0.946 mal_o2m_2=0.759 bbox_o2m_2=0.164 kld_o2m_2=0.283 angle_o2m_2=0.046 fgl_o2m_2=0.937 lr 9.87e-05 | 43.5 img/s data 0.001s crit 0.142s/it\n"
+  "tail": "646 bbox_o2m_1=0.067 kld_o2m_1=0.164 angle_o2m_1=0.014 fgl_o2m_1=0.868 mal_o2m_2=0.617 bbox_o2m_2=0.064 kld_o2m_2=0.158 angle_o2m_2=0.014 fgl_o2m_2=0.857 lr 2.04e-05 | 43.2 img/s data 0.002s crit 0.143s/it\n[07:36:10] ep 21 it 200/435 loss 20.584 mal=0.533 bbox=0.065 kld=0.162 angle=0.018 fgl=0.810 mal_o2m_0=0.712 bbox_o2m_0=0.087 kld_o2m_0=0.204 angle_o2m_0=0.022 fgl_o2m_0=0.920 mal_o2m_1=0.649 bbox_o2m_1=0.068 kld_o2m_1=0.159 angle_o2m_1=0.020 fgl_o2m_1=0.805 mal_o2m_2=0.634 bbox_o2m_2=0.063 kld_o2m_2=0.152 angle_o2m_2=0.018 fgl_o2m_2=0.796 lr 1.96e-05 | 43.3 img/s data 0.001s crit 0.143s/it\n"
 }

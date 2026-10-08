@@ -11,7 +11,7 @@ from vrdet.data.dota import DotaPatches, dataset_classes
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_import_yolo_obb_roundtrip(tmp_path):
+def test_prepare_roundtrip(tmp_path):
     src = tmp_path / "export"
     for split in ("train", "val"):
         (src / "images" / split).mkdir(parents=True)
@@ -25,7 +25,7 @@ def test_import_yolo_obb_roundtrip(tmp_path):
             (src / "labels" / split / f"{split}{k}.txt").write_text("1 " + " ".join(f"{v:.6f}" for v in poly) + "\n")
     (src / "data.yaml").write_text("names:\n  0: junction\n  1: fire pipe\n")
     out = tmp_path / "vrdet"
-    subprocess.run([sys.executable, str(ROOT / "tools/import_yolo_obb.py"), "--src", str(src), "--out", str(out),
+    subprocess.run([sys.executable, str(ROOT / "tools/prepare_dataset.py"), "--src", str(src), "--out", str(out),
                     "--workers", "1"], check=True)
     assert dataset_classes(out) == ("junction", "fire_pipe")
     metas = [json.loads(l) for l in (out / "meta" / "val.jsonl").read_text().splitlines()]
@@ -48,7 +48,7 @@ def test_import_holds_out_val_when_missing(tmp_path):
         (src / "train" / "labels" / f"p{k}.txt").write_text("0 0.1 0.1 0.3 0.1 0.3 0.2 0.1 0.2\n")
     (src / "data.yaml").write_text("names: [junction]\n")
     out = tmp_path / "vrdet"
-    subprocess.run([sys.executable, str(ROOT / "tools/import_yolo_obb.py"), "--src", str(src), "--out", str(out),
+    subprocess.run([sys.executable, str(ROOT / "tools/prepare_dataset.py"), "--src", str(src), "--out", str(out),
                     "--workers", "1", "--val-frac", "0.2"], check=True)
     n_val = len((out / "meta" / "val.jsonl").read_text().splitlines())
     n_tr = len((out / "meta" / "train.jsonl").read_text().splitlines())

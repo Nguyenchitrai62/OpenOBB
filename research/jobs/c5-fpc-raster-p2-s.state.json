@@ -3,31 +3,55 @@
   "started": "2026-10-08 13:24:33",
   "session": "c5-fpc-raster-p2-s-1",
   "out": "/content/work/runs/c5-fpc-raster-p2-s",
-  "status": "running",
+  "status": "done",
   "launched": 1791440678.4884846,
-  "updated": "2026-10-08 14:13:21",
+  "updated": "2026-10-08 14:36:10",
   "fails": 0,
   "synced": {
     "train_progress.log": [
-      72204,
-      1791443526
+      104940,
+      1791444679
     ],
     "setup.log": [
       350,
       1791440699
     ],
     "train.log": [
-      73923,
-      1791443526
+      106659,
+      1791444679
     ],
     "metrics.jsonl": [
-      10704,
-      1791443380
+      17049,
+      1791444682
     ],
     "last.pt": [
       166841313,
-      1791443380
+      1791444651
+    ],
+    "eval_val.json": [
+      5591,
+      1791444659
+    ],
+    "exitcode": [
+      2,
+      1791444687
+    ],
+    "eval_val_q900.json": [
+      5572,
+      1791444679
+    ],
+    "eval_val.txt": [
+      1913,
+      1791444659
+    ],
+    "train_done": [
+      2,
+      1791444682
+    ],
+    "eval_val_q900.txt": [
+      1913,
+      1791444679
     ]
   },
-  "tail": "841 bbox_o2m_1=0.123 kld_o2m_1=0.203 angle_o2m_1=0.023 fgl_o2m_1=0.875 mal_o2m_2=0.785 bbox_o2m_2=0.107 kld_o2m_2=0.184 angle_o2m_2=0.020 fgl_o2m_2=0.845 lr 6.89e-05 | 43.9 img/s data 0.001s crit 0.160s/it\n[07:12:06] ep 16 it 400/435 loss 26.675 mal=0.624 bbox=0.219 kld=0.321 angle=0.025 fgl=0.763 mal_o2m_0=0.866 bbox_o2m_0=0.166 kld_o2m_0=0.323 angle_o2m_0=0.028 fgl_o2m_0=1.116 mal_o2m_1=0.803 bbox_o2m_1=0.116 kld_o2m_1=0.208 angle_o2m_1=0.026 fgl_o2m_1=0.914 mal_o2m_2=0.744 bbox_o2m_2=0.108 kld_o2m_2=0.189 angle_o2m_2=0.023 fgl_o2m_2=0.881 lr 6.76e-05 | 43.9 img/s data 0.001s crit 0.160s/it\n"
+  "tail": "    29     1203  89.55    79.67 100.00\nwashing-machine         141     1759  79.18    70.25  92.91\nsquat-toilet            242     1222  86.65    70.37  92.15\nurinal                  125     1136  88.89    72.94  97.60\ntoilet                  425     2061  87.83    76.35  92.71\nstairs                  562     4313  66.09    56.23  79.36\nelevator                365     2109  88.91    84.16  94.52\nescalator                35     1466  51.62    33.60  77.14\nmAP                                   67.04    56.49\n[07:31:19] [eval] 810 patches / 810 images: predict 5s, merge+eval 14s, dec mAP50 74.04\n"
 }

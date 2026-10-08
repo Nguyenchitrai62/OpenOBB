@@ -58,6 +58,8 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 | 10-08 | e15-dota-o365-s | DOTA | S | init Objects365→COCO | e3 | 70.29 / 46.86 | −2.05 (không tính HC −0.98) | **BÁC BỎ**: giữ init COCO | 10 |
 | 10-08 | c1-fpc-combo-s | FPC | S | gộp SOTA: vector + layer pooling + o2m 900 + AQD + loss góc + IoU-cost (+900 query) | e7 | **78.21 / 69.31** (q900) | +1.41 / +1.64 | gộp có lợi; so YOLO26x: −1.95 / −5.65 (khoảng cách chính là độ khít box) | 9 |
 | 10-08 | c2-fpc-hybrid-s | FPC | S | c1 + kiến trúc lai dense–sparse (query từ head dense) | c1 | 78.16 / 68.80 (q900); hợp 78.14 | −0.05 / −0.51 | **không chọn cho CAD**: bằng c1, chậm hơn (13.6 ms) | 10 |
+| 10-08 | c4-fpc-raster-s | FPC | S | raster-only: RFS + o2m 900 + AQD + loss góc + IoU-cost (+900 query) | e4 | 76.17 / 66.19; **q900 76.83 / 66.57** | +0.87 / +1.41 (cùng 300 q: +0.21 / +1.03) | mốc raster mới; gói gộp lợi ít khi không có vector (phần lớn lợi của c1 là nhờ vector). So YOLO26x: **−3.33 / −8.39**. 10.0 ms (YOLO26x 11.6) | 9 |
+| 10-08 | c5-fpc-raster-p2-s | FPC | S | c4 + level stride-4 (P2, H18) cho decoder | c4 | 67.04 / 56.49; q900 74.04 / 63.32 | **−9.1 / −2.8** (q900) | **BÁC BỎ** (cách gắn này): mọi class tụt (bay-window 14, opening 21, table 45); train chậm hơn 16% (44 so với 52 ảnh/s), 28 GB so với 21 GB | 10 |
 
 ## 3. Phát hiện (có bằng chứng)
 
@@ -111,6 +113,13 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Dataset CAD: ArchCAD-400K (HF `jackluoluo/ArchCAD`, cần user chấp nhận điều khoản), SESYD (HTTP),
     PID2Graph (Zenodo 14803338), ResPlan (CC BY), CubiCasa5K (Zenodo). Không có dataset MEP mở → synthetic từ thư viện symbol.
   - Foundation backbone viễn thám (MTP, RVSA, SkySense) không đáng ở quy mô này (DOTA-v1 gần như không tăng, quá chậm).
+- **F17. Raster-only trên CAD (c4): khoảng cách tới YOLO26x là độ khít box, không phải phát hiện.**
+  - mAP50 −3.3 nhưng mAP50:95 −8.4.
+  - Class tụt mạnh nhất ở AP50:95: sliding-door 53.8 so với 73.1, window 67.9 so với 83.4, airconditioner 52.2 so với 73.8.
+  - Bỏ vector thì cửa đơn −6.8 và bay-window −11.4 (so với c1): đúng các object dựa vào nét mảnh.
+  - Criterion chiếm 46% thời gian mỗi iteration (0.141 / 0.307 s).
+  - Class không có GT trong val (rolling/revolving/folding-door) vẫn nhận hàng nghìn box: FP khi dùng thật, nên đặt ngưỡng conf theo class.
+  - → Đòn bẩy raster cần đo: level stride-4 (c5, P2), receptive field cho nét mảnh (c6, LSK).
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 

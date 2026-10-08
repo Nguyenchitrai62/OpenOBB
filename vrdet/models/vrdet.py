@@ -178,22 +178,22 @@ def build_criterion(num_classes=15, reg_max=32, box_loss="kld", weights=None, co
                         reg_max=reg_max, gauss=box_loss, o2m_k=o2m_k, aqd=aqd)
 
 
-def load_dfine_coco(model, ckpt_or_size, class_names=None, log=print, init="coco"):
-    """Initialise from a D-FINE COCO (or Objects365->COCO) checkpoint; shape-mismatched tensors are copied on
-    their overlap."""
+def load_dfine_coco(model, ckpt_or_size, class_names=None, log=print, init="coco", class_map=None):
+    """Initialise from a D-FINE COCO (or Objects365->COCO) checkpoint, or a VRDet checkpoint path; shape-mismatched
+    tensors are copied on their overlap. class_map {dst_class: src_class} re-indexes the class heads."""
     if isinstance(ckpt_or_size, str) and len(ckpt_or_size) == 1:
         url = DFINE_URL.format(ckpt_or_size) if init == "coco" else             DFINE_URL.rsplit("/", 1)[0] + "/" + DFINE_O365_FILES[ckpt_or_size]
         ck = torch.hub.load_state_dict_from_url(url, map_location="cpu", progress=False)
     else:
-        ck = torch.load(ckpt_or_size, map_location="cpu")
+        ck = torch.load(ckpt_or_size, map_location="cpu", weights_only=False)   # local trusted checkpoints
     if "ema" in ck and isinstance(ck["ema"], dict) and "module" in ck["ema"]:
         src = ck["ema"]["module"]
     else:
         src = ck.get("model", ck)
     dst = model.state_dict()
     full, partial, skipped = 0, 0, []
-    cls_rows = None
-    if class_names is not None:
+    cls_rows = class_map
+    if cls_rows is None and class_names is not None:
         cls_rows = {i: COCO_TO_DOTA[c] for i, c in enumerate(class_names) if c in COCO_TO_DOTA}
     with torch.no_grad():
         for k, v in dst.items():
@@ -201,14 +201,14 @@ def load_dfine_coco(model, ckpt_or_size, class_names=None, log=print, init="coco
                 skipped.append(k)
                 continue
             s = src[k]
-            if s.shape == v.shape:
+            is_cls = ("score_head" in k) or ("denoising_class_embed" in k)
+            if s.shape == v.shape and not (is_cls and class_map is not None):
                 v.copy_(s)
                 full += 1
                 continue
             if s.dim() != v.dim():
                 skipped.append(k)
                 continue
-            is_cls = ("score_head" in k) or ("denoising_class_embed" in k)
             if is_cls:
                 if cls_rows:
                     for i, j in cls_rows.items():

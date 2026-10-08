@@ -403,3 +403,7 @@
 [2026-10-08 13:51:04] watch: balance=93.23 rate=26.7/h active=['c4-fpc-raster-s', 'c5-fpc-raster-p2-s', 'c6-fpc-raster-lsk-s'] ended=[]
 [2026-10-08 14:02:52] watch: balance=88.77 rate=26.7/h active=['c4-fpc-raster-s', 'c5-fpc-raster-p2-s', 'c6-fpc-raster-lsk-s'] ended=[]
 [2026-10-08 14:14:42] watch: balance=82.07 rate=26.7/h active=['c4-fpc-raster-s', 'c5-fpc-raster-p2-s', 'c6-fpc-raster-lsk-s'] ended=[]
+[2026-10-08 14:24:08] c4-fpc-raster-s: finished with status done; stopping VM
+[2026-10-08 14:26:43] watch: balance=77.66 rate=26.7/h active=['c4-fpc-raster-s', 'c5-fpc-raster-p2-s', 'c6-fpc-raster-lsk-s'] ended=[('c4-fpc-raster-s', 'done')]
+[2026-10-08 14:36:10] c5-fpc-raster-p2-s: finished with status done; stopping VM
+[2026-10-08 14:37:32] watch: balance=74.69 rate=17.8/h active=['c5-fpc-raster-p2-s', 'c6-fpc-raster-lsk-s'] ended=[('c5-fpc-raster-p2-s', 'done')]

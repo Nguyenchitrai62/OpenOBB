@@ -6,7 +6,7 @@ batches, and detections are merged back per image with class-wise polygon NMS. O
 with --vectors.
 
 Outputs per image in --out:
-  {stem}.txt   "class_id x1 y1 x2 y2 x3 y3 x4 y4 score" normalised to the image (YOLO-OBB order + score)
+  {stem}.txt   "class_id x1 y1 x2 y2 x3 y3 x4 y4 score" normalised to the image (same order as the training labels + score)
   {stem}.json  [{"class": name, "score": s, "poly": [8 pixel coords]}]
   {stem}_vis.jpg  (with --vis)
 
@@ -60,10 +60,12 @@ def load_model(ckpt_path, device, queries=None, classes=None):
 
 
 @torch.no_grad()
-def predict_image(model, img, size, gap, batch, device, num_top, vec=None, amp=True, union=True):
+def predict_image(model, img, size, gap, batch, device, num_top, vec=None, amp=True, union=True, scale=1.0):
     """-> list of (patch_name, cls, score, poly8 in tile pixels) with patch names carrying the tile offsets.
     Hybrid models (dense head present): decoder + dense outputs are pooled ("union", the measured best rule) and
     de-duplicated by the class-wise NMS of the tile merge."""
+    if scale != 1.0:
+        img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR)
     H, W = img.shape[:2]
     tiles = [(x, y) for y in windows(H, size, gap) for x in windows(W, size, gap)]
     dets = []
@@ -90,15 +92,74 @@ def predict_image(model, img, size, gap, batch, device, num_top, vec=None, amp=T
         s, l, b = (t.cpu().numpy() for t in postprocess(out, num_top, size))
         for j, (x0, y0) in enumerate(chunk):
             for sc, lab, p in zip(s[j], l[j], obb2poly(b[j])):
-                dets.append((f"img__1.0__{x0}___{y0}", int(lab), float(sc), p))
+                dets.append((f"img__{scale}__{x0}___{y0}", int(lab), float(sc), p))
         if union and "dense_logits" in out:
             for (x0, y0), (ds, dl, db) in zip(chunk, dense_predict(out, img_size=size)):
                 for sc, lab, p in zip(ds.cpu().numpy(), dl.cpu().numpy(), obb2poly(db.cpu().numpy())):
-                    dets.append((f"img__1.0__{x0}___{y0}", int(lab), float(sc), p))
+                    dets.append((f"img__{scale}__{x0}___{y0}", int(lab), float(sc), p))
     return dets
 
 
-def main():
+def run(ckpt, source, out=None, conf=0.25, classes=None, size=None, gap=200, queries=900, batch=8, vis=False,
+        vectors_dir=None, device=None, verbose=True, scale=None):
+    """Predict every image in `source` (file or folder). Returns {image_path: [{"class", "class_id", "score",
+    "poly"}]} with pixel polygons; with `out`, also writes {stem}.txt / {stem}.json (and {stem}_vis.jpg)."""
+    device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
+    if isinstance(classes, str):
+        p = Path(classes)
+        classes = json.loads(p.read_text()) if p.exists() else [c.strip() for c in classes.split(",")]
+    model, names, targs = load_model(ckpt, device, queries, classes)
+    size = size or targs.get("img", 1024)
+    scale = scale or targs.get("scale", 1.0)
+    src = Path(source)
+    files = [src] if src.is_file() else sorted(p for p in src.iterdir() if p.suffix.lower() in IMG_EXT)
+    if out is not None:
+        out = Path(out)
+        out.mkdir(parents=True, exist_ok=True)
+    results = {}
+    for f in files:
+        img = cv2.imread(str(f), cv2.IMREAD_COLOR)
+        if img is None:
+            print(f"skip unreadable {f}")
+            continue
+        vec = None
+        if vectors_dir and targs.get("vectors"):
+            vp = Path(vectors_dir) / f"{f.stem}.npz"
+            vec = dict(np.load(vp)) if vp.exists() else None
+        dets = predict_image(model, img, size, gap, batch, device, queries, vec, scale=scale)
+        merged = merge_patches([d for d in dets if d[2] >= conf], iou_thr=0.1)
+        H, W = img.shape[:2]
+        rows, js = [], []
+        for c, (_, sc, pl) in merged.items():
+            for s, p in zip(sc, pl):
+                q = p.copy()
+                q[0::2] /= W
+                q[1::2] /= H
+                rows.append(f"{c} " + " ".join(f"{v:.6f}" for v in q) + f" {s:.4f}")
+                js.append({"class": names[c], "class_id": int(c), "score": round(float(s), 4),
+                           "poly": [round(float(v), 1) for v in p]})
+        results[str(f)] = js
+        if out is not None:
+            (out / f"{f.stem}.txt").write_text("\n".join(rows) + ("\n" if rows else ""))
+            (out / f"{f.stem}.json").write_text(json.dumps(js, ensure_ascii=False))
+            if vis:
+                cv2.imwrite(str(out / f"{f.stem}_vis.jpg"), draw(img, js))
+        if verbose:
+            print(f"{f.name}: {len(js)} objects")
+    return results
+
+
+def draw(img, dets):
+    vis = img.copy()
+    for d in dets:
+        pts = np.array(d["poly"]).reshape(4, 2).astype(np.int32)
+        cv2.polylines(vis, [pts], True, (0, 0, 255), 2)
+        cv2.putText(vis, f"{d['class']} {d['score']:.2f}", tuple(int(v) for v in pts[0]),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+    return vis
+
+
+def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--src", required=True, help="image file or directory")
@@ -111,50 +172,8 @@ def main():
     ap.add_argument("--conf", type=float, default=0.25)
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--vis", action="store_true")
-    a = ap.parse_args()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    classes = None
-    if a.classes:
-        p = Path(a.classes)
-        classes = json.loads(p.read_text()) if p.exists() else [c.strip() for c in a.classes.split(",")]
-    model, names, targs = load_model(a.ckpt, device, a.queries, classes)
-    size = a.size or targs.get("img", 1024)
-    src = Path(a.src)
-    files = [src] if src.is_file() else sorted(p for p in src.iterdir() if p.suffix.lower() in IMG_EXT)
-    out = Path(a.out)
-    out.mkdir(parents=True, exist_ok=True)
-    for f in files:
-        img = cv2.imread(str(f), cv2.IMREAD_COLOR)
-        if img is None:
-            print(f"skip unreadable {f}")
-            continue
-        vec = None
-        if a.vectors_dir and targs.get("vectors"):
-            vp = Path(a.vectors_dir) / f"{f.stem}.npz"
-            vec = dict(np.load(vp)) if vp.exists() else None
-        dets = predict_image(model, img, size, a.gap, a.batch, device, a.queries, vec)
-        merged = merge_patches([d for d in dets if d[2] >= a.conf], iou_thr=0.1)
-        H, W = img.shape[:2]
-        rows, js = [], []
-        for c, (_, sc, pl) in merged.items():
-            for s, p in zip(sc, pl):
-                q = p.copy()
-                q[0::2] /= W
-                q[1::2] /= H
-                rows.append(f"{c} " + " ".join(f"{v:.6f}" for v in q) + f" {s:.4f}")
-                js.append({"class": names[c], "class_id": int(c), "score": round(float(s), 4),
-                           "poly": [round(float(v), 1) for v in p]})
-        (out / f"{f.stem}.txt").write_text("\n".join(rows) + ("\n" if rows else ""))
-        (out / f"{f.stem}.json").write_text(json.dumps(js, ensure_ascii=False))
-        if a.vis:
-            vis = img.copy()
-            for d in js:
-                pts = np.array(d["poly"]).reshape(4, 2).astype(np.int32)
-                cv2.polylines(vis, [pts], True, (0, 0, 255), 2)
-                cv2.putText(vis, f"{d['class']} {d['score']:.2f}", tuple(int(v) for v in pts[0]),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-            cv2.imwrite(str(out / f"{f.stem}_vis.jpg"), vis)
-        print(f"{f.name}: {len(js)} objects")
+    a = ap.parse_args(argv)
+    run(a.ckpt, a.src, a.out, a.conf, a.classes, a.size, a.gap, a.queries, a.batch, a.vis, a.vectors_dir)
 
 
 if __name__ == "__main__":

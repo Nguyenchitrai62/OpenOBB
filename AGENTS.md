@@ -260,7 +260,7 @@ Câu hỏi còn mở:
   - Nhánh vector H7 trên FloorPlanCAD: +0.84 mAP50, +2.51 mAP50:95.
   - 600 query lúc suy luận cho +0.7 (SV +6.3).
   - Phát hiện yếu tố gây nhiễu mosaic (YOLO có, VRDet không), đã soạn E10.
-  - Hạ tầng: giới hạn 3 session; download resume theo chunk; quy tắc CU 170/130; `tools/summarize.py`; `tools/import_yolo_obb.py` (finetune data riêng, để sau).
+  - Hạ tầng: giới hạn 3 session; download resume theo chunk; quy tắc CU 170/130; `tools/summarize.py`; `tools/prepare_dataset.py` (finetune data riêng).
   - Tiêu khoảng 275 CU từ đầu, còn khoảng 225.
 
 - 2026-10-07 (4):
