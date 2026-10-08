@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 from vrdet.data.dota import DotaPatches, collate, dataset_classes
 from vrdet.engine import ModelEMA, eval_dota, lr_factor, param_groups, to_device
 from vrdet.console import EpochBar, val_rows
-from vrdet.report import append_results, plot_labels, plot_results, plot_val_predictions
+from vrdet.report import append_results, plot_labels, plot_results, plot_train_batch, plot_val_predictions
 from vrdet.eval.dota import DOTA1_CLASSES, format_table, summary_table, write_task1
 from vrdet.models.dense_head import DenseCriterion
 from vrdet.models.vrdet import VRDet, build_criterion, load_dfine_coco
@@ -42,7 +42,10 @@ def get_args(argv=None):
     ap.add_argument("--wd", type=float, default=1e-4)
     ap.add_argument("--warmup", type=int, default=1000)
     ap.add_argument("--flat", type=float, default=0.5)
-    ap.add_argument("--min-lr-ratio", type=float, default=0.1)
+    ap.add_argument("--min-lr-ratio", type=float, default=0.1, help="final LR / initial LR (lrf)")
+    ap.add_argument("--schedule", default="flatcos", choices=["flatcos", "linear", "cos"],
+                    help="flatcos: flat then cosine (D-FINE); linear / cos: decay over the whole run to min-lr-ratio")
+    ap.add_argument("--cache", action="store_true", help="decode training images once into RAM")
     ap.add_argument("--clip", type=float, default=0.1)
     ap.add_argument("--ema", type=float, default=0.9998)
     ap.add_argument("--ema-warmups", type=int, default=1000)
@@ -153,8 +156,11 @@ def main(argv=None):
     if a.threads:
         torch.set_num_threads(a.threads)   # CPU debug runs: torch 2.12 CPU kernels race with many threads
     amp = (not a.no_amp) and device.type == "cuda"
+    amp_dtype = torch.bfloat16
+    scaler = None
     if amp and not torch.cuda.is_bf16_supported():
-        amp = False                     # bf16 autocast needs Ampere+ (T4/V100: train in fp32)
+        amp_dtype = torch.float16       # T4 / V100: fp16 autocast with loss scaling
+        scaler = torch.amp.GradScaler("cuda")
     torch.backends.cudnn.benchmark = True
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
@@ -188,7 +194,8 @@ def main(argv=None):
     ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,
                      rotate_p=a.rotate_p, mosaic_p=a.mosaic_p, context=a.context, ctx_dropout=a.ctx_dropout,
                      vectors=a.vectors, max_tokens=a.max_tokens, scale_jitter=a.scale_jitter,
-                     translate=a.translate, mosaic_mode=a.mosaic_mode, layer_drop=a.layer_drop, aug_iof=a.aug_iof)
+                     translate=a.translate, mosaic_mode=a.mosaic_mode, layer_drop=a.layer_drop, aug_iof=a.aug_iof,
+                     cache=a.cache)
     if a.batch > len(ds):
         log(f"batch {a.batch} > {len(ds)} training samples: using batch {len(ds)}", console=True)
         a.batch = len(ds)
@@ -206,7 +213,11 @@ def main(argv=None):
     dl = make_loader()
     iters_per_epoch = len(dl) if a.max_iters is None else min(len(dl), a.max_iters)
     total_iters = iters_per_epoch * a.epochs
-    opt = torch.optim.AdamW(param_groups(model, a.lr, a.backbone_mult, a.wd), lr=a.lr, betas=(0.9, 0.999))
+    try:                                # fused AdamW: one kernel per step instead of one per tensor
+        opt = torch.optim.AdamW(param_groups(model, a.lr, a.backbone_mult, a.wd), lr=a.lr, betas=(0.9, 0.999),
+                                fused=device.type == "cuda")
+    except (RuntimeError, TypeError):
+        opt = torch.optim.AdamW(param_groups(model, a.lr, a.backbone_mult, a.wd), lr=a.lr, betas=(0.9, 0.999))
     base_lrs = [g["lr"] for g in opt.param_groups]
     ema = ModelEMA(model, a.ema, a.ema_warmups)
     start_epoch, it, best_score, best_epoch = 0, 0, -1.0, -1
@@ -251,12 +262,14 @@ def main(argv=None):
         extras = [n for n, on in (("LSK", a.lsk), ("P2", a.p2), ("dense", a.dense)) if on]
         n_val = len(list((Path(a.data) / "gt" / "val").glob("*.txt")))
         say(f"VRDet {__import__('vrdet').__version__} | torch {torch.__version__} | {gpu} | "
-            f"AMP {'bf16' if amp else 'off'} | compile {'on' if a.compile and device.type == 'cuda' else 'off'}")
+            f"AMP {('bf16' if scaler is None else 'fp16') if amp else 'off'} | "
+            f"compile {'on' if a.compile and device.type == 'cuda' else 'off'}")
         say(f"model   VRDet-{a.size}{' + ' + ' + '.join(extras) if extras else ''}, {n_par:.2f}M params, "
             f"{a.queries} queries | init: {init_desc}")
         mode = f"whole image, long side {a.img}" if a.fit else f"tiles {a.img}, scale {a.scale}"
         say(f"data    {len(ds)} train tiles, {n_val} val images, {len(classes)} classes | {mode}")
-        say(f"train   {a.epochs} epochs x {iters_per_epoch} it, batch {a.batch}, AdamW lr {a.lr:g} | "
+        say(f"train   {a.epochs} epochs x {iters_per_epoch} it, batch {a.batch}, AdamW lr {a.lr:g} -> "
+            f"{a.lr * a.min_lr_ratio:g} ({a.schedule}), warmup {a.warmup} it | "
             f"val every {a.eval_every} epoch(s) on {'all' if full_val else len(val_subset or [])} val images")
         say(f"save    {out}  (best.pt, last.pt, results.csv/png, labels.jpg, val_pred.jpg, train_progress.log)")
         if start_epoch == 0:
@@ -299,13 +312,19 @@ def main(argv=None):
                     log(f"[profile] top ops by {key}\n" + prof.key_averages().table(sort_by=key, row_limit=30))
                 return
             t_data += time.time() - tick
-            f = lr_factor(it, total_iters, a.warmup, a.flat, a.min_lr_ratio)
+            f = lr_factor(it, total_iters, a.warmup, a.flat, a.min_lr_ratio, a.schedule)
             for g, b in zip(opt.param_groups, base_lrs):
                 g["lr"] = b * f
+            if bi == 0 and (epoch == start_epoch or epoch == a.epochs - a.mosaic_off):
+                try:
+                    plot_train_batch(out / f"train_batch{'_nomosaic' if epoch and epoch == a.epochs - a.mosaic_off else '0'}.jpg",
+                                     imgs, targets, classes)
+                except Exception as e:  # noqa: BLE001
+                    log(f"train batch preview skipped: {e}")
             x, tg, ctx = to_device(imgs, targets, device)
             if a.channels_last:
                 x = x.contiguous(memory_format=torch.channels_last)
-            with torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=amp):
+            with torch.autocast(device_type=device.type, dtype=amp_dtype, enabled=amp):
                 outputs = model(x, tg, ctx=ctx)
             t0 = time.time()
             losses = crit(outputs, tg)
@@ -321,15 +340,26 @@ def main(argv=None):
                 tick = time.time()
                 continue
             opt.zero_grad(set_to_none=True)
-            loss.backward()
+            if scaler is not None:
+                scaler.scale(loss).backward()
+                scaler.unscale_(opt)
+            else:
+                loss.backward()
             gn = torch.nn.utils.clip_grad_norm_(model.parameters(), a.clip if a.clip > 0 else 1e9)
             if not torch.isfinite(gn):          # never let one bad batch poison the weights
-                log(f"non-finite grad norm at iter {it}; step skipped", console=True)
+                if scaler is not None:
+                    scaler.update()             # fp16 overflow: lower the loss scale, skip the step
+                else:
+                    log(f"non-finite grad norm at iter {it}; step skipped", console=True)
                 opt.zero_grad(set_to_none=True)
                 it += 1
                 tick = time.time()
                 continue
-            opt.step()
+            if scaler is not None:
+                scaler.step(opt)
+                scaler.update()
+            else:
+                opt.step()
             ema.update(model)
             # keep running sums on the GPU: a float() per loss term per step forced ~40 device syncs
             main = {k: v.detach() for k, v in losses.items() if "_aux" not in k and "_dn" not in k and "_enc" not in k
@@ -445,6 +475,12 @@ def main(argv=None):
     jlog({"final": True, "split": "val", "weights": weights, "mAP50": res["mAP50"], "mAP50_95": res["mAP50_95"],
           "per_class_AP50": {c: round(r["AP50"], 4) for c, r in res["classes"].items()},
           "latency_ms_pt_fp16_bs1": lat, "fusion": {k: round(v["mAP50"], 4) for k, v in res.get("fusion", {}).items()}})
+    if not a.eval_only and last.exists():   # finished: drop the optimiser state from last.pt (like best.pt)
+        ck = torch.load(last, map_location="cpu", weights_only=False)
+        if "opt" in ck:
+            torch.save({"model": ck["ema"]["module"], "epoch": ck["epoch"], "args": ck["args"],
+                        "classes": ck["classes"], "best_score": ck.get("best_score")}, out / "last.tmp")
+            os.replace(out / "last.tmp", last)
     (out / "train_done").write_text("ok")
 
 

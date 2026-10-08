@@ -90,6 +90,29 @@ def plot_labels(out, items, classes, size):
     plt.close(fig)
 
 
+def plot_train_batch(path, imgs, targets, classes, n=4):
+    """2x2 preview of an augmented training batch with its target boxes (checks mosaic / zoom / clip)."""
+    from vrdet.ops.obb import obb2poly
+    tiles = []
+    for img, t in list(zip(imgs, targets))[:n]:
+        S = img.shape[-1]
+        vis = np.ascontiguousarray(img.permute(1, 2, 0).numpy()[..., ::-1])
+        b = t["boxes"].numpy().copy()
+        b[:, :4] *= S
+        for c, p in zip(t["labels"].tolist(), obb2poly(b) if len(b) else []):
+            pts = p.reshape(4, 2).round().astype(np.int32)
+            color = PALETTE[int(c) % len(PALETTE)]
+            cv2.polylines(vis, [pts], True, color, 2, cv2.LINE_AA)
+            cv2.putText(vis, classes[int(c)], tuple(int(v) for v in pts[0]), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1,
+                        cv2.LINE_AA)
+        tiles.append(cv2.resize(vis, (640, 640), interpolation=cv2.INTER_AREA))
+    if not tiles:
+        return
+    while len(tiles) < 4:
+        tiles.append(np.full_like(tiles[0], 255))
+    cv2.imwrite(str(path), np.vstack([np.hstack(tiles[:2]), np.hstack(tiles[2:4])]), [cv2.IMWRITE_JPEG_QUALITY, 90])
+
+
 @torch.no_grad()
 def plot_val_predictions(out, model, data_root, device, img_size, classes, num_top=300, n=4, conf=0.3):
     """2x2 grid of val tiles: ground truth in thin green, predictions (score >= conf) in class colours."""

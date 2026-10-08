@@ -33,7 +33,7 @@ pip install git+https://github.com/Nguyenchitrai62/vrdet.git     # hoặc trong 
 - **`tile=True`:** cho trang cực lớn có object rất nhỏ.
   - Cắt tile `imgsz` ở độ phân giải gốc, chồng nhau 200 px, giống SAHI.
   - `tile_scale=` để thu nhỏ trước khi cắt; không đặt thì tự chọn theo cỡ object.
-- Dữ liệu đã chuẩn bị được cache ở `~/.cache/vrdet` (đổi chỗ bằng `cache=` hoặc biến `VRDET_CACHE`).
+- Dữ liệu đã chuẩn bị được cache ở `~/.cache/vrdet` (đổi chỗ bằng `cache_dir=` hoặc biến `VRDET_CACHE`).
 
 ## 2. Train
 
@@ -61,6 +61,8 @@ r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024, project="
 | `translate` | 0.1 | dịch ngẫu nhiên ±10% |
 | `hsv_h`, `hsv_s`, `hsv_v` | 0.015, 0.5, 0.3 | đổi màu |
 | `warmup_epochs` | 3 | khởi động learning rate |
+| `lrf` | 0.01 | learning rate giảm tuyến tính từ `lr0` về `lr0 × lrf` ở cuối run (`cos_lr=True`: giảm theo cosine) |
+| `cache` | auto | giải mã ảnh train một lần vào RAM nếu chiếm dưới 25% RAM (`cache=False` để tắt) |
 | `patience` | 100 | dừng nếu mAP50-95 val không tăng sau N epoch |
 | `lr0` | 1e-4 (bản S) | learning rate (AdamW) |
 

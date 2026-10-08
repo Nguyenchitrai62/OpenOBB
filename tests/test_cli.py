@@ -52,18 +52,18 @@ def test_train_val_predict_smoke(tmp_path):
     data = _dataset(tmp_path / "ds")
     m = Detector("s")
     r = m.train(data=str(data), epochs=1, batch=2, imgsz=512, tile_scale=0.8, project=str(tmp_path / "runs"),
-                name="t", cache=str(tmp_path / "cache"), workers=0, recipe=False, no_pretrained=True,
+                name="t", cache_dir=str(tmp_path / "cache"), workers=0, recipe=False, no_pretrained=True,
                 max_iters=1, threads=1)
     assert os.path.exists(r.best) and m.model == r.best
     args = json.loads((tmp_path / "runs" / "t" / "vrdet_args.json").read_text())
     assert args["scale"] == 0.8 and args["img"] == 512
-    res = m.val(str(data), cache=str(tmp_path / "cache"), workers=0, batch=2)
+    res = m.val(str(data), cache_dir=str(tmp_path / "cache"), workers=0, batch=2)
     assert "mAP50" in res
     out = m.predict(str(tmp_path / "ds" / "valid" / "images"), conf=0.0, save_dir=str(tmp_path / "pred"))
     assert len(out) == 1 and (tmp_path / "pred" / "valid0.json").exists()
     # fine-tune from the result inherits the architecture and maps classes by name
     r2 = Detector(r.best).train(data=str(data), epochs=1, batch=2, project=str(tmp_path / "runs"), name="ft",
-                                cache=str(tmp_path / "cache"), workers=0, recipe=False, max_iters=1, threads=1)
+                                cache_dir=str(tmp_path / "cache"), workers=0, recipe=False, max_iters=1, threads=1)
     assert os.path.exists(r2.best)
 
 
@@ -116,11 +116,40 @@ def test_train_flags_and_oom_retry(tmp_path, monkeypatch):
     monkeypatch.setattr(trainer, "main", fake_main)
     data = _dataset(tmp_path / "ds")
     train(str(data), epochs=10, batch=8, imgsz=512, project=str(tmp_path / "runs"), name="t",
-          cache=str(tmp_path / "cache"), workers=1)
+          cache_dir=str(tmp_path / "cache"), workers=1)
     assert len(calls) == 2
     first, second = (" ".join(c) for c in calls)
     for flag in ("--fit", "--lsk", "--mosaic-p 1.0", "--mosaic-mode yolo", "--scale-jitter 0.5", "--translate 0.1",
                  "--mosaic-off 10", "--patience 100", "--warmup 3", "--eval-every 1", "--batch 8",
-                 "--aug-iof 0.25", "--merge-iou 0.7", "--ema 0.986"):
+                 "--aug-iof 0.25", "--merge-iou 0.7", "--ema 0.986", "--schedule linear", "--min-lr-ratio 0.01"):
         assert flag in first, flag
     assert "--batch 4" in second                                             # halved after the OOM
+
+
+def test_lr_schedules_and_ema():
+    import math as _m
+
+    import torch
+
+    from vrdet.engine import ModelEMA, lr_factor
+    assert lr_factor(0, 1000, 100, schedule="linear", min_ratio=0.01) < 0.02           # warmup ramps up
+    assert abs(lr_factor(500, 1000, 100, schedule="linear", min_ratio=0.01) - 0.505) < 1e-6
+    assert abs(lr_factor(1000, 1000, 100, schedule="linear", min_ratio=0.01) - 0.01) < 1e-9
+    assert abs(lr_factor(1000, 1000, 100, schedule="cos", min_ratio=0.01) - 0.01) < 1e-9
+    assert lr_factor(400, 1000, 100) == 1.0                                              # flatcos unchanged
+    net = torch.nn.Linear(3, 2)
+    ema = ModelEMA(net, decay=0.9, warmups=1)
+    w0 = ema.module.weight.clone()
+    with torch.no_grad():
+        net.weight.add_(1.0)
+    ema.update(net)
+    d = 0.9 * (1 - _m.exp(-1))
+    assert torch.allclose(ema.module.weight, d * w0 + (1 - d) * net.weight)
+
+
+def test_dataset_ram_cache(tmp_path):
+    from vrdet.data.dota import DotaPatches
+    from vrdet.data.prepare import prepare
+    out = prepare(str(_dataset(tmp_path / "ds")), tmp_path / "prep", size=512, fit=True, workers=1)
+    a, b = DotaPatches(out, "train"), DotaPatches(out, "train", cache=True)
+    assert len(b.cache) == len(b.items) and (a[0][0] == b[0][0]).all()

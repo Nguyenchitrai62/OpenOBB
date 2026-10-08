@@ -20,21 +20,26 @@ class ModelEMA:
         for p in self.module.parameters():
             p.requires_grad_(False)
         self.decay, self.warmups, self.updates = decay, warmups, 0
+        self._pairs = None
 
     @torch.no_grad()
     def update(self, model):
         self.updates += 1
         d = self.decay * (1 - math.exp(-self.updates / self.warmups))
-        msd = model.state_dict()
-        fl_e, fl_m = [], []
-        for k, v in self.module.state_dict().items():
-            if v.dtype.is_floating_point:
-                fl_e.append(v)
-                fl_m.append(msd[k].detach())
-            else:
-                v.copy_(msd[k])
-        torch._foreach_mul_(fl_e, d)
-        torch._foreach_add_(fl_e, fl_m, alpha=1 - d)
+        if self._pairs is None:                 # state_dict tensors share storage with the live parameters/buffers
+            msd = model.state_dict()
+            fl, other = ([], []), []
+            for k, v in self.module.state_dict().items():
+                if v.dtype.is_floating_point:
+                    fl[0].append(v)
+                    fl[1].append(msd[k].detach())
+                else:
+                    other.append((v, msd[k]))
+            self._pairs = (fl, other)
+        (fl_e, fl_m), other = self._pairs
+        for v, m in other:
+            v.copy_(m)
+        torch._foreach_lerp_(fl_e, fl_m, 1 - d)
 
     def state_dict(self):
         return {"module": self.module.state_dict(), "updates": self.updates}
@@ -44,14 +49,23 @@ class ModelEMA:
         self.updates = sd["updates"]
 
 
-def lr_factor(it, total, warmup, flat=0.5, min_ratio=0.1):
-    if it < warmup:
-        return (it + 1) / warmup
-    p = it / max(total, 1)
-    if p < flat:
-        return 1.0
-    q = min((p - flat) / max(1 - flat, 1e-9), 1.0)
-    return min_ratio + (1 - min_ratio) * 0.5 * (1 + math.cos(math.pi * q))
+def lr_factor(it, total, warmup, flat=0.5, min_ratio=0.1, schedule="flatcos"):
+    """LR multiplier at iteration `it`. flatcos (D-FINE): linear warmup, flat until `flat` of the run, cosine to
+    min_ratio. linear / cos (one-stage trainer recipe): decay from 1 to min_ratio (lrf) over the whole run, the
+    warmup ramping up to the decayed value."""
+    p = min(it / max(total, 1), 1.0)
+    if schedule == "linear":
+        base = (1 - p) * (1 - min_ratio) + min_ratio
+    elif schedule == "cos":
+        base = min_ratio + (1 - min_ratio) * 0.5 * (1 + math.cos(math.pi * p))
+    else:
+        if it < warmup:
+            return (it + 1) / warmup
+        if p < flat:
+            return 1.0
+        q = min((p - flat) / max(1 - flat, 1e-9), 1.0)
+        return min_ratio + (1 - min_ratio) * 0.5 * (1 + math.cos(math.pi * q))
+    return base * min(1.0, (it + 1) / max(warmup, 1))
 
 
 def param_groups(model, lr, backbone_mult=0.5, wd=1e-4):
@@ -59,7 +73,7 @@ def param_groups(model, lr, backbone_mult=0.5, wd=1e-4):
     for n, p in model.named_parameters():
         if not p.requires_grad:
             continue
-        normish = ("norm" in n) or ("bn" in n)
+        normish = ("norm" in n) or ("bn" in n) or p.ndim <= 1      # biases, norm weights, scales: no decay
         if n.startswith("backbone."):
             groups["bb_norm" if normish else "bb"].append(p)
         elif normish or n.endswith(".bias"):

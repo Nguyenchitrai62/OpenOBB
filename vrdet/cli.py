@@ -18,7 +18,8 @@ resolution (tile_scale= to resize first), for very large pages with tiny objects
 the train images is held out. Prepared data is cached (~/.cache/vrdet). A run resumes from {project}/{name}/last.pt.
 
 Training defaults follow the usual one-stage recipe: mosaic=1.0, scale=0.5 (random zoom 0.5-1.5), translate=0.1,
-close_mosaic=10, warmup_epochs=3, patience=100, batch fitted to the GPU and halved on out-of-memory.
+close_mosaic=10, warmup_epochs=3, LR decayed linearly to lr0 * lrf (lrf=0.01; cos_lr=True for cosine), patience=100,
+cache=auto (decoded images in RAM when they fit), batch fitted to the GPU / dataset and halved on out-of-memory.
 """
 import gc
 import hashlib
@@ -50,9 +51,9 @@ SIZE_DEFAULTS = {          # lr, backbone lr multiplier, weight decay, batch, ~G
 ARCH_KEYS = ("size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_queries", "denoising",
              "no_rotate_sampling", "context")
 MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / per epoch on small datasets
-ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every"}
-IGNORED = ("amp", "device", "save_period", "plots", "cos_lr", "optimizer", "momentum", "lrf", "fliplr", "flipud",
-           "degrees", "shear", "perspective", "mixup", "cutmix", "copy_paste", "cache", "rect", "multi_scale")
+ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every", "lrf": "min_lr_ratio"}
+IGNORED = ("amp", "device", "save_period", "plots", "optimizer", "momentum", "fliplr", "flipud", "degrees", "shear",
+           "perspective", "mixup", "cutmix", "copy_paste", "rect", "multi_scale")
 
 
 def _value(v):
@@ -108,7 +109,7 @@ def _cache_root(cache):
     return Path(cache or os.environ.get("VRDET_CACHE") or Path.home() / ".cache" / "vrdet" / "datasets")
 
 
-def prepare_data(data, imgsz=1024, gap=200, val_frac=0.15, scale=1.0, cache=None, workers=None, seed=0, fit=True):
+def prepare_data(data, imgsz=1024, gap=200, val_frac=0.15, scale=1.0, cache_dir=None, workers=None, seed=0, fit=True):
     """data.yaml / dataset folder -> prepared cache dir (built once, reused). Prepared dirs pass through."""
     if _is_prepared(data):
         return Path(data)
@@ -116,7 +117,7 @@ def prepare_data(data, imgsz=1024, gap=200, val_frac=0.15, scale=1.0, cache=None
     src = Path(data).resolve()
     key = hashlib.sha1(f"{src}|{imgsz}|{gap}|{val_frac}|{scale}|{seed}|{fit}".encode()).hexdigest()[:8]
     stem = src.parent.name if src.suffix in (".yaml", ".yml") else src.name
-    out = _cache_root(cache) / f"{stem}_{imgsz}_{key}"
+    out = _cache_root(cache_dir) / f"{stem}_{imgsz}_{key}"
     return prepare(src, out, size=imgsz, gap=gap, val_frac=val_frac, seed=seed, workers=workers, scale=scale,
                    fit=fit)
 
@@ -132,6 +133,17 @@ def _run_dir(project, name, exist_ok, resume):
         if resume and (d / "last.pt").exists() and not (d / "train_done").exists():
             return d, True
         k += 1
+
+
+def _ram_bytes():
+    try:
+        import psutil
+        return psutil.virtual_memory().total
+    except Exception:  # noqa: BLE001
+        try:
+            return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+        except (ValueError, OSError, AttributeError):
+            return 16 * 2**30
 
 
 def _n_lines(p):
@@ -224,8 +236,8 @@ def _to_argv(opts):
 
 
 def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", name="exp", exist_ok=False,
-          resume=True, tile=False, tile_scale=None, gap=200, val_frac=0.15, cache=None, workers=None, device=None,
-          recipe=True, warmup_epochs=3, patience=100, seed=0, **extra):
+          resume=True, tile=False, tile_scale=None, gap=200, val_frac=0.15, cache="auto", cache_dir=None, workers=None,
+          device=None, recipe=True, warmup_epochs=3, patience=100, lrf=0.01, cos_lr=False, seed=0, **extra):
     """Train (or fine-tune when `model` is a .pt path). Returns SimpleNamespace(save_dir, best, last, metrics)."""
     _set_device(device)
     for k in list(extra):
@@ -266,8 +278,10 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
         scale = auto_scale(data, imgsz) if tile_scale in (None, "auto") else float(tile_scale)
 
     sd = SIZE_DEFAULTS[size]
-    prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache, workers, seed, fit=fit)
+    prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, seed, fit=fit)
     n_train = _n_lines(Path(prepared) / "meta" / "train.jsonl")
+    if cache == "auto":                              # decoded uint8 images in RAM when they take < 25% of it
+        cache = n_train * imgsz * imgsz * 3 < 0.25 * _ram_bytes()
     if batch is None:
         batch, why = sd["batch"], "default"
         mem = _gpu_mem_gb()
@@ -290,7 +304,8 @@ def train(data, model="s", epochs=100, batch=None, imgsz=None, project="runs", n
         print(f"[vrdet] WARNING: only {steps} optimizer steps ({max(1, n_train // int(batch))}/epoch x {epochs} epochs); this "
               f"detector needs ~{MIN_STEPS}+ to converge: raise epochs or lower batch")
     opts = {"size": size, "img": imgsz, "scale": scale, "fit": fit, "epochs": int(epochs), "batch": int(batch),
-            "aug_iof": 0.25, "merge_iou": 0.7 if fit else 0.1,
+            "aug_iof": 0.25, "merge_iou": 0.7 if fit else 0.1, "cache": bool(cache),
+            "schedule": "cos" if cos_lr else "linear", "min_lr_ratio": float(lrf),
             "lr": sd["lr"], "backbone_mult": sd["backbone_mult"], "wd": sd["wd"], "hsv": hsv,
             "eval_every": _eval_every(prepared, int(epochs)), "eval_images": 10**9, "patience": int(patience or 0),
             "seed": seed}
@@ -355,7 +370,7 @@ def _summary(save_dir):
 
 
 def val(model, data, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, batch=8, workers=8, queries=900,
-        cache=None, device=None, seed=0):
+        cache_dir=None, device=None, seed=0):
     """DOTA-protocol mAP of a checkpoint on the val split of `data` (same hold-out and resizing as training)."""
     _set_device(device)
     import torch
@@ -369,7 +384,7 @@ def val(model, data, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, batch=
     imgsz = int(imgsz or targs.get("img", 1024))
     fit = bool(targs.get("fit", False)) and tile_scale is None
     scale = float(tile_scale if tile_scale is not None else targs.get("scale", 1.0))
-    prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache, workers, seed, fit=fit)
+    prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, seed, fit=fit)
     classes = list(dataset_classes(prepared))
     if classes != list(names):
         print(f"[vrdet] WARNING: dataset classes {classes} differ from the model's {list(names)}")

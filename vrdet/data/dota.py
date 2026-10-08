@@ -70,7 +70,7 @@ class DotaPatches(Dataset):
     def __init__(self, root, split, size=1024, augment=False, filter_empty=False, min_size=2.0,
                  hsv=(0.015, 0.5, 0.3), rot90=True, flip=True, limit=None, keep_difficult=True, rotate_p=0.0,
                  mosaic_p=0.0, context=False, thumb=512, ctx_dropout=0.0, vectors=False, max_tokens=4096,
-                 scale_jitter=0.0, translate=0.0, mosaic_mode="half", layer_drop=0.0, aug_iof=0.7):
+                 scale_jitter=0.0, translate=0.0, mosaic_mode="half", layer_drop=0.0, aug_iof=0.7, cache=False):
         self.root, self.split, self.size = Path(root), split, size
         # H11 (YOLO recipe idea): random scale in [1 - scale_jitter, 1 + scale_jitter] and translation of
         # +-translate x size on every training sample; mosaic_mode "yolo" = 4 full-resolution patches around a
@@ -79,6 +79,13 @@ class DotaPatches(Dataset):
         # visible fraction an object cut by a mosaic/zoom crop needs to keep its label (a visible but unlabelled
         # part is trained as background; the one-stage recipe keeps even small pieces)
         self.aug_iof = aug_iof
+        self.cache = {}
+        if cache:                               # decode once in the main process; forked workers share the pages
+            from concurrent.futures import ThreadPoolExecutor
+            files = [self.root / "images" / self.split / m.get("file", f"{m['name']}.jpg") for m in self.items]
+            with ThreadPoolExecutor(8) as ex:
+                imgs = list(ex.map(lambda f: cv2.imread(str(f), cv2.IMREAD_COLOR), files))
+            self.cache = {m["name"]: im for m, im in zip(self.items, imgs)}
         self.layer_drop = layer_drop    # H16: chance to merge all CAD layers into one (do not over-rely on layers)
         self.vectors, self.max_tokens = vectors, max_tokens
         self.context, self.thumb, self.ctx_dropout = context, thumb, ctx_dropout
@@ -97,7 +104,9 @@ class DotaPatches(Dataset):
         return len(self.items)
 
     def _load(self, m):
-        img = cv2.imread(str(self.root / "images" / self.split / m.get("file", f"{m['name']}.jpg")), cv2.IMREAD_COLOR)
+        img = self.cache.get(m["name"])
+        if img is None:
+            img = cv2.imread(str(self.root / "images" / self.split / m.get("file", f"{m['name']}.jpg")), cv2.IMREAD_COLOR)
         objs = m["objs"] if self.keep_difficult else [o for o in m["objs"] if o[1] == 0]
         polys = np.array([o[3:] for o in objs], dtype=np.float32).reshape(-1, 8)
         labels = np.array([o[0] for o in objs], dtype=np.int64)
@@ -178,7 +187,14 @@ class DotaPatches(Dataset):
         s = random.uniform(1 - self.scale_jitter, 1 + self.scale_jitter)
         tx, ty = (random.uniform(-self.translate, self.translate) * S for _ in range(2))
         M = np.array([[s, 0, S / 2 + tx - s * src_centre], [0, s, S / 2 + ty - s * src_centre]], np.float32)
-        img = cv2.warpAffine(np.ascontiguousarray(img), M, (S, S), flags=cv2.INTER_LINEAR, borderValue=PAD_BGR)
+        if s < 1:                               # zoom-out: area resize first so 1-2 px lines are not broken up
+            h, w = img.shape[:2]
+            small = cv2.resize(np.ascontiguousarray(img), (max(1, round(w * s)), max(1, round(h * s))),
+                               interpolation=cv2.INTER_AREA)
+            T = np.array([[1, 0, M[0, 2]], [0, 1, M[1, 2]]], np.float32)
+            img = cv2.warpAffine(small, T, (S, S), flags=cv2.INTER_LINEAR, borderValue=PAD_BGR)
+        else:
+            img = cv2.warpAffine(np.ascontiguousarray(img), M, (S, S), flags=cv2.INTER_LINEAR, borderValue=PAD_BGR)
         if vec is not None and len(vec["pts"]):
             vec["pts"] = (vec["pts"].reshape(-1, 2) @ M[:, :2].T + M[:, 2]).reshape(-1, 16).astype(np.float32)
             vec["attr"][:, 4] *= s
@@ -307,7 +323,7 @@ class DotaPatches(Dataset):
         r = np.random.uniform(-1, 1, 3) * self.hsv + 1
         hue, sat, val = cv2.split(cv2.cvtColor(np.ascontiguousarray(img), cv2.COLOR_BGR2HSV))
         x = np.arange(0, 256, dtype=r.dtype)
-        lut_hue = ((x * r[0]) % 180).astype(np.uint8)
+        lut_hue = ((x + (r[0] - 1) * 180) % 180).astype(np.uint8)          # additive hue shift
         lut_sat = np.clip(x * r[1], 0, 255).astype(np.uint8)
         lut_val = np.clip(x * r[2], 0, 255).astype(np.uint8)
         return cv2.cvtColor(cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val))),
