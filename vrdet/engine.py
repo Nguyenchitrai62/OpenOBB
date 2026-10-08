@@ -23,8 +23,8 @@ class ModelEMA:
 
     @torch.no_grad()
     def update(self, model):
-        # fresh state_dict every step: caching the tensor references once gave an all-NaN EMA together with
-        # torch.compile on GPU (Wall_Color fine-tune, 2026-10-08)
+        # e*d + m*(1-d) with mul/add, not lerp: lerp turns inf BatchNorm statistics into NaN (inf - inf), which made
+        # every validation box NaN when fine-tuning from a checkpoint with an exploded running_var (2026-10-08)
         self.updates += 1
         d = self.decay * (1 - math.exp(-self.updates / self.warmups))
         msd = model.state_dict()
@@ -35,7 +35,8 @@ class ModelEMA:
                 fl_m.append(msd[k].detach())
             else:
                 v.copy_(msd[k])
-        torch._foreach_lerp_(fl_e, fl_m, 1 - d)
+        torch._foreach_mul_(fl_e, d)
+        torch._foreach_add_(fl_e, fl_m, alpha=1 - d)
 
     @torch.no_grad()
     def repair(self, model, log=print):
@@ -46,7 +47,9 @@ class ModelEMA:
         if bad:
             live_bad = [k for k in bad if not torch.isfinite(msd[k]).all()]
             log(f"WARNING: {len(bad)} EMA tensors are NaN/inf (e.g. {bad[:3]}); re-synced from the training model"
-                + (f"; {len(live_bad)} are non-finite in the training model too (e.g. {live_bad[:3]})" if live_bad else ""))
+                + (f"; also non-finite in the training model (e.g. {live_bad[:3]}): its activations have exploded, "
+                   f"usually from a learning rate far above the default (further repeats go to train_progress.log)"
+                   if live_bad else ""))
             sd = self.module.state_dict()
             for k in bad:
                 sd[k].copy_(torch.nan_to_num(msd[k], nan=0.0, posinf=0.0, neginf=0.0)
@@ -59,6 +62,24 @@ class ModelEMA:
     def load_state_dict(self, sd):
         self.module.load_state_dict(sd["module"])
         self.updates = sd["updates"]
+
+
+@torch.no_grad()
+def sanitize_batchnorm(model, limit=1e10, log=print):
+    """BatchNorm running statistics that are NaN/inf or absurdly large (an earlier run diverged; training-mode BN
+    hides it because it uses batch statistics) are reset and re-estimated by the next training steps."""
+    reset = []
+    for name, m in model.named_modules():
+        if isinstance(m, torch.nn.modules.batchnorm._BatchNorm) and m.track_running_stats and m.running_var is not None:
+            rv, rm = m.running_var, m.running_mean
+            if not (torch.isfinite(rv).all() and torch.isfinite(rm).all()) or rv.abs().max() > limit \
+                    or rm.abs().max() > limit:
+                m.reset_running_stats()
+                reset.append(name)
+    if reset:
+        log(f"WARNING: reset {len(reset)} BatchNorm layers with exploded running statistics (e.g. {reset[:3]}); the "
+            f"source checkpoint probably came from a diverging run (learning rate too high)")
+    return reset
 
 
 def lr_factor(it, total, warmup, flat=0.5, min_ratio=0.1, schedule="flatcos"):

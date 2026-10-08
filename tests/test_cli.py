@@ -215,3 +215,17 @@ def test_ema_repair_resyncs_non_finite():
     bad = ema.repair(net, log=lambda m: None)
     assert len(bad) == 2 and torch.isfinite(ema.module[0].weight).all()
     assert torch.equal(ema.module[0].weight, net[0].weight) and torch.isfinite(ema.module[1].running_var).all()
+
+
+def test_inf_batchnorm_stats_never_become_nan():
+    import torch
+
+    from vrdet.engine import ModelEMA, sanitize_batchnorm
+    net = torch.nn.Sequential(torch.nn.Conv2d(3, 4, 1), torch.nn.BatchNorm2d(4))
+    with torch.no_grad():
+        net[1].running_var.fill_(float("inf"))
+    ema = ModelEMA(net, decay=0.9, warmups=1)
+    ema.update(net)                                    # inf with inf: stays inf (lerp gave inf - inf = NaN)
+    assert not torch.isnan(ema.module[1].running_var).any()
+    assert sanitize_batchnorm(net, log=lambda m: None) == ["1"]
+    assert torch.isfinite(net[1].running_var).all() and float(net[1].running_var.max()) == 1.0

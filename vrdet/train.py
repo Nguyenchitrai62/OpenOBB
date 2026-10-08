@@ -17,7 +17,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from vrdet.data.dota import DotaPatches, collate, dataset_classes
-from vrdet.engine import ModelEMA, eval_dota, lr_factor, param_groups, to_device
+from vrdet.engine import ModelEMA, eval_dota, lr_factor, param_groups, sanitize_batchnorm, to_device
 from vrdet.console import EpochBar, val_rows
 from vrdet.report import append_results, plot_labels, plot_results, plot_train_batch, plot_val_predictions
 from vrdet.eval.dota import DOTA1_CLASSES, format_table, summary_table, write_task1
@@ -196,6 +196,7 @@ def main(argv=None):
         init_desc = "D-FINE COCO weights (Apache-2.0)"
     else:
         init_desc = "resume" if last.exists() else "random"
+    sanitize_batchnorm(model, log=lambda m: log(m, console=True))
     model.to(device)
     if a.channels_last:
         model.to(memory_format=torch.channels_last)
@@ -261,6 +262,8 @@ def main(argv=None):
             opt.load_state_dict(ck["opt"])
         start_epoch, it = ck["epoch"] + 1, ck["iter"]
         best_score, best_epoch = ck.get("best_score", -1.0), ck.get("best_epoch", -1)
+        sanitize_batchnorm(model, log=lambda m: log(m, console=True))       # exploded stats saved in last.pt
+        sanitize_batchnorm(ema.module, log=lambda m: log(m))
         log(f"resumed from epoch {ck['epoch']} (iter {it})")
         if not a.eval_only:
             say(f"Resuming {out} from epoch {ck['epoch'] + 1}/{a.epochs}")
@@ -326,7 +329,9 @@ def main(argv=None):
         log(f"best.pt <- epoch {epoch} (val mAP50:95 {score:.4f})")
 
     t_train = time.time()
+    warned = set()                              # repeated warnings go to the log file after the first one
     for epoch in itertools.count(start_epoch):
+        warned_ema = "ema" in warned
         if epoch >= a.epochs:                  # a.epochs may be re-planned by --time
             break
         if ds.mosaic_p and epoch >= a.epochs - a.mosaic_off:
@@ -441,7 +446,7 @@ def main(argv=None):
         res = None
         if val_subset and ((epoch + 1) % a.eval_every == 0 or epoch + 1 == a.epochs) and (epoch + 1 < a.epochs or full_val):
             t_val = time.time()
-            ema.repair(model, log=lambda m: log(m, console=True))
+            ema.repair(model, log=lambda m: log(m, console=not warned_ema) or warned.add("ema"))
             res, _ = eval_dota(ema.module, a.data, device, val_subset, batch=a.batch, workers=a.workers,
                                num_top=a.num_top, img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post, merge_iou=a.merge_iou)
             if not a.verbose:
