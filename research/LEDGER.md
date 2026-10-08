@@ -66,6 +66,13 @@ Quy ước: toàn bộ là val, 24 epoch, ảnh 1024. DOTA cắt SS 1024/200, in
   = 6.7% trọng số mAP. Không tính HC: VRDet-X q900 77.71 so với YOLO26x 78.66 (**−0.95**, so với −2.13 khi tính HC).
   Context (e3-ctx) +1.2 và mosaic (e10) +0.3 trên 14 class còn lại, chỉ HC sụp.
   **Từ nay báo cả mAP50 và mAP50 không tính HC**; quyết định ablation xem cả hai. HC gần vuông nên góc mơ hồ: thử e18.
+- **F14. Góc của object gần vuông** (phân tích, chưa đo):
+  - Loss Gaussian (KLD, ProbIoU) gần như mù góc với box vuông, vì covariance đẳng hướng.
+  - Loss sin²(2Δθ)·ω của YOLO26 (ω = 1 cho box vuông, nhỏ dần khi box dài) có chu kỳ 90°, nên chỉ đúng cho box vuông.
+    Nó **bổ sung** tín hiệu góc ở chỗ Gaussian không thấy.
+  - L1 góc của VRDet (target căn theo biểu diễn tương đương ±90°) cũng cho tín hiệu này. Không được giảm trọng số L1 góc cho box vuông
+    (suýt làm nhầm ngày 10-08, đã hoàn tác).
+  - Liên quan HC (AP50:95 25 so với 37 của YOLO26x): thử e18.
 - **F10. Lỗi ProbIoU** (xem §4).
 - **F11. Tốc độ:** VRDet-X 20.0 ms so với YOLO26x 12.8 ms (64% FPS). VRDet-S 9.4–10.1 ms so với 8.9. Số query không ảnh hưởng latency (300 → 900 vẫn khoảng 20 ms). A100 chậm hơn G4 khoảng 2 lần với workload này.
 - **F12. YOLO26-OBB, đọc từ source/paper:**

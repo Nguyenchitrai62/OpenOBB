@@ -1,0 +1,21 @@
+{
+  "attempts": 1,
+  "started": "2026-10-08 10:10:08",
+  "session": "e12-dota-o2m-s-1",
+  "out": "/content/work/runs/e12-dota-o2m-s",
+  "status": "running",
+  "launched": 1791429014.0483515,
+  "updated": "2026-10-08 10:11:01",
+  "fails": 0,
+  "synced": {
+    "setup.log": [
+      1371,
+      1791429046
+    ],
+    "train.log": [
+      2342,
+      1791429056
+    ]
+  },
+  "tail": "47/3738 [00:05<07:06,  8.66it/s]\nFetching 3738 files:   1%|\u258f         | 51/3738 [00:05<05:04, 12.12it/s]\nFetching 3738 files:   1%|\u258f         | 53/3738 [00:05<05:14, 11.72it/s]\nFetching 3738 files:   1%|\u258f         | 55/3738 [00:06<04:48, 12.78it/s]\nFetching 3738 files:   2%|\u258f         | 57/3738 [00:06<04:31, 13.54it/s]\nFetching 3738 files:   2%|\u258f         | 59/3738 [00:06<04:12, 14.57it/s]\nFetching 3738 files:   2%|\u258f         | 61/3738 [00:06<03:55, 15.63it/s]\nFetching 3738 files:   2%|\u258f         | 63/3738 [00:06<04:10, 14.64it/s]\nFetching 3738 files:   2%|\u258f         | 65/3738 [00:06<03:55, 15.61it/s]"
+}
