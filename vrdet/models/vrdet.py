@@ -68,7 +68,7 @@ class StripContext(nn.Module):
 class VRDet(nn.Module):
     def __init__(self, size="s", num_classes=15, num_queries=300, img_size=1024, rotate_sampling=True,
                  num_denoising=100, dense=False, dense_width=128, strip_k=0, ortho_heads=False, context=False,
-                 dense_queries=False, vectors=False, vec_dim=128, vec_layers=2, **overrides):
+                 dense_queries=False, vectors=False, vec_dim=128, vec_layers=2, o2m_queries=0, **overrides):
         super().__init__()
         cfg = copy.deepcopy(CONFIGS[size])
         for k, v in overrides.items():          # e.g. decoder=dict(num_layers=4)
@@ -80,7 +80,8 @@ class VRDet(nn.Module):
         self.encoder = HybridEncoder(**cfg["encoder"], eval_spatial_size=[img_size, img_size])
         self.decoder = OBBDFINETransformer(num_classes=num_classes, num_queries=num_queries,
                                            eval_spatial_size=[img_size, img_size], rotate_sampling=rotate_sampling,
-                                           num_denoising=num_denoising, ortho_heads=ortho_heads, **cfg["decoder"])
+                                           num_denoising=num_denoising, ortho_heads=ortho_heads,
+                                           o2m_queries=o2m_queries, **cfg["decoder"])
         hid = cfg["encoder"]["hidden_dim"]
         self.context = nn.ModuleList([StripContext(hid, strip_k) for _ in range(3)]) if strip_k else None
         self.global_ctx = GlobalContext(self.backbone, cfg["encoder"]["in_channels"][-1], hid,
@@ -108,12 +109,12 @@ class VRDet(nn.Module):
         return out
 
 
-def build_criterion(num_classes=15, reg_max=32, box_loss="kld", weights=None, cost=None):
+def build_criterion(num_classes=15, reg_max=32, box_loss="kld", weights=None, cost=None, o2m_k=6):
     """box_loss: 'kld' (O2-DETR / RiO-DETR) or 'probiou' (PP-YOLOE-R, YOLO26); used in both cost and loss."""
     cost = cost or dict(cost_class=2.0, cost_chamfer=5.0, cost_kld=2.0)
     weights = weights or {'loss_mal': 1, 'loss_bbox': 5, 'loss_kld': 2, 'loss_fgl': 0.15, 'loss_ddf': 1.5}
     return OBBCriterion(OBBHungarianMatcher(**cost, gauss=box_loss), weights, num_classes=num_classes,
-                        reg_max=reg_max, gauss=box_loss)
+                        reg_max=reg_max, gauss=box_loss, o2m_k=o2m_k)
 
 
 def load_dfine_coco(model, ckpt_or_size, class_names=None, log=print):

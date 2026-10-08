@@ -316,7 +316,7 @@ class OBBDFINETransformer(nn.Module):
                  dim_feedforward=1024, dropout=0., activation="relu", num_denoising=100, label_noise_ratio=0.5,
                  box_noise_scale=1.0, eval_spatial_size=None, eval_idx=-1, eps=1e-2, aux_loss=True,
                  cross_attn_method='default', reg_max=32, reg_scale=4., mlp_act='relu', rotate_sampling=True,
-                 ortho_heads=False):
+                 ortho_heads=False, o2m_queries=0):
         super().__init__()
         feat_strides = list(feat_strides)
         for _ in range(num_levels - len(feat_strides)):
@@ -325,6 +325,7 @@ class OBBDFINETransformer(nn.Module):
         self.num_levels, self.num_classes, self.num_queries = num_levels, num_classes, num_queries
         self.eps, self.num_layers, self.eval_spatial_size = eps, num_layers, eval_spatial_size
         self.aux_loss, self.reg_max = aux_loss, reg_max
+        self.o2m_queries = o2m_queries          # H10: extra training-only query group with one-to-many targets
         self._build_input_proj_layer(list(feat_channels))
         self.up = nn.Parameter(torch.tensor([0.5]), requires_grad=False)
         self.reg_scale = nn.Parameter(torch.tensor([reg_scale]), requires_grad=False)
@@ -438,14 +439,24 @@ class OBBDFINETransformer(nn.Module):
             if denoising_unact is not None:
                 enc_unact = torch.concat([denoising_unact, enc_unact], dim=1)
                 content = torch.concat([denoising_logits, content], dim=1)
-            return content, enc_unact, [], []
+            return content, enc_unact, [], [], None
         enc_logits = self.enc_score_head(output_memory).float()
-        _, topk_ind = torch.topk(enc_logits.max(-1).values, self.num_queries, dim=-1)
-        topk_memory = output_memory.gather(1, topk_ind.unsqueeze(-1).repeat(1, 1, output_memory.shape[-1]))
-        topk_anchors = anchors.expand(memory.shape[0], -1, -1).gather(1, topk_ind.unsqueeze(-1).repeat(1, 1, 4))
-        e = self.enc_bbox_head(topk_memory).float()
-        theta = 0.5 * torch.atan2(e[..., 5], e[..., 4])
-        enc_unact = torch.cat([e[..., :4] + topk_anchors, theta.unsqueeze(-1)], -1)
+        n_o2m = self.o2m_queries if self.training else 0
+        _, topk_all = torch.topk(enc_logits.max(-1).values, max(self.num_queries, n_o2m), dim=-1)
+
+        def select(ind):
+            mem = output_memory.gather(1, ind.unsqueeze(-1).repeat(1, 1, output_memory.shape[-1]))
+            anc = anchors.expand(memory.shape[0], -1, -1).gather(1, ind.unsqueeze(-1).repeat(1, 1, 4))
+            e = self.enc_bbox_head(mem).float()
+            theta = 0.5 * torch.atan2(e[..., 5], e[..., 4])
+            return mem, torch.cat([e[..., :4] + anc, theta.unsqueeze(-1)], -1)
+
+        topk_ind = topk_all[:, :self.num_queries]
+        topk_memory, enc_unact = select(topk_ind)
+        o2m = None
+        if n_o2m:                  # same ranked proposals, independent group (overlaps the main top-k)
+            m2, u2 = select(topk_all[:, :n_o2m])
+            o2m = (m2.detach(), u2.detach())
         enc_boxes_list, enc_logits_list = [], []
         if self.training:
             enc_boxes_list.append(unact_to_box(enc_unact))
@@ -455,7 +466,7 @@ class OBBDFINETransformer(nn.Module):
         if denoising_unact is not None:
             enc_unact = torch.concat([denoising_unact, enc_unact], dim=1)
             content = torch.concat([denoising_logits, content], dim=1)
-        return content, enc_unact, enc_boxes_list, enc_logits_list
+        return content, enc_unact, enc_boxes_list, enc_logits_list, o2m
 
     def forward(self, feats, targets=None, dense=None):
         memory, spatial_shapes = self._get_encoder_input(feats)
@@ -466,11 +477,31 @@ class OBBDFINETransformer(nn.Module):
                 box_noise_scale=self.box_noise_scale)
         else:
             dn_logits = dn_unact = attn_mask = dn_meta = None
-        content, ref_unact, enc_boxes_list, enc_logits_list = self._get_decoder_input(
+        content, ref_unact, enc_boxes_list, enc_logits_list, o2m = self._get_decoder_input(
             memory, spatial_shapes, dn_logits, dn_unact, dense=dense)
+        n_o2m = 0
+        if o2m is not None:        # H10: append the one-to-many group; it neither sees nor is seen by dn/main
+            n_main = content.shape[1]
+            n_o2m = o2m[0].shape[1]
+            content = torch.concat([content, o2m[0]], dim=1)
+            ref_unact = torch.concat([ref_unact, o2m[1]], dim=1)
+            full = torch.zeros(n_main + n_o2m, n_main + n_o2m, dtype=torch.bool, device=content.device)
+            if attn_mask is not None:
+                full[:n_main, :n_main] = attn_mask
+            full[:n_main, n_main:] = True
+            full[n_main:, :n_main] = True
+            attn_mask = full
         out_boxes, out_logits, out_corners, out_refs, pre_boxes, pre_logits = self.decoder(
             content, ref_unact, memory, spatial_shapes, self.dec_bbox_head, self.dec_score_head,
             self.query_pos_head, self.pre_bbox_head, self.up, self.reg_scale, attn_mask=attn_mask)
+        if n_o2m:
+            sp = [out_logits.shape[2] - n_o2m, n_o2m]
+            pre_logits, o2m_pre_logits = torch.split(pre_logits, sp, dim=1)
+            pre_boxes, o2m_pre_boxes = torch.split(pre_boxes, sp, dim=1)
+            out_logits, o2m_logits = torch.split(out_logits, sp, dim=2)
+            out_boxes, o2m_boxes = torch.split(out_boxes, sp, dim=2)
+            out_corners, o2m_corners = torch.split(out_corners, sp, dim=2)
+            out_refs, o2m_refs = torch.split(out_refs, sp, dim=2)
         if self.training and dn_meta is not None:
             dn_pre_logits, pre_logits = torch.split(pre_logits, dn_meta['dn_num_split'], dim=1)
             dn_pre_boxes, pre_boxes = torch.split(pre_boxes, dn_meta['dn_num_split'], dim=1)
@@ -492,6 +523,9 @@ class OBBDFINETransformer(nn.Module):
                                                dn_out_corners[-1], dn_out_logits[-1])
                 out['dn_pre_outputs'] = {'pred_logits': dn_pre_logits, 'pred_boxes': dn_pre_boxes}
                 out['dn_meta'] = dn_meta
+            if n_o2m:
+                out['o2m_outputs'] = self._aux2(o2m_logits, o2m_boxes, o2m_corners, o2m_refs)
+                out['o2m_pre_outputs'] = {'pred_logits': o2m_pre_logits, 'pred_boxes': o2m_pre_boxes}
         return out
 
     @staticmethod

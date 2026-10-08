@@ -41,6 +41,9 @@ def get_args(argv=None):
     ap.add_argument("--ema-warmups", type=int, default=1000)
     ap.add_argument("--queries", type=int, default=300)
     ap.add_argument("--num-top", type=int, default=300)
+    ap.add_argument("--o2m-queries", type=int, default=0,
+                    help="H10: training-only one-to-many query group (e.g. 1500); dropped at inference")
+    ap.add_argument("--o2m-k", type=int, default=6, help="H10: queries assigned per target in the o2m group")
     ap.add_argument("--eval-queries", type=int, default=0,
                     help="H9: also evaluate the final EMA model with N queries / top-N (queries have no parameters)")
     ap.add_argument("--denoising", type=int, default=100)
@@ -114,14 +117,15 @@ def main(argv=None):
     model = VRDet(a.size, num_classes=len(classes), num_queries=a.queries, img_size=a.img,
                   rotate_sampling=not a.no_rotate_sampling, num_denoising=a.denoising, dense=a.dense,
                   strip_k=a.strip_k, ortho_heads=a.ortho_heads, context=a.context,
-                  dense_queries=a.dense_queries, vectors=a.vectors, vec_dim=a.vec_dim, vec_layers=a.vec_layers)
+                  dense_queries=a.dense_queries, vectors=a.vectors, vec_dim=a.vec_dim, vec_layers=a.vec_layers,
+                  o2m_queries=a.o2m_queries)
     last = out / "last.pt"
     if not last.exists() and not a.no_pretrained:
         load_dfine_coco(model, a.size, class_names=classes, log=log)
     model.to(device)
     if a.channels_last:
         model.to(memory_format=torch.channels_last)
-    crit = build_criterion(num_classes=len(classes), box_loss=a.box_loss)
+    crit = build_criterion(num_classes=len(classes), box_loss=a.box_loss, o2m_k=a.o2m_k)
     a.dense = a.dense or a.dense_queries
     dense_crit = DenseCriterion() if a.dense else None
     ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,

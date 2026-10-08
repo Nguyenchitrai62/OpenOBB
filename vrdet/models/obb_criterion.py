@@ -29,6 +29,43 @@ class OBBHungarianMatcher(nn.Module):
         self.cost_class, self.cost_chamfer, self.cost_kld = cost_class, cost_chamfer, cost_kld
         self.alpha, self.gamma, self.gauss = alpha, gamma, gauss
 
+    def pair_cost(self, logits, boxes, tgt_ids, tgt_box):
+        """(N, C) logits, (N, 5) boxes vs (M,) labels, (M, 5) boxes -> (N, M) matching cost."""
+        p = logits.float().sigmoid()[:, tgt_ids]
+        boxes = boxes.float()
+        neg = (1 - self.alpha) * (p ** self.gamma) * (-(1 - p + 1e-8).log())
+        pos = self.alpha * ((1 - p) ** self.gamma) * (-(p + 1e-8).log())
+        C = self.cost_class * (pos - neg) + self.cost_chamfer * chamfer_matrix(boxes, tgt_box.float())
+        g = kld(boxes[:, None, :], tgt_box[None, :, :].float()) if self.gauss == "kld" else \
+            1 - probiou(boxes[:, None, :], tgt_box[None, :, :].float())
+        return torch.nan_to_num(C + self.cost_kld * g, nan=1e4, posinf=1e4)
+
+    @torch.no_grad()
+    def one_to_many(self, outputs, targets, k=6):
+        """H10 assignment on the GPU: every target takes its k lowest-cost queries; a query claimed by several
+        targets keeps the cheapest one. Per image, so the cost matrix stays (queries x targets of that image)."""
+        out = []
+        for i, t in enumerate(targets):
+            n = len(t["labels"])
+            if n == 0:
+                e = torch.zeros(0, dtype=torch.int64)
+                out.append((e, e))
+                continue
+            C = self.pair_cost(outputs["pred_logits"][i], outputs["pred_boxes"][i], t["labels"], t["boxes"])
+            kk = min(k, C.shape[0])
+            cand = C.topk(kk, dim=0, largest=False).indices                # (kk, n) query ids per target
+            q = cand.reshape(-1)
+            g = torch.arange(n, device=C.device).repeat(kk)
+            c = C[q, g]
+            order = torch.argsort(c)                                        # cheapest claim wins
+            q, g = q[order], g[order]
+            uq, inv = torch.unique(q, return_inverse=True)
+            seen = torch.full((len(uq),), len(q), device=q.device, dtype=torch.int64)
+            seen.scatter_reduce_(0, inv, torch.arange(len(q), device=q.device), reduce="amin")
+            first = seen[inv] == torch.arange(len(q), device=q.device)
+            out.append((q[first].cpu(), g[first].cpu()))
+        return out
+
     @torch.no_grad()
     def forward(self, outputs, targets):
         bs, nq = outputs["pred_logits"].shape[:2]
@@ -56,8 +93,9 @@ class OBBHungarianMatcher(nn.Module):
 
 class OBBCriterion(nn.Module):
     def __init__(self, matcher, weight_dict, losses=('mal', 'boxes', 'local'), num_classes=15, reg_max=32,
-                 gamma=1.5, mal_alpha=None, use_uni_set=True, gauss="kld"):
+                 gamma=1.5, mal_alpha=None, use_uni_set=True, gauss="kld", o2m_k=6, o2m_weight=1.0):
         super().__init__()
+        self.o2m_k, self.o2m_weight = o2m_k, o2m_weight
         self.gauss = gauss
         self.matcher, self.weight_dict, self.losses = matcher, weight_dict, list(losses)
         self.num_classes, self.reg_max, self.gamma, self.mal_alpha = num_classes, reg_max, gamma, mal_alpha
@@ -65,7 +103,7 @@ class OBBCriterion(nn.Module):
         self._clear_cache()
 
     def _clear_cache(self):
-        self.fgl_targets, self.fgl_targets_dn = None, None
+        self.fgl_targets, self.fgl_targets_dn, self.fgl_targets_o2m = None, None, None
         self.num_pos, self.num_neg = None, None
 
     @staticmethod
@@ -121,7 +159,8 @@ class OBBCriterion(nn.Module):
         pred_corners = outputs['pred_corners'][idx].reshape(-1, R)
         ref = outputs['ref_points'][idx].detach().float()
         with torch.no_grad():
-            key = 'fgl_targets_dn' if 'is_dn' in outputs else 'fgl_targets'
+            key = 'fgl_targets_dn' if 'is_dn' in outputs else 'fgl_targets_o2m' if 'is_o2m' in outputs \
+                else 'fgl_targets'
             if getattr(self, key) is None:
                 setattr(self, key, obb2distance(ref, align_to(tgt, ref[:, 4]), self.reg_max,
                                                 outputs['reg_scale'], outputs['up']))
@@ -256,4 +295,14 @@ class OBBCriterion(nn.Module):
                 for loss in self.losses:
                     losses.update(self._weighted(self.get_loss(loss, outputs['dn_pre_outputs'], targets, indices_dn,
                                                                dn_num_boxes), '_dn_pre'))
+        if 'o2m_outputs' in outputs:           # H10: one-to-many group, one assignment (last layer) for all layers
+            ind_o2m = dev(self.matcher.one_to_many(outputs['o2m_outputs'][-1], targets, self.o2m_k))
+            n_o2m = max(float(sum(len(x[0]) for x in ind_o2m)), 1.0)
+            heads = list(enumerate(outputs['o2m_outputs'])) + [('pre', outputs['o2m_pre_outputs'])]
+            for i, aux in heads:
+                aux['is_o2m'] = True
+                aux['up'], aux['reg_scale'] = outputs['up'], outputs['reg_scale']
+                for loss in self.losses:
+                    l_dict = self._weighted(self.get_loss(loss, aux, targets, ind_o2m, n_o2m), f'_o2m_{i}')
+                    losses.update({k: v * self.o2m_weight for k, v in l_dict.items()})
         return {k: torch.nan_to_num(v, nan=0.0) for k, v in losses.items()}

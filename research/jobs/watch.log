@@ -288,3 +288,18 @@
 [2026-10-08 04:29:13] watch: balance=225.55 rate=8.9/h active=['e6-vrdet-x-dota-24e'] ended=[('e6-vrdet-x-dota-24e', 'done')]
 [2026-10-08 04:37:14] watch: no active jobs
 [2026-10-08 07:37:45] queue: ['e11-dota-x-qinfer', 'e10-dota-mosaic-s', 'e10-fpc-vec-mosaic-s']
+[2026-10-08 07:37:48] queue: e11-dota-x-qinfer waits (None live sessions, cap 3)
+[2026-10-08 07:45:50] queue: e11-dota-x-qinfer waits (None live sessions, cap 3)
+[2026-10-08 07:53:53] queue: e11-dota-x-qinfer waits (None live sessions, cap 3)
+[2026-10-08 08:01:55] queue: e11-dota-x-qinfer waits (None live sessions, cap 3)
+[2026-10-08 08:09:57] queue: e11-dota-x-qinfer waits (None live sessions, cap 3)
+[2026-10-08 08:17:59] queue: e11-dota-x-qinfer waits (None live sessions, cap 3)
+[2026-10-08 08:26:00] queue: e11-dota-x-qinfer waits (None live sessions, cap 3)
+[2026-10-08 08:28:28] e11-dota-x-qinfer: launching attempt 1 on G4 as session e11-dota-x-qinfer-1
+[2026-10-08 08:28:49] e11-dota-x-qinfer: restoring 1 synced files (239 MB) for resume
+[2026-10-08 08:31:25] e11-dota-x-qinfer: running
+[2026-10-08 08:31:32] e10-dota-mosaic-s: launching attempt 1 on G4 as session e10-dota-mosaic-s-1
+[2026-10-08 08:32:08] e10-dota-mosaic-s: running
+[2026-10-08 08:32:13] e10-fpc-vec-mosaic-s: launching attempt 1 on G4 as session e10-fpc-vec-mosaic-s-1
+[2026-10-08 08:32:44] e10-fpc-vec-mosaic-s: running
+[2026-10-08 08:33:56] queue: ['e12-dota-o2m-s']
