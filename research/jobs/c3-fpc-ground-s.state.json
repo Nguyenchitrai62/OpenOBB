@@ -5,21 +5,29 @@
   "out": "/content/work/runs/c3-fpc-ground-s",
   "status": "running",
   "launched": 1791438794.1367521,
-  "updated": "2026-10-08 12:55:06",
+  "updated": "2026-10-08 13:15:54",
   "fails": 0,
   "synced": {
     "train_progress.log": [
-      605,
-      1791438865
+      35067,
+      1791440093
     ],
     "setup.log": [
       350,
       1791438814
     ],
     "train.log": [
-      2514,
-      1791438865
+      37323,
+      1791440093
+    ],
+    "metrics.jsonl": [
+      5045,
+      1791440023
+    ],
+    "last.pt": [
+      178565337,
+      1791440023
     ]
   },
-  "tail": "4:20] [init] D-FINE coco: 770 full, 13 partial, 68 new tensors\n[05:54:20] RFS repeat factors: single=1.0 double=1.0 slidin=1.0 foldin=3.9 revolv=13.2 rollin=8.8 window=1.0 bay-wi=2.1 blind-=1.1 openin=1.6 sofa=1.4 bed=1.1 chair=1.0 table=1.0 tv-cab=1.3 wardro=1.3 cabine=1.0 gas-st=1.0 sink=1.0 refrig=1.0 aircon=1.0 bath=1.0 bath-t=1.4 washin=1.1 squat-=1.3 urinal=1.4 toilet=1.0 stairs=1.0 elevat=1.0 escala=1.9\n[05:54:25] torch.compile enabled for backbone + encoder (training model only)\n[05:54:25] VRDet-s 11.09M params | train patches 6965 | 435 it/epoch x 24 | batch 16 | device cuda amp=True\n"
+  "tail": "23 angle_o2m_1=0.020 fgl_o2m_1=0.826 mal_o2m_2=0.982 bbox_o2m_2=0.109 kld_o2m_2=0.216 angle_o2m_2=0.020 fgl_o2m_2=0.814 lr 1.00e-04 | 45.1 img/s data 0.003s crit 0.146s/it\n[06:14:53] ep 7 it 200/435 loss 24.791 mal=0.663 bbox=0.103 kld=0.181 angle=0.034 fgl=0.891 member_bce=0.075 member_dice=0.878 mal_o2m_0=0.787 bbox_o2m_0=0.136 kld_o2m_0=0.252 angle_o2m_0=0.031 fgl_o2m_0=0.985 mal_o2m_1=0.767 bbox_o2m_1=0.119 kld_o2m_1=0.211 angle_o2m_1=0.032 fgl_o2m_1=0.890 mal_o2m_2=0.741 bbox_o2m_2=0.118 kld_o2m_2=0.205 angle_o2m_2=0.033 fgl_o2m_2=0.884 lr 1.00e-04 | 45.4 img/s data 0.002s crit 0.146s/it\n"
 }

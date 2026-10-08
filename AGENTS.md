@@ -182,6 +182,13 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
 - (bổ sung 11:45, 2026-10-08) **Chỉ so với YOLO mạnh nhất (YOLO26x).** VRDet được phép nhỏ hơn; không bao giờ so với bản
   không phải SOTA như YOLO26s. Mỗi benchmark cần một run YOLO26x cùng điều kiện (FloorPlanCAD: `e8-fpc-yolo26x-24e`).
 
+- (bổ sung 13:15, 2026-10-08) **QUAN TRỌNG: model chạy trên ẢNH bản vẽ CAD (raster), không có vector khi suy luận.**
+  Mục tiêu: nhận diện object nhỏ, **đường ống mảnh**, và các khối trên ảnh.
+  - DOTA chỉ là tham khảo cho lõi OBB; benchmark chính là FloorPlanCAD dạng ảnh, mốc YOLO26x 80.16/74.96.
+  - Nhánh vector (c1/c3) chỉ là tuỳ chọn khi có PDF.
+  - Việc cần làm cho kiến trúc: feature stride 4 (P2) cho nét mảnh / vật nhỏ, kernel dải cho ống dài thử trên CAD,
+    render giữ nét. Raster-only tốt nhất hiện tại: e4 75.96/65.16; c4 (bản gộp không vector) đang chạy.
+
 Câu hỏi còn mở:
 - Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.
 

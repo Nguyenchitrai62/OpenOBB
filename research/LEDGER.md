@@ -130,6 +130,14 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 
 ## 6. Hướng mở, xếp theo bằng chứng
 
+**ĐỔI MỤC TIÊU (user, 10-08 13:15): suy luận trên ẢNH CAD, không vector.** Ưu tiên raster-only trên FloorPlanCAD so với YOLO26x:
+- c4 (bản gộp không vector), đang chạy.
+- **P2 stride 4** (nét mảnh, vật nhỏ).
+- Kernel dải / LSK thử trên CAD (trước đây chỉ thử DOTA).
+- Render giữ nét mảnh.
+- Nhánh vector, c3 chỉ là tuỳ chọn khi có PDF.
+
+
 **Ưu tiên của user (10-08, 11:15): tập trung vào KIẾN TRÚC MỚI.** Tạm dừng các thí nghiệm đơn lẻ chỉ là tinh chỉnh nhỏ trên nền D-FINE
 (e12b, e17, e18, e13, e23, e24; spec giữ lại).
 - **c1 = gộp các phần tốt nhất SOTA:** RFS, nhóm query một-nhiều H-DETR (900), AQD (RHINO), loss góc (YOLO26),
