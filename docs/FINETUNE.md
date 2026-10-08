@@ -75,3 +75,22 @@ Mỗi trang ra 3 file:
 
 Dùng trong Python: `Detector("best.pt").predict("page.png", conf=0.3, save_dir=None)` trả về
 `{đường dẫn: [{"class", "class_id", "score", "poly"}]}`.
+
+## 4. Test nhanh bằng giao diện kéo thả (Streamlit)
+
+```bash
+pip install streamlit
+streamlit run app/streamlit_app.py
+```
+
+- Đặt `best.pt` tải từ Drive vào `models/best.pt`. Hoặc sửa `MODEL_PATH` đầu file [app/streamlit_app.py](../app/streamlit_app.py), hoặc gõ đường dẫn ở thanh bên.
+- **Thanh bên:**
+  - kéo thả ảnh;
+  - ngưỡng confidence, NMS IoU;
+  - chọn class;
+  - tile và scale (mặc định lấy theo lúc train).
+- **Kết quả:**
+  - ảnh gốc và ảnh có box đặt cạnh nhau;
+  - bảng đếm theo class;
+  - tải nhãn TXT (đúng định dạng nhãn train) và JSON.
+- Chạy được cả CPU lẫn GPU. Trên laptop CPU, một trang 1280 px mất khoảng 10 giây.

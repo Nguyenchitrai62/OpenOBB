@@ -100,6 +100,28 @@ def predict_image(model, img, size, gap, batch, device, num_top, vec=None, amp=T
     return dets
 
 
+def merge_dets(dets, names, conf=0.25, iou=0.1):
+    """Tile detections (predict_image) -> per-image list [{"class", "class_id", "score", "poly" (8 pixel coords)}]
+    after the score threshold and class-wise polygon NMS across tiles."""
+    merged = merge_patches([d for d in dets if d[2] >= conf], iou_thr=iou)
+    js = []
+    for c, (_, sc, pl) in merged.items():
+        for s, p in zip(sc, pl):
+            js.append({"class": names[c], "class_id": int(c), "score": round(float(s), 4),
+                       "poly": [round(float(v), 1) for v in p]})
+    return js
+
+
+def to_label_lines(js, shape, with_score=False):
+    """-> 'class_id x1 y1 ... x4 y4 [score]' lines normalised to the image (training label format)."""
+    H, W = shape[:2]
+    rows = []
+    for d in js:
+        q = [v / (W if i % 2 == 0 else H) for i, v in enumerate(d["poly"])]
+        rows.append(f"{d['class_id']} " + " ".join(f"{v:.6f}" for v in q) + (f" {d['score']:.4f}" if with_score else ""))
+    return rows
+
+
 def run(ckpt, source, out=None, conf=0.25, classes=None, size=None, gap=200, queries=900, batch=8, vis=False,
         vectors_dir=None, device=None, verbose=True, scale=None):
     """Predict every image in `source` (file or folder). Returns {image_path: [{"class", "class_id", "score",
@@ -127,19 +149,10 @@ def run(ckpt, source, out=None, conf=0.25, classes=None, size=None, gap=200, que
             vp = Path(vectors_dir) / f"{f.stem}.npz"
             vec = dict(np.load(vp)) if vp.exists() else None
         dets = predict_image(model, img, size, gap, batch, device, queries, vec, scale=scale)
-        merged = merge_patches([d for d in dets if d[2] >= conf], iou_thr=0.1)
-        H, W = img.shape[:2]
-        rows, js = [], []
-        for c, (_, sc, pl) in merged.items():
-            for s, p in zip(sc, pl):
-                q = p.copy()
-                q[0::2] /= W
-                q[1::2] /= H
-                rows.append(f"{c} " + " ".join(f"{v:.6f}" for v in q) + f" {s:.4f}")
-                js.append({"class": names[c], "class_id": int(c), "score": round(float(s), 4),
-                           "poly": [round(float(v), 1) for v in p]})
+        js = merge_dets(dets, names, conf)
         results[str(f)] = js
         if out is not None:
+            rows = to_label_lines(js, img.shape[:2], with_score=True)
             (out / f"{f.stem}.txt").write_text("\n".join(rows) + ("\n" if rows else ""))
             (out / f"{f.stem}.json").write_text(json.dumps(js, ensure_ascii=False))
             if vis:
