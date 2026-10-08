@@ -307,3 +307,8 @@
 [2026-10-08 08:42:42] queue: e12-dota-o2m-s waits (3 live sessions, cap 3)
 [2026-10-08 08:45:25] e11-dota-x-qinfer: finished with status done; stopping VM
 [2026-10-08 08:45:28] watch: balance=220.84 rate=26.7/h active=['e10-dota-mosaic-s', 'e10-fpc-vec-mosaic-s', 'e11-dota-x-qinfer'] ended=[('e11-dota-x-qinfer', 'done')]
+[2026-10-08 08:53:30] queue: e12-dota-o2m-s waits (3 live sessions, cap 3)
+[2026-10-08 08:55:44] watch: balance=217.14 rate=23.1/h active=['e10-dota-mosaic-s', 'e10-fpc-vec-mosaic-s'] ended=[]
+[2026-10-08 09:03:46] queue: e12-dota-o2m-s waits (3 live sessions, cap 3)
+[2026-10-08 09:06:06] watch: balance=213.58 rate=23.1/h active=['e10-dota-mosaic-s', 'e10-fpc-vec-mosaic-s'] ended=[]
+[2026-10-08 09:08:55] queue: ['e12-dota-o2m-s', 'e13-dota-yoloaug-s']

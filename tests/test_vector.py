@@ -48,7 +48,8 @@ def test_vector_points_follow_every_augmentation(tmp_path):
     random.seed(0)
     np.random.seed(0)
     for kw in (dict(augment=False), dict(augment=True), dict(augment=True, rotate_p=1.0),
-               dict(augment=True, mosaic_p=1.0)):
+               dict(augment=True, mosaic_p=1.0), dict(augment=True, scale_jitter=0.5, translate=0.1),
+               dict(augment=True, mosaic_p=1.0, mosaic_mode="yolo", scale_jitter=0.5, translate=0.1)):
         ds = DotaPatches(tmp_path, "val", size=S, hsv=(0, 0, 0), vectors=True, **kw)
         for _ in range(12):
             _, t = ds[0]
@@ -56,14 +57,18 @@ def test_vector_points_follow_every_augmentation(tmp_path):
             assert vec.shape[1] == 21
             boxes[:, :4] *= S
             lines = vec[vec[:, 0] == 0]
-            assert len(lines) == 4 * max(1, len(boxes)) or kw.get("rotate_p"), (kw, len(lines), len(boxes))
-            for row in lines:
-                pts = row[1:17].reshape(8, 2) * S
-                if not ((pts >= 0) & (pts <= S)).all():
-                    continue            # rotated partly out of the image: the object may have been clipped
+            moved = kw.get("rotate_p") or kw.get("scale_jitter")         # primitives may leave the image
+            assert len(lines) == 4 * max(1, len(boxes)) or moved, (kw, len(lines), len(boxes))
+            segs = [row[1:17].reshape(8, 2) * S for row in lines]
+            if moved:       # truncated objects (iof < 0.7) are dropped while their strokes stay: check boxes -> strokes
+                for b in boxes:
+                    assert any(all(_inside(p, b) for p in pts) for pts in segs), (kw, b)
+                continue
+            for pts in segs:
                 assert any(all(_inside(p, b) for p in pts) for b in boxes), (kw, pts, boxes)
-            want = 0.25 / S if kw.get("mosaic_p") else 0.5 / S        # line width halves with the mosaic scale
-            assert np.allclose(lines[:, 20], want, atol=1e-7), (kw, lines[:, 20])
+            if not kw.get("scale_jitter"):
+                want = 0.25 / S if kw.get("mosaic_p") else 0.5 / S    # line width halves with the mosaic scale
+                assert np.allclose(lines[:, 20], want, atol=1e-7), (kw, lines[:, 20])
 
 
 def test_vector_branch_identity_at_init_and_trains():

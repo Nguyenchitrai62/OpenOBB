@@ -64,8 +64,13 @@ def clip_to_window(polys, labels, S, iof_thr=0.7):
 class DotaPatches(Dataset):
     def __init__(self, root, split, size=1024, augment=False, filter_empty=False, min_size=2.0,
                  hsv=(0.015, 0.5, 0.3), rot90=True, flip=True, limit=None, keep_difficult=True, rotate_p=0.0,
-                 mosaic_p=0.0, context=False, thumb=512, ctx_dropout=0.0, vectors=False, max_tokens=4096):
+                 mosaic_p=0.0, context=False, thumb=512, ctx_dropout=0.0, vectors=False, max_tokens=4096,
+                 scale_jitter=0.0, translate=0.0, mosaic_mode="half"):
         self.root, self.split, self.size = Path(root), split, size
+        # H11 (YOLO recipe idea): random scale in [1 - scale_jitter, 1 + scale_jitter] and translation of
+        # +-translate x size on every training sample; mosaic_mode "yolo" = 4 full-resolution patches around a
+        # random centre on a 2S canvas, then the same scale/translate warp to S (objects keep their size)
+        self.scale_jitter, self.translate, self.mosaic_mode = scale_jitter, translate, mosaic_mode
         self.vectors, self.max_tokens = vectors, max_tokens
         self.context, self.thumb, self.ctx_dropout = context, thumb, ctx_dropout
         self.rotate_p, self.mosaic_p = rotate_p, mosaic_p
@@ -156,6 +161,67 @@ class DotaPatches(Dataset):
             polys, labels = clip_to_window(pts.reshape(-1, 8).astype(np.float32), labels, S)
         return img, polys, labels
 
+    def _warp(self, img, polys, labels, vec, src_centre):
+        """Random scale/translate warp of `img` (S x S or a 2S x 2S mosaic canvas) to an S x S output; polygons are
+        re-clipped with the iof rule, vector points and line widths follow."""
+        S = self.size
+        s = random.uniform(1 - self.scale_jitter, 1 + self.scale_jitter)
+        tx, ty = (random.uniform(-self.translate, self.translate) * S for _ in range(2))
+        M = np.array([[s, 0, S / 2 + tx - s * src_centre], [0, s, S / 2 + ty - s * src_centre]], np.float32)
+        img = cv2.warpAffine(np.ascontiguousarray(img), M, (S, S), flags=cv2.INTER_LINEAR, borderValue=PAD_BGR)
+        if vec is not None and len(vec["pts"]):
+            vec["pts"] = (vec["pts"].reshape(-1, 2) @ M[:, :2].T + M[:, 2]).reshape(-1, 16).astype(np.float32)
+            vec["attr"][:, 4] *= s
+        if len(polys):
+            pts = polys.reshape(-1, 2) @ M[:, :2].T + M[:, 2]
+            polys, labels = clip_to_window(pts.reshape(-1, 8).astype(np.float32), labels, S)
+        return img, polys, labels
+
+    def _mosaic_yolo(self, i):
+        """Four full-resolution patches meeting at a random centre of a 2S canvas, then one scale/translate warp."""
+        S = self.size
+        canvas = np.empty((2 * S, 2 * S, 3), np.uint8)
+        canvas[:] = PAD_BGR
+        xc, yc = (int(random.uniform(0.5 * S, 1.5 * S)) for _ in range(2))
+        P, L, V = [], [], []
+        for q, j in enumerate([i] + [random.randrange(len(self.items)) for _ in range(3)]):
+            img, polys, labels = self._load(self.items[j])
+            vec = self._load_vec(self.items[j]) if self.vectors else None
+            img, polys = self._augment(img, polys, color=False, vec=vec)
+            h, w = img.shape[:2]
+            if q == 0:
+                x1a, y1a, x2a, y2a = max(xc - w, 0), max(yc - h, 0), xc, yc
+                x1b, y1b = w - (x2a - x1a), h - (y2a - y1a)
+            elif q == 1:
+                x1a, y1a, x2a, y2a = xc, max(yc - h, 0), min(xc + w, 2 * S), yc
+                x1b, y1b = 0, h - (y2a - y1a)
+            elif q == 2:
+                x1a, y1a, x2a, y2a = max(xc - w, 0), yc, xc, min(yc + h, 2 * S)
+                x1b, y1b = w - (x2a - x1a), 0
+            else:
+                x1a, y1a, x2a, y2a = xc, yc, min(xc + w, 2 * S), min(yc + h, 2 * S)
+                x1b, y1b = 0, 0
+            canvas[y1a:y2a, x1a:x2a] = img[y1b:y1b + (y2a - y1a), x1b:x1b + (x2a - x1a)]
+            ox, oy = x1a - x1b, y1a - y1b
+            if vec is not None:
+                vec["pts"][:, 0::2] += ox
+                vec["pts"][:, 1::2] += oy
+                V.append(vec)
+            if len(polys):
+                pp = polys.copy()
+                pp[:, 0::2] += ox
+                pp[:, 1::2] += oy
+                P.append(pp)
+                L.append(labels)
+        polys = np.concatenate(P) if P else np.zeros((0, 8), np.float32)
+        labels = np.concatenate(L) if L else np.zeros(0, np.int64)
+        vec = ({"pts": np.concatenate([v["pts"] for v in V]), "attr": np.concatenate([v["attr"] for v in V])}
+               if V else None)
+        if len(polys):                          # objects cut by the patch borders inside the canvas
+            polys, labels = clip_to_window(polys, labels, 2 * S)
+        img, polys, labels = self._warp(canvas, polys, labels, vec, src_centre=S)
+        return img, polys, labels, vec
+
     def _mosaic(self, i):
         """Four patches at half scale, each with its own random flip/rot90 (oriented dense one-to-one, RiO-DETR)."""
         S, h = self.size, self.size // 2
@@ -240,7 +306,7 @@ class DotaPatches(Dataset):
         ctx = None
         vec = None
         if self.augment and self.mosaic_p and random.random() < self.mosaic_p:
-            img, polys, labels, vec = self._mosaic(i)
+            img, polys, labels, vec = self._mosaic_yolo(i) if self.mosaic_mode == "yolo" else self._mosaic(i)
             img = self._hsv(img)
             if self.context:                    # a mosaic has no single parent image: no context
                 ctx = self._load_ctx(m)
@@ -256,6 +322,10 @@ class DotaPatches(Dataset):
                 img, polys = self._augment(img, polys, ctx=ctx, vec=vec)
                 if self.rotate_p and random.random() < self.rotate_p:
                     img, polys, labels = self._rotate(img, polys, labels, ctx=ctx, vec=vec)
+                if self.scale_jitter or self.translate:
+                    img, polys, labels = self._warp(img, polys, labels, vec, src_centre=self.size / 2)
+                    if ctx is not None:
+                        ctx["valid"] = False     # the thumbnail tile box does not follow the warp
         obb = polys_to_obb(polys)
         keep = (obb[:, 2] >= self.min_size) & (obb[:, 3] >= self.min_size) if len(obb) else np.zeros(0, bool)
         obb, labels = obb[keep], labels[keep]

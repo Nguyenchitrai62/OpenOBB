@@ -71,6 +71,10 @@ def get_args(argv=None):
     ap.add_argument("--max-tokens", type=int, default=4096)
     ap.add_argument("--rotate-p", type=float, default=0.0, help="H8: arbitrary-angle rotation prob")
     ap.add_argument("--mosaic-p", type=float, default=0.0, help="H8: oriented mosaic prob")
+    ap.add_argument("--mosaic-mode", default="half", choices=["half", "yolo"],
+                    help="half: 4 half-scale patches; yolo: 4 full-res patches around a random centre + warp")
+    ap.add_argument("--scale-jitter", type=float, default=0.0, help="H11: random scale 1 +- x on every sample")
+    ap.add_argument("--translate", type=float, default=0.0, help="H11: random translation +- x * size")
     ap.add_argument("--mosaic-off", type=int, default=4, help="H8: no mosaic in the last N epochs (YOLO/DEIM practice)")
     ap.add_argument("--context", action="store_true", help="H6: whole-image context tokens for each tile")
     ap.add_argument("--profile", type=int, default=0, help="profile N iterations after 10 warm-up ones, then exit")
@@ -130,7 +134,8 @@ def main(argv=None):
     dense_crit = DenseCriterion() if a.dense else None
     ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,
                      rotate_p=a.rotate_p, mosaic_p=a.mosaic_p, context=a.context, ctx_dropout=a.ctx_dropout,
-                     vectors=a.vectors, max_tokens=a.max_tokens)
+                     vectors=a.vectors, max_tokens=a.max_tokens, scale_jitter=a.scale_jitter,
+                     translate=a.translate, mosaic_mode=a.mosaic_mode)
     sampler = None
     if a.rfs > 0:
         from vrdet.data.dota import repeat_factors
