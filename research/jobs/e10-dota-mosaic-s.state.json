@@ -5,7 +5,7 @@
   "out": "/content/work/runs/e10-dota-mosaic-s",
   "status": "running",
   "launched": 1791423097.6059973,
-  "updated": "2026-10-08 08:32:53",
+  "updated": "2026-10-08 08:43:40",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,9 +13,21 @@
       1791423124
     ],
     "train.log": [
-      16387,
-      1791423168
+      73671,
+      1791423758
+    ],
+    "metrics.jsonl": [
+      241,
+      1791423593
+    ],
+    "train_progress.log": [
+      5600,
+      1791423758
+    ],
+    "last.pt": [
+      165363637,
+      1791423593
     ]
   },
-  "tail": "[00:38<05:17,  9.97it/s]\nFetching 3738 files:  15%|\u2588\u258c        | 572/3738 [00:38<04:44, 11.12it/s]\nFetching 3738 files:  15%|\u2588\u258c        | 575/3738 [00:38<03:43, 14.18it/s]\nFetching 3738 files:  15%|\u2588\u258c        | 577/3738 [00:38<04:20, 12.13it/s]\nFetching 3738 files:  15%|\u2588\u258c        | 579/3738 [00:39<05:22,  9.81it/s]\nFetching 3738 files:  16%|\u2588\u258c        | 581/3738 [00:39<04:39, 11.31it/s]\nFetching 3738 files:  16%|\u2588\u258c        | 583/3738 [00:39<04:08, 12.71it/s]\nFetching 3738 files:  16%|\u2588\u258c        | 585/3738 [00:39<05:24,  9.72it/s]\nFetching 3738 files:  16%|\u2588\u258c        | 587/3738 [00:39<05:30,  9.54it/s]"
+  "tail": "kld=0.586 fgl=1.070 lr 1.00e-04 | 77.3 img/s data 0.001s crit 0.072s/it\n[01:42:07] ep 1 it 650/984 loss 21.543 mal=0.700 bbox=0.411 kld=0.640 fgl=1.005 lr 1.00e-04 | 77.4 img/s data 0.001s crit 0.072s/it\n[01:42:18] ep 1 it 700/984 loss 21.754 mal=0.710 bbox=0.425 kld=0.600 fgl=1.014 lr 1.00e-04 | 77.4 img/s data 0.001s crit 0.073s/it\n[01:42:28] ep 1 it 750/984 loss 21.920 mal=0.822 bbox=0.435 kld=0.524 fgl=1.180 lr 1.00e-04 | 77.3 img/s data 0.001s crit 0.073s/it\n[01:42:38] ep 1 it 800/984 loss 21.360 mal=0.773 bbox=0.396 kld=0.562 fgl=1.121 lr 1.00e-04 | 77.4 img/s data 0.001s crit 0.073s/it\n"
 }

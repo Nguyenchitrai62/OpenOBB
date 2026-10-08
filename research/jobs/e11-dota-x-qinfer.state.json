@@ -3,7 +3,59 @@
   "started": "2026-10-08 08:28:28",
   "session": "e11-dota-x-qinfer-1",
   "out": "/content/work/runs/e11-dota-x-qinfer",
-  "status": "running",
+  "status": "done",
   "launched": 1791422913.7157521,
-  "updated": "2026-10-08 08:31:25"
+  "updated": "2026-10-08 08:45:25",
+  "fails": 0,
+  "synced": {
+    "setup.log": [
+      1161,
+      1791423081
+    ],
+    "ckpt.pt": [
+      251572305,
+      1791423069
+    ],
+    "train.log": [
+      64640,
+      1791423559
+    ],
+    "exitcode": [
+      2,
+      1791423569
+    ],
+    "q600/eval_val.json": [
+      3031,
+      1791423382
+    ],
+    "q600/metrics.jsonl": [
+      545,
+      1791423392
+    ],
+    "q600/train_progress.log": [
+      1270,
+      1791423382
+    ],
+    "q600/eval_val.txt": [
+      1013,
+      1791423382
+    ],
+    "q900/eval_val.json": [
+      3038,
+      1791423559
+    ],
+    "q900/metrics.jsonl": [
+      542,
+      1791423568
+    ],
+    "q900/train_progress.log": [
+      1270,
+      1791423559
+    ],
+    "q900/eval_val.txt": [
+      1013,
+      1791423559
+    ]
+  },
+  "tail": " 94.78\nship                   8861   169358  88.62    64.42  98.39\ntennis-court            739   108328  90.80    88.70  97.83\nbasketball-court        124    80558  72.82    61.03  89.52\nstorage-tank           1869   245096  89.16    66.66  97.11\nsoccer-ball-field        87    61308  72.39    62.02  93.10\nroundabout              164   100213  70.70    40.48  89.63\nharbor                 2065   201632  81.42    48.78  90.22\nswimming-pool           366   167536  61.61    27.04  80.05\nhelicopter               72    39917  56.40    24.91  93.06\nmAP                                   76.29    52.84\n"
 }

@@ -151,6 +151,10 @@ Cấu hình lõi + RFS (đã xác nhận), chưa thêm context/dense để đo �
 
 **XÁC NHẬN:** suy luận với 600 query là lợi miễn phí. Bước tiếp: train với 600 query (H9 train) và eval X với 600 query.
 
+**E11, VRDet-X suy luận nhiều query hơn (không train lại):** q600 76.29 / 52.81, **q900 76.29 / 52.84**, latency vẫn 20.0 ms.
+So với YOLO26x: **−2.13 / −0.26**. SV 68.4 → 76.3, HA 77.8 → 81.4. Chênh lệch lớn nhất còn lại: HC 56.4 so với 75.0
+(riêng HC khoảng 1.3 điểm mAP).
+
 ## E7: H7 nhánh vector trên FloorPlanCAD (cùng điều kiện với `e4-fpc-vrdet-s-24e`)
 
 | Run | Thay đổi duy nhất | Giả thuyết | Pass |
