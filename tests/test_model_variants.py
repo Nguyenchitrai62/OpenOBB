@@ -54,3 +54,24 @@ def test_lsk_adapter_starts_as_identity():
     out = m(x, [{"labels": torch.tensor([1]), "boxes": torch.tensor([[0.5, 0.5, 0.2, 0.1, 0.3]])}])
     out["pred_logits"].sum().backward()
     assert m.lsk[0].out.weight.grad is not None and m.lsk[0].out.weight.grad.abs().sum() > 0
+
+
+def test_p2_level_keeps_coco_offsets_per_head():
+    import os
+    import pytest
+    import torch
+    from vrdet.models.vrdet import DFINE_URL, VRDet, load_dfine_coco
+    ck = os.path.expanduser("~/.cache/torch/hub/checkpoints/dfine_s_coco.pth")
+    if not os.path.exists(ck):
+        pytest.skip("D-FINE COCO checkpoint not cached")
+    src = torch.load(ck, map_location="cpu", weights_only=False)
+    src = src["ema"]["module"] if "ema" in src else src.get("model", src)
+    m = VRDet("s", num_classes=3, img_size=256, num_denoising=10, p2=True)
+    load_dfine_coco(m, ck, class_names=["plane", "ship", "x"])
+    k = next(k for k in m.state_dict() if k.endswith("cross_attn.sampling_offsets.weight"))
+    new, old = m.state_dict()[k].view(8, -1, 256), src[k].view(8, -1, 256)
+    assert new.shape[1] == old.shape[1] + 6                              # 3 extra points x (x, y) per head
+    assert torch.equal(new[:, :old.shape[1]], old)                      # every head keeps its COCO offsets
+    x = torch.rand(1, 3, 256, 256)
+    with torch.no_grad():
+        assert m.eval()(x)["pred_boxes"].shape == (1, 300, 5)

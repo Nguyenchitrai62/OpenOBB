@@ -413,7 +413,7 @@ class OBBDFINETransformer(nn.Module):
             grid_y, grid_x = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
             grid_xy = torch.stack([grid_x, grid_y], dim=-1)
             grid_xy = (grid_xy.unsqueeze(0) + 0.5) / torch.tensor([w, h], dtype=dtype)
-            wh = torch.ones_like(grid_xy) * grid_size * (2.0 ** lvl)
+            wh = torch.ones_like(grid_xy) * grid_size * (self.feat_strides[lvl] / min(self.feat_strides))
             anchors.append(torch.concat([grid_xy, wh], dim=-1).reshape(-1, h * w, 4))
         anchors = torch.concat(anchors, dim=1).to(device)
         valid_mask = ((anchors > self.eps) * (anchors < 1 - self.eps)).all(-1, keepdim=True)

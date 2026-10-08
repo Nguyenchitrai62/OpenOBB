@@ -98,11 +98,19 @@ class VRDet(nn.Module):
     def __init__(self, size="s", num_classes=15, num_queries=300, img_size=1024, rotate_sampling=True,
                  num_denoising=100, dense=False, dense_width=128, strip_k=0, ortho_heads=False, context=False,
                  dense_queries=False, vectors=False, vec_dim=128, vec_layers=2, o2m_queries=0, lsk=False,
-                 vec_lfe=False, vec_ground=False, **overrides):
+                 vec_lfe=False, vec_ground=False, p2=False, **overrides):
         super().__init__()
         cfg = copy.deepcopy(CONFIGS[size])
         for k, v in overrides.items():          # e.g. decoder=dict(num_layers=4)
             cfg[k].update(v)
+        self.p2 = p2
+        if p2:                                  # H18: extra stride-4 decoder level, appended last
+            cfg["backbone"]["return_idx"] = [0] + list(cfg["backbone"]["return_idx"])
+            hid_e = cfg["encoder"]["hidden_dim"]
+            cfg["decoder"]["feat_channels"] = list(cfg["decoder"]["feat_channels"]) + [hid_e]
+            cfg["decoder"]["feat_strides"] = [8, 16, 32, 4]
+            cfg["decoder"]["num_levels"] = 4
+            cfg["decoder"]["num_points"] = list(cfg["decoder"]["num_points"]) + [3]
         self.cfg = cfg
         bb = dict(freeze_at=-1, freeze_norm=False)
         bb.update(cfg["backbone"])
@@ -113,6 +121,9 @@ class VRDet(nn.Module):
                                            num_denoising=num_denoising, ortho_heads=ortho_heads,
                                            o2m_queries=o2m_queries, **cfg["decoder"])
         hid = cfg["encoder"]["hidden_dim"]
+        if p2:
+            c2 = self.backbone._out_channels[0]
+            self.p2_proj = nn.Sequential(nn.Conv2d(c2, hid, 1, bias=False), nn.BatchNorm2d(hid))
         self.context = nn.ModuleList([StripContext(hid, strip_k) for _ in range(3)]) if strip_k else None
         self.lsk = nn.ModuleList([SelectiveKernel(c) for c in cfg["encoder"]["in_channels"]]) if lsk else None
         self.global_ctx = GlobalContext(self.backbone, cfg["encoder"]["in_channels"][-1], hid,
@@ -130,6 +141,9 @@ class VRDet(nn.Module):
             def fn(p5, pos):
                 return self.global_ctx(p5, pos, ctx)
         feats = self.backbone(x)
+        c2 = None
+        if self.p2:
+            c2, feats = feats[0], feats[1:]
         if self.lsk is not None:
             feats = [m(f) for m, f in zip(self.lsk, feats)]
         tok = None
@@ -139,6 +153,8 @@ class VRDet(nn.Module):
         if self.context is not None:
             feats = [m(f) for m, f in zip(self.context, feats)]
         dense = self.dense_head(feats) if self.dense_head is not None else None
+        if c2 is not None:
+            feats = list(feats) + [self.p2_proj(c2)]
         out = self.decoder(feats, targets, dense=dense if self.dense_queries else None)
         if dense is not None:
             out.update(dense)
@@ -202,6 +218,13 @@ def load_dfine_coco(model, ckpt_or_size, class_names=None, log=print, init="coco
                     partial += 1
                 else:
                     skipped.append(k)
+                continue
+            if ("sampling_offsets" in k or "attention_weights" in k) and v.shape[0] > s.shape[0]:
+                heads = 8                       # D-FINE decoders: 8 heads, rows ordered head-major
+                per = 2 if "sampling_offsets" in k else 1
+                vs, ss = v.view(heads, -1, *v.shape[1:]), s.view(heads, -1, *s.shape[1:])
+                vs[:, :ss.shape[1]].copy_(ss)   # original levels' points keep their COCO weights
+                partial += 1
                 continue
             sl = tuple(slice(0, min(a, b)) for a, b in zip(v.shape, s.shape))
             v[sl].copy_(s[sl])

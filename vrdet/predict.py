@@ -51,7 +51,7 @@ def load_model(ckpt_path, device, queries=None, classes=None):
               strip_k=a.get("strip_k", 0), ortho_heads=a.get("ortho_heads", False), context=a.get("context", False),
               dense_queries=a.get("dense_queries", False), vectors=a.get("vectors", False),
               vec_dim=a.get("vec_dim", 128), vec_layers=a.get("vec_layers", 2), lsk=a.get("lsk", False),
-              vec_lfe=a.get("vec_lfe", False))
+              vec_lfe=a.get("vec_lfe", False), vec_ground=a.get("vec_ground", 0) > 0, p2=a.get("p2", False))
     sd = ck["ema"]["module"] if "ema" in ck else ck["model"]
     m.load_state_dict(sd)
     if queries:
