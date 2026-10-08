@@ -3,6 +3,9 @@
 > File bàn giao cho mọi coding agent (Claude Code, Codex, Cursor, Antigravity...).
 >
 > **Tiếp tục nghiên cứu:** gọi skill **`vrdet-research`**. Claude Code: `/vrdet-research`. Codex: `$vrdet-research`. Agent khác: "đọc và làm theo `.agents/skills/vrdet-research/SKILL.md`". Skill tự đọc trạng thái, tự quyết thí nghiệm tiếp theo, tự chạy trên Colab và tự ghi lại kết quả.
+> **Sổ cái nghiên cứu: [research/LEDGER.md](research/LEDGER.md).** Đọc trước khi chọn thí nghiệm. Mọi kết quả, phát hiện và lỗi
+> đều phải ghi vào đó (luật của user, 2026-10-08).
+>
 > **Đọc hết file này trước khi làm gì.** Cập nhật mục "Trạng thái hiện tại" và "Nhật ký" mỗi khi xong một bước, để agent sau làm tiếp được.
 
 ## 1. Mục tiêu
@@ -161,6 +164,11 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
 
 - (bổ sung 08:35, 2026-10-08) **Bỏ giới hạn 130–150/170 CU của đêm qua.** Nghiên cứu kiến trúc mới tiếp, chỉ giữ dự phòng gốc
   40 CU: `new_reserve.txt` = `50 40`. User đã đăng nhập lại Colab CLI.
+
+- (bổ sung 09:30, 2026-10-08)
+  - **Sổ cái:** mọi phát hiện phải ghi vào `research/LEDGER.md` để đọc lại và chọn hướng kế tiếp dựa trên kết quả cũ.
+  - **Session:** chỉ đếm 3 session của agent, session người khác bật (`[?]`) không tính và không đụng tới.
+    `cx.n_sessions()` mặc định đếm session của mình.
 
 Câu hỏi còn mở:
 - Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.

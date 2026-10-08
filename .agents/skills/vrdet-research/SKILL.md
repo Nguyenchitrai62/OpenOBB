@@ -17,7 +17,8 @@ a click. Things that truly need the human go into the "Cần user" list in
 2. `docs/RESEARCH_PLAN.md`: benchmark protocol, baselines to beat, hypotheses H1–H7, roadmap E0–E6.
 3. `docs/AUTONOMY.md`: autonomy rules and **hard limits** (budget, foreign sessions, secrets).
 4. `docs/COLAB.md`: Colab CLI usage. On Windows: the two local patches, plus `PYTHONIOENCODING=utf-8` and `MSYS_NO_PATHCONV=1`.
-5. `research/HYPOTHESES.md` and the tail of `research/decisions.log`.
+5. **`research/LEDGER.md` (the research ledger: every experiment, finding, bug, rejected direction and the ranked open
+   directions)**, then `research/HYPOTHESES.md` and the tail of `research/decisions.log`.
 
 ## 1. Preflight
 
@@ -36,8 +37,11 @@ colab sessions                       # '[?]' rows belong to the user: never touc
    - read `runs/<id>/metrics.jsonl`, `train.log`, `setup.log`;
    - write the verdict (confirmed / rejected / inconclusive, with numbers) into `research/HYPOTHESES.md`;
    - append one line to `research/decisions.log`: `[time] <id> status=<s> result=<key numbers> cu=<spent> next=<decision>`.
+   - **update `research/LEDGER.md` (user rule, 2026-10-08):** add the row to §2; add any new finding / bug / rejected
+     direction to §3-§5 with evidence (never delete, mark invalidated rows); re-rank §6.
    - Failed jobs: diagnose from the logs, fix the code, relaunch. Do not relaunch an unchanged spec more than once.
-2. **Decide.** Pick the next experiment from the roadmap (`docs/RESEARCH_PLAN.md` §5), in order, unless evidence says otherwise.
+2. **Decide.** Pick the next experiment from `research/LEDGER.md` §6 (open directions ranked by past evidence); the
+   roadmap in `docs/RESEARCH_PLAN.md` §5 is background.
    - Before launching, write the hypothesis, the single variable being changed, and the pass/fail criterion into `research/HYPOTHESES.md`.
    - Always keep a same-conditions baseline. Prefer the cheapest experiment that can falsify the hypothesis (DIOR-R or a DOTA subset with a short schedule) before a full DOTA run.
 3. **Implement.** Code lives in `vrdet/` (model, losses, data, eval) and `colab/` (VM-side scripts, `colab/data/*.sh` dataset fetchers).

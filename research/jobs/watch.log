@@ -317,3 +317,5 @@
 [2026-10-08 09:24:24] queue: e14-dota-post-eval waits (3 live sessions, cap 3)
 [2026-10-08 09:26:44] e10-fpc-vec-mosaic-s: finished with status done; stopping VM
 [2026-10-08 09:26:47] watch: balance=205.88 rate=23.1/h active=['e10-dota-mosaic-s', 'e10-fpc-vec-mosaic-s'] ended=[('e10-fpc-vec-mosaic-s', 'done')]
+[2026-10-08 09:29:42] e14-dota-post-eval: launching attempt 1 on G4 as session e14-dota-post-eval-1
+[2026-10-08 09:30:03] e14-dota-post-eval: restoring 2 synced files (397 MB) for resume

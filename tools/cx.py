@@ -57,12 +57,14 @@ def sessions():
     return res
 
 
-def n_sessions():
-    """Number of live sessions on the account (including foreign '[?]' ones); None if the listing failed."""
+def n_sessions(own_only=True):
+    """Number of live sessions; by default only this CLI's own ones (user 2026-10-08: sessions other people open
+    on the shared account do not count against our cap). None if the listing failed."""
     rc, out = run(["sessions"], check=False, timeout=120)
     if rc != 0:
         return None
-    return len(re.findall(r"^\[[^\]]+\]\s+\S+\s+\|\s+Hardware:", out, re.M))
+    names = re.findall(r"^\[([^\]]+)\]\s+\S+\s+\|\s+Hardware:", out, re.M)
+    return len([n for n in names if n != "?"]) if own_only else len(names)
 
 
 def new(name, gpu=None, high_mem=False):
