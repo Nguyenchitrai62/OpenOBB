@@ -165,6 +165,12 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     - (d) Mosaic/zoom kiểu YOLO chưa đo trên CAD.
   - **Cần:** bảng AP theo class; mốc YOLO26x từ COCO chấm bằng evaluator của mình.
 
+- **F21. Wall_Color, VRDet-X khởi đầu từ D-FINE-X COCO** (cả trang 1280, batch 8, 400 query, 50 epoch = 1550 bước):
+  - mAP 0 ở epoch 1. Đến epoch 16: 0.273 / 0.123, vẫn đang tăng. 23 s/epoch, 86.5 GB.
+  - Bản S khởi đầu từ checkpoint FloorPlanCAD (F20) đã ở khoảng 0.40 / 0.18 ngay khi bắt đầu đợt 2.
+  - → Pretrain cùng miền (CAD) quan trọng hơn dung tích ở dữ liệu 250 trang. Chưa có checkpoint X trên CAD.
+  - User hỏi khởi tạo ngẫu nhiên có tốt hơn không: không. Vòng cũ train từ đầu chỉ đạt 0.144 AP50.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
