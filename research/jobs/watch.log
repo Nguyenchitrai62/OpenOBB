@@ -370,3 +370,11 @@
 [2026-10-08 11:47:45] e8-fpc-yolo26x-24e: running
 [2026-10-08 11:49:27] watch: balance=136.49 rate=26.7/h active=['c1-fpc-combo-s', 'c2-fpc-hybrid-s', 'e8-fpc-yolo26x-24e'] ended=[]
 [2026-10-08 11:52:39] queue: ['c3-fpc-ground-s']
+[2026-10-08 11:57:28] queue: c3-fpc-ground-s waits (3 live sessions, cap 3)
+[2026-10-08 12:03:02] watch: balance=132.72 rate=26.7/h active=['c1-fpc-combo-s', 'c2-fpc-hybrid-s', 'e8-fpc-yolo26x-24e'] ended=[]
+[2026-10-08 12:11:04] queue: c3-fpc-ground-s waits (3 live sessions, cap 3)
+[2026-10-08 12:16:37] watch: balance=126.05 rate=26.7/h active=['c1-fpc-combo-s', 'c2-fpc-hybrid-s', 'e8-fpc-yolo26x-24e'] ended=[]
+[2026-10-08 12:24:40] queue: c3-fpc-ground-s waits (3 live sessions, cap 3)
+[2026-10-08 12:31:26] watch: balance=121.58 rate=26.7/h active=['c1-fpc-combo-s', 'c2-fpc-hybrid-s', 'e8-fpc-yolo26x-24e'] ended=[]
+[2026-10-08 12:39:28] queue: c3-fpc-ground-s waits (3 live sessions, cap 3)
+[2026-10-08 12:40:56] c1-fpc-combo-s: finished with status done; stopping VM

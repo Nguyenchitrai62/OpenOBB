@@ -55,6 +55,7 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 | 10-08 | e16-dota-dense-fix-s | DOTA | S | RFS + dense (sau sửa ProbIoU) | e3 | dec 72.29 / 47.90; **dense 69.08**; hợp 72.93 | dense: +19.3 so với bản lỗi | dense ngang YOLO26s ở class nhỏ, kém ở class lớn → bù cho decoder; ủng hộ kiến trúc lai | 13 |
 | 10-08 | e20-dota-base12-s | DOTA | S | mốc 12 epoch | – | 68.21 / 44.17 (q900 69.36) | – | mốc cho sàng lọc 12ep | 5 |
 | 10-08 | e15-dota-o365-s | DOTA | S | init Objects365→COCO | e3 | 70.29 / 46.86 | −2.05 (không tính HC −0.98) | **BÁC BỎ**: giữ init COCO | 10 |
+| 10-08 | c1-fpc-combo-s | FPC | S | gộp SOTA: vector + layer pooling + o2m 900 + AQD + loss góc + IoU-cost (+900 query) | e7 | **78.21 / 69.31** (q900) | +1.41 / +1.64 | gộp có lợi; so YOLO26x chờ e8 | 9 |
 
 ## 3. Phát hiện (có bằng chứng)
 
