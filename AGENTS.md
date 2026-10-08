@@ -170,6 +170,10 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
   - **Session:** chỉ đếm 3 session của agent, session người khác bật (`[?]`) không tính và không đụng tới.
     `cx.n_sessions()` mặc định đếm session của mình.
 
+- (bổ sung 10:20, 2026-10-08) **Tận dụng ý tưởng từ MỌI kiến trúc tốt và mọi dataset mở, bất kể license** (kể cả NC/AGPL), vì đây là
+  nghiên cứu học thuật. Code VRDet vẫn tự viết. Bản thương mại được user finetune trên data tự gắn nhãn.
+  Đã giao 3 sub-agent: kiến trúc detection/OBB SOTA, ngữ nghĩa CAD + VLM grounding, dataset + pretrain đa dataset.
+
 Câu hỏi còn mở:
 - Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.
 
