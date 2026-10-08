@@ -35,3 +35,21 @@ def test_import_yolo_obb_roundtrip(tmp_path):
     assert (out / "gt" / "val" / "val0.txt").read_text().split()[8] == "fire_pipe"
     img, t = DotaPatches(out, "val")[0]
     assert img.shape == (3, 1024, 1024)
+
+
+def test_import_holds_out_val_when_missing(tmp_path):
+    src = tmp_path / "export" / "data"
+    (src / "train" / "images").mkdir(parents=True)
+    (src / "train" / "labels").mkdir(parents=True)
+    (src / "valid" / "images").mkdir(parents=True)                   # AI_Takeoff exports an empty valid/
+    for k in range(10):
+        img = np.full((500, 600, 3), 255, np.uint8)
+        cv2.imwrite(str(src / "train" / "images" / f"p{k}.jpg"), img)
+        (src / "train" / "labels" / f"p{k}.txt").write_text("0 0.1 0.1 0.3 0.1 0.3 0.2 0.1 0.2\n")
+    (src / "data.yaml").write_text("names: [junction]\n")
+    out = tmp_path / "vrdet"
+    subprocess.run([sys.executable, str(ROOT / "tools/import_yolo_obb.py"), "--src", str(src), "--out", str(out),
+                    "--workers", "1", "--val-frac", "0.2"], check=True)
+    n_val = len((out / "meta" / "val.jsonl").read_text().splitlines())
+    n_tr = len((out / "meta" / "train.jsonl").read_text().splitlines())
+    assert n_val == 2 and n_tr == 8

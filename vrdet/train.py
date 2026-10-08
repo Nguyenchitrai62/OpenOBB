@@ -279,7 +279,7 @@ def main(argv=None):
                "max_mem_gb": round(torch.cuda.max_memory_allocated() / 2**30, 1) if device.type == "cuda" else None}
         rec.update({k: round(float(v) / max(n, 1), 4) for k, v in sums.items()})
         torch.save({"model": model.state_dict(), "ema": ema.state_dict(), "opt": opt.state_dict(), "epoch": epoch,
-                    "iter": it, "args": vars(a)}, out / "last.tmp")
+                    "iter": it, "args": vars(a), "classes": list(classes)}, out / "last.tmp")
         os.replace(out / "last.tmp", last)
         if val_subset and ((epoch + 1) % a.eval_every == 0) and epoch + 1 < a.epochs:
             res, _ = eval_dota(ema.module, a.data, device, val_subset, batch=a.batch, workers=a.workers,
