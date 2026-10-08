@@ -1,0 +1,23 @@
+{
+  "attempts": 1,
+  "started": "2026-10-08 11:31:28",
+  "session": "c1-dota-combo-s-1",
+  "out": "/content/work/runs/c1-dota-combo-s",
+  "status": "stopped",
+  "launched": 1791433893.655651,
+  "updated": "2026-10-08 11:35:43",
+  "synced": {
+    "train_progress.log": [
+      260,
+      1791434131
+    ],
+    "setup.log": [
+      1372,
+      1791433923
+    ],
+    "train.log": [
+      72625,
+      1791434131
+    ]
+  }
+}

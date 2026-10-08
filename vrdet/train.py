@@ -292,7 +292,7 @@ def main(argv=None):
     if a.skip_final_eval:
         return
     res, dets = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.num_top,
-                          img_size=a.img, log=log, fusion=a.dense, variants=["dec", "dense"],
+                          img_size=a.img, log=log, fusion=a.dense, variants=["dec", "dense", "union"],
                           save_preds_to=(out / "val_preds.npz") if a.dense else None, context=a.context,
                           vectors=a.vectors, post=a.post)
     table = format_table(res, classes)

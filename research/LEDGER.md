@@ -50,6 +50,9 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 - e12: nhóm query một-nhiều (H10).
 - e13: công thức augmentation YOLO (H11).
 
+| 10-08 | e16-dota-dense-fix-s | DOTA | S | RFS + dense (sau sửa ProbIoU) | e3 | dec 72.29 / 47.90; **dense 69.08**; hợp 72.93 | dense: +19.3 so với bản lỗi | dense ngang YOLO26s ở class nhỏ, kém ở class lớn → bù cho decoder; ủng hộ kiến trúc lai | 13 |
+| 10-08 | e20-dota-base12-s | DOTA | S | mốc 12 epoch | – | 68.21 / 44.17 (q900 69.36) | – | mốc cho sàng lọc 12ep | 5 |
+
 ## 3. Phát hiện (có bằng chứng)
 
 - **F1. Khoảng cách cùng điều kiện:** lõi DETR kém YOLO26 khoảng 2 mAP50 ở cả S lẫn X (24 epoch). Định vị gần ngang: ở X với 900 query, mAP50:95 chỉ kém 0.26 (e11 so với e5).
@@ -65,6 +68,8 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - YOLO có mosaic giữ tỉ lệ cùng scale jitter 0.5–1.5 và translate 0.1, VRDet thì không.
   - YOLO khởi tạo từ Objects365 → COCO, VRDet chỉ từ COCO.
   - YOLO26 dùng AdamW (MuSGD chỉ bật khi trên 10k iteration).
+- **F16. Dense và decoder bù nhau** (e16): head dense kiểu YOLO mạnh ở vật nhỏ (PL, SV, SH, TC, ST ngang YOLO26s), decoder DETR
+  mạnh ở vật lớn/ngữ cảnh (BD, BR, SBF, HA, dense kém 9–13). Hợp hai đầu ra: +0.66 mAP50 → cơ sở cho kiến trúc lai c2.
 - **F13. Helicopter (HC) cực nhiễu và chi phối mAP DOTA:** chỉ 72 mẫu val; AP dao động 17–56 giữa các run VRDet; một class
   = 6.7% trọng số mAP. Không tính HC: VRDet-X q900 77.71 so với YOLO26x 78.66 (**−0.95**, so với −2.13 khi tính HC).
   Context (e3-ctx) +1.2 và mosaic (e10) +0.3 trên 14 class còn lại, chỉ HC sụp.

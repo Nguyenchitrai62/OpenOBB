@@ -428,18 +428,23 @@ class OBBDFINETransformer(nn.Module):
             anchors, valid_mask = self.anchors, self.valid_mask
         memory = valid_mask.to(memory.dtype) * memory
         output_memory = self.enc_output(memory)
-        if dense is not None:      # VRDet H4c: queries come from the dense one-to-many head (distinct top-k)
+        if dense is not None:      # VRDet hybrid (H4c): queries come from the dense one-to-many head (distinct top-k)
             sc = dense["dense_logits"].detach().float().sigmoid().amax(-1) * valid_mask[..., 0].to(torch.float32)
-            topk_ind = distinct_topk(sc, dense["dense_boxes"].detach(), self.num_queries, 3 * self.num_queries)
-            topk_memory = output_memory.gather(1, topk_ind.unsqueeze(-1).repeat(1, 1, output_memory.shape[-1]))
-            b = dense["dense_boxes"].detach().float().gather(1, topk_ind.unsqueeze(-1).repeat(1, 1, 5))
-            b = torch.cat([b[..., :2].clamp(0.001, 0.999), b[..., 2:4].clamp(1e-4, 0.999), b[..., 4:]], -1)
-            enc_unact = box_to_unact(b)
-            content = topk_memory.detach()
+
+            def from_dense(n):
+                ind = distinct_topk(sc, dense["dense_boxes"].detach(), n, 3 * n)
+                mem = output_memory.gather(1, ind.unsqueeze(-1).repeat(1, 1, output_memory.shape[-1]))
+                bx = dense["dense_boxes"].detach().float().gather(1, ind.unsqueeze(-1).repeat(1, 1, 5))
+                bx = torch.cat([bx[..., :2].clamp(0.001, 0.999), bx[..., 2:4].clamp(1e-4, 0.999), bx[..., 4:]], -1)
+                return mem.detach(), box_to_unact(bx)
+
+            content, enc_unact = from_dense(self.num_queries)
+            n_o2m = self.o2m_queries if self.training else 0
+            o2m = from_dense(n_o2m) if n_o2m else None          # H10 group also drawn from the dense proposals
             if denoising_unact is not None:
                 enc_unact = torch.concat([denoising_unact, enc_unact], dim=1)
                 content = torch.concat([denoising_logits, content], dim=1)
-            return content, enc_unact, [], [], None
+            return content, enc_unact, [], [], o2m
         enc_logits = self.enc_score_head(output_memory).float()
         n_o2m = self.o2m_queries if self.training else 0
         _, topk_all = torch.topk(enc_logits.max(-1).values, max(self.num_queries, n_o2m), dim=-1)

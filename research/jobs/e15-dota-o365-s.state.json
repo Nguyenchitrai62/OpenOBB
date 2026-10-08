@@ -5,7 +5,7 @@
   "out": "/content/work/runs/e15-dota-o365-s",
   "status": "running",
   "launched": 1791428285.6724403,
-  "updated": "2026-10-08 11:08:13",
+  "updated": "2026-10-08 11:21:33",
   "fails": 0,
   "synced": {
     "setup.log": [
@@ -13,21 +13,29 @@
       1791428316
     ],
     "train.log": [
-      131855,
-      1791432412
+      143182,
+      1791433081
     ],
     "metrics.jsonl": [
-      5068,
-      1791432308
+      6097,
+      1791433044
     ],
     "train_progress.log": [
-      61044,
-      1791432412
+      72371,
+      1791433081
     ],
     "last.pt": [
       165363829,
-      1791432308
+      1791433044
+    ],
+    "eval_val.json": [
+      3021,
+      1791433081
+    ],
+    "eval_val.txt": [
+      1013,
+      1791433081
     ]
   },
-  "tail": "0.276 fgl=1.180 lr 2.90e-05 | 84.3 img/s data 0.001s crit 0.057s/it\n[04:06:24] ep 20 it 400/984 loss 17.103 mal=0.705 bbox=0.102 kld=0.249 fgl=1.190 lr 2.85e-05 | 84.5 img/s data 0.001s crit 0.057s/it\n[04:06:33] ep 20 it 450/984 loss 16.501 mal=0.612 bbox=0.122 kld=0.270 fgl=1.219 lr 2.80e-05 | 84.7 img/s data 0.001s crit 0.057s/it\n[04:06:42] ep 20 it 500/984 loss 17.998 mal=0.782 bbox=0.144 kld=0.356 fgl=1.153 lr 2.75e-05 | 84.9 img/s data 0.001s crit 0.057s/it\n[04:06:52] ep 20 it 550/984 loss 16.582 mal=0.616 bbox=0.091 kld=0.259 fgl=1.316 lr 2.71e-05 | 85.1 img/s data 0.001s crit 0.056s/it\n"
+  "tail": " 94.69\nship                   8861    48129  88.17    58.09  94.30\ntennis-court            739    49824  90.68    85.91  96.62\nbasketball-court        124    45925  66.96    52.94  89.52\nstorage-tank           1869    83005  88.82    64.09  97.43\nsoccer-ball-field        87    30513  69.71    56.47  94.25\nroundabout              164    39396  60.52    37.18  81.10\nharbor                 2065    48554  73.55    34.43  82.95\nswimming-pool           366    38302  58.15    24.96  85.25\nhelicopter               72     9154  36.31    15.73  86.11\nmAP                                   70.29    46.86\n"
 }

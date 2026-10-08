@@ -3,31 +3,55 @@
   "started": "2026-10-08 10:31:32",
   "session": "e20-dota-base12-s-1",
   "out": "/content/work/runs/e20-dota-base12-s",
-  "status": "running",
+  "status": "done",
   "launched": 1791430297.137341,
-  "updated": "2026-10-08 11:11:36",
+  "updated": "2026-10-08 11:23:20",
   "fails": 0,
   "synced": {
     "train_progress.log": [
-      32988,
-      1791432634
+      37016,
+      1791432989
     ],
     "setup.log": [
       1371,
       1791430331
     ],
     "train.log": [
-      100682,
-      1791432634
+      104710,
+      1791432989
     ],
     "metrics.jsonl": [
-      2812,
-      1791432633
+      3697,
+      1791432992
     ],
     "last.pt": [
       165363957,
-      1791432633
+      1791432816
+    ],
+    "eval_val.json": [
+      3031,
+      1791432853
+    ],
+    "exitcode": [
+      2,
+      1791432997
+    ],
+    "eval_val_q900.json": [
+      3034,
+      1791432989
+    ],
+    "eval_val.txt": [
+      1013,
+      1791432853
+    ],
+    "train_done": [
+      2,
+      1791432992
+    ],
+    "eval_val_q900.txt": [
+      1013,
+      1791432989
     ]
   },
-  "tail": "05 | 86.2 img/s data 0.000s crit 0.054s/it\n[04:10:27] ep 10 it 950/984 loss 17.240 mal=0.656 bbox=0.119 kld=0.257 fgl=1.241 lr 1.64e-05 | 86.4 img/s data 0.000s crit 0.054s/it\n[04:10:33] epoch 10 done in 3.0 min: {\"epoch\": 10, \"iter\": 10824, \"lr\": 1.6040834879332445e-05, \"epoch_s\": 182.0, \"img_s\": 86.5, \"crit_s_per_it\": 0.054, \"data_s_per_it\": 0.0, \"max_mem_gb\": 20.3, \"loss_mal\": 0.7092, \"loss_bbox\": 0.1757, \"loss_kld\": 0.3185, \"loss_fgl\": 1.2294, \"total\": 18.401}\n[04:10:34] ep 11 it 0/984 loss 19.237 mal=0.812 bbox=0.130 kld=0.288 fgl=1.253 lr 1.60e-05 | 23.6 img/s data 0.346s crit 0.121s/it\n"
+  "tail": "739    30998  90.39    84.30  94.99\nbasketball-court        124    46827  61.96    49.68  85.48\nstorage-tank           1869    71448  88.34    61.50  96.31\nsoccer-ball-field        87    26369  58.71    42.92  86.21\nroundabout              164    34778  61.64    35.28  82.93\nharbor                 2065    62172  68.54    31.51  80.10\nswimming-pool           366    30398  57.72    24.90  84.70\nhelicopter               72    12194  35.34    16.43  86.11\nmAP                                   68.21    44.17\n[04:16:29] [eval] 5297 patches / 458 images: predict 20s, merge+eval 114s, dec mAP50 69.36\n"
 }
