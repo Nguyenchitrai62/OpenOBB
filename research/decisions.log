@@ -143,3 +143,4 @@
 [2026-10-08 13:30] user: drop the 80 CU stop limit; only the base 40 CU reserve remains (new_reserve.txt '50 40'). Research continues on the raster-CAD target.
 [2026-10-08 13:33] queued raster-CAD wave (one variable vs c4 each): c6 +LSK adapters, c7 +strip context k11 (long thin pipes), c8 size M (20M params, still ~3x smaller than YOLO26x).
 [2026-10-08 13:35] user: drop the vector architecture, raster OBB detection only; stop the half-trained run to save CU -> c3-fpc-ground-s stopped at ~epoch 11 (~4 CU saved). c4/c5 (raster) keep running; queue c6/c7/c8 (raster) unchanged.
+[2026-10-08 13:45] user: finish the current runs (c4, c5, c6), open no new session, then finalize the best new architecture. Queue cleared (c7, c8 dropped); new-job gate locked (new_reserve.txt 100000 100000); resumes of running jobs still allowed.

@@ -395,3 +395,9 @@
 [2026-10-08 13:25:03] c5-fpc-raster-p2-s: running
 [2026-10-08 13:25:05] queue: c6-fpc-raster-lsk-s waits (3 live sessions, cap 3)
 [2026-10-08 13:26:24] watch: balance=101.97 rate=26.7/h active=['c3-fpc-ground-s', 'c4-fpc-raster-s', 'c5-fpc-raster-p2-s'] ended=[]
+[2026-10-08 13:35:45] c6-fpc-raster-lsk-s: launching attempt 1 on G4 as session c6-fpc-raster-lsk-s-1
+[2026-10-08 13:36:18] c6-fpc-raster-lsk-s: running
+[2026-10-08 13:36:20] queue: c7-fpc-raster-strip-s waits (3 live sessions, cap 3)
+[2026-10-08 13:38:54] watch: balance=97.51 rate=26.7/h active=['c4-fpc-raster-s', 'c5-fpc-raster-p2-s', 'c6-fpc-raster-lsk-s'] ended=[]
+[2026-10-08 13:46:55] queue: c7-fpc-raster-strip-s waits (3 live sessions, cap 3)
+[2026-10-08 13:51:04] watch: balance=93.23 rate=26.7/h active=['c4-fpc-raster-s', 'c5-fpc-raster-p2-s', 'c6-fpc-raster-lsk-s'] ended=[]
