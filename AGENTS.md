@@ -159,6 +159,9 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
   Watcher: `research/jobs/new_reserve.txt` = `170 130`. Job trong hàng đợi chỉ chạy khi số dư ≥ 170 **và**
   `số dư − est_cu − CU còn lại của các job đang chạy ≥ 130`. File này đọc mỗi lần kiểm tra, đổi không cần restart.
 
+- (bổ sung 08:35, 2026-10-08) **Bỏ giới hạn 130–150/170 CU của đêm qua.** Nghiên cứu kiến trúc mới tiếp, chỉ giữ dự phòng gốc
+  40 CU: `new_reserve.txt` = `50 40`. User đã đăng nhập lại Colab CLI.
+
 Câu hỏi còn mở:
 - Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.
 
