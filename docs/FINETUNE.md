@@ -40,13 +40,13 @@ r = Detector("s").train(data="path/data.yaml", epochs=24, imgsz=1024, scale=0.8,
 ```
 
 - `model`:
-  - `s` (10.3M tham số), `m`, `l`, `x` (63M) để train từ đầu.
+  - `s` (12.5M tham số), `m`, `l`, `x` (71M) để train từ đầu.
   - Đường dẫn `best.pt` để **fine-tune**: kiến trúc lấy theo checkpoint, class trùng tên giữ lại trọng số.
-- `batch` tự chọn theo VRAM. Bản S, batch 16, tile 1024 cần khoảng 21 GB.
+- `batch` tự chọn theo VRAM. Bản S, batch 16, tile 1024 cần khoảng 23 GB.
 - Số query tự tăng (600–900) khi tile dày object (p99 trên 240 object/tile).
-- Công thức mặc định là công thức tốt nhất đã đo: RFS 0.1, nhóm query một-nhiều 900, AQD, loss góc, IoU-cost, 900 query khi suy luận.
+- Công thức mặc định là công thức tốt nhất đã đo (c6): adapter LSK, RFS 0.1, nhóm query một-nhiều 900, AQD, loss góc, IoU-cost, 900 query khi suy luận.
   - `recipe=False` để tắt.
-  - Mọi flag của `python -m vrdet.train` đều truyền được dạng `key=value`, ví dụ `lsk=True`, `rfs=0`, `compile=False`.
+  - Mọi flag của `python -m vrdet.train` đều truyền được dạng `key=value`, ví dụ `lsk=False`, `rfs=0`, `compile=False`.
 - **Resume:** chạy lại đúng lệnh, run chưa xong sẽ train tiếp từ `last.pt`. `resume=False` hoặc tên mới để train lại từ đầu.
 
 Kết quả nằm trong `runs/<name>/`:

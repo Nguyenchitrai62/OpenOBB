@@ -236,7 +236,13 @@ Câu hỏi còn mở:
   - Dung tích lớn không tự đóng được khoảng cách.
 - [x] **E7 nhánh vector (H7) trên FloorPlanCAD, cỡ S:** **76.80 / 67.67** (+0.84 / +2.51 so với raster). YOLO26s: 78.51 / 70.54.
 - [x] **E9 trần query (H9):** suy luận với 600 query cho +0.7 (SV +6.3), latency không đổi → dùng 600 khi suy luận. Cờ mới `--eval-queries`.
-- [ ] **Kiến trúc tạm chốt (2026-10-08):** VRDet = D-FINE-OBB (rotated FDR, Chamfer+KLD, MAL IoU xoay) + RFS + nhánh vector cho CAD + 600 query khi suy luận. Chưa vượt YOLO26 cùng cỡ. Báo cáo: [docs/REPORT_2026-10-08.md](docs/REPORT_2026-10-08.md).
+- [x] **KIẾN TRÚC CHỐT (2026-10-08 14:50), raster-only: VRDet-S + LSK** (`c6-fpc-raster-lsk-s`). Thẻ: [docs/ARCHITECTURE_CARD.md](docs/ARCHITECTURE_CARD.md).
+  - Thành phần: D-FINE-OBB + adapter LSK + RFS + nhóm query một-nhiều 900 + AQD + loss góc + IoU-cost + 900 query khi suy luận.
+  - FloorPlanCAD val: **78.16 / 68.81** (12.5M tham số, 11.4 ms) so với YOLO26x 80.16 / 74.96 (57.6M, 11.6 ms). Recall ngang; thua chủ yếu độ khít box object mảnh (F18).
+  - Thư viện pip + CLI: `vrdet train|val|predict|prepare` (`vrdet/cli.py`, API `vrdet.Detector`), mặc định là công thức này.
+    Notebook Colab của user: `colab/VRDet_train.ipynb`, cài từ GitHub `Nguyenchitrai62/vrdet` (public). Hướng dẫn: [docs/FINETUNE.md](docs/FINETUNE.md).
+  - Đã dừng: watcher tắt, không còn session Colab, số dư khoảng 71.7 CU. Hướng kế tiếp (chờ user): xem cuối F18 trong sổ cái.
+- [x] (cũ) Kiến trúc tạm chốt sáng 10-08: D-FINE-OBB + RFS + nhánh vector + 600 query. Báo cáo: [docs/REPORT_2026-10-08.md](docs/REPORT_2026-10-08.md).
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.
@@ -253,6 +259,18 @@ Câu hỏi còn mở:
 **Cần user:** điền tên chủ sở hữu pháp lý (cá nhân hoặc công ty) vào `LICENSE` (hiện để "the repository owner").
 
 ## 9. Nhật ký
+
+- 2026-10-08 (chiều, chốt):
+  - Đợt raster-CAD trên FloorPlanCAD (S, 24 epoch, so c4 = 76.83 / 66.57):
+    - c5 P2 stride-4: bác bỏ (74.04 / 63.32).
+    - **c6 LSK: 78.16 / 68.81, xác nhận**, thành kiến trúc chốt.
+  - Phân rã khoảng cách với YOLO26x (F18): recall ngang; thua ở độ khít box object mảnh và xếp hạng symbol nhỏ; bản S nhỏ hơn 4.6 lần.
+  - Đóng gói thư viện:
+    - `pyproject.toml`, `vrdet/cli.py`, `vrdet/data/prepare.py` + `split.py`.
+    - `best.pt` cùng fine-tune giữ class theo tên.
+    - `colab/VRDet_train.ipynb` thay `colab/finetune_vrdet.ipynb`.
+  - Push GitHub `Nguyenchitrai62/vrdet` (public theo lời user).
+  - Tiêu khoảng 30 CU cho c4/c5/c6; còn khoảng 71.7 CU.
 
 - 2026-10-08 (đêm):
   - Mốc YOLO26x DOTA val (24 epoch) **78.42**. VRDet-X đạt **75.61** (−2.81; mAP50:95 −0.79; 64% FPS).

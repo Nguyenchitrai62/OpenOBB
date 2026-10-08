@@ -59,6 +59,7 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 | 10-08 | c1-fpc-combo-s | FPC | S | gộp SOTA: vector + layer pooling + o2m 900 + AQD + loss góc + IoU-cost (+900 query) | e7 | **78.21 / 69.31** (q900) | +1.41 / +1.64 | gộp có lợi; so YOLO26x: −1.95 / −5.65 (khoảng cách chính là độ khít box) | 9 |
 | 10-08 | c2-fpc-hybrid-s | FPC | S | c1 + kiến trúc lai dense–sparse (query từ head dense) | c1 | 78.16 / 68.80 (q900); hợp 78.14 | −0.05 / −0.51 | **không chọn cho CAD**: bằng c1, chậm hơn (13.6 ms) | 10 |
 | 10-08 | c4-fpc-raster-s | FPC | S | raster-only: RFS + o2m 900 + AQD + loss góc + IoU-cost (+900 query) | e4 | 76.17 / 66.19; **q900 76.83 / 66.57** | +0.87 / +1.41 (cùng 300 q: +0.21 / +1.03) | mốc raster mới; gói gộp lợi ít khi không có vector (phần lớn lợi của c1 là nhờ vector). So YOLO26x: **−3.33 / −8.39**. 10.0 ms (YOLO26x 11.6) | 9 |
+| 10-08 | c6-fpc-raster-lsk-s | FPC | S | c4 + adapter LSK (kernel chọn lọc 5×5 + 7×7 giãn 3) trên C3/C4/C5 | c4 | 77.71 / 68.39; **q900 78.16 / 68.81** | **+1.33 / +2.24** (q900) | **XÁC NHẬN, raster tốt nhất, chốt làm mặc định.** mAP50:95 tăng ở 26/27 class (bay-window +7.6, airconditioner +5.1, blind-window +4.8, sliding-door +3.3, window +2.7); recall 92.0 bằng YOLO26x. So YOLO26x: **−2.00 / −6.15**. 12.5M tham số, 11.4 ms (c4 10.0), train 43.6 ảnh/s (c4 52.4) | 10 |
 | 10-08 | c5-fpc-raster-p2-s | FPC | S | c4 + level stride-4 (P2, H18) cho decoder | c4 | 67.04 / 56.49; q900 74.04 / 63.32 | **−9.1 / −2.8** (q900) | **BÁC BỎ** (cách gắn này): mọi class tụt (bay-window 14, opening 21, table 45); train chậm hơn 16% (44 so với 52 ảnh/s), 28 GB so với 21 GB | 10 |
 
 ## 3. Phát hiện (có bằng chứng)
@@ -120,6 +121,24 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Criterion chiếm 46% thời gian mỗi iteration (0.141 / 0.307 s).
   - Class không có GT trong val (rolling/revolving/folding-door) vẫn nhận hàng nghìn box: FP khi dùng thật, nên đặt ngưỡng conf theo class.
   - → Đòn bẩy raster cần đo: level stride-4 (c5, P2), receptive field cho nét mảnh (c6, LSK).
+- **F18. Phân rã khoảng cách c4 (q900) so với YOLO26x trên FloorPlanCAD** (27 class có ≥ 20 GT, trung bình không trọng số):
+  - **Recall gần ngang:** R50 90.9 so với 91.9. VRDet tìm thấy object gần bằng YOLO; có class còn cao hơn (opening-symbol +7.7, sofa +6.9, chair +4.2).
+  - **Độ khít box là phần thua chính:**
+    - mAP50 −3.4, mAP50:95 −8.7. Tỉ lệ AP50:95/AP50 là 0.86 so với 0.93.
+    - Tệ nhất ở object mảnh, dài: sliding-door 0.63 so với 0.83, window 0.80 so với 0.96, blind-window 0.79 so với 0.96, airconditioner 0.81 so với 0.93.
+  - **Xếp hạng điểm kém hơn chút:** AP50/R50 0.87 so với 0.90.
+    - Symbol nhỏ dễ lẫn có recall ngang nhưng AP50 thấp: airconditioner −15, bay-window −13, bath −10, sink −9.
+    - VRDet xuất nhiều hơn YOLO 3–10 box mỗi class (top-900 trên query × class, YOLO cắt 300 mỗi tile).
+  - **VRDet thắng ở object lớn, cần hình dạng toàn cục:** wardrobe +7.7, sofa +6.3 AP50, giống DOTA (harbor, BD).
+  - **Yếu tố gây nhiễu:**
+    - Dung tích: VRDet-S 10.3M so với YOLO26x 57.6M tham số (202 GFLOPs).
+    - Trên DOTA, VRDet-X gần ngang mAP50:95 của YOLO26x (−0.26), nên phần thua độ khít trên CAD có thể chủ yếu do cỡ S. Chưa đo X trên FloorPlanCAD.
+    - Chưa hội tụ: c4 sub-mAP50 còn tăng mạnh từ ep 11 (75.2) tới ep 17 (79.9).
+    - YOLO26x nạp 1164/1176 tensor pretrained, aug mạnh (mosaic 1.0, scale ±0.5, translate 0.1, randaugment, erasing).
+  - **Sau c6 (LSK):** recall 92.0 (YOLO 91.9), AP50 81.1, AP50:95 71.4 (YOLO 77.7), tỉ lệ khít 0.874 (YOLO 0.930).
+    - Vùng nhìn rộng, thích ứng giúp đúng các class mảnh/nhỏ.
+    - Phần còn lại vẫn chủ yếu là độ khít box: window −12.9, sliding-door −16.0, blind-window −13.2 AP50:95.
+  - Hướng kế tiếp: loss IoU xoay trực tiếp + lấy mẫu dọc trục dài, train dài hơn, cỡ M/X trên FPC, mosaic giữ độ phân giải (e13).
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 

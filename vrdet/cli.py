@@ -26,12 +26,13 @@ from types import SimpleNamespace
 MODES = ("train", "val", "predict", "prepare")
 SIZES = ("s", "m", "l", "x")
 
-# Best recipe measured on FloorPlanCAD / DOTA (research/LEDGER.md): repeat-factor sampling, one-to-many query
-# group, adaptive query denoising, square-aware angle loss, IoU-aware matching, 900 inference queries.
-RECIPE = {"rfs": 0.1, "o2m_queries": 900, "o2m_k": 6, "aqd": True, "angle_weight": 1.0, "cost_iou": 0.5,
+# Best recipe measured on FloorPlanCAD / DOTA (research/LEDGER.md, c6): selective large-kernel adapters (LSK),
+# repeat-factor sampling, one-to-many query group, adaptive query denoising, square-aware angle loss, IoU-aware
+# matching, 900 inference queries.
+RECIPE = {"lsk": True, "rfs": 0.1, "o2m_queries": 900, "o2m_k": 6, "aqd": True, "angle_weight": 1.0, "cost_iou": 0.5,
           "eval_queries": 900, "channels_last": True, "compile": True}
 SIZE_DEFAULTS = {          # lr, backbone lr multiplier, weight decay, batch, ~GB of GPU memory per image at 1024 px
-    "s": dict(lr=1e-4, backbone_mult=0.5, wd=1e-4, batch=16, gb=1.3),
+    "s": dict(lr=1e-4, backbone_mult=0.5, wd=1e-4, batch=16, gb=1.4),
     "m": dict(lr=1e-4, backbone_mult=0.1, wd=1e-4, batch=16, gb=1.8),
     "l": dict(lr=8e-5, backbone_mult=0.05, wd=1.25e-4, batch=8, gb=2.6),
     "x": dict(lr=6e-5, backbone_mult=0.1, wd=1.25e-4, batch=8, gb=4.0),
