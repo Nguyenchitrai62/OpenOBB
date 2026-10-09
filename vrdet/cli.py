@@ -35,10 +35,10 @@ from types import SimpleNamespace
 MODES = ("train", "val", "predict", "prepare")
 SIZES = ("s", "m", "l", "x")
 # model names: vrdet1{s,m,l,x} (= s/m/l/x, DETR-style VRDet), vrdet2{n,s,m,l,x} (dense segment-aware VRDet2),
-# vrdet3{s,m,l,x} (pretrained encoder + dense anisotropic oriented head)
+# vrdet3{s,m,l,x} (pretrained encoder + dense anisotropic oriented head), vrdet4x (DINOv2 + hybrid DETR)
 MODELS = {**{s: ("v1", s) for s in SIZES}, **{f"vrdet1{s}": ("v1", s) for s in SIZES},
           **{f"vrdet2{s}": ("v2", s) for s in ("n", "s", "m", "l", "x")},
-          **{f"vrdet3{s}": ("v3", s) for s in SIZES}}
+          **{f"vrdet3{s}": ("v3", s) for s in SIZES}, "vrdet4x": ("v4", "x")}
 
 # Best architecture recipe measured on FloorPlanCAD / DOTA (research/LEDGER.md, c6): selective large-kernel
 # adapters (LSK), repeat-factor sampling, one-to-many query group, adaptive query denoising, square-aware angle loss,
@@ -71,9 +71,14 @@ SIZE_DEFAULTS3 = {
     "x": dict(lr=5e-4, backbone_mult=0.1, wd=1e-4, batch=8, gb=3.6),
 }
 RECIPE3 = {"lsk": True, "rfs": 0.1, "channels_last": True, "clip": 10.0, "num_top": 1000}
+# VRDet4: DINOv2 ViT (self-supervised, Apache-2.0) + D-FINE encoder/decoder (COCO) + VRDet3 oriented head as the
+# dense branch (auxiliary one-to-many supervision + query proposals); output = decoder + dense branch through NMS
+SIZE_DEFAULTS4 = {"x": dict(lr=1e-4, backbone_mult=0.5, wd=1e-4, batch=8, gb=6.0)}      # ViT-B/14, accuracy first
+RECIPE4 = dict(RECIPE, dense=True, dense_v3=True, dense_queries=True, primary="union")
+BACKBONE4 = {"x": "dinov2_b"}
 # architecture flags a fine-tune inherits from its source checkpoint (weights only load into the same shape)
 ARCH_KEYS = ("arch", "size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_queries", "denoising",
-             "no_rotate_sampling", "context")
+             "no_rotate_sampling", "context", "backbone", "dense_v3", "primary")
 MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / per epoch on small datasets
 ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every", "lrf": "min_lr_ratio"}
 IGNORED = ("save_period", "plots", "momentum", "degrees", "shear", "perspective", "mixup", "cutmix",
@@ -444,7 +449,7 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
     else:
         scale = auto_scale(data, imgsz) if tile_scale in (None, "auto") else float(tile_scale)
 
-    sd = {"v2": SIZE_DEFAULTS2, "v3": SIZE_DEFAULTS3}.get(arch, SIZE_DEFAULTS)[size]
+    sd = {"v2": SIZE_DEFAULTS2, "v3": SIZE_DEFAULTS3, "v4": SIZE_DEFAULTS4}.get(arch, SIZE_DEFAULTS)[size]
     if str(optimizer).lower() not in ("auto", "adamw"):
         raise SystemExit("optimizer must be 'auto' or 'AdamW'")   # lr0 given -> used; otherwise the measured LR
     prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, seed, fit=fit)
@@ -470,7 +475,9 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
     if workers is not None:
         opts["workers"] = int(workers)
     if recipe:
-        opts.update({"v2": RECIPE2, "v3": RECIPE3}.get(arch, RECIPE))
+        opts.update({"v2": RECIPE2, "v3": RECIPE3, "v4": RECIPE4}.get(arch, RECIPE))
+    if arch == "v4" and "backbone" not in inherited:
+        opts["backbone"] = BACKBONE4[size]
     if aug["mosaic"]:
         opts["mosaic_mode"] = "yolo"
     opts.update({AUG_FLAGS[k]: v for k, v in aug.items()})

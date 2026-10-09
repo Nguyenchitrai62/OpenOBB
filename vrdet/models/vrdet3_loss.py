@@ -95,3 +95,16 @@ class VRDet3Loss(nn.Module):
         out["across"] = (torch.log1p((r[:, 1] * s - at).abs() / thick.clamp(min=2.0)) * w).sum() / norm
         out["angle"] = ((1 - torch.cos(2 * (r[:, 0] - th_t))) * w).sum() / norm
         return {f"loss_{k}": v * self.w[k] for k, v in out.items()}
+
+
+class DenseOrientedCriterion(nn.Module):
+    """VRDet3Loss on the dense branch of a DETR model (VRDet4); keys prefixed loss_dense_*."""
+
+    def __init__(self, img_size=1024):
+        super().__init__()
+        self.loss = VRDet3Loss(img_size=img_size)
+
+    def forward(self, out, targets):
+        o = {"cls": out["dense_logits"], "reg": out["dense_reg"], "points": out["dense_pts_px"],
+             "strides": out["dense_st_px"]}
+        return {k.replace("loss_", "loss_dense_", 1): v for k, v in self.loss(o, targets).items()}

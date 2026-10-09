@@ -47,6 +47,8 @@ r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024)   # r.bes
 ```
 
 **`model`:**
+- **`vrdet4x`** (mới nhất, 134.8M, ưu tiên độ chính xác): DINOv2 ViT-B + encoder/decoder DETR pretrained + nhánh dense
+  oriented (giám sát phụ + đề xuất query), đầu ra decoder ∪ dense. Chi tiết: [VRDET4.md](VRDET4.md).
 - **`vrdet3x`** (mới nhất, 64.6M): backbone + encoder pretrained COCO, head dense oriented dị hướng, NMS.
   Chi tiết: [VRDET3.md](VRDET3.md). Có thể khởi tạo từ checkpoint VRDet1 bằng `weights=<v1 .pt>`.
 - **`vrdet2x`** (mới, 55.6M, train từ đầu, nên dùng `epochs=300`): kiến trúc dense segment-aware, không NMS.

@@ -247,6 +247,23 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Tỉ lệ khít tăng dần: 0.30 (ep10) → 0.40 (ep26). Vẫn dưới v1 0.56 / YOLO 0.68.
   - Train nhanh hơn v2 khoảng 1.5 lần (13 s/epoch ở batch 16, v2 20 s).
   - Chờ kết quả cuối + bảng theo class để so v1 (0.63 / 0.35).
+  - User báo ep55: **0.502 / 0.250** (tỉ lệ khít 0.50), gần hội tụ.
+  - → Cùng feature COCO, head dense (v3) < decoder DETR (v1, 0.63). Decoder có ích trên data này.
+- **F29. Hai thước đo không cùng chuẩn (10-09).**
+  - Số YOLO 0.74 / 0.50 do Ultralytics chấm:
+    - ProbIoU thay vì IoU đa giác;
+    - khớp mỗi detection với GT có IoU cao nhất, rồi mỗi GT lấy detection có điểm cao nhất;
+    - AP nội suy 101 điểm (tối đa 0.995).
+  - Ví dụ: tường 3 px lệch 1.2 px có IoU đa giác 0.43 nhưng ProbIoU 0.54. DOTA chấm trượt, Ultralytics chấm trúng.
+  - Từ commit `2ba3b81`, val in thêm "Ultralytics-style metric" (`vrdet/eval/ultra.py`). Mọi so sánh với YOLO phải dùng dòng này.
+- **F30. VRDet4-x (10-09): thiết kế, chưa có số GPU.** Chi tiết: [docs/VRDET4.md](../docs/VRDET4.md).
+  - Thành phần:
+    - DINOv2 ViT-B/14 reg4 (Apache) + adapter (ViTDet + spatial prior);
+    - LSK + encoder/decoder D-FINE-X COCO (v1);
+    - nhánh dense = head v3 (Co-DETR aux + đề xuất query DDQ);
+    - đầu ra union.
+  - 134.8M tham số. Đã kiểm: checkpoint DINOv2 thật nạp khớp 176/176 tensor.
+  - Tiêu chí: vượt v1 (0.63 / 0.35) cùng thước. Nếu không vượt, chạy `backbone=hgnet` để tách tác dụng của DINOv2.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 

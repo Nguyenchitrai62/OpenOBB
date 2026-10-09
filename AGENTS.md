@@ -266,6 +266,10 @@ Câu hỏi còn mở:
   - Encoder pretrained COCO (như v1) + LSK + head dense oriented dị hướng (DFL dọc trục / độ dày), NMS. 64.6M tham số.
   - Dùng: `model=vrdet3x`. Chi tiết: [docs/VRDET3.md](docs/VRDET3.md).
   - Lý do: v2 train từ đầu chỉ đạt 0.27 / 0.10 → pretrained quyết định trên data nhỏ; `end_loss` của v2 bị kẹt (LEDGER F25–F26).
+- [x] **Thước đo kiểu Ultralytics (2026-10-09, F29):** val in thêm ProbIoU + AP 101 điểm để so với YOLO.
+- [x] **VRDet4-x (2026-10-09, F30):**
+  - DINOv2 ViT-B + adapter + LSK + encoder/decoder DETR COCO + nhánh dense oriented (head v3), đầu ra union. 134.8M tham số.
+  - Dùng: `model=vrdet4x`. Chi tiết: [docs/VRDET4.md](docs/VRDET4.md). User chỉ train bản x.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.
@@ -282,6 +286,10 @@ Câu hỏi còn mở:
 **Cần user:** điền tên chủ sở hữu pháp lý (cá nhân hoặc công ty) vào `LICENSE` (hiện để "the repository owner").
 
 ## 9. Nhật ký
+
+- 2026-10-09 (3):
+  - Thước đo Ultralytics (`vrdet/eval/ultra.py`).
+  - VRDet4-x (`vrdet/models/vit.py`, `DenseOriented`, `--arch v4`, `--backbone`, `--dense-v3`, `--primary`). 81 test pass.
 
 - 2026-10-09 (2): VRDet3.
   - Viết `vrdet/models/vrdet3.py`, `vrdet3_loss.py`. CLI nhận `vrdet3{s,m,l,x}`. `assign` dùng chung có dải đa tầng (v2 tắt).

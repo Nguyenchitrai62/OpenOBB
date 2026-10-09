@@ -31,9 +31,12 @@ def build_parser():
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3"],
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4"],
                     help="v1: VRDet (DETR-style decoder); v2: VRDet2 (dense segment-aware, NMS-free); "
-                         "v3: VRDet3 (pretrained encoder + dense anisotropic oriented head)")
+                         "v3: VRDet3 (pretrained encoder + dense anisotropic oriented head); "
+                         "v4: VRDet4 (DINOv2 backbone + DETR decoder + dense oriented branch)")
+    ap.add_argument("--backbone", default="hgnet", choices=["hgnet", "dinov2_s", "dinov2_b", "dinov2_l"])
+    ap.add_argument("--dense-v3", action="store_true", help="dense branch = VRDet3's oriented head (VRDet4)")
     ap.add_argument("--img", type=int, default=1024)
     ap.add_argument("--scale", type=float, default=1.0,
                     help="image scale the data was tiled at (recorded for inference; set by vrdet.data.prepare)")
@@ -187,8 +190,10 @@ def main(argv=None):
     torch.backends.cudnn.allow_tf32 = True
 
     classes = dataset_classes(a.data)
-    v2, v3 = a.arch == "v2", a.arch == "v3"
+    v2, v3, v4 = a.arch == "v2", a.arch == "v3", a.arch == "v4"
     dense_arch = v2 or v3                       # dense heads: no queries / decoder
+    if v4:                                      # DETR decoder fed and supervised by the dense oriented branch
+        a.dense = a.dense_queries = a.dense_v3 = True
     if v2:
         from vrdet.models.vrdet2 import VRDet2
         from vrdet.models.vrdet2_loss import VRDet2Loss
@@ -202,7 +207,8 @@ def main(argv=None):
                       rotate_sampling=not a.no_rotate_sampling, num_denoising=a.denoising, dense=a.dense,
                       strip_k=a.strip_k, ortho_heads=a.ortho_heads, context=a.context,
                       dense_queries=a.dense_queries, vectors=a.vectors, vec_dim=a.vec_dim, vec_layers=a.vec_layers,
-                      o2m_queries=a.o2m_queries, lsk=a.lsk, vec_lfe=a.vec_lfe, vec_ground=a.vec_ground > 0, p2=a.p2)
+                      o2m_queries=a.o2m_queries, lsk=a.lsk, vec_lfe=a.vec_lfe, vec_ground=a.vec_ground > 0, p2=a.p2,
+                      backbone=a.backbone, dense_v3=a.dense_v3)
     last = wdir / "last.pt"
     if not last.exists() and a.weights:
         # shape-tolerant copy of a VRDet checkpoint; class rows are matched by name (new classes start fresh)
@@ -214,6 +220,10 @@ def main(argv=None):
     elif not last.exists() and not a.no_pretrained and not v2:
         load_dfine_coco(model, a.size, class_names=classes, log=lambda m: log(m, console=True), init=a.init)
         init_desc = "D-FINE COCO weights (Apache-2.0)"
+        if not v3 and a.backbone != "hgnet":    # ViT backbone: its own weights; encoder input projections restart
+            model.backbone.load_pretrained(log=lambda m: log(m, console=True))
+            model.reset_input_proj()
+            init_desc = f"DINOv2 {a.backbone} backbone + D-FINE COCO encoder/decoder (Apache-2.0)"
     else:
         init_desc = "resume" if last.exists() else "random (trained from scratch)"
     sanitize_batchnorm(model, log=lambda m: log(m, console=True))
@@ -228,7 +238,11 @@ def main(argv=None):
         crit = build_criterion(num_classes=len(classes), box_loss=a.box_loss, o2m_k=a.o2m_k, aqd=a.aqd,
                                angle_weight=a.angle_weight, cost_iou=a.cost_iou, member_weight=a.vec_ground)
     a.dense = (a.dense or a.dense_queries) and not dense_arch
-    dense_crit = DenseCriterion() if a.dense else None
+    if a.dense and a.dense_v3:
+        from vrdet.models.vrdet3_loss import DenseOrientedCriterion
+        dense_crit = DenseOrientedCriterion(img_size=a.img)
+    else:
+        dense_crit = DenseCriterion() if a.dense else None
     ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,
                      rotate_p=a.rotate_p, mosaic_p=a.mosaic_p, context=a.context, ctx_dropout=a.ctx_dropout,
                      vectors=a.vectors, max_tokens=a.max_tokens, scale_jitter=a.scale_jitter,
@@ -242,6 +256,8 @@ def main(argv=None):
             if frozen is None:
                 raise SystemExit("VRDet2 --freeze must be 'backbone' or 'encoder' (backbone + neck)")
         elif f.isdigit():
+            if not hasattr(model.backbone, "stages"):
+                raise SystemExit("--freeze N needs the HGNetv2 backbone; use 'backbone' or 'encoder'")
             frozen = [model.backbone.stem] + list(model.backbone.stages[:int(f)])
         elif f == "backbone":
             frozen = [model.backbone]
@@ -336,6 +352,10 @@ def main(argv=None):
         if v2:
             say(f"model   VRDet2-{a.size} (dense segment-aware, P2-P5, NMS-free), {n_par:.2f}M params, "
                 f"top {a.num_top} detections | init: {init_desc}")
+        elif v4:
+            say(f"model   VRDet4-{a.size} ({a.backbone} + {'LSK + ' if a.lsk else ''}hybrid encoder + DETR decoder "
+                f"+ dense oriented branch, output {a.primary}), {n_par:.2f}M params, {a.queries} queries | "
+                f"init: {init_desc}")
         elif v3:
             say(f"model   VRDet3-{a.size} (pretrained encoder{' + LSK' if a.lsk else ''}, dense oriented head P3-P5), "
                 f"{n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")

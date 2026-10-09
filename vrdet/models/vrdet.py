@@ -98,7 +98,7 @@ class VRDet(nn.Module):
     def __init__(self, size="s", num_classes=15, num_queries=300, img_size=1024, rotate_sampling=True,
                  num_denoising=100, dense=False, dense_width=128, strip_k=0, ortho_heads=False, context=False,
                  dense_queries=False, vectors=False, vec_dim=128, vec_layers=2, o2m_queries=0, lsk=False,
-                 vec_lfe=False, vec_ground=False, p2=False, **overrides):
+                 vec_lfe=False, vec_ground=False, p2=False, backbone="hgnet", dense_v3=False, **overrides):
         super().__init__()
         cfg = copy.deepcopy(CONFIGS[size])
         for k, v in overrides.items():          # e.g. decoder=dict(num_layers=4)
@@ -114,7 +114,14 @@ class VRDet(nn.Module):
         self.cfg = cfg
         bb = dict(freeze_at=-1, freeze_norm=False)
         bb.update(cfg["backbone"])
-        self.backbone = HGNetv2(**bb, pretrained=False)
+        if backbone == "hgnet":
+            self.backbone = HGNetv2(**bb, pretrained=False)
+        else:                                   # VRDet4: DINOv2 ViT + adapter producing the encoder's input maps
+            if p2:
+                raise ValueError("p2 is only available with the HGNetv2 backbone")
+            from .vit import DinoV2Backbone
+            self.backbone = DinoV2Backbone(backbone, cfg["encoder"]["in_channels"])
+        self.backbone_name = backbone
         self.encoder = HybridEncoder(**cfg["encoder"], eval_spatial_size=[img_size, img_size])
         self.decoder = OBBDFINETransformer(num_classes=num_classes, num_queries=num_queries,
                                            eval_spatial_size=[img_size, img_size], rotate_sampling=rotate_sampling,
@@ -128,12 +135,24 @@ class VRDet(nn.Module):
         self.lsk = nn.ModuleList([SelectiveKernel(c) for c in cfg["encoder"]["in_channels"]]) if lsk else None
         self.global_ctx = GlobalContext(self.backbone, cfg["encoder"]["in_channels"][-1], hid,
                                         p5_size=img_size // 32) if context else None
-        self.dense_head = DenseRotatedHead(cfg["encoder"]["hidden_dim"], num_classes, (8, 16, 32), dense_width,
-                                           img_size) if (dense or dense_queries) else None
+        if (dense or dense_queries) and dense_v3:       # VRDet4: VRDet3's oriented head as the dense branch
+            from .vrdet3 import DenseOriented
+            self.dense_head = DenseOriented(hid, num_classes, img_size)
+        else:
+            self.dense_head = DenseRotatedHead(cfg["encoder"]["hidden_dim"], num_classes, (8, 16, 32), dense_width,
+                                               img_size) if (dense or dense_queries) else None
         self.dense_queries = dense_queries
         self.vector = VectorBranch(cfg["encoder"]["in_channels"], d=vec_dim, layers=vec_layers,
                                    lfe=vec_lfe) if vectors else None
         self.member = MemberHead(cfg["decoder"]["hidden_dim"], vec_dim) if (vectors and vec_ground) else None
+
+    def reset_input_proj(self):
+        """Re-initialise the encoder's input projections (their COCO weights were fitted to HGNetv2 maps)."""
+        for m in self.encoder.input_proj.modules():
+            if hasattr(m, "reset_parameters") and m is not self.encoder.input_proj:
+                m.reset_parameters()
+            if isinstance(m, nn.BatchNorm2d):
+                m.reset_running_stats()
 
     def forward(self, x, targets=None, ctx=None):
         fn = None

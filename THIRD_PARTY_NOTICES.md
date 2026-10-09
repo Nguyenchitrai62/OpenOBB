@@ -21,6 +21,10 @@ All other code in `vrdet/`, `colab/data/`, `tools/`, `tests/` is original VRDet 
 
 - Initialisation uses D-FINE **COCO-only** checkpoints (`dfine_{s,m,l,x}_coco.pth`, Apache-2.0 repository).
   The Objects365 checkpoints are deliberately NOT used: D-FINE notes they may be subject to Objects365 terms.
+- VRDet4 (`model=vrdet4x`) downloads the **DINOv2 ViT-B/14 (registers)** weights from Meta
+  (github.com/facebookresearch/dinov2, code and weights Apache-2.0) at training start. The ViT code in
+  `vrdet/models/vit.py` is VRDet's own; only the parameter names follow the released checkpoints. Keep the DINOv2
+  copyright notice and the Apache-2.0 text when distributing weights derived from it.
 - Weights trained on research datasets (DOTA: academic use only; FloorPlanCAD: CC BY-NC 4.0) are for
   benchmarking. Commercial weights should be fine-tuned from the COCO initialisation on data the owner has
   rights to.
@@ -34,4 +38,4 @@ All other code in `vrdet/`, `colab/data/`, `tools/`, `tests/` is original VRDet 
   is replaceable: for a fully permissive product use pypdfium2 (Apache-2.0 / BSD-3, PDFium path objects) or
   pdfminer.six (MIT) to produce the tokens, or keep PyMuPDF under its commercial licence.
 - Ideas taken from published papers (O2-DETR, RiO-DETR, YOLO26, PP-YOLOE-R, RTMDet-R, DDQ, LSKNet, Strip R-CNN,
-  ...) were re-implemented from the papers; no code was copied from non-commercial repositories.
+  RF-DETR, ViTDet, ViT-Adapter, Co-DETR, RT-DETRv3, ...) were re-implemented from the papers; no code was copied from non-commercial repositories.

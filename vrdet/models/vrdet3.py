@@ -147,3 +147,33 @@ class VRDet3(nn.Module):
         boxes[..., :4] = boxes[..., :4] / self.img_size
         boxes[..., 4] = torch.remainder(boxes[..., 4] + math.pi / 2, math.pi) - math.pi / 2
         return {"pred_logits": logits, "pred_boxes": boxes}
+
+
+class DenseOriented(nn.Module):
+    """VRDet3's oriented head as the dense branch of the DETR model (VRDet4): one-to-many auxiliary supervision of
+    the encoder (Co-DETR / RT-DETRv3 idea) and distinct top-k proposals for the decoder queries (DDQ idea).
+    Output keys follow the VRDet1 dense interface (normalised boxes) plus what VRDet3Loss needs (pixels)."""
+
+    def __init__(self, ch, nc, img_size, strides=(8, 16, 32)):
+        super().__init__()
+        self.head = OrientedHead([ch] * len(strides), nc)
+        self.strides, self.img_size = strides, img_size
+        self._grid = {}
+
+    def forward(self, feats):
+        cls, reg = self.head(feats)
+        key = tuple(f.shape[-2:] for f in feats) + (feats[0].device,)
+        if key not in self._grid:
+            pts, st = [], []
+            for f, s in zip(feats, self.strides):
+                h, w = f.shape[-2:]
+                ys, xs = torch.meshgrid(torch.arange(h, device=f.device, dtype=torch.float32),
+                                        torch.arange(w, device=f.device, dtype=torch.float32), indexing="ij")
+                pts.append(torch.stack([(xs + 0.5) * s, (ys + 0.5) * s], -1).reshape(-1, 2))
+                st.append(torch.full((h * w,), float(s), device=f.device))
+            self._grid = {key: (torch.cat(pts), torch.cat(st))}
+        pts, st = self._grid[key]
+        boxes = decode(reg, pts, st)
+        nb = torch.cat([boxes[..., :4] / self.img_size, boxes[..., 4:]], -1)
+        return {"dense_logits": cls, "dense_boxes": nb, "dense_points": pts / self.img_size,
+                "dense_strides": st / self.img_size, "dense_reg": reg, "dense_pts_px": pts, "dense_st_px": st}
