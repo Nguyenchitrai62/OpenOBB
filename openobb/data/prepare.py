@@ -52,6 +52,11 @@ def _labels_for(img_dir):
         if parts[i] == "images":
             parts[i] = "labels"
             return Path(*parts)
+    if any(img_dir.glob("*.txt")):                  # images and label files side by side (train/a.png + a.txt)
+        return img_dir
+    for c in (img_dir / "labels", img_dir.parent / "labels"):
+        if c.is_dir():
+            return c
     return img_dir.parent / "labels"
 
 

@@ -254,3 +254,33 @@ def test_optimizer_auto_ignores_lr0(tmp_path, monkeypatch):
     assert "--lr 0.001 " in calls[-1]                       # lr0 given: used as is
     train(str(data), name="b", lr0=0.0002, optimizer="AdamW", **kw)
     assert "--lr 0.0002 " in calls[-1]
+
+
+@pytest.mark.parametrize("layout", ["roboflow", "flat", "yolo", "split_only"])
+def test_dataset_layouts_with_yaml_beside_splits(tmp_path, layout):
+    """data.yaml next to the split folders, with a stale `path:` from another machine (zip from a colleague)."""
+    from openobb.data.prepare import find_splits, prepare
+    root = tmp_path / "ds"
+    yaml_lines = {"roboflow": "train: ../train/images\nval: ../val/images\n",   # Roboflow export
+                  "flat": "train: train\nval: val\n",                           # images + txt side by side
+                  "yolo": "train: images/train\nval: images/val\n",
+                  "split_only": ""}                                             # no train/val keys
+    for s in ("train", "val"):
+        if layout in ("roboflow", "split_only"):
+            img_d, lbl_d = root / s / "images", root / s / "labels"
+        elif layout == "flat":
+            img_d = lbl_d = root / s
+        else:
+            img_d, lbl_d = root / "images" / s, root / "labels" / s
+        img_d.mkdir(parents=True, exist_ok=True)
+        lbl_d.mkdir(parents=True, exist_ok=True)
+        img = np.full((256, 256, 3), 255, np.uint8)
+        cv2.rectangle(img, (40, 40), (200, 60), (0, 0, 0), -1)
+        cv2.imwrite(str(img_d / f"{s}0.png"), img)
+        (lbl_d / f"{s}0.txt").write_text("1 0.15625 0.15625 0.78125 0.15625 0.78125 0.234375 0.15625 0.234375\n")
+    (root / "data.yaml").write_text("path: D:/someone_else/dataset\n" + yaml_lines[layout] + "names:\n  0: door\n  1: foot\n")
+    names, splits = find_splits(root / "data.yaml")
+    assert names == ["door", "foot"] and splits["train"] is not None and splits["val"] is not None
+    out = prepare(str(root / "data.yaml"), tmp_path / "prep", size=256, fit=True, workers=1)
+    objs = [json.loads(l)["objs"] for l in (out / "meta" / "train.jsonl").read_text().splitlines()]
+    assert sum(len(o) for o in objs) == 1                                      # the label was found
