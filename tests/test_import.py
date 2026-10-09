@@ -6,7 +6,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from vrdet.data.dota import DotaPatches, dataset_classes
+from openobb.data.dota import DotaPatches, dataset_classes
 
 ROOT = Path(__file__).resolve().parents[1]
 

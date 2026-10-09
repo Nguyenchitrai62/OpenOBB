@@ -1,6 +1,6 @@
 import torch
 
-from vrdet.models.vrdet import postprocess
+from openobb.models.vrdet import postprocess
 
 
 def test_argmax_post_keeps_one_class_per_query():

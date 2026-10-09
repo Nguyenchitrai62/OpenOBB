@@ -4,8 +4,8 @@ import os
 import pytest
 import torch
 
-from vrdet.models.vrdet3 import ALONG_BINS, REG_CH, THICK_BINS, VRDet3, decode, fast_nms
-from vrdet.models.vrdet3_loss import VRDet3Loss, frame_targets
+from openobb.models.vrdet3 import ALONG_BINS, REG_CH, THICK_BINS, VRDet3, decode, fast_nms
+from openobb.models.vrdet3_loss import VRDet3Loss, frame_targets
 
 torch.set_num_threads(1)
 
@@ -67,7 +67,7 @@ def test_vrdet3_train_eval_and_loss():
     with torch.no_grad():
         ev = m(x)
     assert ev["pred_logits"].shape == (1, 1000, 2) and ev["pred_boxes"].shape == (1, 1000, 5)
-    from vrdet.models.vrdet import postprocess
+    from openobb.models.vrdet import postprocess
     s, l, b = postprocess(ev, 100, 256)
     assert torch.isfinite(b).all()
 
@@ -82,7 +82,7 @@ def test_fast_nms_removes_duplicates_keeps_neighbours():
 
 def test_backbone_encoder_match_vrdet1():
     """Same names / shapes as VRDet1: COCO weights and VRDet1 checkpoints load into the backbone, encoder, LSK."""
-    from vrdet.models.vrdet import VRDet
+    from openobb.models.vrdet import VRDet
     a = VRDet("s", num_classes=2, img_size=256, lsk=True).state_dict()
     b = VRDet3("s", num_classes=2, img_size=256).state_dict()
     keys = [k for k in b if k.startswith(("backbone.", "encoder.", "lsk."))]
@@ -95,9 +95,9 @@ def test_vrdet3_x_size():
 
 
 def test_cli_vrdet3_flags(tmp_path, monkeypatch):
-    import vrdet.train as trainer
+    import openobb.train as trainer
     from test_cli import _dataset
-    from vrdet.cli import train
+    from openobb.cli import train
     calls = []
     monkeypatch.setattr(trainer, "main", lambda argv: calls.append(" ".join(argv)))
     data = _dataset(tmp_path / "ds")
@@ -112,7 +112,7 @@ def test_cli_vrdet3_flags(tmp_path, monkeypatch):
 
 
 def test_predict_loads_v3_checkpoint(tmp_path):
-    from vrdet.predict import load_model
+    from openobb.predict import load_model
     m = VRDet3("s", num_classes=2, img_size=256)
     p = tmp_path / "best.pt"
     torch.save({"model": m.state_dict(), "args": {"arch": "v3", "size": "s", "img": 256, "lsk": True},
@@ -124,7 +124,7 @@ def test_predict_loads_v3_checkpoint(tmp_path):
 @pytest.mark.skipif(os.environ.get("VRDET_SLOW") != "1", reason="CPU pipeline check (set VRDET_SLOW=1)")
 def test_vrdet3_cli_smoke(tmp_path):
     from test_cli import _dataset
-    from vrdet.cli import Detector
+    from openobb.cli import Detector
     data = _dataset(tmp_path / "ds")
     m = Detector("vrdet3s")
     r = m.train(data=str(data), epochs=1, batch=2, imgsz=256, project=str(tmp_path / "runs"), name="t",

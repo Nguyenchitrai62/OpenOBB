@@ -14,7 +14,7 @@ objects). Thickness is learned independently of where the point sits, so points 
 
 Sizes follow the usual depth / width multipliers; vrdet2x is the accuracy-first model.
 Output (eval): {"pred_logits": (B, A, C), "pred_boxes": (B, A, 5) normalised (cx, cy, w, h, theta)}: one-to-one
-classes + the shared segment regression, read by vrdet.models.vrdet.postprocess like the DETR outputs.
+classes + the shared segment regression, read by openobb.models.vrdet.postprocess like the DETR outputs.
 """
 import math
 

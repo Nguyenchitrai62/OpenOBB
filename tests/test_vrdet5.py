@@ -3,8 +3,8 @@ import os
 import pytest
 import torch
 
-from vrdet.models.vrdet3 import REG_CH, OrientedHead
-from vrdet.models.vrdet5 import GEO_CH, GeoOrientedHead, VRDet5, geometry_maps, relation_targets
+from openobb.models.vrdet3 import REG_CH, OrientedHead
+from openobb.models.vrdet5 import GEO_CH, GeoOrientedHead, VRDet5, geometry_maps, relation_targets
 
 torch.set_num_threads(1)
 
@@ -43,7 +43,7 @@ def test_relation_targets_soft_iou():
 
 @pytest.mark.parametrize("backbone", ["hgnet", "dinov2_s"])
 def test_vrdet5_train_eval(backbone):
-    from vrdet.models.vrdet5_loss import VRDet5Loss
+    from openobb.models.vrdet5_loss import VRDet5Loss
     torch.manual_seed(0)
     m = VRDet5("s", num_classes=2, img_size=256, backbone=backbone, rel_k=50)
     m.train()
@@ -63,9 +63,9 @@ def test_vrdet5_train_eval(backbone):
 
 
 def test_cli_vrdet5_flags(tmp_path, monkeypatch):
-    import vrdet.train as trainer
+    import openobb.train as trainer
     from test_cli import _dataset
-    from vrdet.cli import train
+    from openobb.cli import train
     calls = []
     monkeypatch.setattr(trainer, "main", lambda argv: calls.append(" ".join(argv)))
     data = _dataset(tmp_path / "ds")
@@ -80,7 +80,7 @@ def test_cli_vrdet5_flags(tmp_path, monkeypatch):
 
 
 def test_predict_loads_v5_checkpoint(tmp_path):
-    from vrdet.predict import load_model
+    from openobb.predict import load_model
     m = VRDet5("s", num_classes=2, img_size=256, backbone="hgnet", rel_k=50)
     p = tmp_path / "best.pt"
     torch.save({"model": m.state_dict(), "args": {"arch": "v5", "size": "s", "img": 256, "lsk": True,
@@ -93,7 +93,7 @@ def test_predict_loads_v5_checkpoint(tmp_path):
 @pytest.mark.skipif(os.environ.get("VRDET_SLOW") != "1", reason="CPU pipeline check (set VRDET_SLOW=1)")
 def test_vrdet5_cli_smoke(tmp_path):
     from test_cli import _dataset
-    from vrdet.cli import Detector
+    from openobb.cli import Detector
     data = _dataset(tmp_path / "ds")
     m = Detector("vrdet5x")
     r = m.train(data=str(data), epochs=1, batch=2, imgsz=256, project=str(tmp_path / "runs"), name="t",

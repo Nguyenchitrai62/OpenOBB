@@ -8,8 +8,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from vrdet.engine import fusion_sets, load_preds, merge_parallel  # noqa: E402
-from vrdet.eval.dota import DOTA1_CLASSES, evaluate, load_gt_dir  # noqa: E402
+from openobb.engine import fusion_sets, load_preds, merge_parallel  # noqa: E402
+from openobb.eval.dota import DOTA1_CLASSES, evaluate, load_gt_dir  # noqa: E402
 
 
 def main():

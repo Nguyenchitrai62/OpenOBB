@@ -6,11 +6,11 @@ VRDet tự viết phần giao diện này; package không phụ thuộc Ultralyt
 ## Cài đặt
 
 ```bash
-pip install "vrdet @ git+https://github.com/Nguyenchitrai62/vrdet.git"
+pip install "openobb @ git+https://github.com/Nguyenchitrai62/openobb.git"
 ```
 
 - Phụ thuộc: torch, numpy, opencv-python, shapely, scipy, pyyaml. Pillow là tuỳ chọn, chỉ cần khi đưa ảnh PIL vào.
-- Nếu repo chuyển sang private: `pip install "vrdet @ git+https://<token>@github.com/Nguyenchitrai62/vrdet.git"`.
+- Nếu repo chuyển sang private: `pip install "openobb @ git+https://<token>@github.com/Nguyenchitrai62/openobb.git"`.
 - Chỉ cần file `best.pt`. Mọi thông tin kiến trúc (v1–v5), class và imgsz đều nằm trong checkpoint.
 
 ## Đổi code
@@ -21,7 +21,7 @@ from ultralytics import YOLO
 model = YOLO("best.pt")
 
 # sau
-from vrdet import VRDet
+from openobb import VRDet
 model = VRDet("best.pt")
 ```
 
@@ -50,7 +50,7 @@ for r in results:
 | `len(r)`, `r[i]` | giống | |
 | `model.names`, `model.task` (= "obb") | giống | |
 | `model.val(data=...)` → `metrics.box.map`, `.map50`, `.maps`, `.mp`, `.mr`, `metrics.results_dict` | giống | mAP tính theo cách chấm của YOLO |
-| `model.train(...)` | `VRDet("vrdet5x").train(data=..., epochs=...)` | Hoặc CLI `vrdet train ...` |
+| `model.train(...)` | `VRDet("vrdet5x").train(data=..., epochs=...)` | Hoặc CLI `openobb train ...` |
 | `model.export(...)`, `model.track(...)` | chưa có | |
 
 ## Khác biệt cần biết
@@ -64,4 +64,4 @@ for r in results:
 | `half` | tham số | GPU tự chạy bf16 |
 | `tile` | không có | `tile=True` cắt trang rất lớn thành tile ở độ phân giải gốc |
 
-Kết quả của `VRDet.predict` giống hệt `vrdet predict` (CLI) và app Streamlit: cùng tiền xử lý như lúc train và cùng bước ghép NMS.
+Kết quả của `VRDet.predict` giống hệt `openobb predict` (CLI) và app Streamlit: cùng tiền xử lý như lúc train và cùng bước ghép NMS.

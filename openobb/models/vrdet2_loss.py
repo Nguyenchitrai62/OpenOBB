@@ -21,8 +21,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from vrdet.models.vrdet2 import REG_BINS, decode
-from vrdet.ops.obb_torch import probiou
+from openobb.models.vrdet2 import REG_BINS, decode
+from openobb.ops.obb_torch import probiou
 
 
 @torch.no_grad()

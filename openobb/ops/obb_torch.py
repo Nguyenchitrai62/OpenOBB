@@ -11,7 +11,7 @@ EPS = 1e-7
 
 
 def obb2poly(obb):
-    """(..., 5) -> (..., 4, 2) corners, same order as vrdet.ops.obb.obb2poly."""
+    """(..., 5) -> (..., 4, 2) corners, same order as openobb.ops.obb.obb2poly."""
     cx, cy, w, h, t = obb.unbind(-1)
     c, s = torch.cos(t), torch.sin(t)
     wx, wy = w / 2 * c, w / 2 * s

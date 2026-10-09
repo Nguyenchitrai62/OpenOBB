@@ -17,7 +17,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from scipy.optimize import linear_sum_assignment
 
-from vrdet.ops.obb_torch import probiou, rotated_iou
+from openobb.ops.obb_torch import probiou, rotated_iou
 from .obb_utils import align_to, chamfer_matrix, kld, obb2distance
 
 N_DIST = 5

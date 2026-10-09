@@ -20,7 +20,7 @@ import torch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from vrdet.predict import conf_thresholds, load_model, merge_dets, predict_image, to_label_lines  # noqa: E402
+from openobb.predict import conf_thresholds, load_model, merge_dets, predict_image, to_label_lines  # noqa: E402
 
 MODEL_PATH = r"F:\Source_code\NEW_architecture\models\best_v1.pt"       # đường dẫn model: tuyệt đối, hoặc tương đối so với thư mục repo
 

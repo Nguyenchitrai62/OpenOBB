@@ -103,7 +103,7 @@ class OBB:
         return OBB(d.to(*args, **kw), self.orig_shape)
 
     def __repr__(self):
-        return f"vrdet.results.OBB object with {len(self)} boxes\ndata: {self.data!r}"
+        return f"openobb.results.OBB object with {len(self)} boxes\ndata: {self.data!r}"
 
 
 class Results:
@@ -217,5 +217,5 @@ class Results:
             cv2.waitKey(0)
 
     def __repr__(self):
-        return (f"vrdet.results.Results object: {self.path} {self.orig_shape[1]}x{self.orig_shape[0]}, "
+        return (f"openobb.results.Results object: {self.path} {self.orig_shape[1]}x{self.orig_shape[0]}, "
                 f"{len(self)} oriented boxes, names: {self.names}")

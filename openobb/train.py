@@ -1,7 +1,7 @@
 """VRDet trainer (single GPU). Resumes from {out}/last.pt, appends one JSON line per epoch to
 {out}/metrics.jsonl, ends with a full DOTA-protocol evaluation of the EMA weights on val.
 
-python -u -m vrdet.train --data /content/datasets/dota1_1024 --out OUT --size s --epochs 24 --batch 32
+python -u -m openobb.train --data /content/datasets/dota1_1024 --out OUT --size s --epochs 24 --batch 32
 """
 import argparse
 import itertools
@@ -16,14 +16,14 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from vrdet.data.dota import DotaPatches, collate, dataset_classes
-from vrdet.engine import (ModelEMA, batchnorm_finite, eval_dota, lr_factor, param_groups, sanitize_batchnorm,
+from openobb.data.dota import DotaPatches, collate, dataset_classes
+from openobb.engine import (ModelEMA, batchnorm_finite, eval_dota, lr_factor, param_groups, sanitize_batchnorm,
                           to_device)
-from vrdet.console import EpochBar, val_rows
-from vrdet.report import append_results, plot_labels, plot_results, plot_train_batch, plot_val_predictions
-from vrdet.eval.dota import DOTA1_CLASSES, format_table, summary_table, write_task1
-from vrdet.models.dense_head import DenseCriterion
-from vrdet.models.vrdet import VRDet, build_criterion, load_dfine_coco
+from openobb.console import EpochBar, val_rows
+from openobb.report import append_results, plot_labels, plot_results, plot_train_batch, plot_val_predictions
+from openobb.eval.dota import DOTA1_CLASSES, format_table, summary_table, write_task1
+from openobb.models.dense_head import DenseCriterion
+from openobb.models.vrdet import VRDet, build_criterion, load_dfine_coco
 
 
 def build_parser():
@@ -42,7 +42,7 @@ def build_parser():
     ap.add_argument("--rel-k", type=int, default=600, help="VRDet5: candidates per image for relation re-scoring")
     ap.add_argument("--img", type=int, default=1024)
     ap.add_argument("--scale", type=float, default=1.0,
-                    help="image scale the data was tiled at (recorded for inference; set by vrdet.data.prepare)")
+                    help="image scale the data was tiled at (recorded for inference; set by openobb.data.prepare)")
     ap.add_argument("--fit", action="store_true",
                     help="data was prepared with each image resized to long side = img (one tile per image); "
                          "recorded so inference does the same")
@@ -201,15 +201,15 @@ def main(argv=None):
     if v4:                                      # DETR decoder fed and supervised by the dense oriented branch
         a.dense = a.dense_queries = a.dense_v3 = True
     if v2:
-        from vrdet.models.vrdet2 import VRDet2
-        from vrdet.models.vrdet2_loss import VRDet2Loss
+        from openobb.models.vrdet2 import VRDet2
+        from openobb.models.vrdet2_loss import VRDet2Loss
         model = VRDet2(a.size, num_classes=len(classes), img_size=a.img)
     elif v3:
-        from vrdet.models.vrdet3 import VRDet3
-        from vrdet.models.vrdet3_loss import VRDet3Loss
+        from openobb.models.vrdet3 import VRDet3
+        from openobb.models.vrdet3_loss import VRDet3Loss
         if v5:
-            from vrdet.models.vrdet5 import VRDet5
-            from vrdet.models.vrdet5_loss import VRDet5Loss
+            from openobb.models.vrdet5 import VRDet5
+            from openobb.models.vrdet5_loss import VRDet5Loss
             model = VRDet5(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
                            backbone=a.backbone, geo_cls=a.geo_cls, relate=a.relate, rel_k=a.rel_k)
         else:
@@ -252,7 +252,7 @@ def main(argv=None):
                                angle_weight=a.angle_weight, cost_iou=a.cost_iou, member_weight=a.vec_ground)
     a.dense = (a.dense or a.dense_queries) and not dense_arch
     if a.dense and a.dense_v3:
-        from vrdet.models.vrdet3_loss import DenseOrientedCriterion
+        from openobb.models.vrdet3_loss import DenseOrientedCriterion
         dense_crit = DenseOrientedCriterion(img_size=a.img)
     else:
         dense_crit = DenseCriterion() if a.dense else None
@@ -291,7 +291,7 @@ def main(argv=None):
         a.batch = len(ds)
     sampler = None
     if a.rfs > 0:
-        from vrdet.data.dota import repeat_factors
+        from openobb.data.dota import repeat_factors
         w, f, r = repeat_factors(ds.items, len(classes), a.rfs)
         sampler = torch.utils.data.WeightedRandomSampler(torch.as_tensor(w, dtype=torch.double), len(ds), replacement=True)
         log("RFS repeat factors: " + " ".join(f"{c[:6]}={x:.1f}" for c, x in zip(classes, r)))
@@ -359,7 +359,7 @@ def main(argv=None):
                if device.type == "cuda" else "CPU")
         extras = [n for n, on in (("LSK", a.lsk), ("P2", a.p2), ("dense", a.dense)) if on]
         n_val = len(list((Path(a.data) / "gt" / "val").glob("*.txt")))
-        say(f"VRDet {__import__('vrdet').__version__} | torch {torch.__version__} | {gpu} | "
+        say(f"VRDet {__import__('openobb').__version__} | torch {torch.__version__} | {gpu} | "
             f"AMP {('bf16' if scaler is None else 'fp16') if amp else 'off'} | "
             f"compile {'on' if a.compile and device.type == 'cuda' else 'off'}")
         if v2:
@@ -616,7 +616,7 @@ def main(argv=None):
     final = rq if a.eval_queries and a.eval_queries != a.queries and not dense_arch else res
     say(summary_table(final, classes))
     if final.get("ultra", {}).get("confusion"):
-        from vrdet.eval.ultra import top_confusions
+        from openobb.eval.ultra import top_confusions
         (out / "confusion_matrix.json").write_text(json.dumps(final["ultra"]["confusion"]))
         lines = top_confusions(final["ultra"]["confusion"])
         if lines:

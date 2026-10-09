@@ -15,7 +15,7 @@ Detections use the DOTA submission format: one file per class `Task1_<class>.txt
 `<image_id> <score> x1 y1 x2 y2 x3 y3 x4 y4`. Patch detections are merged back to full
 images with `merge_patches` (class-wise polygon NMS, IoU 0.1 like mmrotate's DOTAMetric).
 
-CLI:  python -m vrdet.eval.dota --dets DIR_WITH_Task1_FILES --gt LABELTXT_DIR [--out res.json]
+CLI:  python -m openobb.eval.dota --dets DIR_WITH_Task1_FILES --gt LABELTXT_DIR [--out res.json]
 """
 import argparse
 import json
@@ -25,7 +25,7 @@ from pathlib import Path
 
 import numpy as np
 
-from vrdet.ops.obb import nms_poly, poly_iou
+from openobb.ops.obb import nms_poly, poly_iou
 
 DOTA1_CLASSES = ('plane', 'baseball-diamond', 'bridge', 'ground-track-field', 'small-vehicle',
                  'large-vehicle', 'ship', 'tennis-court', 'basketball-court', 'storage-tank',

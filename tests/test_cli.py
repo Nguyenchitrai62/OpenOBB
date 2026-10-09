@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 import pytest
 
-from vrdet.cli import parse_kv
+from openobb.cli import parse_kv
 
 
 def test_parse_kv():
@@ -15,7 +15,7 @@ def test_parse_kv():
 
 
 def test_run_folders_and_resume_lookup(tmp_path):
-    from vrdet.cli import _find_last, increment_path
+    from openobb.cli import _find_last, increment_path
     assert increment_path(tmp_path, "train") == tmp_path / "train"
     (tmp_path / "train" / "weights").mkdir(parents=True)
     assert increment_path(tmp_path, "train") == tmp_path / "train2"            # never reuses a folder by default
@@ -47,7 +47,7 @@ def _dataset(root, n_train=3, n_val=1, size=640):
 
 
 def test_auto_scale(tmp_path):
-    from vrdet.cli import auto_scale
+    from openobb.cli import auto_scale
     data = _dataset(tmp_path / "ds", size=640)
     assert auto_scale(str(data), 512) == 0.8              # 640 px pages -> one 512 tile
     assert auto_scale(str(data), 1024) == 1.0             # page fits in a tile: native resolution
@@ -56,7 +56,7 @@ def test_auto_scale(tmp_path):
 
 @pytest.mark.skipif(os.environ.get("VRDET_SLOW") != "1", reason="CPU smoke train (set VRDET_SLOW=1)")
 def test_train_val_predict_smoke(tmp_path):
-    from vrdet.cli import Detector
+    from openobb.cli import Detector
     data = _dataset(tmp_path / "ds")
     m = Detector("s")
     r = m.train(data=str(data), epochs=1, batch=2, imgsz=512, tile_scale=0.8, project=str(tmp_path / "runs"),
@@ -78,8 +78,8 @@ def test_train_val_predict_smoke(tmp_path):
 def test_console_rows():
     import io
 
-    from vrdet.console import EpochBar, val_rows
-    from vrdet.eval.dota import evaluate, summary_table
+    from openobb.console import EpochBar, val_rows
+    from openobb.eval.dota import evaluate, summary_table
     sq = np.array([0, 0, 10, 0, 10, 10, 0, 10], float)
     gts = {"a": [(sq.tolist(), "door", False)], "b": [((sq + 50).tolist(), "door", False)]}
     dets = {"door": (["a", "b", "b"], np.array([0.9, 0.8, 0.3]), np.stack([sq, sq + 50, sq + 20]))}
@@ -99,8 +99,8 @@ def test_console_rows():
 def test_fit_mode_one_tile_per_image(tmp_path):
     import json as _json
 
-    from vrdet.data.prepare import prepare
-    from vrdet.eval.dota import merge_patches
+    from openobb.data.prepare import prepare
+    from openobb.eval.dota import merge_patches
     data = _dataset(tmp_path / "ds", size=640)
     out = prepare(str(data), tmp_path / "prep", size=512, fit=True, workers=1)
     metas = [_json.loads(l) for l in (out / "meta" / "val.jsonl").read_text().splitlines()]
@@ -112,8 +112,8 @@ def test_fit_mode_one_tile_per_image(tmp_path):
 
 
 def test_train_flags_and_oom_retry(tmp_path, monkeypatch):
-    import vrdet.train as trainer
-    from vrdet.cli import train
+    import openobb.train as trainer
+    from openobb.cli import train
     calls = []
 
     def fake_main(argv):
@@ -139,7 +139,7 @@ def test_lr_schedules_and_ema():
 
     import torch
 
-    from vrdet.engine import ModelEMA, lr_factor
+    from openobb.engine import ModelEMA, lr_factor
     assert lr_factor(0, 1000, 100, schedule="linear", min_ratio=0.01) < 0.02           # warmup ramps up
     assert abs(lr_factor(500, 1000, 100, schedule="linear", min_ratio=0.01) - 0.505) < 1e-6
     assert abs(lr_factor(1000, 1000, 100, schedule="linear", min_ratio=0.01) - 0.01) < 1e-9
@@ -156,8 +156,8 @@ def test_lr_schedules_and_ema():
 
 
 def test_dataset_ram_cache(tmp_path):
-    from vrdet.data.dota import DotaPatches
-    from vrdet.data.prepare import prepare
+    from openobb.data.dota import DotaPatches
+    from openobb.data.prepare import prepare
     out = prepare(str(_dataset(tmp_path / "ds")), tmp_path / "prep", size=512, fit=True, workers=1)
     a, b = DotaPatches(out, "train"), DotaPatches(out, "train", cache=True)
     assert len(b.cache) == len(b.items) and (a[0][0] == b[0][0]).all()
@@ -166,8 +166,8 @@ def test_dataset_ram_cache(tmp_path):
 def test_typo_and_resume_rules(tmp_path, monkeypatch):
     import json as _json
 
-    import vrdet.train as trainer
-    from vrdet.cli import check_keys, train
+    import openobb.train as trainer
+    from openobb.cli import check_keys, train
     with pytest.raises(SystemExit, match="Similar: epochs"):
         check_keys({"epoch": 10})
     check_keys({"freeze": "backbone", "time": 1.0, "fliplr": 0.0, "rot90": False, "lr0": 1e-4})
@@ -195,13 +195,13 @@ def test_typo_and_resume_rules(tmp_path, monkeypatch):
 
 
 def test_conf_thresholds():
-    from vrdet.predict import conf_thresholds
+    from openobb.predict import conf_thresholds
     assert conf_thresholds(["a", "b"], {}, 0.4) == [0.4, 0.4]
     assert conf_thresholds(["a", "b"], {"conf_thr": {"a": 0.1}}, "auto") == [0.1, 0.25]
 
 
 def test_nan_predictions_do_not_crash_merge_or_eval():
-    from vrdet.eval.dota import evaluate, merge_patches
+    from openobb.eval.dota import evaluate, merge_patches
     sq = np.array([0, 0, 10, 0, 10, 10, 0, 10], float)
     bad = np.full(8, np.nan)
     merged = merge_patches([("a__1.0__0___0", 0, 0.9, sq), ("a__1.0__0___0", 0, 0.8, bad),
@@ -216,7 +216,7 @@ def test_nan_predictions_do_not_crash_merge_or_eval():
 def test_ema_repair_resyncs_non_finite():
     import torch
 
-    from vrdet.engine import ModelEMA
+    from openobb.engine import ModelEMA
     net = torch.nn.Sequential(torch.nn.Linear(3, 2), torch.nn.BatchNorm1d(2))
     ema = ModelEMA(net, decay=0.9, warmups=1)
     with torch.no_grad():
@@ -230,7 +230,7 @@ def test_ema_repair_resyncs_non_finite():
 def test_inf_batchnorm_stats_never_become_nan():
     import torch
 
-    from vrdet.engine import ModelEMA, sanitize_batchnorm
+    from openobb.engine import ModelEMA, sanitize_batchnorm
     net = torch.nn.Sequential(torch.nn.Conv2d(3, 4, 1), torch.nn.BatchNorm2d(4))
     with torch.no_grad():
         net[1].running_var.fill_(float("inf"))
@@ -242,8 +242,8 @@ def test_inf_batchnorm_stats_never_become_nan():
 
 
 def test_optimizer_auto_ignores_lr0(tmp_path, monkeypatch):
-    import vrdet.train as trainer
-    from vrdet.cli import train
+    import openobb.train as trainer
+    from openobb.cli import train
     calls = []
     monkeypatch.setattr(trainer, "main", lambda argv: calls.append(" ".join(argv)))
     data = _dataset(tmp_path / "ds")

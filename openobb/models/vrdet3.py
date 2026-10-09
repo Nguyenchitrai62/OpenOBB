@@ -15,7 +15,7 @@ Lessons it is built on (research/LEDGER.md F23-F25, Wall_Color, 250 images):
   * Output: class-wise Fast-NMS on ProbIoU inside the model (YOLO-style dense output), padded to `max_det`.
 
 Box convention: (cx, cy, w, h, theta) with w measured along theta. Eval output matches VRDet1:
-{"pred_logits": (B, K, C), "pred_boxes": (B, K, 5) normalised}, read by vrdet.models.vrdet.postprocess.
+{"pred_logits": (B, K, C), "pred_boxes": (B, K, 5) normalised}, read by openobb.models.vrdet.postprocess.
 """
 import copy
 import math
@@ -23,7 +23,7 @@ import math
 import torch
 import torch.nn as nn
 
-from vrdet.ops.obb_torch import probiou
+from openobb.ops.obb_torch import probiou
 
 from .hgnetv2 import HGNetv2
 from .hybrid_encoder import HybridEncoder
@@ -115,7 +115,7 @@ class VRDet3(nn.Module):
         # same module names as VRDet1 / D-FINE: COCO weights (and a VRDet1 checkpoint) load into backbone/encoder/lsk
         if backbone == "hgnet":
             self.backbone = HGNetv2(**bb, pretrained=False)
-        else:                                   # DINOv2 ViT + adapter (vrdet/models/vit.py)
+        else:                                   # DINOv2 ViT + adapter (openobb/models/vit.py)
             from .vit import DinoV2Backbone
             self.backbone = DinoV2Backbone(backbone, cfg["encoder"]["in_channels"])
         self.backbone_name = backbone

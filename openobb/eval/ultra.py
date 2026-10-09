@@ -1,7 +1,7 @@
 """Second metric with the conventions of the Ultralytics OBB validator, so VRDet numbers can be compared with the
 mAP that YOLO prints (VRDet's own code, written from the validator's documented behaviour; no Ultralytics code).
 
-Differences from the DOTA devkit protocol in vrdet.eval.dota:
+Differences from the DOTA devkit protocol in openobb.eval.dota:
   * IoU = ProbIoU between oriented boxes (min-area rectangles of the polygons), not polygon IoU. ProbIoU is more
     lenient on thin objects (3 px wall, 1 px across error: polygon IoU 0.50, ProbIoU ~0.61);
   * matching per image and IoU threshold: each detection keeps its best-IoU GT of the same class, then each GT keeps
@@ -11,7 +11,7 @@ Differences from the DOTA devkit protocol in vrdet.eval.dota:
 """
 import numpy as np
 
-from vrdet.data.dota import polys_to_obb
+from openobb.data.dota import polys_to_obb
 
 
 def probiou(a, b, eps=1e-7):
@@ -59,7 +59,7 @@ def _ap(rec, prec):
 
 
 def evaluate_ultra(dets, gts, classes, conf=0.001, max_det=300, iou_thrs=None):
-    """dets {class_name: (image_ids, scores, polys)}, gts {image_id: [(poly, cls, difficult)]} (as vrdet.eval.dota)
+    """dets {class_name: (image_ids, scores, polys)}, gts {image_id: [(poly, cls, difficult)]} (as openobb.eval.dota)
     -> {"mAP50", "mAP50_95", "classes": {name: {"AP50", "AP50_95"}}}. Difficult objects count as normal GT."""
     thrs = np.round(np.arange(0.5, 0.96, 0.05), 2) if iou_thrs is None else np.asarray(iou_thrs)
     per_img = {}

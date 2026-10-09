@@ -1,5 +1,5 @@
 """Prepare a labelled OBB dataset (data.yaml + 'class x1 y1 x2 y2 x3 y3 x4 y4' normalised txt labels) as VRDet tiles.
-Thin wrapper of vrdet.data.prepare; `vrdet train data=<data.yaml>` does the same automatically.
+Thin wrapper of openobb.data.prepare; `openobb train data=<data.yaml>` does the same automatically.
 
 python tools/prepare_dataset.py --src <data.yaml or dataset folder> --out datasets/mydata [--size 1024] [--val-frac 0.15]
 """
@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from vrdet.data.prepare import prepare  # noqa: E402
+from openobb.data.prepare import prepare  # noqa: E402
 
 
 def main():

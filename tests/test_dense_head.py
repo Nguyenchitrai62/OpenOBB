@@ -2,7 +2,7 @@ import math
 
 import torch
 
-from vrdet.models.dense_head import DenseCriterion, DenseRotatedHead, decode, dense_predict, rotated_tal
+from openobb.models.dense_head import DenseCriterion, DenseRotatedHead, decode, dense_predict, rotated_tal
 
 torch.set_num_threads(1)     # torch 2.12 CPU kernels race with many threads on this machine
 

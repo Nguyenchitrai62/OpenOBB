@@ -6,13 +6,13 @@ Dataset theo chuẩn OBB 8 điểm (cùng định dạng nhãn bản export "tra
 - Bộ khung train/infer lấy các ý tưởng quen thuộc của YOLO, tự viết lại: resize cả ảnh, mosaic/scale/translate, warmup, dừng sớm, tự giảm batch, `results.csv`/`results.png`.
 
 **Cách nhanh nhất là chạy notebook Colab:**
-- [`colab/VRDet_wall_color.ipynb`](../colab/VRDet_wall_color.ipynb): bản gọn, chỉ cài, giải nén, `vrdet train`.
+- [`colab/VRDet_wall_color.ipynb`](../colab/VRDet_wall_color.ipynb): bản gọn, chỉ cài, giải nén, `openobb train`.
 - [`colab/VRDet_train.ipynb`](../colab/VRDet_train.ipynb): bản đầy đủ, có chọn dataset, biểu đồ và ảnh dự đoán.
 
 ## 0. Cài đặt
 
 ```bash
-pip install git+https://github.com/Nguyenchitrai62/vrdet.git     # hoặc trong repo: pip install -e .
+pip install git+https://github.com/Nguyenchitrai62/openobb.git     # hoặc trong repo: pip install -e .
 ```
 
 - Cần torch (CUDA), opencv-python, shapely ≥ 2, scipy, numpy, pyyaml. Colab có sẵn.
@@ -35,16 +35,16 @@ pip install git+https://github.com/Nguyenchitrai62/vrdet.git     # hoặc trong 
   - `tile_scale=` để thu nhỏ trước khi cắt; không đặt thì tự chọn theo cỡ object.
 - Dữ liệu đã chuẩn bị được cache ở `~/.cache/vrdet` (đổi chỗ bằng `cache_dir=` hoặc biến `VRDET_CACHE`).
 
-> **Deploy (thay YOLO trong code sản phẩm):** xem [DEPLOY.md](DEPLOY.md): `from vrdet import VRDet; VRDet("best.pt").predict(...)`.
+> **Deploy (thay YOLO trong code sản phẩm):** xem [DEPLOY.md](DEPLOY.md): `from openobb import VRDet; VRDet("best.pt").predict(...)`.
 
 ## 2. Train
 
 ```bash
-vrdet train data=path/data.yaml model=s epochs=100 imgsz=1024        # -> runs/obb/train
+openobb train data=path/data.yaml model=s epochs=100 imgsz=1024        # -> runs/obb/train
 ```
 
 ```python
-from vrdet import Detector
+from openobb import Detector
 r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024)   # r.best = .../weights/best.pt
 ```
 
@@ -85,7 +85,7 @@ r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024)   # r.bes
 - Số query tự tăng (600–900) khi ảnh dày object.
 - Kiến trúc mặc định là bản chốt (c6): adapter LSK, RFS, nhóm query một-nhiều, AQD, loss góc, IoU-cost.
   - `recipe=False` để tắt.
-  - Mọi flag của `python -m vrdet.train` truyền được dạng `key=value`.
+  - Mọi flag của `python -m openobb.train` truyền được dạng `key=value`.
 - **Thư mục kết quả như YOLO:** mặc định `runs/obb/train`, lần sau `train2`, `train3`... (`project=`, `name=` để đổi; `exist_ok=True` ghi đè thư mục cũ). Weights ở `weights/best.pt` và `weights/last.pt`.
 - **Resume chỉ khi `resume=True`** (như YOLO): train tiếp run chưa xong mới nhất (hoặc `name=` / `resume=<last.pt>`) với **đúng tham số đã lưu**.
   - Chỉ đổi được `workers`, `cache`, `patience`, `time`; tham số khác bị bỏ qua và có thông báo.
@@ -119,8 +119,8 @@ Khi xong, màn hình in bảng theo từng class của `best.pt`. Kết quả n�
 ## 3. Đánh giá và suy luận
 
 ```bash
-vrdet val     model=runs/obb/train/weights/best.pt data=path/data.yaml
-vrdet predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.3   # -> runs/obb/predict
+openobb val     model=runs/obb/train/weights/best.pt data=path/data.yaml
+openobb predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.3   # -> runs/obb/predict
 ```
 
 - Ảnh được xử lý đúng như lúc train. `tile=True` để cắt tile ảnh rất lớn.
@@ -128,7 +128,7 @@ vrdet predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.3   # ->
   - `conf=auto` dùng ngưỡng riêng cho từng class, là ngưỡng cho F2 cao nhất trên val, được lưu trong `best.pt`.
   - Bảng val có cột F2 theo class.
 - **`classes=`:** chỉ giữ các class này, theo id hoặc tên (ví dụ `classes=wall,door`). `names=` dùng cho checkpoint không có tên class.
-- `vrdet val model=best.pt` không cần `data=` nếu chạy trên cùng máy lúc train. Lệch thứ tự class giữa data và model thì báo lỗi.
+- `openobb val model=best.pt` không cần `data=` nếu chạy trên cùng máy lúc train. Lệch thứ tự class giữa data và model thì báo lỗi.
 - Mỗi ảnh ra:
   - `<tên>.txt`: `class x1 y1 ... x4 y4 score`, chuẩn hoá theo ảnh;
   - `<tên>.json`: toạ độ pixel và tên class;

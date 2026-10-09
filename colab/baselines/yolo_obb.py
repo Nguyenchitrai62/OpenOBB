@@ -1,4 +1,4 @@
-"""Ultralytics YOLO-OBB baseline (AGPL: run on Colab ONLY to measure it, never imported by vrdet/).
+"""Ultralytics YOLO-OBB baseline (AGPL: run on Colab ONLY to measure it, never imported by openobb/).
 
 Trains on our DOTA patch split, then predicts the val patches, merges them back to full
 images and scores them with OUR DOTA-devkit-protocol evaluator, so the number is directly
@@ -16,8 +16,8 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from vrdet.data.dota import dataset_classes  # noqa: E402
-from vrdet.eval.dota import evaluate, format_table, load_gt_dir, merge_patches, write_task1  # noqa: E402
+from openobb.data.dota import dataset_classes  # noqa: E402
+from openobb.eval.dota import evaluate, format_table, load_gt_dir, merge_patches, write_task1  # noqa: E402
 
 
 def jlog(out, rec):

@@ -1,7 +1,7 @@
 import torch
 
-from vrdet.models.obb_criterion import OBBHungarianMatcher
-from vrdet.models.vrdet import VRDet, build_criterion
+from openobb.models.obb_criterion import OBBHungarianMatcher
+from openobb.models.vrdet import VRDet, build_criterion
 
 torch.set_num_threads(1)
 

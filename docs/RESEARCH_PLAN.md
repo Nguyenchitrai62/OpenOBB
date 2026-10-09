@@ -96,7 +96,7 @@ Kiến trúc tự chế, train from scratch, assigner/loss/evaluator tự viết
 
 Tên làm việc: **VRDet**. Lõi là detector OBB raster tổng quát (benchmark được trên DOTA). Nhánh vector là **plug-in** riêng cho CAD.
 
-### 4.1 Khung nền (đã code, `vrdet/models/`)
+### 4.1 Khung nền (đã code, `openobb/models/`)
 
 Dựa trên D-FINE (Apache-2.0), init từ checkpoint **COCO** của D-FINE: chỉ COCO, tránh điều khoản Objects365.
 - Backbone HGNetv2 cộng hybrid encoder (AIFI + CCFM), giữ nguyên D-FINE.
@@ -111,7 +111,7 @@ Dựa trên D-FINE (Apache-2.0), init từ checkpoint **COCO** của D-FINE: ch�
 
 ### 4.2 Lõi đóng góp: dense–sparse hybrid (H4) và các giả thuyết
 
-**Head dense xoay** (`vrdet/models/dense_head.py`) gắn lên P3–P5 của encoder:
+**Head dense xoay** (`openobb/models/dense_head.py`) gắn lên P3–P5 của encoder:
 - Tower depthwise rẻ, train one-to-many bằng rotated TAL (IoU xoay chính xác, mở rộng ứng viên cho vật tí hon kiểu STAL).
 - Loss: ProbIoU cộng angle penalty cho box gần vuông (YOLO26).
 

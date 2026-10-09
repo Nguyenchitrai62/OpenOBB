@@ -4,8 +4,8 @@ import os
 import pytest
 import torch
 
-from vrdet.models.vrdet2 import REG_BINS, VRDet2, decode
-from vrdet.models.vrdet2_loss import VRDet2Loss
+from openobb.models.vrdet2 import REG_BINS, VRDet2, decode
+from openobb.models.vrdet2_loss import VRDet2Loss
 
 torch.set_num_threads(1)
 
@@ -51,7 +51,7 @@ def test_vrdet2_train_eval_shapes_and_finite_loss():
         ev = m(x)
     A = sum((256 // s) ** 2 for s in m.strides)
     assert ev["pred_logits"].shape == (1, A, 2) and ev["pred_boxes"].shape == (1, A, 5)
-    from vrdet.models.vrdet import postprocess
+    from openobb.models.vrdet import postprocess
     s, l, b = postprocess(ev, 50, 256)
     assert s.shape[1] == 50 and b.shape[-1] == 5
 
@@ -62,8 +62,8 @@ def test_vrdet2_x_size():
 
 
 def test_cli_model_names(tmp_path, monkeypatch):
-    import vrdet.train as trainer
-    from vrdet.cli import train
+    import openobb.train as trainer
+    from openobb.cli import train
     from test_cli import _dataset
     calls = []
     monkeypatch.setattr(trainer, "main", lambda argv: calls.append(" ".join(argv)))
@@ -86,7 +86,7 @@ def test_cli_model_names(tmp_path, monkeypatch):
 
 
 def test_predict_loads_v2_checkpoint(tmp_path):
-    from vrdet.predict import load_model
+    from openobb.predict import load_model
     m = VRDet2("n", num_classes=2, img_size=256)
     p = tmp_path / "best.pt"
     torch.save({"model": m.state_dict(), "args": {"arch": "v2", "size": "n", "img": 256},
@@ -98,7 +98,7 @@ def test_predict_loads_v2_checkpoint(tmp_path):
 @pytest.mark.skipif(os.environ.get("VRDET_SLOW") != "1", reason="CPU smoke train (set VRDET_SLOW=1)")
 def test_vrdet2_cli_smoke(tmp_path):
     from test_cli import _dataset
-    from vrdet.cli import Detector
+    from openobb.cli import Detector
     data = _dataset(tmp_path / "ds")
     m = Detector("vrdet2n")
     r = m.train(data=str(data), epochs=1, batch=2, imgsz=256, project=str(tmp_path / "runs"), name="t",

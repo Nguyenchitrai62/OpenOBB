@@ -1,8 +1,8 @@
 import pytest
 import torch
 
-from vrdet.models.dense_head import DenseCriterion
-from vrdet.models.vrdet import VRDet, build_criterion
+from openobb.models.dense_head import DenseCriterion
+from openobb.models.vrdet import VRDet, build_criterion
 
 torch.set_num_threads(1)     # torch 2.12 CPU kernels race with many threads on this machine
 
@@ -40,7 +40,7 @@ def test_variant_trains_one_step(kw, box_loss):
 
 def test_lsk_adapter_starts_as_identity():
     import torch
-    from vrdet.models.vrdet import VRDet
+    from openobb.models.vrdet import VRDet
     torch.manual_seed(0)
     m = VRDet("s", num_classes=3, img_size=256, num_denoising=0, lsk=True).eval()
     x = torch.rand(1, 3, 256, 256)
@@ -60,7 +60,7 @@ def test_p2_level_keeps_coco_offsets_per_head():
     import os
     import pytest
     import torch
-    from vrdet.models.vrdet import DFINE_URL, VRDet, load_dfine_coco
+    from openobb.models.vrdet import DFINE_URL, VRDet, load_dfine_coco
     ck = os.path.expanduser("~/.cache/torch/hub/checkpoints/dfine_s_coco.pth")
     if not os.path.exists(ck):
         pytest.skip("D-FINE COCO checkpoint not cached")

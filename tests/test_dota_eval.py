@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from vrdet.eval.dota import (DOTA1_CLASSES, evaluate, merge_patches, parse_patch_name, read_task1,
+from openobb.eval.dota import (DOTA1_CLASSES, evaluate, merge_patches, parse_patch_name, read_task1,
                              voc_ap, write_task1)
-from vrdet.ops.obb import nms_poly, norm_obb, obb2poly, poly2obb, poly_iou
+from openobb.ops.obb import nms_poly, norm_obb, obb2poly, poly2obb, poly_iou
 
 rng = np.random.default_rng(0)
 

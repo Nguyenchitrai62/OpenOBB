@@ -20,8 +20,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from vrdet.data.split import PAD_BGR, THUMB, split_image, split_items, window_starts  # noqa: E402,F401
-from vrdet.eval.dota import DOTA1_CLASSES  # noqa: E402
+from openobb.data.split import PAD_BGR, THUMB, split_image, split_items, window_starts  # noqa: E402,F401
+from openobb.eval.dota import DOTA1_CLASSES  # noqa: E402
 
 
 def split_set(src, out, split, size=1024, gap=200, rates=(1.0,), iof_thr=0.7, classes=DOTA1_CLASSES,

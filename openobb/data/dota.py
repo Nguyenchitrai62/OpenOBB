@@ -396,7 +396,7 @@ def repeat_factors(items, num_classes, t):
 
 def dataset_classes(root):
     """Class names of a prepared split ({root}/classes.json), DOTA-v1.0 by default."""
-    from vrdet.eval.dota import DOTA1_CLASSES
+    from openobb.eval.dota import DOTA1_CLASSES
     p = Path(root) / "classes.json"
     return tuple(json.loads(p.read_text())) if p.exists() else DOTA1_CLASSES
 

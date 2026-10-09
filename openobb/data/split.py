@@ -1,5 +1,5 @@
 """Cut large images into fixed-size overlapping tiles with OBB labels (VRDet's own implementation of the usual
-DOTA-devkit protocol). Used for DOTA, FloorPlanCAD and labelled OBB datasets (vrdet.data.prepare).
+DOTA-devkit protocol). Used for DOTA, FloorPlanCAD and labelled OBB datasets (openobb.data.prepare).
 
 Output (per split):
   {out}/images/{split}/{img}__{rate}__{x0}___{y0}.jpg   tile, padded to size x size (ImageNet-mean gray)
@@ -25,7 +25,7 @@ import cv2
 import numpy as np
 import shapely
 
-from vrdet.eval.dota import parse_dota_txt
+from openobb.eval.dota import parse_dota_txt
 
 PAD_BGR = (104, 116, 124)       # ImageNet mean, so padding is ~0 after normalisation
 THUMB = 512                     # long side of the whole-image thumbnail used for global context

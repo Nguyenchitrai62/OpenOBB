@@ -64,7 +64,7 @@ def plot_labels(out, items, classes, size):
         import matplotlib.pyplot as plt
     except ImportError:
         return
-    from vrdet.data.dota import polys_to_obb
+    from openobb.data.dota import polys_to_obb
     cls, wh = [], []
     for m in items:
         if m["objs"]:
@@ -92,7 +92,7 @@ def plot_labels(out, items, classes, size):
 
 def plot_train_batch(path, imgs, targets, classes, n=4):
     """2x2 preview of an augmented training batch with its target boxes (checks mosaic / zoom / clip)."""
-    from vrdet.ops.obb import obb2poly
+    from openobb.ops.obb import obb2poly
     tiles = []
     for img, t in list(zip(imgs, targets))[:n]:
         S = img.shape[-1]
@@ -116,9 +116,9 @@ def plot_train_batch(path, imgs, targets, classes, n=4):
 @torch.no_grad()
 def plot_val_predictions(out, model, data_root, device, img_size, classes, num_top=300, n=4, conf=0.3):
     """2x2 grid of val tiles: ground truth in thin green, predictions (score >= conf) in class colours."""
-    from vrdet.data.dota import DotaPatches
-    from vrdet.models.vrdet import postprocess
-    from vrdet.ops.obb import obb2poly
+    from openobb.data.dota import DotaPatches
+    from openobb.models.vrdet import postprocess
+    from openobb.ops.obb import obb2poly
     ds = DotaPatches(data_root, "val", augment=False)
     idx = [i for i, m in enumerate(ds.items) if m["objs"]][:n]
     if not idx:

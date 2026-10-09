@@ -3,7 +3,7 @@
 Dùng: CLI giữ nguyên, chỉ đổi `model=`.
 
 ```bash
-vrdet train data=/content/data.yaml model=vrdet4x epochs=100 imgsz=1280
+openobb train data=/content/data.yaml model=vrdet4x epochs=100 imgsz=1280
 ```
 
 - Lần đầu tự tải 2 bộ weights, đều Apache-2.0:
@@ -51,7 +51,7 @@ Rút ra hai điều:
 
 | # | Phần | Làm gì | Tham số | Nguồn code / weights |
 |---|---|---|---|---|
-| 1 | **ViT-B/14 DINOv2** (12 lớp, 4 register, pos-embed nội suy theo kích thước ảnh) | Feature tổng quát tự giám sát, attention toàn ảnh ngay từ backbone | 86.6M | Code VRDet tự viết (`vrdet/models/vit.py`); **weights DINOv2 Apache-2.0** |
+| 1 | **ViT-B/14 DINOv2** (12 lớp, 4 register, pos-embed nội suy theo kích thước ảnh) | Feature tổng quát tự giám sát, attention toàn ảnh ngay từ backbone | 86.6M | Code VRDet tự viết (`openobb/models/vit.py`); **weights DINOv2 Apache-2.0** |
 | 2 | **Adapter** (trộn 4 tầng 3/6/9/12 → P3 deconv, P4, P5) + **nhánh chi tiết CNN stride 8** | Tạo kim tự tháp stride 8/16/32; giữ nét mảnh | 8.2M | VRDet (ý tưởng ViTDet, ViT-Adapter) |
 | 3 | **LSK** ×3 | Trường nhìn thích nghi (đã đo +1.3 trên CAD) | 8.5M | VRDet |
 | 4 | **Hybrid encoder** (AIFI + CCFF) | Ngữ cảnh toàn cục + trộn đa tầng | 20.7M | Code D-FINE Apache, **weights COCO** (riêng lớp chiếu đầu vào khởi tạo lại) |

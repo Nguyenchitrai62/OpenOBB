@@ -1,6 +1,6 @@
 """VRDet3 assignment + losses (VRDet's own implementation).
 
-Assignment: rotated task-aligned (vrdet.models.vrdet2_loss.assign) with a length-adaptive top-k and a per-level
+Assignment: rotated task-aligned (openobb.models.vrdet2_loss.assign) with a length-adaptive top-k and a per-level
 across band of 1 stride (every level has candidates along every object). Points not selected are negatives
 (the head is the output head; duplicates are removed by NMS).
 
@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from vrdet.ops.obb_torch import probiou
+from openobb.ops.obb_torch import probiou
 
 from .vrdet2_loss import assign
 from .vrdet3 import ALONG_BINS, THICK_BINS, decode

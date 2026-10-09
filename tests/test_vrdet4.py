@@ -3,13 +3,13 @@ import os
 import pytest
 import torch
 
-from vrdet.models.vit import DinoV2Backbone
+from openobb.models.vit import DinoV2Backbone
 
 torch.set_num_threads(1)
 
 
 def _v4(nc=2, img=256):
-    from vrdet.models.vrdet import VRDet
+    from openobb.models.vrdet import VRDet
     return VRDet("s", num_classes=nc, img_size=img, backbone="dinov2_s", dense=True, dense_v3=True,
                  dense_queries=True, lsk=True)
 
@@ -33,9 +33,9 @@ def test_backbone_maps_any_size():
 
 
 def test_vrdet4_train_eval():
-    from vrdet.models.dense_head import dense_predict
-    from vrdet.models.vrdet import build_criterion
-    from vrdet.models.vrdet3_loss import DenseOrientedCriterion
+    from openobb.models.dense_head import dense_predict
+    from openobb.models.vrdet import build_criterion
+    from openobb.models.vrdet3_loss import DenseOrientedCriterion
     torch.manual_seed(0)
     m = _v4()
     t = [{"labels": torch.tensor([0, 1]),
@@ -58,7 +58,7 @@ def test_vrdet4_train_eval():
 
 
 def test_adapter_trains_at_full_lr():
-    from vrdet.engine import param_groups
+    from openobb.engine import param_groups
     m = _v4()
     groups = {g["name"]: g for g in param_groups(m, 1e-4, 0.5, 1e-4)}
     bb = {id(p) for p in groups["bb"]["params"] + groups["bb_norm"]["params"]}
@@ -67,9 +67,9 @@ def test_adapter_trains_at_full_lr():
 
 
 def test_cli_vrdet4_flags(tmp_path, monkeypatch):
-    import vrdet.train as trainer
+    import openobb.train as trainer
     from test_cli import _dataset
-    from vrdet.cli import train
+    from openobb.cli import train
     calls = []
     monkeypatch.setattr(trainer, "main", lambda argv: calls.append(" ".join(argv)))
     data = _dataset(tmp_path / "ds")
@@ -82,7 +82,7 @@ def test_cli_vrdet4_flags(tmp_path, monkeypatch):
 
 
 def test_predict_loads_v4_checkpoint(tmp_path):
-    from vrdet.predict import load_model
+    from openobb.predict import load_model
     m = _v4()
     p = tmp_path / "best.pt"
     torch.save({"model": m.state_dict(), "args": {"arch": "v4", "size": "s", "img": 256, "lsk": True,
@@ -103,7 +103,7 @@ def test_real_dinov2_checkpoint_loads():
 @pytest.mark.skipif(os.environ.get("VRDET_SLOW") != "1", reason="CPU pipeline check (set VRDET_SLOW=1)")
 def test_vrdet4_cli_smoke(tmp_path):
     from test_cli import _dataset
-    from vrdet.cli import Detector
+    from openobb.cli import Detector
     data = _dataset(tmp_path / "ds")
     m = Detector("vrdet4x")
     r = m.train(data=str(data), epochs=1, batch=2, imgsz=256, project=str(tmp_path / "runs"), name="t",

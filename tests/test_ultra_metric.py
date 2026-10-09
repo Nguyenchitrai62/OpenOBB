@@ -1,7 +1,7 @@
 import numpy as np
 
-from vrdet.eval.dota import evaluate
-from vrdet.eval.ultra import evaluate_ultra, probiou
+from openobb.eval.dota import evaluate
+from openobb.eval.ultra import evaluate_ultra, probiou
 
 
 def _poly(cx, cy, w, h):
@@ -33,20 +33,20 @@ def test_eval_metric_switch_reports_yolo_numbers():
     """metric='yolo' puts the Ultralytics-style numbers in the main fields and keeps the DOTA ones aside."""
     import copy
 
-    from vrdet.eval.ultra import evaluate_ultra
+    from openobb.eval.ultra import evaluate_ultra
     gts = {"a": [(_poly(100, 100, 200, 3).tolist(), "wall", False)]}
     off = {"wall": (["a"], np.array([0.9]), np.stack([_poly(100, 101.2, 200, 3)]))}
     res = evaluate(off, gts, ["wall"])
     dota = copy.deepcopy(res)
     u = evaluate_ultra(off, gts, ["wall"])
-    # same swap as vrdet.engine.eval_dota(metric="yolo")
+    # same swap as openobb.engine.eval_dota(metric="yolo")
     res["dota"] = {"mAP50": res["mAP50"], "mAP50_95": res["mAP50_95"]}
     res["mAP50"], res["mAP50_95"] = u["mAP50"], u["mAP50_95"]
     assert res["dota"]["mAP50"] == dota["mAP50"] == 0.0 and res["mAP50"] > 0.99
 
 
 def test_confusion_matrix_counts_class_mixups():
-    from vrdet.eval.ultra import top_confusions
+    from openobb.eval.ultra import top_confusions
     gts = {"a": [(_poly(100, 100, 200, 6).tolist(), "wall_300", False), (_poly(50, 50, 20, 20).tolist(), "door", False)]}
     dets = {"wall": (["a"], np.array([0.9]), np.stack([_poly(100, 100, 200, 6)])),     # wall_300 called wall
             "door": (["a"], np.array([0.1]), np.stack([_poly(50, 50, 20, 20)]))}        # below conf 0.25: missed

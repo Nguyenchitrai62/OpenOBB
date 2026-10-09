@@ -118,7 +118,7 @@ research/                 ← HYPOTHESES.md, decisions.log, DIRECTIONS.md (vòng
 cad_vlmdet/               ← code vòng cũ (tham khảo, KHÔNG phát triển tiếp)
 kaggle_pkg/               ← kernel/log/weights vòng cũ
 dataset_obb_train_v3.zip  ← data floorplan (gitignored)
-vrdet/                    ← (sẽ tạo) code kiến trúc mới
+openobb/                    ← (sẽ tạo) code kiến trúc mới
 colab/                    ← (sẽ tạo) script chạy trên Colab
 ```
 
@@ -145,7 +145,7 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
 - (bổ sung 22:10) **Kiến trúc phải mới và thuộc sở hữu của user để thương mại hoá.**
   - Không dùng thư viện hạn chế thương mại như Ultralytics (AGPL) trong code sản phẩm.
   - Trường hợp tệ nhất vẫn chấp nhận: một kiến trúc mới độc quyền, độ chính xác và tốc độ na ná YOLO.
-  - Đã chốt bằng `LICENSE` (proprietary), `THIRD_PARTY_NOTICES.md` (chỉ Apache-2.0: D-FINE/DEIM), `LICENSES/`, và `tests/test_license_guard.py` (cấm import ultralytics/mmcv/mmdet/mmrotate/ai4rs trong `vrdet/`).
+  - Đã chốt bằng `LICENSE` (proprietary), `THIRD_PARTY_NOTICES.md` (chỉ Apache-2.0: D-FINE/DEIM), `LICENSES/`, và `tests/test_license_guard.py` (cấm import ultralytics/mmcv/mmdet/mmrotate/ai4rs trong `openobb/`).
 - (bổ sung 21:50) **Đối thủ để so là cỡ lớn nhất: YOLO26x (và YOLO11x)**, không phải bản s.
   - VRDet được phép chậm hơn, nhưng phải chính xác và thông minh hơn.
   - **`dataset_obb_train_v3.zip` (floorplan trong repo) là data riêng để finetune sau. KHÔNG dùng để benchmark** cho tới khi kiến trúc đã thắng trên các dataset public (DOTA, FloorPlanCAD...).
@@ -220,13 +220,13 @@ Câu hỏi còn mở:
 - [x] Skill `vrdet-research` (`.agents/skills/`, adapter `.claude/skills/`)
 - [x] Bỏ Google Drive (mount cần người bấm Allow mỗi VM). Thay bằng: data tải trực tiếp trên VM, checkpoint đồng bộ về `runs/` local.
 - [x] **E0 xong:**
-  - `vrdet/eval/dota.py`: evaluator theo đúng protocol devkit (VOC07, bỏ difficult, IoU polygon, ghép patch bằng NMS 0.1), có test.
+  - `openobb/eval/dota.py`: evaluator theo đúng protocol devkit (VOC07, bỏ difficult, IoU polygon, ghép patch bằng NMS 0.1), có test.
   - `colab/data/get_dota.py` + `split_dota.py`: tải DOTA-v1.0 gốc từ HF `Last-Bullet/DOTAv1.0` (pinned), cắt 1024/200 ra khoảng 15.8k patch train, mất khoảng 6 phút trên VM.
   - `colab/baselines/yolo_obb.py`: baseline Ultralytics, chỉ chạy trên Colab.
-- [x] **Code VRDet v0** (`vrdet/`):
+- [x] **Code VRDet v0** (`openobb/`):
   - D-FINE-S (Apache) chuyển sang OBB với rotated FDR (4 cạnh + phân phối góc), cost Chamfer + KLD, MAL dùng IoU xoay chính xác, init từ COCO.
   - Head dense xoay + rotated TAL (H4) bật bằng `--dense`; eval ghép đầu ra theo nhiều kiểu.
-  - Trainer `vrdet/train.py`: EMA, LR flat-cosine, resume.
+  - Trainer `openobb/train.py`: EMA, LR flat-cosine, resume.
   - Test: `pytest -q tests/` (CPU).
   - **Lưu ý: torch 2.12 CPU trên máy này crash (heap) khi chạy nhiều luồng.** Chạy CPU thì dùng `--threads 1`, hoặc test trên Colab.
 - [x] **E1a YOLO26s** (24 epoch, SS, train→val): **val mAP50 74.77**, mAP50:95 49.49. Sanity OK.
@@ -253,8 +253,8 @@ Câu hỏi còn mở:
 - [x] **KIẾN TRÚC CHỐT (2026-10-08 14:50), raster-only: VRDet-S + LSK** (`c6-fpc-raster-lsk-s`). Thẻ: [docs/ARCHITECTURE_CARD.md](docs/ARCHITECTURE_CARD.md).
   - Thành phần: D-FINE-OBB + adapter LSK + RFS + nhóm query một-nhiều 900 + AQD + loss góc + IoU-cost + 900 query khi suy luận.
   - FloorPlanCAD val: **78.16 / 68.81** (12.5M tham số, 11.4 ms) so với YOLO26x 80.16 / 74.96 (57.6M, 11.6 ms). Recall ngang; thua chủ yếu độ khít box object mảnh (F18).
-  - Thư viện pip + CLI: `vrdet train|val|predict|prepare` (`vrdet/cli.py`, API `vrdet.Detector`), mặc định là công thức này.
-    Notebook Colab của user: `colab/VRDet_train.ipynb`, cài từ GitHub `Nguyenchitrai62/vrdet` (public). Hướng dẫn: [docs/FINETUNE.md](docs/FINETUNE.md).
+  - Thư viện pip + CLI: `openobb train|val|predict|prepare` (`openobb/cli.py`, API `vrdet.Detector`), mặc định là công thức này.
+    Notebook Colab của user: `colab/VRDet_train.ipynb`, cài từ GitHub `Nguyenchitrai62/openobb` (public). Hướng dẫn: [docs/FINETUNE.md](docs/FINETUNE.md).
   - Đã dừng: watcher tắt, không còn session Colab, số dư khoảng 71.7 CU. Hướng kế tiếp (chờ user): xem cuối F18 trong sổ cái.
 - [x] (cũ) Kiến trúc tạm chốt sáng 10-08: D-FINE-OBB + RFS + nhánh vector + 600 query. Báo cáo: [docs/REPORT_2026-10-08.md](docs/REPORT_2026-10-08.md).
 - [x] **VRDet2 (2026-10-09), kiến trúc mới:**
@@ -294,24 +294,24 @@ Câu hỏi còn mở:
 ## 9. Nhật ký
 
 - 2026-10-09 (5):
-  - API deploy giống Ultralytics: `from vrdet import VRDet` → `predict` → `Results.obb.*`, `plot`, `save_txt`, `summary`, `val().box.map`.
-    Code ở `vrdet/model.py`, `vrdet/results.py`; tài liệu [docs/DEPLOY.md](docs/DEPLOY.md).
+  - API deploy giống Ultralytics: `from openobb import VRDet` → `predict` → `Results.obb.*`, `plot`, `save_txt`, `summary`, `val().box.map`.
+    Code ở `openobb/model.py`, `openobb/results.py`; tài liệu [docs/DEPLOY.md](docs/DEPLOY.md).
   - `rotate_p` giờ áp dụng cả lên ảnh mosaic. 94 test pass.
 
 - 2026-10-09 (4):
-  - VRDet5 (`vrdet/models/vrdet5.py`, `vrdet5_loss.py`, `--arch v5`, `--geo-cls`, `--relate`, `--rel-k`).
-  - v3 nhận `--backbone`. Confusion matrix trong `vrdet/eval/ultra.py`. 90 test pass.
+  - VRDet5 (`openobb/models/vrdet5.py`, `vrdet5_loss.py`, `--arch v5`, `--geo-cls`, `--relate`, `--rel-k`).
+  - v3 nhận `--backbone`. Confusion matrix trong `openobb/eval/ultra.py`. 90 test pass.
 
 - 2026-10-09 (3):
-  - Thước đo Ultralytics (`vrdet/eval/ultra.py`).
-  - VRDet4-x (`vrdet/models/vit.py`, `DenseOriented`, `--arch v4`, `--backbone`, `--dense-v3`, `--primary`). 81 test pass.
+  - Thước đo Ultralytics (`openobb/eval/ultra.py`).
+  - VRDet4-x (`openobb/models/vit.py`, `DenseOriented`, `--arch v4`, `--backbone`, `--dense-v3`, `--primary`). 81 test pass.
 
 - 2026-10-09 (2): VRDet3.
-  - Viết `vrdet/models/vrdet3.py`, `vrdet3_loss.py`. CLI nhận `vrdet3{s,m,l,x}`. `assign` dùng chung có dải đa tầng (v2 tắt).
+  - Viết `openobb/models/vrdet3.py`, `vrdet3_loss.py`. CLI nhận `vrdet3{s,m,l,x}`. `assign` dùng chung có dải đa tầng (v2 tắt).
   - Thêm `tests/test_vrdet3.py`; 73 test pass.
 
 - 2026-10-09: VRDet2.
-  - Viết `vrdet/models/vrdet2.py`, `vrdet2_loss.py`. CLI nhận `vrdet1*` / `vrdet2*`. Predict/val nạp được v2.
+  - Viết `openobb/models/vrdet2.py`, `vrdet2_loss.py`. CLI nhận `vrdet1*` / `vrdet2*`. Predict/val nạp được v2.
   - Test `tests/test_vrdet2.py`; 65 test pass.
   - Overfit CPU tìm ra lỗi gán nhãn cho line dài, đã sửa (LEDGER F24).
 
@@ -321,10 +321,10 @@ Câu hỏi còn mở:
     - **c6 LSK: 78.16 / 68.81, xác nhận**, thành kiến trúc chốt.
   - Phân rã khoảng cách với YOLO26x (F18): recall ngang; thua ở độ khít box object mảnh và xếp hạng symbol nhỏ; bản S nhỏ hơn 4.6 lần.
   - Đóng gói thư viện:
-    - `pyproject.toml`, `vrdet/cli.py`, `vrdet/data/prepare.py` + `split.py`.
+    - `pyproject.toml`, `openobb/cli.py`, `openobb/data/prepare.py` + `split.py`.
     - `best.pt` cùng fine-tune giữ class theo tên.
     - `colab/VRDet_train.ipynb` thay `colab/finetune_vrdet.ipynb`.
-  - Push GitHub `Nguyenchitrai62/vrdet` (public theo lời user).
+  - Push GitHub `Nguyenchitrai62/openobb` (public theo lời user).
   - Tiêu khoảng 30 CU cho c4/c5/c6; còn khoảng 71.7 CU.
 
 - 2026-10-08 (đêm):

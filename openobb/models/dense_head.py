@@ -16,7 +16,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from vrdet.ops.obb_torch import probiou, rotated_iou
+from openobb.ops.obb_torch import probiou, rotated_iou
 
 
 class ConvBN(nn.Module):

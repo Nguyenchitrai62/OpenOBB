@@ -6,8 +6,8 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from vrdet.eval.dota import DOTA1_CLASSES  # noqa: E402
-from vrdet.ops.obb import obb2poly  # noqa: E402
+from openobb.eval.dota import DOTA1_CLASSES  # noqa: E402
+from openobb.ops.obb import obb2poly  # noqa: E402
 
 COLORS = {0: (40, 40, 230), 6: (40, 220, 40), 9: (230, 60, 40)}   # plane, ship, storage-tank (BGR)
 

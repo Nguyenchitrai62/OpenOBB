@@ -44,7 +44,7 @@ colab sessions                       # '[?]' rows belong to the user: never touc
    roadmap in `docs/RESEARCH_PLAN.md` §5 is background.
    - Before launching, write the hypothesis, the single variable being changed, and the pass/fail criterion into `research/HYPOTHESES.md`.
    - Always keep a same-conditions baseline. Prefer the cheapest experiment that can falsify the hypothesis (DIOR-R or a DOTA subset with a short schedule) before a full DOTA run.
-3. **Implement.** Code lives in `vrdet/` (model, losses, data, eval) and `colab/` (VM-side scripts, `colab/data/*.sh` dataset fetchers).
+3. **Implement.** Code lives in `openobb/` (model, losses, data, eval) and `colab/` (VM-side scripts, `colab/data/*.sh` dataset fetchers).
    - Training scripts must write everything to `--out`, auto-resume from `{out}/last.pt`, and append one JSON line per epoch to `{out}/metrics.jsonl`.
    - Setup steps must be idempotent: they rerun on every fresh VM.
    - Test locally on CPU with a tiny config before spending GPU (`python -m pytest -q` if tests exist).
@@ -71,7 +71,7 @@ If you are about to run out of context or quota, first make sure `AGENTS.md` §8
 
 ## 4. Rules that are easy to forget
 
-- Never use Ultralytics code inside `vrdet/` (AGPL). It may only be run as a baseline.
+- Never use Ultralytics code inside `openobb/` (AGPL). It may only be run as a baseline.
 - Use the standard DOTA rotated-mAP evaluator. Never claim a win without numbers measured under identical conditions.
 - Before ending a turn, run `colab sessions` and make sure no VM of yours is idle.
 - Never type passwords or OAuth codes for the user.

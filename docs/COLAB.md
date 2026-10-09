@@ -64,8 +64,8 @@ Ghi chú:
 ## 5. Quy ước cho nghiên cứu
 
 - Tên session: `<exp-id>-<gpu>`, ví dụ `e1-dior-a100`.
-- **Mọi checkpoint/log ghi vào Drive**: `/content/drive/MyDrive/vrdet/runs/<exp-id>/`. Train phải resume được từ `last.pt` vì VM có thể chết bất cứ lúc nào.
-- Dataset: tải 1 lần, nén, để trên Drive tại `/content/drive/MyDrive/vrdet/datasets/`. Mỗi VM mới copy về `/content/datasets` (đĩa local ~190 GB, nhanh hơn đọc trực tiếp từ Drive).
+- **Mọi checkpoint/log ghi vào Drive**: `/content/drive/MyDrive/openobb/runs/<exp-id>/`. Train phải resume được từ `last.pt` vì VM có thể chết bất cứ lúc nào.
+- Dataset: tải 1 lần, nén, để trên Drive tại `/content/drive/MyDrive/openobb/datasets/`. Mỗi VM mới copy về `/content/datasets` (đĩa local ~190 GB, nhanh hơn đọc trực tiếp từ Drive).
 - Ghi CU tiêu thụ của mỗi thí nghiệm vào `research/decisions.log`.
 - Môi trường VM đo ngày 2026-10-07 (T4): Python 3.13, torch 2.11.0+cu130, driver 580.
 

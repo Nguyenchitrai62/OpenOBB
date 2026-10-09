@@ -3,7 +3,7 @@
 Dùng: CLI giữ nguyên, chỉ đổi `model=`.
 
 ```bash
-vrdet train data=path/data.yaml model=vrdet2x epochs=300 imgsz=1024
+openobb train data=path/data.yaml model=vrdet2x epochs=300 imgsz=1024
 ```
 
 - `model=vrdet2x`: kiến trúc mới (VRDet2), train từ đầu.
@@ -62,11 +62,11 @@ Hệ quả: **mọi điểm trên một bức tường dài đều đọc ra cù
 
 | Loại | VRDet1 (D-FINE-OBB) | VRDet2 |
 |---|---|---|
-| Code chép/chuyển từ repo khác | Backbone + encoder D-FINE (Apache-2.0), khoảng 86% tham số | **0%**: toàn bộ model, assign và loss tự viết trong `vrdet/models/vrdet2.py`, `vrdet2_loss.py` |
+| Code chép/chuyển từ repo khác | Backbone + encoder D-FINE (Apache-2.0), khoảng 86% tham số | **0%**: toàn bộ model, assign và loss tự viết trong `openobb/models/vrdet2.py`, `vrdet2_loss.py` |
 | Weights pretrained | D-FINE COCO (Apache-2.0) | **Không có**: train từ đầu (random init) |
 | Ý tưởng công bố (không bản quyền) | DETR, deformable attention, FDR | CSP/PAN/SPPF/TAL/dual-assign của họ YOLO, strip conv (Strip R-CNN, LSKNet), AIFI, GFL (QFL/DFL), ProbIoU |
 | Phần mới của VRDet2 | — | Segment head (vị trí dọc, log-length, độ dày phân phối); o2o dùng chung box; top-k theo độ dài; vùng bỏ qua; ưu tiên điểm giữa; end loss + across loss |
-| Bộ khung train/val/predict (`vrdet/cli.py`, `train.py`, `engine.py`, data, eval) | Dùng chung | Dùng chung, không đổi gì ngoài chọn kiến trúc |
+| Bộ khung train/val/predict (`openobb/cli.py`, `train.py`, `engine.py`, data, eval) | Dùng chung | Dùng chung, không đổi gì ngoài chọn kiến trúc |
 | License | Apache-2.0 notice cho D-FINE | Không phụ thuộc bên thứ ba ngoài PyTorch → **sở hữu hoàn toàn** |
 
 ## 4. Công thức train mặc định của `vrdet2x`

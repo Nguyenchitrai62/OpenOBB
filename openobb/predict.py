@@ -11,7 +11,7 @@ Outputs per image in --out:
   {stem}.json  [{"class": name, "score": s, "poly": [8 pixel coords]}]
   {stem}_vis.jpg  (with --vis)
 
-python -m vrdet.predict --ckpt runs/myjob/last.pt --src pages/ --out preds/ [--conf 0.25] [--vis]
+python -m openobb.predict --ckpt runs/myjob/last.pt --src pages/ --out preds/ [--conf 0.25] [--vis]
 """
 import argparse
 import json
@@ -21,11 +21,11 @@ import cv2
 import numpy as np
 import torch
 
-from vrdet.data.vectors import cut_tile
-from vrdet.eval.dota import merge_patches
-from vrdet.models.dense_head import dense_predict
-from vrdet.models.vrdet import VRDet, postprocess
-from vrdet.ops.obb import obb2poly
+from openobb.data.vectors import cut_tile
+from openobb.eval.dota import merge_patches
+from openobb.models.dense_head import dense_predict
+from openobb.models.vrdet import VRDet, postprocess
+from openobb.ops.obb import obb2poly
 
 PAD_BGR = (104, 116, 124)
 IMG_EXT = (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")
@@ -47,19 +47,19 @@ def load_model(ckpt_path, device, queries=None, classes=None):
     if not names:
         raise SystemExit("class names unknown: pass --classes (classes.json of the training data or a,b,c)")
     if a.get("arch") == "v2":
-        from vrdet.models.vrdet2 import VRDet2
+        from openobb.models.vrdet2 import VRDet2
         m = VRDet2(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
     if a.get("arch") == "v5":
-        from vrdet.models.vrdet5 import VRDet5
+        from openobb.models.vrdet5 import VRDet5
         m = VRDet5(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
                    max_det=max(int(a.get("num_top", 1000)), int(queries or 0)), backbone=a.get("backbone", "dinov2_b"),
                    geo_cls=a.get("geo_cls", True), relate=a.get("relate", True), rel_k=a.get("rel_k", 600))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
     if a.get("arch") == "v3":
-        from vrdet.models.vrdet3 import VRDet3
+        from openobb.models.vrdet3 import VRDet3
         m = VRDet3(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
                    max_det=max(int(a.get("num_top", 1000)), int(queries or 0)), backbone=a.get("backbone", "hgnet"))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
@@ -128,7 +128,7 @@ def conf_thresholds(names, targs, conf):
     if str(conf).lower() == "auto":
         saved = targs.get("conf_thr") or {}
         if not saved:
-            print("[vrdet] checkpoint has no per-class thresholds: using conf 0.25")
+            print("[openobb] checkpoint has no per-class thresholds: using conf 0.25")
         return [float(saved.get(n, 0.25)) for n in names]
     return [float(conf)] * len(names)
 

@@ -1,6 +1,6 @@
 """Ultralytics-style model object for deployment (VRDet's own implementation of that public interface).
 
-    from vrdet import VRDet
+    from openobb import VRDet
     model = VRDet("best.pt")                          # any VRDet checkpoint (v1..v5)
     results = model.predict("page.png", conf=0.25, iou=0.7, imgsz=1280)   # or model("page.png")
     for r in results:
@@ -18,7 +18,7 @@ import cv2
 import numpy as np
 import torch
 
-from vrdet.results import OBB, Results
+from openobb.results import OBB, Results
 
 IMG_EXT = (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp")
 
@@ -114,7 +114,7 @@ class VRDet:
 
     # ---- loading
     def _load(self, device=None):
-        from vrdet.predict import load_model
+        from openobb.predict import load_model
         dev = torch.device(device if device not in (None, "") else ("cuda" if torch.cuda.is_available() else "cpu"))
         if isinstance(device, int) or (isinstance(device, str) and device.isdigit()):
             dev = torch.device(f"cuda:{int(device)}")
@@ -156,9 +156,9 @@ class VRDet:
 
     def _predict(self, source, conf, iou, imgsz, device, max_det, classes, agnostic_nms, verbose, save, save_txt,
                  save_conf, project, name, exist_ok, batch, tile, line_width, show, show_labels, show_conf):
-        from vrdet.data.dota import polys_to_obb
-        from vrdet.ops.obb import nms_poly
-        from vrdet.predict import conf_thresholds, merge_dets, predict_image
+        from openobb.data.dota import polys_to_obb
+        from openobb.ops.obb import nms_poly
+        from openobb.predict import conf_thresholds, merge_dets, predict_image
         if self.model is None or (device not in (None, "") and str(device) != str(self.device)):
             self._load(device)
         a = self.args
@@ -174,7 +174,7 @@ class VRDet:
             keep_cls = {int(c) if str(c).isdigit() else names.index(str(c)) for c in cl}
         save_dir = None
         if save or save_txt:
-            from vrdet.cli import increment_path
+            from openobb.cli import increment_path
             save_dir = increment_path(project, name, exist_ok)
             save_dir.mkdir(parents=True, exist_ok=True)
         srcs = load_sources(source)
@@ -220,7 +220,7 @@ class VRDet:
 
     # ---- training / validation (same entry points as the CLI)
     def train(self, data=None, **kw):
-        from vrdet.cli import train
+        from openobb.cli import train
         r = train(data, model=self.ckpt_path, **kw)
         if Path(r.best).exists():
             self.ckpt_path = r.best
@@ -228,5 +228,5 @@ class VRDet:
         return r
 
     def val(self, data=None, **kw):
-        from vrdet.cli import val
+        from openobb.cli import val
         return Metrics(val(self.ckpt_path, data, **kw), self.names)

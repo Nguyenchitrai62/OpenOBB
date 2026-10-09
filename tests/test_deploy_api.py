@@ -12,7 +12,7 @@ torch.set_num_threads(1)
 
 @pytest.fixture(scope="module")
 def ckpt(tmp_path_factory):
-    from vrdet.models.vrdet3 import VRDet3
+    from openobb.models.vrdet3 import VRDet3
     d = tmp_path_factory.mktemp("m")
     torch.manual_seed(0)
     m = VRDet3("s", num_classes=2, img_size=256)
@@ -27,7 +27,7 @@ def ckpt(tmp_path_factory):
 
 
 def test_obb_geometry_follows_yolo_conventions():
-    from vrdet.results import OBB
+    from openobb.results import OBB
     o = OBB(torch.tensor([[100.0, 50.0, 40.0, 10.0, math.pi / 2, 0.9, 1.0]]), (200, 300))
     p = o.xyxyxyxy[0]
     assert torch.allclose(p[:, 0].sort().values, torch.tensor([95.0, 95.0, 105.0, 105.0]), atol=1e-4)
@@ -39,7 +39,7 @@ def test_obb_geometry_follows_yolo_conventions():
 
 
 def test_predict_like_yolo(ckpt, tmp_path):
-    from vrdet import VRDet
+    from openobb import VRDet
     p, d, img = ckpt
     model = VRDet(str(p))
     assert model.names == {0: "wall", 1: "door"} and model.task == "obb"
@@ -71,7 +71,7 @@ def test_predict_like_yolo(ckpt, tmp_path):
 
 
 def test_result_outputs(ckpt, tmp_path):
-    from vrdet import VRDet
+    from openobb import VRDet
     p, d, img = ckpt
     r = VRDet(str(p))(img, conf=0.0, max_det=5, verbose=False)[0]
     s = r.summary()

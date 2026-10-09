@@ -13,7 +13,7 @@ from pathlib import Path
 
 import cv2
 
-from vrdet.data.split import split_items
+from openobb.data.split import split_items
 
 IMG_EXT = (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp")
 

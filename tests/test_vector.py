@@ -6,9 +6,9 @@ import cv2
 import numpy as np
 import torch
 
-from vrdet.data.dota import DotaPatches, collate
-from vrdet.engine import ctx_batch
-from vrdet.models.vrdet import VRDet
+from openobb.data.dota import DotaPatches, collate
+from openobb.engine import ctx_batch
+from openobb.models.vrdet import VRDet
 
 torch.set_num_threads(1)
 S = 256

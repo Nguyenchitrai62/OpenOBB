@@ -3,7 +3,7 @@
 Dùng: CLI giữ nguyên, chỉ đổi `model=`.
 
 ```bash
-vrdet train data=/content/data.yaml model=vrdet5x epochs=100 imgsz=1280
+openobb train data=/content/data.yaml model=vrdet5x epochs=100 imgsz=1280
 ```
 
 - Mặc định: lr 5e-4, phần ViT × 0.2, batch 8.
@@ -79,7 +79,7 @@ Epoch  GPU_mem  cls_loss  box_loss  dfl_loss  angle_loss  rel_loss  Instances  S
 
 - `rel_loss` là loss của bộ chấm lại. Phải giảm, nếu không thì phần quan hệ không học được gì.
 - **Mới ở mọi run:** cuối run in dòng `Most frequent errors (true -> predicted ...)`, và lưu `confusion_matrix.json`.
-  Đọc ra được, ví dụ, `wall_300 -> wall: 37 (26% of wall_300)`, tức wall_300 bị gọi nhầm thành wall. `vrdet val` cũng in phần này.
+  Đọc ra được, ví dụ, `wall_300 -> wall: 37 (26% of wall_300)`, tức wall_300 bị gọi nhầm thành wall. `openobb val` cũng in phần này.
 
 ## 5. Rủi ro
 

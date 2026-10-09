@@ -286,7 +286,7 @@ def snap_boxes(member_logits, pts, valid, q, polys, img_size, thr=0.5, iou_gate=
     member_logits (Q, M), pts (M, 16) normalised, valid (M,), q (K,) query per output, polys (K, 8) px."""
     import cv2
     import numpy as np
-    from vrdet.ops.obb import poly_iou
+    from openobb.ops.obb import poly_iou
     out = polys.copy()
     prob = 1 / (1 + np.exp(-member_logits))
     P = pts.reshape(-1, 8, 2) * img_size

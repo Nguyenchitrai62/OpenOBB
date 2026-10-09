@@ -3,8 +3,8 @@ import math
 import numpy as np
 import torch
 
-from vrdet.ops.obb import obb2poly as obb2poly_np, poly_iou
-from vrdet.ops.obb_torch import norm_le90, obb2poly, probiou, probiou_matrix, rotated_iou, rotated_iou_matrix
+from openobb.ops.obb import obb2poly as obb2poly_np, poly_iou
+from openobb.ops.obb_torch import norm_le90, obb2poly, probiou, probiou_matrix, rotated_iou, rotated_iou_matrix
 
 g = torch.Generator().manual_seed(0)
 
@@ -76,7 +76,7 @@ def test_norm_le90():
 
 def test_probiou_is_scale_invariant():
     """Regression (2026-10-08): additive eps made ProbIoU ~1 for normalised boxes below ~100 px."""
-    from vrdet.ops.obb_torch import probiou
+    from openobb.ops.obb_torch import probiou
     n = torch.tensor([1024.0, 1024.0, 1024.0, 1024.0, 1.0])
     for side in (3.0, 12.0, 60.0, 400.0):
         a = torch.tensor([[500.0, 500.0, side, side / 2, 0.3]])

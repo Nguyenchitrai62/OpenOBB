@@ -5,8 +5,8 @@ import cv2
 import numpy as np
 import torch
 
-from vrdet.data.dota import DotaPatches
-from vrdet.ops.obb import obb2poly
+from openobb.data.dota import DotaPatches
+from openobb.ops.obb import obb2poly
 
 COL = {0: (40, 40, 230), 6: (40, 220, 40)}
 
@@ -65,8 +65,8 @@ def test_rotation_also_applies_to_mosaic_samples(tmp_path):
     import numpy as np
 
     from test_cli import _dataset
-    from vrdet.data.dota import DotaPatches
-    from vrdet.data.prepare import prepare
+    from openobb.data.dota import DotaPatches
+    from openobb.data.prepare import prepare
     out = prepare(str(_dataset(tmp_path / "ds", n_train=4)), tmp_path / "prep", size=512, fit=True, workers=1)
     ds = DotaPatches(str(out), "train", size=512, augment=True, mosaic_p=1.0, mosaic_mode="yolo", rotate_p=1.0,
                      rot90=False, flip=False, scale_jitter=0.0, translate=0.0)

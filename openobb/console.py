@@ -60,7 +60,7 @@ class EpochBar:
 
 def val_rows(res, seconds=None, stream=sys.stdout):
     """'Class Images Instances P R mAP50 mAP50-95' header + the 'all' row."""
-    from vrdet.eval.dota import summary_table
+    from openobb.eval.dota import summary_table
     head, row = summary_table(res, per_class=False).splitlines()
     print(head + (f"  ({_dur(seconds)})" if seconds is not None else ""), file=stream)
     print(row, file=stream, flush=True)

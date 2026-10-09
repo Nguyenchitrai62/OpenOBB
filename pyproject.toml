@@ -3,9 +3,9 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vrdet"
+name = "openobb"
 version = "0.1.0"
-description = "VRDet: real-time oriented-box (OBB) detector, DETR-style, for CAD drawings and aerial images"
+description = "OpenOBB: oriented-box (OBB) detection library (VRDet architectures) for CAD drawings and aerial images"
 readme = "docs/FINETUNE.md"
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
@@ -23,7 +23,7 @@ dev = ["pytest"]
 app = ["streamlit", "pandas"]
 
 [project.scripts]
-vrdet = "vrdet.cli:main"
+openobb = "openobb.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["vrdet*"]
+include = ["openobb*"]

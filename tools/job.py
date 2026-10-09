@@ -4,9 +4,9 @@ A job is research/jobs/<id>.json:
 {
   "id": "e1-dior-s",            # also the Colab session name prefix
   "gpu": "A100",                # T4 | L4 | A100 | H100
-  "bundle": ["vrdet", "colab"], # local dirs shipped to /content/work/code
+  "bundle": ["openobb", "colab"], # local dirs shipped to /content/work/code
   "setup": ["pip install -q -r colab/requirements.txt", "bash colab/data/dior_r.sh"],
-  "cmd": "python -u -m vrdet.train --cfg cfg/x.yaml --out {out}",
+  "cmd": "python -u -m openobb.train --cfg cfg/x.yaml --out {out}",
   "sync": ["last.pt", "best.pt", "*.json", "*.jsonl", "*.log", "*.png"],
   "max_hours": 10, "max_retries": 3
 }

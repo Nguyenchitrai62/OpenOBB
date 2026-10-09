@@ -3,7 +3,7 @@
 Chỉ nói về kiến trúc model: chỉ số, các lớp, phần dùng lại và nguồn, rủi ro bản quyền.
 
 - Mục tiêu: OBB trên **ảnh** bản vẽ CAD (object nhỏ, ống mảnh, khối), không dùng vector khi suy luận.
-- Bản chốt: **VRDet + LSK** (run `c6-fpc-raster-lsk-s`). Đây là mặc định của `vrdet train`.
+- Bản chốt: **VRDet + LSK** (run `c6-fpc-raster-lsk-s`). Đây là mặc định của `openobb train`.
 - Lịch sử thí nghiệm: [research/LEDGER.md](../research/LEDGER.md).
 
 ## 1. Sơ đồ

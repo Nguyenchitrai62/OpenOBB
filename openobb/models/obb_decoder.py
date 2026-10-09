@@ -19,7 +19,7 @@ import torch.nn.functional as F
 import torch.nn.init as init
 
 from .deim_utils import bias_init_with_prob, deformable_attention_core_func_v2, get_activation
-from vrdet.ops.obb_torch import probiou
+from openobb.ops.obb_torch import probiou
 from .obb_utils import (angle_project, box_to_unact, distance2obb, inverse_sigmoid, pos_features,
                         unact_to_box, weighting_function)
 

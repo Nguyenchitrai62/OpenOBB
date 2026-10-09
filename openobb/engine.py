@@ -8,10 +8,10 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from vrdet.data.dota import DotaPatches, collate, dataset_classes
-from vrdet.eval.dota import DOTA1_CLASSES, evaluate, load_gt_dir, merge_patches, parse_patch_name
-from vrdet.models.vrdet import postprocess
-from vrdet.ops.obb import obb2poly
+from openobb.data.dota import DotaPatches, collate, dataset_classes
+from openobb.eval.dota import DOTA1_CLASSES, evaluate, load_gt_dir, merge_patches, parse_patch_name
+from openobb.models.vrdet import postprocess
+from openobb.ops.obb import obb2poly
 
 
 class ModelEMA:
@@ -155,7 +155,7 @@ def to_device(imgs, targets, device):
 @torch.no_grad()
 def predict_patches(model, ds, device, batch=32, workers=8, num_top=300, img_size=1024, amp=True, post="flat"):
     """-> {"dec": [(patch, cls, score, poly8)], "dense": [...] (only if the model has a dense head)}."""
-    from vrdet.models.dense_head import dense_predict
+    from openobb.models.dense_head import dense_predict
     model.eval()
     dl = DataLoader(ds, batch_size=batch, shuffle=False, num_workers=workers, collate_fn=collate, pin_memory=True)
     out = {"dec": []}
@@ -171,7 +171,7 @@ def predict_patches(model, ds, device, batch=32, workers=8, num_top=300, img_siz
         s, l, b, qi = s.cpu().numpy(), l.cpu().numpy(), b.cpu().numpy(), qi.cpu().numpy()
         grounded = "pred_members" in o
         if grounded:                           # H17: snap boxes to the selected CAD primitives
-            from vrdet.models.vrdet import snap_boxes
+            from openobb.models.vrdet import snap_boxes
             out.setdefault("snap", [])
             out.setdefault("snapg", [])
             mem = o["pred_members"].float().cpu().numpy()
@@ -296,7 +296,7 @@ def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num
             primary_dets = dets
     res = results[primary if primary in results else "dec"]
     if ultra or metric == "yolo":               # Ultralytics-validator conventions, comparable with YOLO's mAP
-        from vrdet.eval.ultra import evaluate_ultra
+        from openobb.eval.ultra import evaluate_ultra
         res["ultra"] = evaluate_ultra(primary_dets, gts, classes)
     if metric == "yolo":                        # report (and select best.pt) on the YOLO-comparable numbers
         u = res["ultra"]

@@ -1,13 +1,13 @@
 """VRDet command line and Python API. Arguments are key=value pairs.
 
-    vrdet train   data=data.yaml model=s epochs=100 imgsz=1024             # -> runs/obb/train, train2, ...
-    vrdet train   data=data.yaml model=runs/obb/train/weights/best.pt epochs=50   # fine-tune
-    vrdet train   resume=True                                                # continue the latest unfinished run
-    vrdet val     model=runs/obb/train/weights/best.pt data=data.yaml
-    vrdet predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.25   # -> runs/obb/predict, ...
-    vrdet prepare data=data.yaml out=datasets/mydata imgsz=1024
+    openobb train   data=data.yaml model=s epochs=100 imgsz=1024             # -> runs/obb/train, train2, ...
+    openobb train   data=data.yaml model=runs/obb/train/weights/best.pt epochs=50   # fine-tune
+    openobb train   resume=True                                                # continue the latest unfinished run
+    openobb val     model=runs/obb/train/weights/best.pt data=data.yaml
+    openobb predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.25   # -> runs/obb/predict, ...
+    openobb prepare data=data.yaml out=datasets/mydata imgsz=1024
 
-    from vrdet import Detector
+    from openobb import Detector
     model = Detector("s")                       # or Detector("runs/obb/train/weights/best.pt")
     r = model.train(data="data.yaml", epochs=100, imgsz=1024)    # r.best = runs/obb/train/weights/best.pt
     model.predict("pages/", conf=0.25)
@@ -145,7 +145,7 @@ def prepare_data(data, imgsz=1024, gap=200, val_frac=0.15, scale=1.0, cache_dir=
     """data.yaml / dataset folder -> prepared cache dir (built once, reused). Prepared dirs pass through."""
     if _is_prepared(data):
         return Path(data)
-    from vrdet.data.prepare import prepare
+    from openobb.data.prepare import prepare
     src = Path(data).resolve()
     key = hashlib.sha1(f"{src}|{imgsz}|{gap}|{val_frac}|{scale}|{seed}|{fit}".encode()).hexdigest()[:8]
     stem = src.parent.name if src.suffix in (".yaml", ".yml") else src.name
@@ -226,7 +226,7 @@ def page_stats(data, n=40):
     import cv2
     import numpy as np
 
-    from vrdet.data.prepare import IMG_EXT, _labels_for, find_splits
+    from openobb.data.prepare import IMG_EXT, _labels_for, find_splits
     _, splits = find_splits(data)
     imgs = sorted(p for p in splits["train"].iterdir() if p.suffix.lower() in IMG_EXT)
     lbl_dir = _labels_for(splits["train"])
@@ -262,7 +262,7 @@ def auto_scale(data, imgsz, fit=0.7):
         scale = min(1.0, imgsz / med)
     scale = math.floor(scale * 1e4) / 1e4
     how = "one tile per page" if med * scale <= imgsz else f"~{math.ceil((med * scale - 200) / (imgsz - 200)) ** 2} tiles per page"
-    print(f"[vrdet] tile mode: pages ~{med:.0f} px, objects up to ~{big:.0f} px (p99) -> tile_scale {scale}, {how}")
+    print(f"[openobb] tile mode: pages ~{med:.0f} px, objects up to ~{big:.0f} px (p99) -> tile_scale {scale}, {how}")
     return scale
 
 
@@ -295,7 +295,7 @@ RUN_FILES = ("weights/last.pt", "weights/best.pt", "last.pt", "best.pt", "train_
 def _known_keys():
     import inspect
 
-    from vrdet.train import build_parser
+    from openobb.train import build_parser
     keys = set(inspect.signature(train).parameters) - {"extra"}
     keys |= set(ALIASES) | set(IGNORED) | set(AUGMENT) | {"hsv_h", "hsv_s", "hsv_v", "amp", "rot90"}
     keys |= {a.dest for a in build_parser()._actions}
@@ -327,13 +327,13 @@ def _batch_from(batch, sd, imgsz, n_train):
     small = 2 ** int(math.log2(max(4, n_train // MIN_STEPS_EPOCH)))   # small data: >= ~25 optimizer steps / epoch
     if small < batch:
         batch, why = max(4, small), f"{n_train} training images"
-    print(f"[vrdet] batch {batch} ({why}; set batch= to override)")
+    print(f"[openobb] batch {batch} ({why}; set batch= to override)")
     return batch
 
 
 def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_ema):
     """Run the trainer; on CUDA out-of-memory before the first epoch is saved, halve the batch and retry."""
-    from vrdet import train as trainer
+    from openobb import train as trainer
     opts["wdir"] = "weights"
     for attempt in range(4):
         ipe = max(1, n_train // int(opts["batch"]))
@@ -347,7 +347,7 @@ def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_
         saved = json.loads(args_file.read_text()) if args_file.exists() else {}
         args_file.write_text(json.dumps({**saved, "prepared": str(prepared), **opts}, indent=1, default=str))
         if opts.get("verbose"):
-            print("[vrdet] python -m vrdet.train " + " ".join(argv))
+            print("[openobb] python -m openobb.train " + " ".join(argv))
         try:
             trainer.main(argv)
             return
@@ -360,7 +360,7 @@ def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_
         torch.cuda.empty_cache()
         old = int(opts["batch"])
         opts["batch"] = max(2, old // 2)
-        print(f"[vrdet] WARNING: CUDA out of memory with batch={old}. Reducing to batch={opts['batch']} and retrying.")
+        print(f"[openobb] WARNING: CUDA out of memory with batch={old}. Reducing to batch={opts['batch']} and retrying.")
 
 
 def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="runs/obb", name=None,
@@ -375,7 +375,7 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
             extra[ALIASES[k]] = extra.pop(k)
         elif k in IGNORED:
             extra.pop(k)
-            print(f"[vrdet] '{k}' is not used by VRDet (ignored)")
+            print(f"[openobb] '{k}' is not used by VRDet (ignored)")
     if extra.pop("amp", True) is False:
         extra["no_amp"] = True
     if extra.pop("rot90", True) is False:
@@ -400,7 +400,7 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
         given = {"batch": batch, "imgsz": imgsz, **extra, **({"epochs": epochs} if epochs != 100 else {})}
         ignored = [k for k, v in given.items() if v is not None and k not in RESUME_OK
                    and str(opts.get(ALIASES.get(k, k), v)) != str(v)]
-        print(f"[vrdet] resuming {save_dir} with its saved settings"
+        print(f"[openobb] resuming {save_dir} with its saved settings"
               + (f" (ignores {ignored})" if ignored else ""))
         opts.update({k: extra[k] for k in RESUME_OK if k in extra})
         if workers is not None:
@@ -409,7 +409,7 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
         _run_trainer(save_dir, prepared, opts, n_train, opts["epochs"], warmup_epochs, user_ema=True)
         return _summary(save_dir)
     if data is None:
-        raise SystemExit("vrdet train needs data=<data.yaml or dataset folder>")
+        raise SystemExit("openobb train needs data=<data.yaml or dataset folder>")
     save_dir = increment_path(project, name or "train", exist_ok)   # new run: train, train2, ... (never resumes)
     save_dir.mkdir(parents=True, exist_ok=True)
     saved_file = save_dir / "vrdet_args.json"
@@ -437,16 +437,16 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
     imgsz = int(imgsz or extra.pop("img", None) or 1024)
     if imgsz % 32:
         imgsz = int(math.ceil(imgsz / 32) * 32)
-        print(f"[vrdet] imgsz must be a multiple of 32: using {imgsz}")
+        print(f"[openobb] imgsz must be a multiple of 32: using {imgsz}")
 
     fit = not tile and tile_scale is None
     if fit:
         med, big, small = page_stats(data) if not _is_prepared(data) else (0, 0, 0)
         if med:
             r = imgsz / med
-            print(f"[vrdet] images ~{med:.0f} px (median long side) -> resized x{r:.2f} to long side {imgsz} px")
+            print(f"[openobb] images ~{med:.0f} px (median long side) -> resized x{r:.2f} to long side {imgsz} px")
             if small and small * r < 3:
-                print(f"[vrdet] WARNING: small objects (~{small:.0f} px) become ~{small * r:.1f} px at this size; "
+                print(f"[openobb] WARNING: small objects (~{small:.0f} px) become ~{small * r:.1f} px at this size; "
                       f"use a larger imgsz or tile=True")
         scale = 1.0
     else:
@@ -464,7 +464,7 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
 
     steps = max(1, n_train // int(batch)) * int(epochs)
     if steps < MIN_STEPS and not extra.get("time"):
-        print(f"[vrdet] WARNING: only {steps} optimizer steps ({max(1, n_train // int(batch))}/epoch x {epochs} epochs); this "
+        print(f"[openobb] WARNING: only {steps} optimizer steps ({max(1, n_train // int(batch))}/epoch x {epochs} epochs); this "
               f"detector needs ~{MIN_STEPS}+ to converge: raise epochs or lower batch")
     opts = {"size": size, "img": imgsz, "scale": scale, "fit": fit, "epochs": int(epochs), "batch": int(batch),
             "aug_iof": 0.25, "merge_iou": 0.7 if fit else 0.1, "cache": bool(cache),
@@ -475,7 +475,7 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
     q = _queries_for(prepared)
     if q > 300 and not dense_arch:
         opts.update(queries=q, num_top=q)
-        print(f"[vrdet] dense images (p99 objects/image > 240): {q} queries")
+        print(f"[openobb] dense images (p99 objects/image > 240): {q} queries")
     if workers is not None:
         opts["workers"] = int(workers)
     if recipe:
@@ -490,7 +490,7 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
         opts["weights"] = weights
     opts.update(extra)
     if float(opts["lr"]) > 3 * sd["lr"] and not dense_arch:
-        print(f"[vrdet] WARNING: lr0={opts['lr']:g} is {float(opts['lr']) / sd['lr']:.0f}x the default for VRDet-{size} "
+        print(f"[openobb] WARNING: lr0={opts['lr']:g} is {float(opts['lr']) / sd['lr']:.0f}x the default for VRDet-{size} "
               f"({sd['lr']:g}). DETR-style detectors usually diverge (NaN boxes) above ~2e-4; the 1e-3 of one-stage "
               f"detectors does not transfer.")
     saved_file.write_text(json.dumps({"data": str(data)}, indent=1))
@@ -518,10 +518,10 @@ def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, b
     _set_device(device)
     import torch
 
-    from vrdet.data.dota import dataset_classes
-    from vrdet.engine import eval_dota
-    from vrdet.eval.dota import summary_table
-    from vrdet.predict import load_model
+    from openobb.data.dota import dataset_classes
+    from openobb.engine import eval_dota
+    from openobb.eval.dota import summary_table
+    from openobb.predict import load_model
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net, names, targs = load_model(model, dev, queries)
     imgsz = int(imgsz or targs.get("img", 1024))
@@ -542,7 +542,7 @@ def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, b
                        post=targs.get("post", "flat"), primary=targs.get("primary", "dec"),
                        fusion=targs.get("primary", "dec") != "dec", ultra=True, metric=metric)
     print(summary_table(res, classes))
-    from vrdet.eval.ultra import top_confusions
+    from openobb.eval.ultra import top_confusions
     for line in top_confusions(res["ultra"]["confusion"], k=10):
         print("  confusion  " + line)
     if res.get("metric") == "yolo":
@@ -564,10 +564,10 @@ def predict(model, source, conf=0.25, save_dir=None, vis=True, imgsz=None, tile=
     conf="auto" uses the per-class thresholds (best F2 on val) stored in best.pt; classes= keeps only these class
     ids or names; names= supplies class names for checkpoints that lack them."""
     _set_device(device)
-    from vrdet.predict import run
+    from openobb.predict import run
     if save_dir is None and save:
         save_dir = increment_path(project, name, exist_ok)
-        print(f"[vrdet] results -> {save_dir}")
+        print(f"[openobb] results -> {save_dir}")
     return run(model, source, save_dir, conf, names, imgsz, gap, queries, batch, bool(vis) and save_dir is not None,
                scale=tile_scale, tile=True if tile_scale is not None else tile, classes=classes)
 
@@ -608,11 +608,11 @@ def main(argv=None):
         if bad:
             import difflib
             near = difflib.get_close_matches(bad[0], sorted(ok), n=3, cutoff=0.6)
-            raise SystemExit(f"'{bad[0]}' is not a valid argument for vrdet {mode}."
+            raise SystemExit(f"'{bad[0]}' is not a valid argument for openobb {mode}."
                              + (f" Similar: {', '.join(near)}" if near else ""))
     if mode == "train":
         if "data" not in kv and not kv.get("resume"):
-            raise SystemExit("vrdet train needs data=<data.yaml or dataset folder> (or resume=True)")
+            raise SystemExit("openobb train needs data=<data.yaml or dataset folder> (or resume=True)")
         train(**kv)
     elif mode == "val":
         val(**kv)
@@ -622,13 +622,13 @@ def main(argv=None):
         out = kv.pop("out", None)
         tile = bool(kv.get("tile", False))
         if out:
-            from vrdet.data.prepare import prepare
+            from openobb.data.prepare import prepare
             prepare(kv["data"], out, size=int(kv.get("imgsz", 1024)), gap=int(kv.get("gap", 200)),
                     val_frac=float(kv.get("val_frac", 0.15)), seed=int(kv.get("seed", 0)),
                     workers=kv.get("workers"), scale=float(kv.get("tile_scale", 1.0)), fit=not tile)
-            print(f"[vrdet] prepared -> {out}")
+            print(f"[openobb] prepared -> {out}")
         else:
-            print(f"[vrdet] prepared -> {prepare_data(kv['data'], int(kv.get('imgsz', 1024)), fit=not tile)}")
+            print(f"[openobb] prepared -> {prepare_data(kv['data'], int(kv.get('imgsz', 1024)), fit=not tile)}")
     return 0
 
 

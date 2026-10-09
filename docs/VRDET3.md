@@ -3,7 +3,7 @@
 Dùng: CLI giữ nguyên, chỉ đổi `model=`.
 
 ```bash
-vrdet train data=/content/data.yaml model=vrdet3x epochs=100 imgsz=1280
+openobb train data=/content/data.yaml model=vrdet3x epochs=100 imgsz=1280
 ```
 
 - Mặc định: backbone + encoder khởi tạo từ D-FINE-X COCO (Apache-2.0), tự tải về.

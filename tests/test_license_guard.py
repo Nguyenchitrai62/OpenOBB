@@ -2,7 +2,7 @@
 import ast
 from pathlib import Path
 
-PKG = Path(__file__).resolve().parents[1] / "vrdet"
+PKG = Path(__file__).resolve().parents[1] / "openobb"
 FORBIDDEN = ("ultralytics", "mmcv", "mmdet", "mmrotate", "ai4rs")     # AGPL, or carrying NC-derived code
 
 

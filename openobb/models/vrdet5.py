@@ -6,7 +6,7 @@ Built from the Wall_Color results (research/LEDGER.md F31-F33, Ultralytics-style
   * VRDet4 (DINOv2 + DETR decoder) 0.663 / 0.457 in one run: better wall_300 (+0.08) and wall fit, but weak rare
     classes (one positive per object in the decoder) and 38 ms.
 VRDet5 keeps the dense head as the output (rare classes, speed) and adds what VRDet4 suggested helps:
-  1. DINOv2 ViT-B backbone (vrdet/models/vit.py) - self-supervised features (default; backbone=hgnet for speed);
+  1. DINOv2 ViT-B backbone (openobb/models/vit.py) - self-supervised features (default; backbone=hgnet for speed);
   2. geometry-aware classification: the class branch reads the geometry the box branch measured on the same point
      (thickness, length, angle, across offset, thickness uncertainty; detached). wall vs wall_300 differ mostly by
      thickness, which the class branch of VRDet3 could not see;
@@ -21,7 +21,7 @@ import math
 import torch
 import torch.nn as nn
 
-from vrdet.ops.obb_torch import probiou
+from openobb.ops.obb_torch import probiou
 
 from .obb_decoder import distinct_topk
 from .vrdet3 import ALONG_BINS, THICK_BINS, OrientedHead, VRDet3, decode, fast_nms
