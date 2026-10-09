@@ -94,6 +94,8 @@ def build_parser():
     ap.add_argument("--hsv", type=float, nargs=3, default=[0.015, 0.5, 0.3])
     ap.add_argument("--skip-final-eval", action="store_true")
     ap.add_argument("--dense", action="store_true", help="add the dense one-to-many rotated head (H4)")
+    ap.add_argument("--primary", default="dec", choices=["dec", "union"],
+                    help="detections scored as the model output: decoder only, or decoder + dense head (NMS)")
     ap.add_argument("--dense-weight", type=float, default=1.0)
     ap.add_argument("--dense-queries", action="store_true", help="H4c: decoder queries from the dense head")
     ap.add_argument("--box-loss", default="kld", choices=["kld", "probiou"], help="H1")
@@ -507,7 +509,9 @@ def main(argv=None):
             t_val = time.time()
             ema.repair(model, log=lambda m: log(m, console=not warned_ema) or warned.add("ema"))
             res, _ = eval_dota(ema.module, a.data, device, val_subset, batch=a.batch, workers=a.workers,
-                               num_top=a.num_top, img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post, merge_iou=a.merge_iou)
+                               num_top=a.num_top, img_size=a.img, log=log, context=a.context, vectors=a.vectors,
+                               post=a.post, merge_iou=a.merge_iou, fusion=a.primary != "dec",
+                               variants=["dec", a.primary], primary=a.primary)
             if not a.verbose:
                 val_rows(res, time.time() - t_val)
             rec["sub_mAP50"] = round(res["mAP50"], 4)
@@ -553,7 +557,7 @@ def main(argv=None):
     res, dets = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.num_top,
                           img_size=a.img, log=log, fusion=a.dense or a.vec_ground > 0, variants=["dec", "dense", "union", "snap", "snapg"],
                           save_preds_to=(out / "val_preds.npz") if a.dense else None, context=a.context,
-                          vectors=a.vectors, post=a.post, merge_iou=a.merge_iou)
+                          vectors=a.vectors, post=a.post, merge_iou=a.merge_iou, primary=a.primary, ultra=True)
     if not a.eval_only and not full_val:
         save_best(res["mAP50_95"], a.epochs - 1)
     table = summary_table(res, classes)
@@ -564,13 +568,18 @@ def main(argv=None):
     if a.eval_queries and a.eval_queries != a.queries and not dense_arch:   # extra eval, main numbers stay at --queries
         ema.module.decoder.num_queries = a.eval_queries
         rq, _ = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.eval_queries,
-                          img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post, merge_iou=a.merge_iou)
+                          img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post, merge_iou=a.merge_iou,
+                          fusion=a.primary != "dec", variants=["dec", a.primary], primary=a.primary, ultra=True)
         (out / f"eval_val_q{a.eval_queries}.txt").write_text(summary_table(rq, classes) + "\n")
         (out / f"eval_val_q{a.eval_queries}.json").write_text(json.dumps(rq, indent=1))
         jlog({"final_q": a.eval_queries, "mAP50": rq["mAP50"], "mAP50_95": rq["mAP50_95"]})
         ema.module.decoder.num_queries = a.queries
     final = rq if a.eval_queries and a.eval_queries != a.queries and not dense_arch else res
     say(summary_table(final, classes))
+    if final.get("ultra"):
+        u = final["ultra"]
+        say(f"Ultralytics-style metric (ProbIoU matching, 101-point AP; compare with YOLO's printed mAP): "
+            f"mAP50 {u['mAP50']:.3f}  mAP50-95 {u['mAP50_95']:.3f}")
     if not a.eval_only and (wdir / "best.pt").exists():  # per-class confidence (best F2) for predict conf=auto
         ck = torch.load(wdir / "best.pt", map_location="cpu", weights_only=False)
         ck["conf_thr"] = {c: round(final["classes"][c].get("conf_f2", 0.25), 3) for c in classes}
@@ -605,7 +614,8 @@ def main(argv=None):
         f"results.csv/png, val_pred.jpg")
     jlog({"final": True, "split": "val", "weights": weights, "mAP50": res["mAP50"], "mAP50_95": res["mAP50_95"],
           "per_class_AP50": {c: round(r["AP50"], 4) for c, r in res["classes"].items()},
-          "latency_ms_pt_fp16_bs1": lat, "fusion": {k: round(v["mAP50"], 4) for k, v in res.get("fusion", {}).items()}})
+          "latency_ms_pt_fp16_bs1": lat, "fusion": {k: round(v["mAP50"], 4) for k, v in res.get("fusion", {}).items()},
+          "ultra": {k: round(final["ultra"][k], 4) for k in ("mAP50", "mAP50_95")} if final.get("ultra") else None})
     if not a.eval_only and last.exists():   # finished: drop the optimiser state from last.pt (like best.pt)
         ck = torch.load(last, map_location="cpu", weights_only=False)
         if "opt" in ck:

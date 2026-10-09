@@ -114,7 +114,7 @@ def param_groups(model, lr, backbone_mult=0.5, wd=1e-4):
         if not p.requires_grad:
             continue
         normish = ("norm" in n) or ("bn" in n) or p.ndim <= 1      # biases, norm weights, scales: no decay
-        if n.startswith("backbone."):
+        if n.startswith("backbone.") and not n.startswith("backbone.adapter."):   # ViT adapter: new layers
             groups["bb_norm" if normish else "bb"].append(p)
         elif normish or n.endswith(".bias"):
             groups["nodecay"].append(p)
@@ -264,7 +264,7 @@ def load_preds(path):
 
 def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num_top=300, img_size=1024,
               merge_workers=16, log=print, fusion=False, variants=None, save_preds_to=None, context=False,
-              vectors=False, post="flat", merge_iou=0.1):
+              vectors=False, post="flat", merge_iou=0.1, primary="dec", ultra=False):
     """DOTA-protocol eval of the decoder output (primary). With fusion=True and a dense head, also scores
     the dense-only / union / size-routed variants (res["fusion"])."""
     t0 = time.time()
@@ -292,9 +292,12 @@ def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num
         merged = merge_parallel(pd, merge_iou, merge_workers)
         dets = {classes[c]: v for c, v in merged.items()}
         results[name] = evaluate(dets, gts, classes)
-        if name == "dec":
+        if name == (primary if primary in sets else "dec"):
             primary_dets = dets
-    res = results["dec"]
+    res = results[primary if primary in results else "dec"]
+    if ultra:                                   # Ultralytics-validator conventions, comparable with YOLO's mAP
+        from vrdet.eval.ultra import evaluate_ultra
+        res["ultra"] = evaluate_ultra(primary_dets, gts, classes)
     if len(results) > 1:
         res["fusion"] = {k: {"mAP50": v["mAP50"], "mAP50_95": v["mAP50_95"],
                              "per_class_AP50": {c: round(r["AP50"], 4) for c, r in v["classes"].items()}}

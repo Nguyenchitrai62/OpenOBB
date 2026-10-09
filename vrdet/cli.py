@@ -528,8 +528,11 @@ def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, b
         raise SystemExit(f"dataset classes {classes} do not match the model's {list(names)} (same names, same order)")
     res, _ = eval_dota(net, prepared, dev, None, batch=batch, workers=workers, num_top=queries, img_size=imgsz,
                        merge_iou=0.7 if fit else 0.1,
-                       post=targs.get("post", "flat"))
+                       post=targs.get("post", "flat"), primary=targs.get("primary", "dec"),
+                       fusion=targs.get("primary", "dec") != "dec", ultra=True)
     print(summary_table(res, classes))
+    u = res["ultra"]
+    print(f"Ultralytics-style metric (ProbIoU matching, 101-point AP): mAP50 {u['mAP50']:.3f}  mAP50-95 {u['mAP50_95']:.3f}")
     return res
 
 
