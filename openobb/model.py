@@ -1,7 +1,7 @@
 """Ultralytics-style model object for deployment (VRDet's own implementation of that public interface).
 
-    from openobb import VRDet
-    model = VRDet("best.pt")                          # any VRDet checkpoint (v1..v5)
+    from openobb import OpenOBB
+    model = OpenOBB("best.pt")                          # any VRDet checkpoint (v1..v5)
     results = model.predict("page.png", conf=0.25, iou=0.7, imgsz=1280)   # or model("page.png")
     for r in results:
         r.obb.xyxyxyxy, r.obb.xywhr, r.obb.conf, r.obb.cls, r.names, r.plot(), r.save_txt("out.txt")
@@ -101,7 +101,7 @@ class Metrics:
                              "fitness": 0.1 * self.box.map50 + 0.9 * self.box.map}
 
 
-class VRDet:
+class OpenOBB:
     task = "obb"
 
     def __init__(self, model="best.pt", task=None, verbose=False):
@@ -230,3 +230,6 @@ class VRDet:
     def val(self, data=None, **kw):
         from openobb.cli import val
         return Metrics(val(self.ckpt_path, data, **kw), self.names)
+
+
+VRDet = OpenOBB          # earlier name of this class, kept so existing code keeps working

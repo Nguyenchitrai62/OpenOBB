@@ -32,8 +32,8 @@ openobb predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.3
 ## Suy luận (thay YOLO trong code sản phẩm)
 
 ```python
-from openobb import VRDet
-model = VRDet("best.pt")
+from openobb import OpenOBB
+model = OpenOBB("best.pt")
 for r in model.predict("page.png", conf=0.25):
     print(r.obb.xyxyxyxy, r.obb.conf, r.obb.cls, r.names)
 ```

@@ -1,13 +1,13 @@
-"""VRDet: oriented-box (OBB) detector for drawings and aerial images (Apache-2.0 / MIT components only).
+"""OpenOBB: oriented-box (OBB) detection library (VRDet architectures) for drawings and aerial images.
 
 Deployment (same interface as an Ultralytics OBB model):
 
-    from openobb import VRDet
-    model = VRDet("best.pt")
+    from openobb import OpenOBB
+    model = OpenOBB("best.pt")
     for r in model.predict("page.png", conf=0.25):
         print(r.obb.xyxyxyxy, r.obb.conf, r.obb.cls, r.names)
 
-Training: `openobb train data=data.yaml model=vrdet5x ...` (CLI) or VRDet("vrdet5x").train(data="data.yaml").
+Training: `openobb train data=data.yaml model=vrdet5x ...` (CLI) or OpenOBB("vrdet5x").train(data="data.yaml").
 """
 __version__ = "0.1.0"
 
@@ -16,7 +16,7 @@ def __getattr__(name):              # lazy: `python -m openobb.cli` must not imp
     if name == "Detector":
         from openobb.cli import Detector
         return Detector
-    if name in ("VRDet", "Metrics"):
+    if name in ("OpenOBB", "VRDet", "Metrics"):
         import openobb.model as m
         return getattr(m, name)
     if name in ("Results", "OBB"):

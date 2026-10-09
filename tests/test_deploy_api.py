@@ -39,9 +39,11 @@ def test_obb_geometry_follows_yolo_conventions():
 
 
 def test_predict_like_yolo(ckpt, tmp_path):
-    from openobb import VRDet
+    from openobb import OpenOBB
     p, d, img = ckpt
-    model = VRDet(str(p))
+    model = OpenOBB(str(p))
+    from openobb import VRDet
+    assert VRDet is OpenOBB
     assert model.names == {0: "wall", 1: "door"} and model.task == "obb"
     res = model.predict(img, conf=0.0, max_det=20, verbose=False)
     assert isinstance(res, list) and len(res) == 1
@@ -71,9 +73,9 @@ def test_predict_like_yolo(ckpt, tmp_path):
 
 
 def test_result_outputs(ckpt, tmp_path):
-    from openobb import VRDet
+    from openobb import OpenOBB
     p, d, img = ckpt
-    r = VRDet(str(p))(img, conf=0.0, max_det=5, verbose=False)[0]
+    r = OpenOBB(str(p))(img, conf=0.0, max_det=5, verbose=False)[0]
     s = r.summary()
     assert len(s) == len(r) and {"name", "class", "confidence", "box"} <= set(s[0]) and "x4" in s[0]["box"]
     assert math.isfinite(json.loads(r.to_json(normalize=True))[0]["box"]["x1"])
@@ -84,7 +86,7 @@ def test_result_outputs(ckpt, tmp_path):
     assert r.plot().shape == img.shape and (tmp_path / "x.jpg").exists() is False
     r.save(str(tmp_path / "x.jpg"))
     assert (tmp_path / "x.jpg").exists() and r.verbose().endswith(", ")
-    out = VRDet(str(p)).predict(img, conf=0.0, max_det=3, save=True, save_txt=True, project=str(tmp_path / "runs"),
+    out = OpenOBB(str(p)).predict(img, conf=0.0, max_det=3, save=True, save_txt=True, project=str(tmp_path / "runs"),
                                 name="predict", verbose=False)
     assert (tmp_path / "runs" / "predict" / "image0.jpg").exists()
     assert (tmp_path / "runs" / "predict" / "labels" / "image0.txt").exists() and out[0].save_dir is not None

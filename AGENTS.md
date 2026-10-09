@@ -310,7 +310,7 @@ Câu hỏi còn mở:
     Giờ các luật ignore đã neo gốc (`/models/`), và script từ chối đẩy nếu thiếu file package.
 
 - 2026-10-09 (5):
-  - API deploy giống Ultralytics: `from openobb import VRDet` → `predict` → `Results.obb.*`, `plot`, `save_txt`, `summary`, `val().box.map`.
+  - API deploy giống Ultralytics: `from openobb import OpenOBB` → `predict` → `Results.obb.*`, `plot`, `save_txt`, `summary`, `val().box.map`.
     Code ở `openobb/model.py`, `openobb/results.py`; tài liệu [docs/DEPLOY.md](docs/DEPLOY.md).
   - `rotate_p` giờ áp dụng cả lên ảnh mosaic. 94 test pass.
 

@@ -1,7 +1,7 @@
-# Deploy VRDet thay cho YOLO-OBB
+# Deploy OpenOBB thay cho YOLO-OBB
 
-Giao diện suy luận của VRDet giống model OBB của Ultralytics. Code đang đọc kết quả YOLO chỉ cần đổi 2 dòng import và tạo model.
-VRDet tự viết phần giao diện này; package không phụ thuộc Ultralytics.
+Giao diện suy luận của OpenOBB giống model OBB của Ultralytics. Code đang đọc kết quả YOLO chỉ cần đổi 2 dòng import và tạo model.
+OpenOBB tự viết phần giao diện này; package không phụ thuộc Ultralytics.
 
 ## Cài đặt
 
@@ -21,8 +21,8 @@ from ultralytics import YOLO
 model = YOLO("best.pt")
 
 # sau
-from openobb import VRDet
-model = VRDet("best.pt")
+from openobb import OpenOBB
+model = OpenOBB("best.pt")
 ```
 
 Phần còn lại giữ nguyên, ví dụ:
@@ -36,9 +36,9 @@ for r in results:
 
 ## Bảng đối chiếu
 
-| Ultralytics | VRDet | Ghi chú |
+| Ultralytics | OpenOBB | Ghi chú |
 |---|---|---|
-| `YOLO("best.pt")` | `VRDet("best.pt")` | Mọi checkpoint VRDet v1–v5 |
+| `YOLO("best.pt")` | `OpenOBB("best.pt")` | Mọi checkpoint VRDet v1–v5 |
 | `model.predict(source, conf, iou, imgsz, device, max_det, classes, agnostic_nms, save, save_txt, save_conf, stream, verbose, project, name, exist_ok, line_width, show, show_labels, show_conf)` | giống | Tham số khác bị bỏ qua |
 | `model(source)` | giống | |
 | `source`: path, thư mục, glob, URL, list, numpy BGR, PIL, tensor (B,3,H,W) RGB 0–1 | giống | **Chưa hỗ trợ video/webcam/stream** |
@@ -50,12 +50,12 @@ for r in results:
 | `len(r)`, `r[i]` | giống | |
 | `model.names`, `model.task` (= "obb") | giống | |
 | `model.val(data=...)` → `metrics.box.map`, `.map50`, `.maps`, `.mp`, `.mr`, `metrics.results_dict` | giống | mAP tính theo cách chấm của YOLO |
-| `model.train(...)` | `VRDet("vrdet5x").train(data=..., epochs=...)` | Hoặc CLI `openobb train ...` |
+| `model.train(...)` | `OpenOBB("vrdet5x").train(data=..., epochs=...)` | Hoặc CLI `openobb train ...` |
 | `model.export(...)`, `model.track(...)` | chưa có | |
 
 ## Khác biệt cần biết
 
-| Tham số | Ultralytics | VRDet |
+| Tham số | Ultralytics | OpenOBB |
 |---|---|---|
 | `imgsz` mặc định | 640 | **kích thước lúc train** (ví dụ 1280). Nên để mặc định |
 | `iou` mặc định | 0.7 | 0.7 với model resize cả ảnh; 0.1 với model cắt tile (`tile=True`), vì ghép tile cần NMS chặt |
@@ -64,4 +64,4 @@ for r in results:
 | `half` | tham số | GPU tự chạy bf16 |
 | `tile` | không có | `tile=True` cắt trang rất lớn thành tile ở độ phân giải gốc |
 
-Kết quả của `VRDet.predict` giống hệt `openobb predict` (CLI) và app Streamlit: cùng tiền xử lý như lúc train và cùng bước ghép NMS.
+Kết quả của `OpenOBB.predict` giống hệt `openobb predict` (CLI) và app Streamlit: cùng tiền xử lý như lúc train và cùng bước ghép NMS.
