@@ -61,13 +61,8 @@ def _labels_for(img_dir):
 
 
 def find_splits(data):
-    """-> (names, {"train": img_dir, "val": img_dir or None}). `data` is a data.yaml, a dataset folder, or a folder
-    holding one (an unzipped archive: its data.yaml may sit in a sub-folder; the shallowest one is used)."""
+    """-> (names, {"train": img_dir, "val": img_dir or None})"""
     data = Path(data)
-    if data.is_dir() and not any((data / n).exists() for n in ("data.yaml", "dataset.yaml")):
-        found = sorted((p for n in ("data.yaml", "dataset.yaml") for p in data.rglob(n)), key=lambda p: len(p.parts))
-        if found:
-            data = found[0]
     yaml_path = data if data.suffix in (".yaml", ".yml") else next(
         (p for p in (data / "data.yaml", data / "dataset.yaml") if p.exists()), None)
     cfg = _load_yaml(yaml_path) if yaml_path else {}

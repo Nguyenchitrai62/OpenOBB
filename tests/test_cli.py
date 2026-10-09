@@ -305,28 +305,3 @@ def test_yaml_copied_out_with_path_to_dataset(tmp_path, layout):
     (tmp_path / "data.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False))
     names, splits = find_splits(tmp_path / "data.yaml")
     assert names == ["wall"] and splits["train"] is not None and splits["val"] is not None
-
-
-@pytest.mark.parametrize("layout", ["yolo", "roboflow", "flat", "split_only"])
-def test_unzipped_folder_with_nested_yaml(tmp_path, layout):
-    """Colab: data=/content/dataset_local (the unzip folder); the dataset's data.yaml sits one level below."""
-    from openobb.data.prepare import find_splits, prepare
-    local = tmp_path / "dataset_local"
-    root = local / "dataset_wall_color"
-    keys = {"yolo": "train: images/train\nval: images/val\n", "roboflow": "train: ../train/images\nval: ../val/images\n",
-            "flat": "train: train\nval: val\n", "split_only": ""}[layout]
-    for s in ("train", "val"):
-        d = {"yolo": (root / "images" / s, root / "labels" / s), "roboflow": (root / s / "images", root / s / "labels"),
-             "flat": (root / s, root / s), "split_only": (root / s / "images", root / s / "labels")}[layout]
-        for x in d:
-            x.mkdir(parents=True, exist_ok=True)
-        img = np.full((256, 256, 3), 255, np.uint8)
-        cv2.rectangle(img, (40, 40), (200, 60), (0, 0, 0), -1)
-        cv2.imwrite(str(d[0] / f"{s}0.png"), img)
-        (d[1] / f"{s}0.txt").write_text("0 0.15625 0.15625 0.78125 0.15625 0.78125 0.234375 0.15625 0.234375\n")
-    (root / "data.yaml").write_text("path: D:/someone_else/x\n" + keys + "names:\n  0: wall\n  1: door\n")
-    names, splits = find_splits(local)
-    assert names == ["wall", "door"] and splits["train"] is not None and splits["val"] is not None
-    out = prepare(str(local), tmp_path / "prep", size=256, fit=True, workers=1)
-    objs = [json.loads(l)["objs"] for l in (out / "meta" / "train.jsonl").read_text().splitlines()]
-    assert sum(len(o) for o in objs) == 1
