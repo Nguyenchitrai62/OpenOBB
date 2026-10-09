@@ -47,6 +47,8 @@ r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024)   # r.bes
 ```
 
 **`model`:**
+- **`vrdet5x`** (mới nhất, 127.9M): head dense v3 + DINOv2 + phân loại theo hình học + chấm lại theo quan hệ.
+  Chi tiết: [VRDET5.md](VRDET5.md). Cuối mỗi run in thêm các lỗi nhầm class thường gặp (confusion matrix).
 - **`vrdet4x`** (mới nhất, 134.8M, ưu tiên độ chính xác): DINOv2 ViT-B + encoder/decoder DETR pretrained + nhánh dense
   oriented (giám sát phụ + đề xuất query), đầu ra decoder ∪ dense. Chi tiết: [VRDET4.md](VRDET4.md).
 - **`vrdet3x`** (mới nhất, 64.6M): backbone + encoder pretrained COCO, head dense oriented dị hướng, NMS.

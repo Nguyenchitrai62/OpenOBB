@@ -31,12 +31,15 @@ def build_parser():
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4"],
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5"],
                     help="v1: VRDet (DETR-style decoder); v2: VRDet2 (dense segment-aware, NMS-free); "
                          "v3: VRDet3 (pretrained encoder + dense anisotropic oriented head); "
                          "v4: VRDet4 (DINOv2 backbone + DETR decoder + dense oriented branch)")
     ap.add_argument("--backbone", default="hgnet", choices=["hgnet", "dinov2_s", "dinov2_b", "dinov2_l"])
     ap.add_argument("--dense-v3", action="store_true", help="dense branch = VRDet3's oriented head (VRDet4)")
+    ap.add_argument("--geo-cls", action="store_true", help="VRDet5: class branch reads the predicted geometry")
+    ap.add_argument("--relate", action="store_true", help="VRDet5: relation re-scoring of the best candidates")
+    ap.add_argument("--rel-k", type=int, default=600, help="VRDet5: candidates per image for relation re-scoring")
     ap.add_argument("--img", type=int, default=1024)
     ap.add_argument("--scale", type=float, default=1.0,
                     help="image scale the data was tiled at (recorded for inference; set by vrdet.data.prepare)")
@@ -193,7 +196,7 @@ def main(argv=None):
     torch.backends.cudnn.allow_tf32 = True
 
     classes = dataset_classes(a.data)
-    v2, v3, v4 = a.arch == "v2", a.arch == "v3", a.arch == "v4"
+    v2, v3, v4, v5 = a.arch == "v2", a.arch in ("v3", "v5"), a.arch == "v4", a.arch == "v5"
     dense_arch = v2 or v3                       # dense heads: no queries / decoder
     if v4:                                      # DETR decoder fed and supervised by the dense oriented branch
         a.dense = a.dense_queries = a.dense_v3 = True
@@ -204,7 +207,14 @@ def main(argv=None):
     elif v3:
         from vrdet.models.vrdet3 import VRDet3
         from vrdet.models.vrdet3_loss import VRDet3Loss
-        model = VRDet3(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top)
+        if v5:
+            from vrdet.models.vrdet5 import VRDet5
+            from vrdet.models.vrdet5_loss import VRDet5Loss
+            model = VRDet5(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
+                           backbone=a.backbone, geo_cls=a.geo_cls, relate=a.relate, rel_k=a.rel_k)
+        else:
+            model = VRDet3(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
+                           backbone=a.backbone)
     else:
         model = VRDet(a.size, num_classes=len(classes), num_queries=a.queries, img_size=a.img,
                       rotate_sampling=not a.no_rotate_sampling, num_denoising=a.denoising, dense=a.dense,
@@ -223,7 +233,7 @@ def main(argv=None):
     elif not last.exists() and not a.no_pretrained and not v2:
         load_dfine_coco(model, a.size, class_names=classes, log=lambda m: log(m, console=True), init=a.init)
         init_desc = "D-FINE COCO weights (Apache-2.0)"
-        if not v3 and a.backbone != "hgnet":    # ViT backbone: its own weights; encoder input projections restart
+        if a.backbone != "hgnet":               # ViT backbone: its own weights; encoder input projections restart
             model.backbone.load_pretrained(log=lambda m: log(m, console=True))
             model.reset_input_proj()
             init_desc = f"DINOv2 {a.backbone} backbone + D-FINE COCO encoder/decoder (Apache-2.0)"
@@ -236,7 +246,7 @@ def main(argv=None):
     if v2:
         crit = VRDet2Loss(img_size=a.img)
     elif v3:
-        crit = VRDet3Loss(img_size=a.img)
+        crit = VRDet5Loss(img_size=a.img) if v5 else VRDet3Loss(img_size=a.img)
     else:
         crit = build_criterion(num_classes=len(classes), box_loss=a.box_loss, o2m_k=a.o2m_k, aqd=a.aqd,
                                angle_weight=a.angle_weight, cost_iou=a.cost_iou, member_weight=a.vec_ground)
@@ -359,8 +369,12 @@ def main(argv=None):
             say(f"model   VRDet4-{a.size} ({a.backbone} + {'LSK + ' if a.lsk else ''}hybrid encoder + DETR decoder "
                 f"+ dense oriented branch, output {a.primary}), {n_par:.2f}M params, {a.queries} queries | "
                 f"init: {init_desc}")
+        elif v5:
+            parts = [a.backbone] + (["LSK"] if a.lsk else []) + ["hybrid encoder", "dense oriented head P3-P5"] +                 (["geometry-aware classes"] if a.geo_cls else []) +                 ([f"relation re-scoring of {a.rel_k} candidates"] if a.relate else [])
+            say(f"model   VRDet5-{a.size} ({' + '.join(parts)}), {n_par:.2f}M params, max {a.num_top} detections | "
+                f"init: {init_desc}")
         elif v3:
-            say(f"model   VRDet3-{a.size} (pretrained encoder{' + LSK' if a.lsk else ''}, dense oriented head P3-P5), "
+            say(f"model   VRDet3-{a.size} ({a.backbone + ' + ' if a.backbone != 'hgnet' else ''}pretrained encoder{' + LSK' if a.lsk else ''}, dense oriented head P3-P5), "
                 f"{n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")
         else:
             say(f"model   VRDet-{a.size}{' + ' + ' + '.join(extras) if extras else ''}, {n_par:.2f}M params, "
@@ -412,7 +426,7 @@ def main(argv=None):
         if device.type == "cuda":
             torch.cuda.reset_peak_memory_stats()
         prof = None
-        bar = EpochBar(epoch, a.epochs, iters_per_epoch, a.img, v2=v2, v3=v3) if not a.verbose else None
+        bar = EpochBar(epoch, a.epochs, iters_per_epoch, a.img, v2=v2, v3=v3, v5=v5) if not a.verbose else None
         for bi, (imgs, targets) in enumerate(dl):
             if bi >= iters_per_epoch:
                 break
@@ -601,6 +615,13 @@ def main(argv=None):
         ema.module.decoder.num_queries = a.queries
     final = rq if a.eval_queries and a.eval_queries != a.queries and not dense_arch else res
     say(summary_table(final, classes))
+    if final.get("ultra", {}).get("confusion"):
+        from vrdet.eval.ultra import top_confusions
+        (out / "confusion_matrix.json").write_text(json.dumps(final["ultra"]["confusion"]))
+        lines = top_confusions(final["ultra"]["confusion"])
+        if lines:
+            say("Most frequent errors (true -> predicted, conf 0.25, IoU 0.5; background = missed / false box): "
+                + " | ".join(lines))
     if final.get("metric") == "yolo":
         d = final["dota"]
         say(f"(mAP above: Ultralytics validator conventions, comparable with YOLO. DOTA devkit metric, polygon IoU + "

@@ -38,7 +38,7 @@ SIZES = ("s", "m", "l", "x")
 # vrdet3{s,m,l,x} (pretrained encoder + dense anisotropic oriented head), vrdet4x (DINOv2 + hybrid DETR)
 MODELS = {**{s: ("v1", s) for s in SIZES}, **{f"vrdet1{s}": ("v1", s) for s in SIZES},
           **{f"vrdet2{s}": ("v2", s) for s in ("n", "s", "m", "l", "x")},
-          **{f"vrdet3{s}": ("v3", s) for s in SIZES}, "vrdet4x": ("v4", "x")}
+          **{f"vrdet3{s}": ("v3", s) for s in SIZES}, "vrdet4x": ("v4", "x"), "vrdet5x": ("v5", "x")}
 
 # Best architecture recipe measured on FloorPlanCAD / DOTA (research/LEDGER.md, c6): selective large-kernel
 # adapters (LSK), repeat-factor sampling, one-to-many query group, adaptive query denoising, square-aware angle loss,
@@ -76,9 +76,12 @@ RECIPE3 = {"lsk": True, "rfs": 0.1, "channels_last": True, "clip": 10.0, "num_to
 SIZE_DEFAULTS4 = {"x": dict(lr=1e-4, backbone_mult=0.5, wd=1e-4, batch=8, gb=6.0)}      # ViT-B/14, accuracy first
 RECIPE4 = dict(RECIPE, dense=True, dense_v3=True, dense_queries=True, primary="union")
 BACKBONE4 = {"x": "dinov2_b"}
+# VRDet5: VRDet3's dense head as the output + DINOv2 + geometry-aware classes + relation re-scoring
+SIZE_DEFAULTS5 = {"x": dict(lr=5e-4, backbone_mult=0.2, wd=1e-4, batch=8, gb=5.0)}
+RECIPE5 = dict(RECIPE3, geo_cls=True, relate=True, rel_k=600)
 # architecture flags a fine-tune inherits from its source checkpoint (weights only load into the same shape)
 ARCH_KEYS = ("arch", "size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_queries", "denoising",
-             "no_rotate_sampling", "context", "backbone", "dense_v3", "primary")
+             "no_rotate_sampling", "context", "backbone", "dense_v3", "primary", "geo_cls", "relate", "rel_k")
 MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / per epoch on small datasets
 ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every", "lrf": "min_lr_ratio"}
 IGNORED = ("save_period", "plots", "momentum", "degrees", "shear", "perspective", "mixup", "cutmix",
@@ -430,7 +433,7 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
         raise SystemExit(f"model must be one of {', '.join(MODELS)} or an existing VRDet .pt checkpoint, "
                          f"got '{model}'")
     arch = inherited.get("arch", "v1")
-    v2, dense_arch = arch == "v2", arch in ("v2", "v3")
+    v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5")
     imgsz = int(imgsz or extra.pop("img", None) or 1024)
     if imgsz % 32:
         imgsz = int(math.ceil(imgsz / 32) * 32)
@@ -449,7 +452,8 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
     else:
         scale = auto_scale(data, imgsz) if tile_scale in (None, "auto") else float(tile_scale)
 
-    sd = {"v2": SIZE_DEFAULTS2, "v3": SIZE_DEFAULTS3, "v4": SIZE_DEFAULTS4}.get(arch, SIZE_DEFAULTS)[size]
+    sd = {"v2": SIZE_DEFAULTS2, "v3": SIZE_DEFAULTS3, "v4": SIZE_DEFAULTS4,
+          "v5": SIZE_DEFAULTS5}.get(arch, SIZE_DEFAULTS)[size]
     if str(optimizer).lower() not in ("auto", "adamw"):
         raise SystemExit("optimizer must be 'auto' or 'AdamW'")   # lr0 given -> used; otherwise the measured LR
     prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, seed, fit=fit)
@@ -475,8 +479,8 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
     if workers is not None:
         opts["workers"] = int(workers)
     if recipe:
-        opts.update({"v2": RECIPE2, "v3": RECIPE3, "v4": RECIPE4}.get(arch, RECIPE))
-    if arch == "v4" and "backbone" not in inherited:
+        opts.update({"v2": RECIPE2, "v3": RECIPE3, "v4": RECIPE4, "v5": RECIPE5}.get(arch, RECIPE))
+    if arch in ("v4", "v5") and "backbone" not in inherited:
         opts["backbone"] = BACKBONE4[size]
     if aug["mosaic"]:
         opts["mosaic_mode"] = "yolo"
@@ -538,6 +542,9 @@ def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, b
                        post=targs.get("post", "flat"), primary=targs.get("primary", "dec"),
                        fusion=targs.get("primary", "dec") != "dec", ultra=True, metric=metric)
     print(summary_table(res, classes))
+    from vrdet.eval.ultra import top_confusions
+    for line in top_confusions(res["ultra"]["confusion"], k=10):
+        print("  confusion  " + line)
     if res.get("metric") == "yolo":
         d = res["dota"]
         print(f"(mAP above: Ultralytics validator conventions, comparable with YOLO. DOTA devkit metric: "

@@ -43,3 +43,14 @@ def test_eval_metric_switch_reports_yolo_numbers():
     res["dota"] = {"mAP50": res["mAP50"], "mAP50_95": res["mAP50_95"]}
     res["mAP50"], res["mAP50_95"] = u["mAP50"], u["mAP50_95"]
     assert res["dota"]["mAP50"] == dota["mAP50"] == 0.0 and res["mAP50"] > 0.99
+
+
+def test_confusion_matrix_counts_class_mixups():
+    from vrdet.eval.ultra import top_confusions
+    gts = {"a": [(_poly(100, 100, 200, 6).tolist(), "wall_300", False), (_poly(50, 50, 20, 20).tolist(), "door", False)]}
+    dets = {"wall": (["a"], np.array([0.9]), np.stack([_poly(100, 100, 200, 6)])),     # wall_300 called wall
+            "door": (["a"], np.array([0.1]), np.stack([_poly(50, 50, 20, 20)]))}        # below conf 0.25: missed
+    u = evaluate_ultra(dets, gts, ["wall", "wall_300", "door"])
+    lines = top_confusions(u["confusion"])
+    assert any(l.startswith("wall_300 -> wall: 1") for l in lines) and any(l.startswith("door -> background: 1")
+                                                                            for l in lines)

@@ -51,10 +51,17 @@ def load_model(ckpt_path, device, queries=None, classes=None):
         m = VRDet2(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
+    if a.get("arch") == "v5":
+        from vrdet.models.vrdet5 import VRDet5
+        m = VRDet5(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
+                   max_det=max(int(a.get("num_top", 1000)), int(queries or 0)), backbone=a.get("backbone", "dinov2_b"),
+                   geo_cls=a.get("geo_cls", True), relate=a.get("relate", True), rel_k=a.get("rel_k", 600))
+        m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
+        return m.to(device).eval(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
     if a.get("arch") == "v3":
         from vrdet.models.vrdet3 import VRDet3
         m = VRDet3(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
-                   max_det=max(int(a.get("num_top", 1000)), int(queries or 0)))
+                   max_det=max(int(a.get("num_top", 1000)), int(queries or 0)), backbone=a.get("backbone", "hgnet"))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
     m = VRDet(a.get("size", "s"), num_classes=len(names), num_queries=a.get("queries", 300),

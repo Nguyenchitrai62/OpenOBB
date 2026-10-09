@@ -9,6 +9,8 @@ COLS2 = ("cls_loss", "box_loss", "end_loss", "thick_loss", "angle_loss")
 KEYS2 = ("loss_cls", "loss_box", "loss_end", "loss_dfl", "loss_angle")      # VRDet2: one-to-many head
 COLS3 = ("cls_loss", "box_loss", "dfl_loss", "acr_loss", "angle_loss")
 KEYS3 = ("loss_cls", "loss_box", "loss_dfl", "loss_across", "loss_angle")    # VRDet3
+COLS5 = ("cls_loss", "box_loss", "dfl_loss", "angle_loss", "rel_loss")
+KEYS5 = ("loss_cls", "loss_box", "loss_dfl", "loss_angle", "loss_rel")         # VRDet5
 
 
 def _bar(i, n, width=12):
@@ -30,9 +32,9 @@ def _dur(s):
 class EpochBar:
     """Usage: bar = EpochBar(epoch, epochs, n_iters, size); bar.update(i, means, inst, mem) ...; bar.close()."""
 
-    def __init__(self, epoch, epochs, n, size, stream=sys.stdout, every=1.0, v2=False, v3=False):
+    def __init__(self, epoch, epochs, n, size, stream=sys.stdout, every=1.0, v2=False, v3=False, v5=False):
         self.epoch, self.epochs, self.n, self.size = epoch, epochs, n, size
-        self.cols, self.keys = (COLS3, KEYS3) if v3 else (COLS2, KEYS2) if v2 else (COLS, KEYS)
+        self.cols, self.keys = (COLS5, KEYS5) if v5 else (COLS3, KEYS3) if v3 else (COLS2, KEYS2) if v2 else (COLS, KEYS)
         self.stream, self.every = stream, every
         self.t0 = self.last = time.time()
         print("\n" + f"{'Epoch':>11}{'GPU_mem':>11}" + "".join(f"{c:>11}" for c in self.cols)

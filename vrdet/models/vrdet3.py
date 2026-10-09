@@ -104,7 +104,8 @@ def fast_nms(logits, boxes, max_det=1000, conf=0.001, iou=0.7, pre=4000):
 class VRDet3(nn.Module):
     arch = "v3"
 
-    def __init__(self, size="x", num_classes=15, img_size=1024, lsk=True, max_det=1000, nms_iou=0.7, **_):
+    def __init__(self, size="x", num_classes=15, img_size=1024, lsk=True, max_det=1000, nms_iou=0.7, backbone="hgnet",
+                 **_):
         super().__init__()
         cfg = copy.deepcopy(CONFIGS[size])
         self.size, self.nc, self.img_size = size, num_classes, img_size
@@ -112,13 +113,26 @@ class VRDet3(nn.Module):
         bb = dict(freeze_at=-1, freeze_norm=False)
         bb.update(cfg["backbone"])
         # same module names as VRDet1 / D-FINE: COCO weights (and a VRDet1 checkpoint) load into backbone/encoder/lsk
-        self.backbone = HGNetv2(**bb, pretrained=False)
+        if backbone == "hgnet":
+            self.backbone = HGNetv2(**bb, pretrained=False)
+        else:                                   # DINOv2 ViT + adapter (vrdet/models/vit.py)
+            from .vit import DinoV2Backbone
+            self.backbone = DinoV2Backbone(backbone, cfg["encoder"]["in_channels"])
+        self.backbone_name = backbone
         self.lsk = nn.ModuleList([SelectiveKernel(c) for c in cfg["encoder"]["in_channels"]]) if lsk else None
         self.encoder = HybridEncoder(**cfg["encoder"], eval_spatial_size=[img_size, img_size])
         hid = cfg["encoder"]["hidden_dim"]
         self.strides = (8, 16, 32)
         self.head = OrientedHead([hid] * 3, num_classes)
         self._grid = {}
+
+    def reset_input_proj(self):
+        """Re-initialise the encoder's input projections (their COCO weights were fitted to HGNetv2 maps)."""
+        for m in self.encoder.input_proj.modules():
+            if hasattr(m, "reset_parameters") and m is not self.encoder.input_proj:
+                m.reset_parameters()
+            if isinstance(m, nn.BatchNorm2d):
+                m.reset_running_stats()
 
     def anchors(self, feats):
         key = tuple(f.shape[-2:] for f in feats) + (feats[0].device,)

@@ -106,7 +106,46 @@ def evaluate_ultra(dets, gts, classes, conf=0.001, max_det=300, iou_thrs=None):
         aps = [_ap(tpc[:, k] / (npos[ci] + 1e-16), tpc[:, k] / np.maximum(tpc[:, k] + fpc[:, k], 1e-16))
                if len(t) else 0.0 for k in range(len(thrs))]
         res["classes"][c] = {"AP50": aps[0], "AP50_95": float(np.mean(aps))}
+    res["confusion"] = confusion(per_img, gts, classes)
     vals = list(res["classes"].values())
     res["mAP50"] = float(np.mean([v["AP50"] for v in vals])) if vals else 0.0
     res["mAP50_95"] = float(np.mean([v["AP50_95"] for v in vals])) if vals else 0.0
     return res
+
+
+def confusion(per_img, gts, classes, conf=0.25, iou_thr=0.5):
+    """Class-agnostic matching at ProbIoU >= iou_thr of detections with score >= conf (YOLO's confusion-matrix
+    defaults). Rows = true class (+ background), columns = predicted class (+ background)."""
+    n = len(classes)
+    cm = np.zeros((n + 1, n + 1), int)
+    for img, objs in gts.items():
+        gc = np.array([classes.index(o[1]) for o in objs if o[1] in classes], int)
+        gp = np.array([o[0] for o in objs if o[1] in classes], np.float64).reshape(-1, 8)
+        d = sorted([t for t in per_img.get(img, []) if t[0] >= conf], key=lambda t: -t[0])
+        dc = np.array([t[1] for t in d], int)
+        taken = np.zeros(len(gc), bool)
+        if len(d) and len(gc):
+            iou = probiou(polys_to_obb(np.stack([t[2] for t in d]).astype(np.float32)).astype(np.float64),
+                          polys_to_obb(gp.astype(np.float32)).astype(np.float64))
+            for i in range(len(d)):
+                j = int(np.argmax(np.where(taken, -1.0, iou[i])))
+                if iou[i, j] >= iou_thr and not taken[j]:
+                    taken[j] = True
+                    cm[gc[j], dc[i]] += 1
+                else:
+                    cm[n, dc[i]] += 1
+        elif len(d):
+            np.add.at(cm[n], dc, 1)
+        np.add.at(cm[:, n], gc[~taken], 1)
+    return {"classes": list(classes) + ["background"], "matrix": cm.tolist()}
+
+
+def top_confusions(cm, k=6):
+    """-> lines 'true -> predicted: n (share of that true class)' for the largest off-diagonal cells."""
+    m = np.asarray(cm["matrix"])
+    names = cm["classes"]
+    n = len(names) - 1
+    rows = m[:n].sum(1)
+    cells = [(m[i, j], i, j) for i in range(n) for j in range(n + 1) if i != j and m[i, j] > 0]
+    cells.sort(reverse=True)
+    return [f"{names[i]} -> {names[j]}: {v} ({100 * v / max(rows[i], 1):.0f}% of {names[i]})" for v, i, j in cells[:k]]

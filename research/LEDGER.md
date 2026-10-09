@@ -342,6 +342,15 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Việc tiếp:
     - Thí nghiệm một yếu tố: **head v3 + backbone DINOv2** (tách tác dụng DINOv2 khỏi decoder).
     - Xem `eval_val.json` → `fusion` (dec / dense / union) để biết class hiếm nhờ nhánh nào.
+- **F34. VRDet5-x (10-09): thiết kế, chưa có số GPU.** Chi tiết: [docs/VRDET5.md](../docs/VRDET5.md).
+  - Thành phần: đầu ra = head dense v3 (giữ ưu thế class hiếm), DINOv2 ViT-B (thứ đã giúp v4), cộng 2 phần mới nhắm wall_300:
+    1. **Phân loại theo hình học:** 7 số đo dự đoán, detach, conv 1×1 khởi tạo 0, đưa vào nhánh class.
+    2. **Chấm lại theo quan hệ:** 2 lớp self-attention trên 600 ứng viên khác nhau, sửa logit class (cộng dư, khởi tạo 0, `loss_rel`).
+  - Kiểm chứng: head v5 lúc khởi tạo = head v3 (test).
+  - Tham số: 127.9M.
+  - Thêm confusion matrix (thước YOLO, conf 0.25, IoU 0.5) vào mọi lần val, để xác nhận wall_300 bị nhầm thành gì.
+  - Tiêu chí: vượt v3 (0.712 / 0.467) và YOLO26x (0.746 / 0.499). wall_300 phải > 0.683 (mức của v4).
+  - Nếu không đạt, tách tác dụng bằng `backbone=hgnet`, `relate=False`, `geo_cls=False`.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 

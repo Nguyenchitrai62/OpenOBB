@@ -271,6 +271,11 @@ Câu hỏi còn mở:
 - [x] **VRDet4-x (2026-10-09, F30):**
   - DINOv2 ViT-B + adapter + LSK + encoder/decoder DETR COCO + nhánh dense oriented (head v3), đầu ra union. 134.8M tham số.
   - Dùng: `model=vrdet4x`. Chi tiết: [docs/VRDET4.md](docs/VRDET4.md). User chỉ train bản x.
+- [x] **VRDet5-x (2026-10-09, F34):**
+  - Head dense v3 + DINOv2 + phân loại theo hình học + chấm lại theo quan hệ. 127.9M tham số.
+  - Dùng: `model=vrdet5x`. Chi tiết: [docs/VRDET5.md](docs/VRDET5.md).
+  - Val in thêm confusion matrix (lỗi nhầm class thường gặp).
+- Kết quả cùng thước YOLO (Wall_Color): YOLO26x 0.746 / 0.499; v3 0.712 / 0.467; v4 0.663 / 0.457 (1 run). Xem LEDGER F32–F33.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.
@@ -287,6 +292,10 @@ Câu hỏi còn mở:
 **Cần user:** điền tên chủ sở hữu pháp lý (cá nhân hoặc công ty) vào `LICENSE` (hiện để "the repository owner").
 
 ## 9. Nhật ký
+
+- 2026-10-09 (4):
+  - VRDet5 (`vrdet/models/vrdet5.py`, `vrdet5_loss.py`, `--arch v5`, `--geo-cls`, `--relate`, `--rel-k`).
+  - v3 nhận `--backbone`. Confusion matrix trong `vrdet/eval/ultra.py`. 90 test pass.
 
 - 2026-10-09 (3):
   - Thước đo Ultralytics (`vrdet/eval/ultra.py`).
