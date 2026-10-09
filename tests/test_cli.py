@@ -284,3 +284,24 @@ def test_dataset_layouts_with_yaml_beside_splits(tmp_path, layout):
     out = prepare(str(root / "data.yaml"), tmp_path / "prep", size=256, fit=True, workers=1)
     objs = [json.loads(l)["objs"] for l in (out / "meta" / "train.jsonl").read_text().splitlines()]
     assert sum(len(o) for o in objs) == 1                                      # the label was found
+
+
+@pytest.mark.parametrize("layout", ["yolo", "roboflow", "flat", "split_only"])
+def test_yaml_copied_out_with_path_to_dataset(tmp_path, layout):
+    """Colab notebook: the dataset's data.yaml is copied to /content/data.yaml with path: set to the dataset folder."""
+    import yaml
+    from openobb.data.prepare import find_splits
+    root = tmp_path / "dataset_local" / "ds"
+    keys = {"yolo": "train: images/train\nval: images/val\n", "roboflow": "train: ../train/images\nval: ../val/images\n",
+            "flat": "train: train\nval: val\n", "split_only": ""}[layout]
+    for s in ("train", "val"):
+        d = {"yolo": root / "images" / s, "roboflow": root / s / "images", "flat": root / s,
+             "split_only": root / s / "images"}[layout]
+        d.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(str(d / "a.png"), np.full((32, 32, 3), 255, np.uint8))
+    (root / "data.yaml").write_text("path: D:/x\n" + keys + "names:\n  0: wall\n")
+    cfg = yaml.safe_load((root / "data.yaml").read_text())
+    cfg["path"] = str(root)
+    (tmp_path / "data.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False))
+    names, splits = find_splits(tmp_path / "data.yaml")
+    assert names == ["wall"] and splits["train"] is not None and splits["val"] is not None

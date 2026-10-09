@@ -71,11 +71,12 @@ def find_splits(data):
     if root is not None and not root.is_absolute():
         root = yaml_dir / root
     splits = {"train": _resolve(cfg.get("train"), yaml_dir, root), "val": _resolve(cfg.get("val"), yaml_dir, root)}
-    base = data if data.is_dir() else yaml_dir
+    bases = [data] if data.is_dir() else [b for b in (root, yaml_dir) if b is not None and b.is_dir()]
     for s, alts in (("train", ("train",)), ("val", ("val", "valid"))):
         for a in alts:
-            if splits[s] is None:
-                splits[s] = _resolve(f"images/{a}", base, None) or _resolve(f"{a}/images", base, None)
+            for base in bases:
+                if splits[s] is None:
+                    splits[s] = _resolve(f"images/{a}", base, None) or _resolve(f"{a}/images", base, None)
     if splits["train"] is None:
         raise SystemExit(f"no training images found from {data}")
     return _names(cfg) if cfg else None, splits
