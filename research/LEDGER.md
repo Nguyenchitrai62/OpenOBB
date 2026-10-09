@@ -291,6 +291,33 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
        Độ khít của vật mảnh (wall, junction: tỉ lệ 0.41–0.45) là điểm yếu thứ hai.
     4. BN của `encoder.input_proj` ở P5 dễ nổ với LR cao → giữ lr ≤ 5e-4 cho encoder pretrained.
   - → Việc cần làm: đo lại v1 bằng thước Ultralytics để xếp hạng v1 / v3 / v4 cho đúng.
+- **F32. VRDet3-x so với YOLO26x-obb, CÙNG THƯỚC Ultralytics (user, 10-09).**
+  - Điều kiện:
+    - Cả hai: Wall_Color, val 53 ảnh, imgsz 1280.
+    - YOLO26x-obb: 57.6M tham số, 150 epoch, A100.
+    - VRDet3-x: 64.6M tham số, best ep40 của một vòng fine-tune 50 epoch.
+  - mAP50 / mAP50-95:
+    | Class | YOLO26x | VRDet3-x | Chênh |
+    |---|---|---|---|
+    | all | 0.746 / 0.499 | 0.712 / 0.467 | −0.034 / −0.032 |
+    | wall | 0.919 / 0.624 | 0.894 / 0.575 | −0.025 / −0.049 |
+    | note | 0.764 / 0.517 | 0.744 / 0.470 | −0.020 / −0.047 |
+    | door | 0.965 / 0.811 | **0.975 / 0.820** | +0.010 / +0.009 |
+    | slide_door | 0.345 / 0.123 | 0.273 / 0.119 | −0.072 / −0.004 |
+    | double_door | 0.494 / 0.392 | **0.589 / 0.476** | +0.095 / +0.084 |
+    | **wall_300** | 0.824 / 0.441 | **0.599 / 0.256** | **−0.225 / −0.185** (R 0.33 so với 0.87) |
+    | junction | 0.910 / 0.584 | 0.907 / 0.556 | −0.003 / −0.028 |
+  - **Riêng wall_300 chiếm khoảng 95% khoảng cách mAP50** (−0.225 / 7 = −0.032 trên −0.034) và khoảng 80% khoảng cách mAP50-95.
+    Bỏ wall_300 ra, v3 ngang YOLO26x ở mAP50 (lệch trung bình 6 class còn lại −0.003).
+  - Phần còn lại là độ khít (mAP50-95): wall −0.049, note −0.047, junction −0.028.
+  - P / R của VRDet trong bảng vẫn tính bằng ghép IoU đa giác nên không so được với P / R của YOLO. Chỉ so mAP.
+  - Tốc độ chưa so được:
+    - YOLO in 96.9 ms / ảnh lúc val (A100, batch val, gồm cả warmup).
+    - VRDet3 23.1 ms (RTX PRO 6000, batch 1, fp16, sau warmup).
+  - Việc tiếp:
+    1. Tìm vì sao v3 bỏ sót wall_300: nhầm sang wall? (cần confusion matrix).
+    2. Hướng kiến trúc: phân loại có điều kiện theo hình học (độ dày dự đoán đưa vào nhánh class).
+    3. Xem wall_300 ở v4.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
