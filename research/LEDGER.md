@@ -234,6 +234,19 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     1. Hồi quy dọc trục "vị trí × log(chiều dài)" + L1 đầu mút không học được (end_loss kẹt).
     2. Không có pretrained.
   - → Không đầu tư thêm cho v2. Thay bằng VRDet3 (F26): DFL hai khoảng cách đầu mút, feature COCO.
+- **F28. VRDet3-x Wall_Color, đang chạy (user, 10-09).**
+  - Điều kiện: init D-FINE COCO, lr 1e-3, batch 16, 100 epoch.
+  - Mốc giữa chừng: ep10 0.283 / 0.085; ep20 0.346 / 0.136; ep26 **0.367 / 0.148**. Sau 26 epoch đã vượt mức cuối của v2 (0.356 / 0.133 sau 116 epoch).
+  - Loss train giảm rõ, khác hẳn v2:
+    | Loss | ep1 → ep26 |
+    |---|---|
+    | box | 1.53 → 0.51 |
+    | dfl | 1.67 → 0.67 |
+    | across | 0.23 → 0.11 |
+    | angle | 0.13 → 0.06 |
+  - Tỉ lệ khít tăng dần: 0.30 (ep10) → 0.40 (ep26). Vẫn dưới v1 0.56 / YOLO 0.68.
+  - Train nhanh hơn v2 khoảng 1.5 lần (13 s/epoch ở batch 16, v2 20 s).
+  - Chờ kết quả cuối + bảng theo class để so v1 (0.63 / 0.35).
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
