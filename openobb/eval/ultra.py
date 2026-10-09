@@ -1,5 +1,5 @@
-"""Second metric with the conventions of the Ultralytics OBB validator, so VRDet numbers can be compared with the
-mAP that YOLO prints (VRDet's own code, written from the validator's documented behaviour; no Ultralytics code).
+"""Second metric with the conventions of the Ultralytics OBB validator, so OpenOBB numbers can be compared with the
+mAP that YOLO prints (OpenOBB's own code, written from the validator's documented behaviour; no Ultralytics code).
 
 Differences from the DOTA devkit protocol in openobb.eval.dota:
   * IoU = ProbIoU between oriented boxes (min-area rectangles of the polygons), not polygon IoU. ProbIoU is more

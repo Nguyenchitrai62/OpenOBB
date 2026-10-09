@@ -1,4 +1,4 @@
-# Kế hoạch nghiên cứu: kiến trúc OBB mới (VRDet)
+# Kế hoạch nghiên cứu: kiến trúc OBB mới (OpenOBB)
 
 Cập nhật: 2026-10-07. Trạng thái: **bản thảo v1**. Các mốc số liệu tham chiếu đều đã ghi nguồn. Mục nào chưa có nguồn thì là giả thuyết.
 
@@ -43,7 +43,7 @@ Real-time DETR-OBB (Apache-2.0), DOTA-v1 test, 72 epoch, 2×2080Ti. Nguồn: [ar
 | O2-DEIM-R18 | 20M | 147G | 233 | 79.49 | multi-scale |
 | O2-DEIM-R50 | 42M | 339G | 119 | 80.15 | multi-scale |
 
-Ghi chú license: code O2-RTDETR trong ai4rs giống 82–96% code RHINO (CC BY-NC). VRDet chỉ lấy ý tưởng từ paper, tự viết lại.
+Ghi chú license: code O2-RTDETR trong ai4rs giống 82–96% code RHINO (CC BY-NC). OpenOBB chỉ lấy ý tưởng từ paper, tự viết lại.
 
 **Mốc mới (cập nhật 2026-10-07): RiO-DETR** ([arXiv 2603.09411](https://arxiv.org/abs/2603.09411), ECCV 2026, repo Apache-2.0, chỉ công bố baseline). DOTA-v1.0 test, single-scale (SS), train+val:
 
@@ -92,15 +92,15 @@ Kiến trúc tự chế, train from scratch, assigner/loss/evaluator tự viết
 2. Dùng metric chuẩn (DOTA devkit), không tự chế metric.
 3. Mỗi lần chỉ thay một thứ.
 
-## 4. Hướng kiến trúc: VRDet
+## 4. Hướng kiến trúc: OpenOBB
 
-Tên làm việc: **VRDet**. Lõi là detector OBB raster tổng quát (benchmark được trên DOTA). Nhánh vector là **plug-in** riêng cho CAD.
+Tên làm việc: **OpenOBB**. Lõi là detector OBB raster tổng quát (benchmark được trên DOTA). Nhánh vector là **plug-in** riêng cho CAD.
 
 ### 4.1 Khung nền (đã code, `openobb/models/`)
 
 Dựa trên D-FINE (Apache-2.0), init từ checkpoint **COCO** của D-FINE: chỉ COCO, tránh điều khoản Objects365.
 - Backbone HGNetv2 cộng hybrid encoder (AIFI + CCFM), giữ nguyên D-FINE.
-- Decoder OBB do VRDet tự viết:
+- Decoder OBB do OpenOBB tự viết:
   - **rotated FDR**: 4 phân phối cho cạnh trong hệ trục box, cộng 1 phân phối cho góc dư ±45°;
   - GT được "căn" về biểu diễn tương đương gần góc tham chiếu nhất, nên không có bài toán biên góc;
   - deformable sampling xoay theo θ;
@@ -141,14 +141,14 @@ Kiểm chứng đa dataset, sau khi thắng trên DOTA:
 
 ### 4.3 Họ model
 
-Theo YOLO, kiến trúc phải scale được thành n/s/m/l/x bằng depth/width multiplier. Mục tiêu sau cùng: **mỗi cỡ VRDet có mAP50 ≥ YOLO26 cùng cỡ + ≥1 điểm**, latency ≤ 1.3× YOLO26 cùng cỡ.
+Theo YOLO, kiến trúc phải scale được thành n/s/m/l/x bằng depth/width multiplier. Mục tiêu sau cùng: **mỗi cỡ OpenOBB có mAP50 ≥ YOLO26 cùng cỡ + ≥1 điểm**, latency ≤ 1.3× YOLO26 cùng cỡ.
 
 ## 5. Lộ trình thí nghiệm
 
 | Bước | Nội dung | Tiêu chí qua | Ước tính GPU |
 |---|---|---|---|
 | E0 | Hạ tầng: Colab CLI, data DOTA tải trực tiếp trên VM, evaluator DOTA, checkpoint + resume | eval GT=pred cho mAP=1.0; resume đúng sau khi kill (**xong**) | nhỏ |
-| E1 | Baseline 24 epoch SS train→val: YOLO26s-obb (chỉ đo) + VRDet-S (D-FINE OBB) | VRDet-S ≥ YOLO26s − 2 | ~6 + ~10 CU |
+| E1 | Baseline 24 epoch SS train→val: YOLO26s-obb (chỉ đo) + OpenOBB1-S (D-FINE OBB) | OpenOBB1-S ≥ YOLO26s − 2 | ~6 + ~10 CU |
 | E2 | Ablation H1, H4 (cỡ s, schedule ngắn) | mỗi H: Δ ≥ +0.5 mAP50 hoặc bỏ | trung bình |
 | E3 | Ablation H2, H3, H5, H6 | như trên, kèm FPS | trung bình |
 | E4 | Gộp các H đã qua, train đủ schedule trên DOTA train+val, nộp test server | ≥ YOLO26 cùng cỡ | lớn |
@@ -183,7 +183,7 @@ Ngân sách: Colab Pro+, ~500 compute units (2026-10-07). G4 ≈ 8.9 CU/h. YOLO2
   - CADSpotting 87.4;
   - SymPoint 83.3 (NC);
   - CADTransformer 68.9 (raster + vector, MIT).
-- **Thí nghiệm E6:** VRDet raster-only vs VRDet + vector tokens (H7), cùng điều kiện, đo mAP50 / mAP50-95 OBB theo class.
+- **Thí nghiệm E6:** OpenOBB raster-only vs OpenOBB + vector tokens (H7), cùng điều kiện, đo mAP50 / mAP50-95 OBB theo class.
 
 ## 6. Tài liệu tham khảo chính
 

@@ -5,7 +5,7 @@ Copyright (c) 2024 The DEIM Authors. All Rights Reserved.
 Modified from D-FINE (https://github.com/Peterande/D-FINE)
 Copyright (c) 2023 . All Rights Reserved.
 
-# Vendored into VRDet (Apache-2.0). Changes: removed the config registry / torch.distributed
+# Vendored into OpenOBB (Apache-2.0). Changes: removed the config registry / torch.distributed
 # coupling; pretrained loading simplified. See THIRD_PARTY_NOTICES.md.
 """
 

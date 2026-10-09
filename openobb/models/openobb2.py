@@ -1,20 +1,20 @@
-"""VRDet2: dense, NMS-free oriented detector for drawings (thin / long / small objects, small datasets).
+"""OpenOBB2: dense, NMS-free oriented detector for drawings (thin / long / small objects, small datasets).
 
-VRDet's own implementation; the ideas follow published work, re-implemented from scratch:
+OpenOBB's own implementation; the ideas follow published work, re-implemented from scratch:
   * dense anchor-free prediction at every feature location with task-aligned assignment (TOOD / YOLO family),
     one-to-many head for training signal + one-to-one head for NMS-free output (YOLOv10 / YOLO26);
   * long strip depthwise convolutions for elongated context (Strip R-CNN, LSKNet idea);
   * a P2 (stride 4) level through a two-way PAN, so 2-3 px lines and tiny junctions get their own cells;
   * one global self-attention block on P5 for page-level context (AIFI / C2PSA idea).
-New in VRDet2 (segment-aware head): every oriented box is read as a segment along its long axis plus a thickness.
+New in OpenOBB2 (segment-aware head): every oriented box is read as a segment along its long axis plus a thickness.
 Each location predicts the axis angle, its own position along the segment (relative to the half length), the
 segment length in log space (no length cap: a long wall is measured from any point on it), a signed offset across
 the axis, and the thickness as a fine distribution (sub-stride precision: 1 px of thickness decides IoU for thin
 objects). Thickness is learned independently of where the point sits, so points beside a 2 px line still work.
 
-Sizes follow the usual depth / width multipliers; vrdet2x is the accuracy-first model.
+Sizes follow the usual depth / width multipliers; openobb2x is the accuracy-first model.
 Output (eval): {"pred_logits": (B, A, C), "pred_boxes": (B, A, 5) normalised (cx, cy, w, h, theta)}: one-to-one
-classes + the shared segment regression, read by openobb.models.vrdet.postprocess like the DETR outputs.
+classes + the shared segment regression, read by openobb.models.openobb1.postprocess like the DETR outputs.
 """
 import math
 
@@ -218,7 +218,7 @@ def decode(reg, pts, strides):
     return torch.stack([cx, cy, length, thick, th], -1)
 
 
-class VRDet2(nn.Module):
+class OpenOBB2(nn.Module):
     arch = "v2"
 
     def __init__(self, size="x", num_classes=15, img_size=1024, **_):

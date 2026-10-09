@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 from openobb.data.dota import DotaPatches
 from openobb.engine import ctx_batch
-from openobb.models.vrdet import VRDet
+from openobb.models.openobb1 import OpenOBB1
 
 torch.set_num_threads(1)
 ROOT = Path(__file__).resolve().parents[1]
@@ -51,7 +51,7 @@ def test_context_crop_matches_patch(tmp_path):
 
 def test_context_is_identity_at_init_and_trains(tmp_path):
     torch.manual_seed(0)
-    m = VRDet("s", img_size=256, context=True, num_denoising=0).eval()
+    m = OpenOBB1("s", img_size=256, context=True, num_denoising=0).eval()
     x = torch.rand(2, 3, 256, 256)
     ctx = {"thumb": torch.rand(2, 3, 128, 128), "tile": torch.tensor([[0., 0., 64., 64.], [32., 32., 96., 96.]]),
            "valid": torch.tensor([True, False])}

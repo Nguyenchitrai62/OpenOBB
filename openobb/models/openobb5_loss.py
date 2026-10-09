@@ -1,11 +1,11 @@
-"""VRDet5 losses: VRDet3's dense losses + a quality-focal loss on the relation re-scorer's corrected class logits."""
+"""OpenOBB5 losses: OpenOBB3's dense losses + a quality-focal loss on the relation re-scorer's corrected class logits."""
 import torch.nn.functional as F
 
-from .vrdet3_loss import VRDet3Loss
-from .vrdet5 import relation_targets
+from .openobb3_loss import OpenOBB3Loss
+from .openobb5 import relation_targets
 
 
-class VRDet5Loss(VRDet3Loss):
+class OpenOBB5Loss(OpenOBB3Loss):
     def __init__(self, w_rel=1.0, rel_thr=0.5, **kw):
         super().__init__(**kw)
         self.w_rel, self.rel_thr = w_rel, rel_thr

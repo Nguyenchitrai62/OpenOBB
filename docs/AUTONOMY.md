@@ -38,7 +38,7 @@ Agent thức dậy vì một trong ba lý do: watcher kết thúc, task định 
 ## 3b. Quy tắc tiết kiệm CU (user nhắc 2026-10-07)
 
 - **Chỉ dùng G4**, tối đa **3 phiên song song**.
-  - A100 trên Colab chậm khoảng 2× với workload VRDet (VM ít CPU), tốn khoảng 1.9× CU mỗi ảnh train.
+  - A100 trên Colab chậm khoảng 2× với workload OpenOBB (VM ít CPU), tốn khoảng 1.9× CU mỗi ảnh train.
   - Mọi run phải bật `--channels-last --compile` (×1.43 tốc độ).
 - **Dừng sớm**: khi 2 checkpoint sub-mAP liên tiếp thấp hơn baseline rõ rệt (> 1 điểm), dừng run (`job.py stop`) và ghi kết luận.
 - Trước khi launch, ước lượng CU (giờ × 8.9) và cân nhắc giá trị thông tin. Ưu tiên ablation rẻ và gộp sớm các thành phần đã có tín hiệu tốt.

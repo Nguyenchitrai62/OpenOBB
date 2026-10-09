@@ -7,7 +7,7 @@ render `scale`; images are full pages rendered in display space (top-left origin
 Output: {out}/{image_stem}.npz  with  tokens (N, 21) = type, 8 x (x, y) px, r, g, b, width px;  layer (N,) int
 (-1 = no optional-content layer);  layer_names (L,).  See openobb/data/vectors.py.
 
-PDF reading uses PyMuPDF (AGPL-3.0 / commercial licence; AI_Takeoff already depends on it). VRDet itself only
+PDF reading uses PyMuPDF (AGPL-3.0 / commercial licence; AI_Takeoff already depends on it). OpenOBB itself only
 consumes the token arrays, so a permissive reader (pypdfium2, pdfminer.six) can replace this script later.
 
 python tools/pdf_vectors.py --export D:/exports/fire_doc12 --pdf-dir D:/pdfs --out D:/exports/fire_doc12/vectors

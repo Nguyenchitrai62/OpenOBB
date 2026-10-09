@@ -1,6 +1,6 @@
-"""VRDet3 assignment + losses (VRDet's own implementation).
+"""OpenOBB3 assignment + losses (OpenOBB's own implementation).
 
-Assignment: rotated task-aligned (openobb.models.vrdet2_loss.assign) with a length-adaptive top-k and a per-level
+Assignment: rotated task-aligned (openobb.models.openobb2_loss.assign) with a length-adaptive top-k and a per-level
 across band of 1 stride (every level has candidates along every object). Points not selected are negatives
 (the head is the output head; duplicates are removed by NMS).
 
@@ -19,8 +19,8 @@ import torch.nn.functional as F
 
 from openobb.ops.obb_torch import probiou
 
-from .vrdet2_loss import assign
-from .vrdet3 import ALONG_BINS, THICK_BINS, decode
+from .openobb2_loss import assign
+from .openobb3 import ALONG_BINS, THICK_BINS, decode
 
 
 def _dfl(logits, t):
@@ -49,7 +49,7 @@ def frame_targets(pts, theta_p, g, lam=3.0):
     return length / 2 + u, length / 2 - u, -v, length, thick, torch.atan2(ax[:, 1], ax[:, 0])
 
 
-class VRDet3Loss(nn.Module):
+class OpenOBB3Loss(nn.Module):
     def __init__(self, w_cls=1.0, w_box=2.0, w_dfl=0.5, w_across=1.0, w_angle=0.5, topk=10, topk_len=16.0,
                  topk_max=48, alpha=1.0, beta=6.0, min_side=8.0, across=1.0, img_size=1024):
         super().__init__()
@@ -98,11 +98,11 @@ class VRDet3Loss(nn.Module):
 
 
 class DenseOrientedCriterion(nn.Module):
-    """VRDet3Loss on the dense branch of a DETR model (VRDet4); keys prefixed loss_dense_*."""
+    """OpenOBB3Loss on the dense branch of a DETR model (OpenOBB4); keys prefixed loss_dense_*."""
 
     def __init__(self, img_size=1024):
         super().__init__()
-        self.loss = VRDet3Loss(img_size=img_size)
+        self.loss = OpenOBB3Loss(img_size=img_size)
 
     def forward(self, out, targets):
         o = {"cls": out["dense_logits"], "reg": out["dense_reg"], "points": out["dense_pts_px"],

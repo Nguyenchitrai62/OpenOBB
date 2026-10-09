@@ -1,4 +1,4 @@
-"""VRDet model assembly: HGNetv2 backbone + hybrid encoder (D-FINE, Apache-2.0) + oriented D-FINE decoder.
+"""OpenOBB model assembly: HGNetv2 backbone + hybrid encoder (D-FINE, Apache-2.0) + oriented D-FINE decoder.
 
 Sizes mirror D-FINE so its COCO checkpoints (Apache-2.0, COCO-only: no Objects365 terms) initialise
 everything that has a matching shape; oriented-specific rows/columns start from neutral values.
@@ -52,7 +52,7 @@ COCO_TO_DOTA = {"plane": 4, "helicopter": 4, "small-vehicle": 2, "large-vehicle"
 class StripContext(nn.Module):
     """Large anisotropic receptive field for long / large objects (bridge, harbor, fields): depthwise 1xk and kx1
     strips + 3x3 + pointwise mix, residual, zero-initialised output so it starts as identity. Idea from strip /
-    large selective kernels (Strip R-CNN, LSKNet); implementation is VRDet's own."""
+    large selective kernels (Strip R-CNN, LSKNet); implementation is OpenOBB's own."""
 
     def __init__(self, c, k=11):
         super().__init__()
@@ -71,7 +71,7 @@ class StripContext(nn.Module):
 
 class SelectiveKernel(nn.Module):
     """H14: per-location adaptive receptive field on the backbone maps (idea: LSKNet's large selective kernel, read
-    from the paper; VRDet's own implementation). A near branch (depthwise 5x5) and a far branch (then depthwise 7x7,
+    from the paper; OpenOBB's own implementation). A near branch (depthwise 5x5) and a far branch (then depthwise 7x7,
     dilation 3: ~23 px field) are mixed by a spatial gate built from channel mean/max; the result modulates the input
     multiplicatively through a zero-initialised projection, so the block starts as identity."""
 
@@ -94,7 +94,7 @@ class SelectiveKernel(nn.Module):
         return x + x * self.out(a * g[:, :1] + b * g[:, 1:])
 
 
-class VRDet(nn.Module):
+class OpenOBB1(nn.Module):
     def __init__(self, size="s", num_classes=15, num_queries=300, img_size=1024, rotate_sampling=True,
                  num_denoising=100, dense=False, dense_width=128, strip_k=0, ortho_heads=False, context=False,
                  dense_queries=False, vectors=False, vec_dim=128, vec_layers=2, o2m_queries=0, lsk=False,
@@ -116,7 +116,7 @@ class VRDet(nn.Module):
         bb.update(cfg["backbone"])
         if backbone == "hgnet":
             self.backbone = HGNetv2(**bb, pretrained=False)
-        else:                                   # VRDet4: DINOv2 ViT + adapter producing the encoder's input maps
+        else:                                   # OpenOBB4: DINOv2 ViT + adapter producing the encoder's input maps
             if p2:
                 raise ValueError("p2 is only available with the HGNetv2 backbone")
             from .vit import DinoV2Backbone
@@ -135,8 +135,8 @@ class VRDet(nn.Module):
         self.lsk = nn.ModuleList([SelectiveKernel(c) for c in cfg["encoder"]["in_channels"]]) if lsk else None
         self.global_ctx = GlobalContext(self.backbone, cfg["encoder"]["in_channels"][-1], hid,
                                         p5_size=img_size // 32) if context else None
-        if (dense or dense_queries) and dense_v3:       # VRDet4: VRDet3's oriented head as the dense branch
-            from .vrdet3 import DenseOriented
+        if (dense or dense_queries) and dense_v3:       # OpenOBB4: OpenOBB3's oriented head as the dense branch
+            from .openobb3 import DenseOriented
             self.dense_head = DenseOriented(hid, num_classes, img_size)
         else:
             self.dense_head = DenseRotatedHead(cfg["encoder"]["hidden_dim"], num_classes, (8, 16, 32), dense_width,
@@ -198,7 +198,7 @@ def build_criterion(num_classes=15, reg_max=32, box_loss="kld", weights=None, co
 
 
 def load_dfine_coco(model, ckpt_or_size, class_names=None, log=print, init="coco", class_map=None):
-    """Initialise from a D-FINE COCO (or Objects365->COCO) checkpoint, or a VRDet checkpoint path; shape-mismatched
+    """Initialise from a D-FINE COCO (or Objects365->COCO) checkpoint, or a OpenOBB checkpoint path; shape-mismatched
     tensors are copied on their overlap. class_map {dst_class: src_class} re-indexes the class heads."""
     if isinstance(ckpt_or_size, str) and len(ckpt_or_size) == 1:
         url = DFINE_URL.format(ckpt_or_size) if init == "coco" else             DFINE_URL.rsplit("/", 1)[0] + "/" + DFINE_O365_FILES[ckpt_or_size]

@@ -1,12 +1,12 @@
-"""Dense rotated head (VRDet's one-to-many branch) + rotated task-aligned assigner + loss.
+"""Dense rotated head (OpenOBB's one-to-many branch) + rotated task-aligned assigner + loss.
 
 Why: DETR-OBB decoders win the large / context classes on DOTA but lose small dense objects to
-YOLO-style dense heads (RiO-DETR vs YOLO26 per-class: PL, SP, HC, SV). VRDet keeps both: a cheap
+YOLO-style dense heads (RiO-DETR vs YOLO26 per-class: PL, SP, HC, SV). OpenOBB keeps both: a cheap
 anchor-free dense head on the encoder's P3-P5 (trained one-to-many, giving many positives per object
 and recall on tiny objects) next to the relation decoder (one-to-one). The head can be used as an
 auxiliary loss only, as a second output fused at inference, or as the query source of the decoder.
 
-All code here is VRDet's own (Apache-2.0); the ideas follow published work: TAL (TOOD), rotated
+All code here is OpenOBB's own (Apache-2.0); the ideas follow published work: TAL (TOOD), rotated
 TAL + ProbIoU (PP-YOLOE-R), small-target-aware candidate expansion (YOLO26 STAL), near-square
 angle penalty sin^2(2*dtheta) * exp(-ln^2(w/h)/lambda^2) (YOLO26 paper).
 """

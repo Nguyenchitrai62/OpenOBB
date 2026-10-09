@@ -1,7 +1,7 @@
 """Oriented-box helpers for the rotated Fine-grained Distribution Refinement (rotated FDR).
 
 `weighting_function` and `translate_gt` follow D-FINE (Apache-2.0, Copyright (c) 2024 The D-FINE
-Authors); everything oriented-box specific is VRDet code.
+Authors); everything oriented-box specific is OpenOBB code.
 
 Conventions
   * boxes are (cx, cy, w, h, theta) with cx, cy, w, h normalised by the square input size;

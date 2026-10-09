@@ -38,7 +38,7 @@ for r in results:
 
 | Ultralytics | OpenOBB | Ghi chú |
 |---|---|---|
-| `YOLO("best.pt")` | `OpenOBB("best.pt")` | Mọi checkpoint VRDet v1–v5 |
+| `YOLO("best.pt")` | `OpenOBB("best.pt")` | Mọi checkpoint OpenOBB v1–v5 |
 | `model.predict(source, conf, iou, imgsz, device, max_det, classes, agnostic_nms, save, save_txt, save_conf, stream, verbose, project, name, exist_ok, line_width, show, show_labels, show_conf)` | giống | Tham số khác bị bỏ qua |
 | `model(source)` | giống | |
 | `source`: path, thư mục, glob, URL, list, numpy BGR, PIL, tensor (B,3,H,W) RGB 0–1 | giống | **Chưa hỗ trợ video/webcam/stream** |
@@ -50,7 +50,7 @@ for r in results:
 | `len(r)`, `r[i]` | giống | |
 | `model.names`, `model.task` (= "obb") | giống | |
 | `model.val(data=...)` → `metrics.box.map`, `.map50`, `.maps`, `.mp`, `.mr`, `metrics.results_dict` | giống | mAP tính theo cách chấm của YOLO |
-| `model.train(...)` | `OpenOBB("vrdet5x").train(data=..., epochs=...)` | Hoặc CLI `openobb train ...` |
+| `model.train(...)` | `OpenOBB("openobb5x").train(data=..., epochs=...)` | Hoặc CLI `openobb train ...` |
 | `model.export(...)`, `model.track(...)` | chưa có | |
 
 ## Khác biệt cần biết

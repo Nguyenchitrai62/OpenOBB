@@ -1,4 +1,4 @@
-"""Run a trained VRDet checkpoint on images of any size (e.g. full drawing pages rendered from PDF).
+"""Run a trained OpenOBB checkpoint on images of any size (e.g. full drawing pages rendered from PDF).
 
 Images are prepared exactly as in training: resized so the long side = SIZE (default, whole image per forward pass),
 or, for models trained with tile=True, cut into SIZE x SIZE tiles with GAP overlap. Tiles are predicted in batches and
@@ -24,7 +24,7 @@ import torch
 from openobb.data.vectors import cut_tile
 from openobb.eval.dota import merge_patches
 from openobb.models.dense_head import dense_predict
-from openobb.models.vrdet import VRDet, postprocess
+from openobb.models.openobb1 import OpenOBB1, postprocess
 from openobb.ops.obb import obb2poly
 
 PAD_BGR = (104, 116, 124)
@@ -47,24 +47,24 @@ def load_model(ckpt_path, device, queries=None, classes=None):
     if not names:
         raise SystemExit("class names unknown: pass --classes (classes.json of the training data or a,b,c)")
     if a.get("arch") == "v2":
-        from openobb.models.vrdet2 import VRDet2
-        m = VRDet2(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024))
+        from openobb.models.openobb2 import OpenOBB2
+        m = OpenOBB2(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
     if a.get("arch") == "v5":
-        from openobb.models.vrdet5 import VRDet5
-        m = VRDet5(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
+        from openobb.models.openobb5 import OpenOBB5
+        m = OpenOBB5(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
                    max_det=max(int(a.get("num_top", 1000)), int(queries or 0)), backbone=a.get("backbone", "dinov2_b"),
                    geo_cls=a.get("geo_cls", True), relate=a.get("relate", True), rel_k=a.get("rel_k", 600))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
     if a.get("arch") == "v3":
-        from openobb.models.vrdet3 import VRDet3
-        m = VRDet3(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
+        from openobb.models.openobb3 import OpenOBB3
+        m = OpenOBB3(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
                    max_det=max(int(a.get("num_top", 1000)), int(queries or 0)), backbone=a.get("backbone", "hgnet"))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
-    m = VRDet(a.get("size", "s"), num_classes=len(names), num_queries=a.get("queries", 300),
+    m = OpenOBB1(a.get("size", "s"), num_classes=len(names), num_queries=a.get("queries", 300),
               img_size=a.get("img", 1024), rotate_sampling=not a.get("no_rotate_sampling", False),
               num_denoising=a.get("denoising", 100), dense=a.get("dense", False) or a.get("dense_queries", False),
               strip_k=a.get("strip_k", 0), ortho_heads=a.get("ortho_heads", False), context=a.get("context", False),

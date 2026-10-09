@@ -4,13 +4,13 @@ import sys
 import time
 
 COLS = ("cls_loss", "box_loss", "kld_loss", "angle_loss", "dfl_loss")
-KEYS = ("loss_mal", "loss_bbox", "loss_kld", "loss_angle", "loss_fgl")      # VRDet1: final decoder layer losses
+KEYS = ("loss_mal", "loss_bbox", "loss_kld", "loss_angle", "loss_fgl")      # OpenOBB1: final decoder layer losses
 COLS2 = ("cls_loss", "box_loss", "end_loss", "thick_loss", "angle_loss")
-KEYS2 = ("loss_cls", "loss_box", "loss_end", "loss_dfl", "loss_angle")      # VRDet2: one-to-many head
+KEYS2 = ("loss_cls", "loss_box", "loss_end", "loss_dfl", "loss_angle")      # OpenOBB2: one-to-many head
 COLS3 = ("cls_loss", "box_loss", "dfl_loss", "acr_loss", "angle_loss")
-KEYS3 = ("loss_cls", "loss_box", "loss_dfl", "loss_across", "loss_angle")    # VRDet3
+KEYS3 = ("loss_cls", "loss_box", "loss_dfl", "loss_across", "loss_angle")    # OpenOBB3
 COLS5 = ("cls_loss", "box_loss", "dfl_loss", "angle_loss", "rel_loss")
-KEYS5 = ("loss_cls", "loss_box", "loss_dfl", "loss_angle", "loss_rel")         # VRDet5
+KEYS5 = ("loss_cls", "loss_box", "loss_dfl", "loss_angle", "loss_rel")         # OpenOBB5
 
 
 def _bar(i, n, width=12):

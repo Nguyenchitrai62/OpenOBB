@@ -7,7 +7,7 @@
 GitHub (github.com/Nguyenchitrai62/OpenOBB) holds everything: research, Colab notebooks (Colab installs from it).
 GitLab (openanything/openobb) holds only the commercial-clean product: ALLOW below, minus EXCLUDE (tests that need
 research scripts), with TRANSFORMS applied (notices / docs that mention research files, install URLs). Its own
-README.md and .gitignore are never overwritten. Only committed files are synced (`git archive HEAD`), commits go on
+README.md comes from tools/gitlab_README.md; its .gitignore is never overwritten. Only committed files are synced (`git archive HEAD`), commits go on
 top of GitLab main (never a force-push), and nothing is pushed unless the GitLab copy passes its tests and contains
 every source file of the package.
 """
@@ -25,28 +25,30 @@ ROOT = Path(__file__).resolve().parents[1]
 GITLAB = "https://git.anybim.vn/CxDP/service/hicasai/openanything/openobb.git"
 GITLAB_PIP = "git.anybim.vn/CxDP/service/hicasai/openanything/openobb.git"
 CHECKOUT = ROOT / ".gitlab_export"                     # persistent working clone of GitLab (gitignored)
-ALLOW = ["openobb", "tests", "docs/DEPLOY.md", "docs/FINETUNE.md", "docs/VRDET2.md", "docs/VRDET3.md",
-         "docs/VRDET4.md", "docs/VRDET5.md", "docs/ARCHITECTURE_CARD.md", "app/streamlit_app.py", "run_app.bat",
+ALLOW = ["openobb", "tests", "docs/DEPLOY.md", "docs/FINETUNE.md", "docs/OPENOBB2.md", "docs/OPENOBB3.md",
+         "docs/OPENOBB4.md", "docs/OPENOBB5.md", "docs/OPENOBB1.md", "app/streamlit_app.py", "run_app.bat",
          "LICENSE", "LICENSES", "THIRD_PARTY_NOTICES.md", "pyproject.toml", "requirements.txt"]
+# files from older layouts removed from GitLab when present (renamed in the research repo)
+RETIRED = ["docs/ARCHITECTURE_CARD.md", "docs/VRDET2.md", "docs/VRDET3.md", "docs/VRDET4.md", "docs/VRDET5.md",
+           "tests/test_vrdet2.py", "tests/test_vrdet3.py", "tests/test_vrdet4.py", "tests/test_vrdet5.py"]
+README_SRC = "tools/gitlab_README.md"                 # GitLab README (product wording), copied as README.md
 EXCLUDE = {"tests/test_context.py", "tests/test_import.py", "tests/test_layers.py", "tests/test_pdf_vectors.py"}
 FORBIDDEN = re.compile(r"^\s*(import|from)\s+(ultralytics|fitz|pymupdf|mmcv|mmdet|mmrotate|ai4rs)\b", re.M)
 # (file, pattern, replacement, is_regex): product-repo wording for text that mentions research-only files
 TRANSFORMS = [
-    ("THIRD_PARTY_NOTICES.md", "All other code in `openobb/`, `colab/data/`, `tools/`, `tests/` is original VRDet code.",
-     "All other code in `openobb/`, `tests/`, `app/` is original OpenOBB / VRDet code.", False),
+    ("THIRD_PARTY_NOTICES.md", "All other code in `openobb/`, `colab/data/`, `tools/`, `tests/` is original OpenOBB code.",
+     "All other code in `openobb/`, `tests/`, `app/` is original OpenOBB code.", False),
     ("THIRD_PARTY_NOTICES.md",
      r"- \*\*Ultralytics \(AGPL-3\.0\)\*\* is only used by `colab/baselines/yolo_obb\.py`.*?is not distributed\.",
      "- **Ultralytics (AGPL-3.0)** is not used or distributed by this repository. `tests/test_license_guard.py` "
      "fails if\n  `openobb/` imports it (or mmcv / mmdet / mmrotate / ai4rs). YOLO models were only trained, in a "
      "separate research\n  repository, as accuracy baselines.", True),
-    ("docs/ARCHITECTURE_CARD.md", "- Lịch sử thí nghiệm: [research/LEDGER.md](../research/LEDGER.md).",
+    ("docs/OPENOBB1.md", "- Lịch sử thí nghiệm: [research/LEDGER.md](../research/LEDGER.md).",
      "- Lịch sử thí nghiệm: sổ cái của repo nghiên cứu (không nằm trong repo này).", False),
-    ("docs/FINETUNE.md", r"- \[`colab/VRDet_wall_color\.ipynb`\].*\n- \[`colab/VRDet_train\.ipynb`\].*",
+    ("docs/FINETUNE.md", r"- \[`colab/OpenOBB_wall_color\.ipynb`\].*\n- \[`colab/OpenOBB_train\.ipynb`\].*",
      "- Notebook Colab nằm ở repo nghiên cứu. Trong repo này dùng thẳng CLI: `pip install` rồi `openobb train ...` "
      "(mục 2).", True),
     ("requirements.txt", r"(?m)^.*(pdf_vectors|pymupdf).*\n", "", True),
-    ("requirements.txt", "# VRDet runtime", "# OpenOBB runtime", False),
-    ("pyproject.toml", 'readme = "docs/FINETUNE.md"', 'readme = "README.md"', False),
     ("docs/DEPLOY.md", r"https://<token>@github\.com/Nguyenchitrai62/OpenOBB\.git",
      f"https://<user>:<token>@{GITLAB_PIP}", True),
     ("docs/DEPLOY.md", "Nếu repo chuyển sang private", "Repo GitLab công ty cần đăng nhập", False),
@@ -67,11 +69,13 @@ def build_tree(dst):
     """Committed ALLOW files of HEAD -> dst, minus EXCLUDE, with TRANSFORMS applied."""
     with tempfile.TemporaryDirectory() as tmp:
         tar = Path(tmp) / "a.tar"
-        run(["git", "archive", "-o", str(tar), "HEAD", *ALLOW])
+        run(["git", "archive", "-o", str(tar), "HEAD", *ALLOW, README_SRC])
         with tarfile.open(tar) as t:
             t.extractall(dst, filter="data")
     for rel in EXCLUDE:
         (dst / rel).unlink(missing_ok=True)
+    (dst / README_SRC).replace(dst / "README.md")
+    shutil.rmtree(dst / "tools")
     for rel, pat, rep, is_re in TRANSFORMS:
         p = dst / rel
         s = p.read_text(encoding="utf-8")
@@ -110,7 +114,7 @@ def main():
         new = Path(tmp) / "tree"
         new.mkdir()
         build_tree(new)
-        for rel in ALLOW:                                 # replace the managed paths, keep README.md / .gitignore
+        for rel in ALLOW + RETIRED + ["README.md"]:       # replace the managed paths, keep .gitignore
             p = CHECKOUT / rel
             if p.is_dir():
                 shutil.rmtree(p)

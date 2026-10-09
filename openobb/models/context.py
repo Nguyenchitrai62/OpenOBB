@@ -1,4 +1,4 @@
-"""Global image context for tiled inference (VRDet H6).
+"""Global image context for tiled inference (OpenOBB H6).
 
 Large inputs (DOTA images up to ~4000 px, CAD sheets 2000x3000+) are processed as high-resolution tiles so
 small objects and thin lines stay visible, but a tile alone loses the scene: where the water is (ship vs
@@ -12,7 +12,7 @@ relative to itself, including outside its borders. The output projection starts 
 initialisation the model is exactly the tile-only detector.
 
 Cost: one thumbnail pass per image, amortised over its tiles (~25 for a 4000x4000 image), plus one
-1024x256 attention per tile. All code is VRDet's own (Apache-2.0).
+1024x256 attention per tile. All code is OpenOBB's own (Apache-2.0).
 """
 import torch
 import torch.nn as nn

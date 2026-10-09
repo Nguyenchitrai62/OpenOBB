@@ -1,7 +1,7 @@
-"""DIOR-R (oriented) -> VRDet split layout. Research/benchmark data only.
+"""DIOR-R (oriented) -> OpenOBB split layout. Research/benchmark data only.
 
 Standard DIOR-R protocol: train on trainval (11,725 images), evaluate on test (11,738). To reuse every
-VRDet tool unchanged, the output calls them "train" and "val":
+OpenOBB tool unchanged, the output calls them "train" and "val":
   {out}/images/train = DIOR train+val,  {out}/images/val = DIOR test   (800 x 800 JPEGs, copied as is)
   labels/, meta/, gt/ (DOTA-format polygons + class names), thumbs/, classes.json
 

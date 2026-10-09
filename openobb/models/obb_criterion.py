@@ -1,7 +1,7 @@
 """Matcher and losses for the oriented D-FINE/DEIM head.
 
 Structure follows DEIMCriterion / HungarianMatcher (Apache-2.0; Copyright (c) 2024 The DEIM Authors,
-D-FINE Authors, Facebook DETR). Oriented-box parts are VRDet's own:
+D-FINE Authors, Facebook DETR). Oriented-box parts are OpenOBB's own:
   * matching cost  = focal class cost + Chamfer corner distance + KLD (weights from O2-DETR's ablation);
   * MAL quality target = exact rotated IoU (no gradient);
   * box loss       = L1 on (cx, cy, w, h, theta/pi) with the target aligned to the predicted angle

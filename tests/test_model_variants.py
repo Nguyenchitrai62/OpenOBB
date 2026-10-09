@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from openobb.models.dense_head import DenseCriterion
-from openobb.models.vrdet import VRDet, build_criterion
+from openobb.models.openobb1 import OpenOBB1, build_criterion
 
 torch.set_num_threads(1)     # torch 2.12 CPU kernels race with many threads on this machine
 
@@ -20,7 +20,7 @@ def _targets():
                                          (dict(dense_queries=True), "kld")])
 def test_variant_trains_one_step(kw, box_loss):
     torch.manual_seed(0)
-    m = VRDet("s", img_size=256, **kw)
+    m = OpenOBB1("s", img_size=256, **kw)
     crit = build_criterion(box_loss=box_loss)
     t = _targets()
     out = m(torch.rand(2, 3, 256, 256), t)
@@ -40,9 +40,9 @@ def test_variant_trains_one_step(kw, box_loss):
 
 def test_lsk_adapter_starts_as_identity():
     import torch
-    from openobb.models.vrdet import VRDet
+    from openobb.models.openobb1 import OpenOBB1
     torch.manual_seed(0)
-    m = VRDet("s", num_classes=3, img_size=256, num_denoising=0, lsk=True).eval()
+    m = OpenOBB1("s", num_classes=3, img_size=256, num_denoising=0, lsk=True).eval()
     x = torch.rand(1, 3, 256, 256)
     with torch.no_grad():
         a = m(x)["pred_boxes"]
@@ -60,13 +60,13 @@ def test_p2_level_keeps_coco_offsets_per_head():
     import os
     import pytest
     import torch
-    from openobb.models.vrdet import DFINE_URL, VRDet, load_dfine_coco
+    from openobb.models.openobb1 import DFINE_URL, OpenOBB1, load_dfine_coco
     ck = os.path.expanduser("~/.cache/torch/hub/checkpoints/dfine_s_coco.pth")
     if not os.path.exists(ck):
         pytest.skip("D-FINE COCO checkpoint not cached")
     src = torch.load(ck, map_location="cpu", weights_only=False)
     src = src["ema"]["module"] if "ema" in src else src.get("model", src)
-    m = VRDet("s", num_classes=3, img_size=256, num_denoising=10, p2=True)
+    m = OpenOBB1("s", num_classes=3, img_size=256, num_denoising=10, p2=True)
     load_dfine_coco(m, ck, class_names=["plane", "ship", "x"])
     k = next(k for k in m.state_dict() if k.endswith("cross_attn.sampling_offsets.weight"))
     new, old = m.state_dict()[k].view(8, -1, 256), src[k].view(8, -1, 256)

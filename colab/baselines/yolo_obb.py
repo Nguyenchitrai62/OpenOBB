@@ -2,7 +2,7 @@
 
 Trains on our DOTA patch split, then predicts the val patches, merges them back to full
 images and scores them with OUR DOTA-devkit-protocol evaluator, so the number is directly
-comparable with VRDet runs. Resumable: re-running continues from {out}/train/weights/last.pt.
+comparable with OpenOBB runs. Resumable: re-running continues from {out}/train/weights/last.pt.
 
 python -u colab/baselines/yolo_obb.py --data /content/datasets/dota1_1024 --out OUT \
     --model yolo26s-obb.yaml --weights yolo26s.pt --epochs 24 --imgsz 1024 --batch 32

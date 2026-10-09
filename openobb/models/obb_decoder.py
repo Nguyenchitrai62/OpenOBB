@@ -1,8 +1,8 @@
-"""Oriented-box D-FINE decoder for VRDet.
+"""Oriented-box D-FINE decoder for OpenOBB.
 
 Derived from DEIM / D-FINE (Apache-2.0):
   DEIM: Copyright (c) 2024 The DEIM Authors. D-FINE: Copyright (c) 2024 The D-FINE Authors.
-VRDet changes (Apache-2.0): 5-d oriented references (cx, cy, w, h, theta); rotated FDR (4 edge
+OpenOBB changes (Apache-2.0): 5-d oriented references (cx, cy, w, h, theta); rotated FDR (4 edge
 distributions in the box frame + 1 angle-residual distribution); rotated deformable sampling;
 oriented query selection head; oriented contrastive denoising; representation-invariant
 query positional features.
@@ -37,7 +37,7 @@ def distinct_topk(scores, boxes, k, pre, thr=0.7):
     return idx.gather(1, s.topk(min(k, pre), dim=1).indices)
 
 N_DIST = 5      # 4 rotated edges + 1 angle residual
-_DEBUG = bool(int(__import__('os').environ.get('VRDET_DEBUG', '0')))
+_DEBUG = bool(int(__import__('os').environ.get('OPENOBB_DEBUG', '0')))
 
 
 class MLP(nn.Module):
@@ -428,7 +428,7 @@ class OBBDFINETransformer(nn.Module):
             anchors, valid_mask = self.anchors, self.valid_mask
         memory = valid_mask.to(memory.dtype) * memory
         output_memory = self.enc_output(memory)
-        if dense is not None:      # VRDet hybrid (H4c): queries come from the dense one-to-many head (distinct top-k)
+        if dense is not None:      # OpenOBB hybrid (H4c): queries come from the dense one-to-many head (distinct top-k)
             sc = dense["dense_logits"].detach().float().sigmoid().amax(-1) * valid_mask[..., 0].to(torch.float32)
 
             def from_dense(n):

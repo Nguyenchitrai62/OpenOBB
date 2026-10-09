@@ -117,7 +117,7 @@ def plot_train_batch(path, imgs, targets, classes, n=4):
 def plot_val_predictions(out, model, data_root, device, img_size, classes, num_top=300, n=4, conf=0.3):
     """2x2 grid of val tiles: ground truth in thin green, predictions (score >= conf) in class colours."""
     from openobb.data.dota import DotaPatches
-    from openobb.models.vrdet import postprocess
+    from openobb.models.openobb1 import postprocess
     from openobb.ops.obb import obb2poly
     ds = DotaPatches(data_root, "val", augment=False)
     idx = [i for i, m in enumerate(ds.items) if m["objs"]][:n]

@@ -24,7 +24,7 @@ def test_prepare_roundtrip(tmp_path):
             poly = (np.array([200, 300, 400, 300, 400, 360, 200, 360], float).reshape(4, 2) / [W, H]).reshape(-1)
             (src / "labels" / split / f"{split}{k}.txt").write_text("1 " + " ".join(f"{v:.6f}" for v in poly) + "\n")
     (src / "data.yaml").write_text("names:\n  0: junction\n  1: fire pipe\n")
-    out = tmp_path / "vrdet"
+    out = tmp_path / "openobb"
     subprocess.run([sys.executable, str(ROOT / "tools/prepare_dataset.py"), "--src", str(src), "--out", str(out),
                     "--workers", "1"], check=True)
     assert dataset_classes(out) == ("junction", "fire_pipe")
@@ -47,7 +47,7 @@ def test_import_holds_out_val_when_missing(tmp_path):
         cv2.imwrite(str(src / "train" / "images" / f"p{k}.jpg"), img)
         (src / "train" / "labels" / f"p{k}.txt").write_text("0 0.1 0.1 0.3 0.1 0.3 0.2 0.1 0.2\n")
     (src / "data.yaml").write_text("names: [junction]\n")
-    out = tmp_path / "vrdet"
+    out = tmp_path / "openobb"
     subprocess.run([sys.executable, str(ROOT / "tools/prepare_dataset.py"), "--src", str(src), "--out", str(out),
                     "--workers", "1", "--val-frac", "0.2"], check=True)
     n_val = len((out / "meta" / "val.jsonl").read_text().splitlines())

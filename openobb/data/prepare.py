@@ -1,4 +1,4 @@
-"""Labelled OBB dataset -> VRDet tiled training layout.
+"""Labelled OBB dataset -> OpenOBB tiled training layout.
 
 Accepts a data.yaml (names + train/val image folders; relative paths incl. the "../train/images" form)
 or a dataset folder (images/{split} + labels/{split}, or {split}/images + {split}/labels, plus data.yaml).
@@ -176,7 +176,7 @@ def prepare(data, out, size=1024, gap=200, val_frac=0.15, seed=0, names=None, wo
                 "val": ([p for i, p in enumerate(tr) if i in hold], lbl)}
         print(f"[data] no val split: holding out {n_val}/{len(tr)} train images")
     summary = []
-    with tempfile.TemporaryDirectory(prefix="vrdet_lbl_") as tmp:
+    with tempfile.TemporaryDirectory(prefix="openobb_lbl_") as tmp:
         for split, (imgs, lbl_dir) in plan.items():
             items, safe, n_obj, st = _to_dota(imgs, lbl_dir, names, Path(tmp) / split)
             summary.append(f"[data] {split}: {len(items)} images, {n_obj} objects, "

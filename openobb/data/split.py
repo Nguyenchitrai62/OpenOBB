@@ -1,4 +1,4 @@
-"""Cut large images into fixed-size overlapping tiles with OBB labels (VRDet's own implementation of the usual
+"""Cut large images into fixed-size overlapping tiles with OBB labels (OpenOBB's own implementation of the usual
 DOTA-devkit protocol). Used for DOTA, FloorPlanCAD and labelled OBB datasets (openobb.data.prepare).
 
 Output (per split):

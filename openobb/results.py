@@ -1,5 +1,5 @@
-"""Prediction results with the same interface as the Ultralytics OBB results, so code written for YOLO reads VRDet
-output unchanged (VRDet's own implementation of that public interface; no Ultralytics code):
+"""Prediction results with the same interface as the Ultralytics OBB results, so code written for YOLO reads OpenOBB
+output unchanged (OpenOBB's own implementation of that public interface; no Ultralytics code):
 
     r = model.predict("page.png")[0]
     r.obb.xywhr        (N, 5) cx, cy, w, h, rotation (radians, [0, pi), w >= h), pixels

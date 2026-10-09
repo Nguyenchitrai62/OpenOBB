@@ -1,9 +1,9 @@
-# Thẻ kiến trúc VRDet: bản chốt raster (2026-10-08)
+# Thẻ kiến trúc OpenOBB: bản chốt raster (2026-10-08)
 
 Chỉ nói về kiến trúc model: chỉ số, các lớp, phần dùng lại và nguồn, rủi ro bản quyền.
 
 - Mục tiêu: OBB trên **ảnh** bản vẽ CAD (object nhỏ, ống mảnh, khối), không dùng vector khi suy luận.
-- Bản chốt: **VRDet + LSK** (run `c6-fpc-raster-lsk-s`). Đây là mặc định của `openobb train`.
+- Bản chốt: **OpenOBB + LSK** (run `c6-fpc-raster-lsk-s`). Đây là mặc định của `openobb train`.
 - Lịch sử thí nghiệm: [research/LEDGER.md](../research/LEDGER.md).
 
 ## 1. Sơ đồ
@@ -38,12 +38,12 @@ Chỉ nói về kiến trúc model: chỉ số, các lớp, phần dùng lại v
 | Benchmark | Model | Tham số | mAP50 | mAP50:95 | Latency (bs1, fp16, RTX PRO 6000) |
 |---|---|---|---|---|---|
 | FloorPlanCAD (ảnh CAD, 30 class) | YOLO26x (mốc) | 57.6M, 202 GFLOPs | **80.16** | **74.96** | 11.6 ms |
-| FloorPlanCAD | **VRDet-S + LSK (bản chốt)** | **12.5M** | **78.16** | **68.81** | 11.4 ms |
-| FloorPlanCAD | VRDet-S, không LSK (c4) | 10.3M | 76.83 | 66.57 | 10.0 ms |
+| FloorPlanCAD | **OpenOBB1-S + LSK (bản chốt)** | **12.5M** | **78.16** | **68.81** | 11.4 ms |
+| FloorPlanCAD | OpenOBB1-S, không LSK (c4) | 10.3M | 76.83 | 66.57 | 10.0 ms |
 | DOTA-v1.0 (tham khảo lõi OBB) | YOLO26x | 57.6M | 78.42 | 53.10 | 12.8 ms |
-| DOTA-v1.0 | VRDet-X (không LSK) | 63.4M | 76.29 | 52.84 | 20.0 ms |
+| DOTA-v1.0 | OpenOBB1-X (không LSK) | 63.4M | 76.29 | 52.84 | 20.0 ms |
 
-- Số VRDet đo với 900 query khi suy luận. Latency YOLO đo end-to-end, latency VRDet đo forward model; hai số gần tương đương.
+- Số OpenOBB đo với 900 query khi suy luận. Latency YOLO đo end-to-end, latency OpenOBB đo forward model; hai số gần tương đương.
 - **Bản S nhỏ hơn YOLO26x 4.6 lần, cùng tốc độ.**
   - Recall bằng YOLO26x: 92.0 so với 91.9.
   - Thắng ở object lớn cần hình dạng toàn cục: wardrobe +7.2, sofa +6.6 AP50.

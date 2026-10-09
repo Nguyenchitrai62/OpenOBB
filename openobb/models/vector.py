@@ -6,7 +6,7 @@ tokens of the image (drawing-level reasoning: which strokes form a symbol, what 
 token's feature is splatted onto the cells its stroke passes through at the backbone strides and added to the
 backbone maps through zero-initialised 1x1 convs. The model therefore starts exactly as the raster-only detector,
 and the encoder / decoder learn to use vector evidence (stroke type, layer colour, exact geometry) that is
-ambiguous in pixels. Idea family: CADTransformer / SymPoint / VecFormer (papers); implementation is VRDet's own.
+ambiguous in pixels. Idea family: CADTransformer / SymPoint / VecFormer (papers); implementation is OpenOBB's own.
 """
 import math
 

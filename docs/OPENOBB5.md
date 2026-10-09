@@ -1,9 +1,9 @@
-# VRDet5-x: dense oriented + DINOv2 + phân loại theo hình học + chấm lại theo quan hệ (bản 5, 2026-10-09)
+# OpenOBB5-x: dense oriented + DINOv2 + phân loại theo hình học + chấm lại theo quan hệ (bản 5, 2026-10-09)
 
 Dùng: CLI giữ nguyên, chỉ đổi `model=`.
 
 ```bash
-openobb train data=/content/data.yaml model=vrdet5x epochs=100 imgsz=1280
+openobb train data=/content/data.yaml model=openobb5x epochs=100 imgsz=1280
 ```
 
 - Mặc định: lr 5e-4, phần ViT × 0.2, batch 8.
@@ -26,17 +26,17 @@ openobb train data=/content/data.yaml model=vrdet5x epochs=100 imgsz=1280
 
 **v5 = đầu ra của v3** (nhiều mẫu dương: tốt cho class hiếm, nhanh) **+ thứ đã giúp v4** (feature DINOv2, ngữ cảnh) **+ 2 phần mới nhắm vào wall_300.**
 
-## 2. Các phần của VRDet5-x (127.9M tham số)
+## 2. Các phần của OpenOBB5-x (127.9M tham số)
 
 | # | Phần | Làm gì | Tham số | Nguồn |
 |---|---|---|---|---|
-| 1 | **DINOv2 ViT-B/14** (registers) + adapter (P3/P4/P5, nhánh chi tiết stride 8) | Feature tự giám sát (giống v4) | 86.6 + 8.2M | Code VRDet; weights DINOv2 Apache |
-| 2 | LSK ×3 | Trường nhìn thích nghi | 8.5M | VRDet |
+| 1 | **DINOv2 ViT-B/14** (registers) + adapter (P3/P4/P5, nhánh chi tiết stride 8) | Feature tự giám sát (giống v4) | 86.6 + 8.2M | Code OpenOBB; weights DINOv2 Apache |
+| 2 | LSK ×3 | Trường nhìn thích nghi | 8.5M | OpenOBB |
 | 3 | Hybrid encoder (AIFI + CCFF) | Ngữ cảnh toàn cục + trộn đa tầng | 20.7M | Code D-FINE Apache, weights COCO |
-| 4 | **Head dense oriented của v3** (DFL 2 đầu mút + độ dày, lệch ngang, mục tiêu theo hệ trục dự đoán, TAL đa tầng) | Đầu ra chính; nhiều mẫu dương, tốt cho class hiếm | 2.2M | VRDet (v3) |
-| 5 | **Phân loại theo hình học (mới)** | Nhánh class nhận 7 số đo mà nhánh box vừa dự đoán ở cùng điểm (đã detach); xem bảng dưới | khoảng 0.01M | VRDet |
-| 6 | **Chấm lại theo quan hệ (mới)** | 600 ứng viên khác nhau tốt nhất mỗi ảnh "nhìn nhau" qua 2 lớp transformer (d=256) rồi **sửa logit class** (cộng dư, khởi tạo 0); xem ví dụ dưới | 1.75M | VRDet (ý tưởng Relation Networks / self-attention của DETR, áp lên ứng viên dense) |
-| 7 | Đầu ra = các ứng viên đã chấm lại → Fast-NMS ProbIoU 0.7 | | 0 | VRDet |
+| 4 | **Head dense oriented của v3** (DFL 2 đầu mút + độ dày, lệch ngang, mục tiêu theo hệ trục dự đoán, TAL đa tầng) | Đầu ra chính; nhiều mẫu dương, tốt cho class hiếm | 2.2M | OpenOBB (v3) |
+| 5 | **Phân loại theo hình học (mới)** | Nhánh class nhận 7 số đo mà nhánh box vừa dự đoán ở cùng điểm (đã detach); xem bảng dưới | khoảng 0.01M | OpenOBB |
+| 6 | **Chấm lại theo quan hệ (mới)** | 600 ứng viên khác nhau tốt nhất mỗi ảnh "nhìn nhau" qua 2 lớp transformer (d=256) rồi **sửa logit class** (cộng dư, khởi tạo 0); xem ví dụ dưới | 1.75M | OpenOBB (ý tưởng Relation Networks / self-attention của DETR, áp lên ứng viên dense) |
+| 7 | Đầu ra = các ứng viên đã chấm lại → Fast-NMS ProbIoU 0.7 | | 0 | OpenOBB |
 
 **Phân loại theo hình học (phần 5).** 7 số đo đưa vào nhánh class:
 
@@ -92,12 +92,12 @@ Epoch  GPU_mem  cls_loss  box_loss  dfl_loss  angle_loss  rel_loss  Instances  S
 
 ## 6. Đã kiểm chứng tới đâu
 
-- CPU, `tests/test_vrdet5.py` (90 test toàn repo pass):
+- CPU, `tests/test_openobb5.py` (90 test toàn repo pass):
   - **head v5 lúc khởi tạo cho đúng kết quả của head v3** (nạp được checkpoint v3);
   - đích chấm lại;
   - train/eval với HGNet và DINOv2, gradient tới phần mới;
   - chỉ xuất ứng viên đã chấm lại;
-  - CLI `model=vrdet5x`, nạp `best.pt`;
+  - CLI `model=openobb5x`, nạp `best.pt`;
   - luồng train → val → predict (2 vòng lặp);
   - confusion matrix bắt đúng lỗi "wall_300 → wall".
 - **Chưa chạy GPU / data thật.**

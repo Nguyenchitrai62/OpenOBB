@@ -1,4 +1,4 @@
-"""Prepare a labelled OBB dataset (data.yaml + 'class x1 y1 x2 y2 x3 y3 x4 y4' normalised txt labels) as VRDet tiles.
+"""Prepare a labelled OBB dataset (data.yaml + 'class x1 y1 x2 y2 x3 y3 x4 y4' normalised txt labels) as OpenOBB tiles.
 Thin wrapper of openobb.data.prepare; `openobb train data=<data.yaml>` does the same automatically.
 
 python tools/prepare_dataset.py --src <data.yaml or dataset folder> --out datasets/mydata [--size 1024] [--val-frac 0.15]

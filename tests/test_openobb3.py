@@ -4,8 +4,8 @@ import os
 import pytest
 import torch
 
-from openobb.models.vrdet3 import ALONG_BINS, REG_CH, THICK_BINS, VRDet3, decode, fast_nms
-from openobb.models.vrdet3_loss import VRDet3Loss, frame_targets
+from openobb.models.openobb3 import ALONG_BINS, REG_CH, THICK_BINS, OpenOBB3, decode, fast_nms
+from openobb.models.openobb3_loss import OpenOBB3Loss, frame_targets
 
 torch.set_num_threads(1)
 
@@ -49,10 +49,10 @@ def test_frame_targets_flip_wrap_and_square():
     assert abs(float(L3) - 200) < 1e-4
 
 
-def test_vrdet3_train_eval_and_loss():
+def test_openobb3_train_eval_and_loss():
     torch.manual_seed(0)
-    m = VRDet3("s", num_classes=2, img_size=256)
-    crit = VRDet3Loss(img_size=256)
+    m = OpenOBB3("s", num_classes=2, img_size=256)
+    crit = OpenOBB3Loss(img_size=256)
     x = torch.rand(1, 3, 256, 256)
     t = [{"labels": torch.tensor([0, 1]),
           "boxes": torch.tensor([[0.5, 0.3, 0.7, 4 / 256, 0.0], [0.25, 0.7, 12 / 256, 10 / 256, 0.3]])}]
@@ -67,7 +67,7 @@ def test_vrdet3_train_eval_and_loss():
     with torch.no_grad():
         ev = m(x)
     assert ev["pred_logits"].shape == (1, 1000, 2) and ev["pred_boxes"].shape == (1, 1000, 5)
-    from openobb.models.vrdet import postprocess
+    from openobb.models.openobb1 import postprocess
     s, l, b = postprocess(ev, 100, 256)
     assert torch.isfinite(b).all()
 
@@ -80,21 +80,21 @@ def test_fast_nms_removes_duplicates_keeps_neighbours():
     assert kept == 2 and torch.allclose(bx[0, 1, 1], torch.tensor(140.0))      # parallel wall 40 px away survives
 
 
-def test_backbone_encoder_match_vrdet1():
-    """Same names / shapes as VRDet1: COCO weights and VRDet1 checkpoints load into the backbone, encoder, LSK."""
-    from openobb.models.vrdet import VRDet
-    a = VRDet("s", num_classes=2, img_size=256, lsk=True).state_dict()
-    b = VRDet3("s", num_classes=2, img_size=256).state_dict()
+def test_backbone_encoder_match_openobb1():
+    """Same names / shapes as OpenOBB1: COCO weights and OpenOBB1 checkpoints load into the backbone, encoder, LSK."""
+    from openobb.models.openobb1 import OpenOBB1
+    a = OpenOBB1("s", num_classes=2, img_size=256, lsk=True).state_dict()
+    b = OpenOBB3("s", num_classes=2, img_size=256).state_dict()
     keys = [k for k in b if k.startswith(("backbone.", "encoder.", "lsk."))]
     assert keys and all(k in a and a[k].shape == b[k].shape for k in keys)
 
 
-def test_vrdet3_x_size():
-    n = sum(p.numel() for p in VRDet3("x", num_classes=7).parameters()) / 1e6
+def test_openobb3_x_size():
+    n = sum(p.numel() for p in OpenOBB3("x", num_classes=7).parameters()) / 1e6
     assert 50 < n < 70
 
 
-def test_cli_vrdet3_flags(tmp_path, monkeypatch):
+def test_cli_openobb3_flags(tmp_path, monkeypatch):
     import openobb.train as trainer
     from test_cli import _dataset
     from openobb.cli import train
@@ -102,7 +102,7 @@ def test_cli_vrdet3_flags(tmp_path, monkeypatch):
     monkeypatch.setattr(trainer, "main", lambda argv: calls.append(" ".join(argv)))
     data = _dataset(tmp_path / "ds")
     kw = dict(epochs=10, batch=4, imgsz=512, project=str(tmp_path / "runs"), cache_dir=str(tmp_path / "c"), workers=1)
-    train(str(data), model="vrdet3x", name="a", **kw)
+    train(str(data), model="openobb3x", name="a", **kw)
     a = calls[-1] + " "
     for flag in ("--arch v3 ", "--size x ", "--lr 0.0005 ", "--backbone-mult 0.1 ", "--lsk ", "--clip 10.0 ",
                  "--num-top 1000 ", "--rfs 0.1 "):
@@ -113,20 +113,20 @@ def test_cli_vrdet3_flags(tmp_path, monkeypatch):
 
 def test_predict_loads_v3_checkpoint(tmp_path):
     from openobb.predict import load_model
-    m = VRDet3("s", num_classes=2, img_size=256)
+    m = OpenOBB3("s", num_classes=2, img_size=256)
     p = tmp_path / "best.pt"
     torch.save({"model": m.state_dict(), "args": {"arch": "v3", "size": "s", "img": 256, "lsk": True},
                 "classes": ["door", "window"]}, p)
     net, names, _ = load_model(str(p), torch.device("cpu"))
-    assert isinstance(net, VRDet3) and names == ["door", "window"]
+    assert isinstance(net, OpenOBB3) and names == ["door", "window"]
 
 
-@pytest.mark.skipif(os.environ.get("VRDET_SLOW") != "1", reason="CPU pipeline check (set VRDET_SLOW=1)")
-def test_vrdet3_cli_smoke(tmp_path):
+@pytest.mark.skipif(os.environ.get("OPENOBB_SLOW") != "1", reason="CPU pipeline check (set OPENOBB_SLOW=1)")
+def test_openobb3_cli_smoke(tmp_path):
     from test_cli import _dataset
     from openobb.cli import Detector
     data = _dataset(tmp_path / "ds")
-    m = Detector("vrdet3s")
+    m = Detector("openobb3s")
     r = m.train(data=str(data), epochs=1, batch=2, imgsz=256, project=str(tmp_path / "runs"), name="t",
                 cache_dir=str(tmp_path / "cache"), workers=0, max_iters=2, threads=1, no_pretrained=True)
     assert os.path.exists(r.best)

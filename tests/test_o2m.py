@@ -1,7 +1,7 @@
 import torch
 
 from openobb.models.obb_criterion import OBBHungarianMatcher
-from openobb.models.vrdet import VRDet, build_criterion
+from openobb.models.openobb1 import OpenOBB1, build_criterion
 
 torch.set_num_threads(1)
 
@@ -26,9 +26,9 @@ def test_one_to_many_assignment():
 
 def test_o2m_group_is_training_only_and_trains():
     torch.manual_seed(0)
-    base = VRDet("s", num_classes=3, img_size=256, num_denoising=10).eval()
+    base = OpenOBB1("s", num_classes=3, img_size=256, num_denoising=10).eval()
     torch.manual_seed(0)
-    m = VRDet("s", num_classes=3, img_size=256, num_denoising=10, o2m_queries=120).eval()
+    m = OpenOBB1("s", num_classes=3, img_size=256, num_denoising=10, o2m_queries=120).eval()
     x = torch.rand(2, 3, 256, 256)
     with torch.no_grad():
         assert torch.allclose(base(x)["pred_boxes"], m(x)["pred_boxes"], atol=1e-6)    # no extra parameters
@@ -48,7 +48,7 @@ def test_o2m_group_is_training_only_and_trains():
 
 def test_aqd_and_angle_loss_train_step():
     torch.manual_seed(0)
-    m = VRDet("s", num_classes=3, img_size=256, num_denoising=20).train()
+    m = OpenOBB1("s", num_classes=3, img_size=256, num_denoising=20).train()
     x = torch.rand(2, 3, 256, 256)
     tg = [{"labels": torch.tensor([1, 2, 0]), "boxes": torch.tensor([[0.5, 0.5, 0.2, 0.1, 0.3], [0.2, 0.3, 0.1, 0.1, 0.0],
                                                                      [0.7, 0.7, 0.15, 0.05, -0.6]])},

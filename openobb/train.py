@@ -1,4 +1,4 @@
-"""VRDet trainer (single GPU). Resumes from {out}/last.pt, appends one JSON line per epoch to
+"""OpenOBB trainer (single GPU). Resumes from {out}/last.pt, appends one JSON line per epoch to
 {out}/metrics.jsonl, ends with a full DOTA-protocol evaluation of the EMA weights on val.
 
 python -u -m openobb.train --data /content/datasets/dota1_1024 --out OUT --size s --epochs 24 --batch 32
@@ -23,7 +23,7 @@ from openobb.console import EpochBar, val_rows
 from openobb.report import append_results, plot_labels, plot_results, plot_train_batch, plot_val_predictions
 from openobb.eval.dota import DOTA1_CLASSES, format_table, summary_table, write_task1
 from openobb.models.dense_head import DenseCriterion
-from openobb.models.vrdet import VRDet, build_criterion, load_dfine_coco
+from openobb.models.openobb1 import OpenOBB1, build_criterion, load_dfine_coco
 
 
 def build_parser():
@@ -32,14 +32,14 @@ def build_parser():
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
     ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5"],
-                    help="v1: VRDet (DETR-style decoder); v2: VRDet2 (dense segment-aware, NMS-free); "
-                         "v3: VRDet3 (pretrained encoder + dense anisotropic oriented head); "
-                         "v4: VRDet4 (DINOv2 backbone + DETR decoder + dense oriented branch)")
+                    help="v1: OpenOBB (DETR-style decoder); v2: OpenOBB2 (dense segment-aware, NMS-free); "
+                         "v3: OpenOBB3 (pretrained encoder + dense anisotropic oriented head); "
+                         "v4: OpenOBB4 (DINOv2 backbone + DETR decoder + dense oriented branch)")
     ap.add_argument("--backbone", default="hgnet", choices=["hgnet", "dinov2_s", "dinov2_b", "dinov2_l"])
-    ap.add_argument("--dense-v3", action="store_true", help="dense branch = VRDet3's oriented head (VRDet4)")
-    ap.add_argument("--geo-cls", action="store_true", help="VRDet5: class branch reads the predicted geometry")
-    ap.add_argument("--relate", action="store_true", help="VRDet5: relation re-scoring of the best candidates")
-    ap.add_argument("--rel-k", type=int, default=600, help="VRDet5: candidates per image for relation re-scoring")
+    ap.add_argument("--dense-v3", action="store_true", help="dense branch = OpenOBB3's oriented head (OpenOBB4)")
+    ap.add_argument("--geo-cls", action="store_true", help="OpenOBB5: class branch reads the predicted geometry")
+    ap.add_argument("--relate", action="store_true", help="OpenOBB5: relation re-scoring of the best candidates")
+    ap.add_argument("--rel-k", type=int, default=600, help="OpenOBB5: candidates per image for relation re-scoring")
     ap.add_argument("--img", type=int, default=1024)
     ap.add_argument("--scale", type=float, default=1.0,
                     help="image scale the data was tiled at (recorded for inference; set by openobb.data.prepare)")
@@ -70,7 +70,7 @@ def build_parser():
     ap.add_argument("--queries", type=int, default=300)
     ap.add_argument("--num-top", type=int, default=300)
     ap.add_argument("--weights", default=None,
-                    help="fine-tune: initialise from a VRDet checkpoint (last.pt); class heads are re-used when the "
+                    help="fine-tune: initialise from a OpenOBB checkpoint (last.pt); class heads are re-used when the "
                          "class list matches, otherwise re-initialised")
     ap.add_argument("--init", default="coco", choices=["coco", "obj2coco"],
                     help="D-FINE init: COCO-only (commercially clean) or Objects365->COCO (benchmark parity with YOLO26)")
@@ -201,22 +201,22 @@ def main(argv=None):
     if v4:                                      # DETR decoder fed and supervised by the dense oriented branch
         a.dense = a.dense_queries = a.dense_v3 = True
     if v2:
-        from openobb.models.vrdet2 import VRDet2
-        from openobb.models.vrdet2_loss import VRDet2Loss
-        model = VRDet2(a.size, num_classes=len(classes), img_size=a.img)
+        from openobb.models.openobb2 import OpenOBB2
+        from openobb.models.openobb2_loss import OpenOBB2Loss
+        model = OpenOBB2(a.size, num_classes=len(classes), img_size=a.img)
     elif v3:
-        from openobb.models.vrdet3 import VRDet3
-        from openobb.models.vrdet3_loss import VRDet3Loss
+        from openobb.models.openobb3 import OpenOBB3
+        from openobb.models.openobb3_loss import OpenOBB3Loss
         if v5:
-            from openobb.models.vrdet5 import VRDet5
-            from openobb.models.vrdet5_loss import VRDet5Loss
-            model = VRDet5(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
+            from openobb.models.openobb5 import OpenOBB5
+            from openobb.models.openobb5_loss import OpenOBB5Loss
+            model = OpenOBB5(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
                            backbone=a.backbone, geo_cls=a.geo_cls, relate=a.relate, rel_k=a.rel_k)
         else:
-            model = VRDet3(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
+            model = OpenOBB3(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
                            backbone=a.backbone)
     else:
-        model = VRDet(a.size, num_classes=len(classes), num_queries=a.queries, img_size=a.img,
+        model = OpenOBB1(a.size, num_classes=len(classes), num_queries=a.queries, img_size=a.img,
                       rotate_sampling=not a.no_rotate_sampling, num_denoising=a.denoising, dense=a.dense,
                       strip_k=a.strip_k, ortho_heads=a.ortho_heads, context=a.context,
                       dense_queries=a.dense_queries, vectors=a.vectors, vec_dim=a.vec_dim, vec_layers=a.vec_layers,
@@ -224,7 +224,7 @@ def main(argv=None):
                       backbone=a.backbone, dense_v3=a.dense_v3)
     last = wdir / "last.pt"
     if not last.exists() and a.weights:
-        # shape-tolerant copy of a VRDet checkpoint; class rows are matched by name (new classes start fresh)
+        # shape-tolerant copy of a OpenOBB checkpoint; class rows are matched by name (new classes start fresh)
         src_cls = list(torch.load(a.weights, map_location="cpu", weights_only=False).get("classes") or [])
         cmap = {i: src_cls.index(c) for i, c in enumerate(classes) if c in src_cls}
         load_dfine_coco(model, a.weights, log=lambda m: log(m, console=True), class_map=cmap)
@@ -244,15 +244,15 @@ def main(argv=None):
     if a.channels_last:
         model.to(memory_format=torch.channels_last)
     if v2:
-        crit = VRDet2Loss(img_size=a.img)
+        crit = OpenOBB2Loss(img_size=a.img)
     elif v3:
-        crit = VRDet5Loss(img_size=a.img) if v5 else VRDet3Loss(img_size=a.img)
+        crit = OpenOBB5Loss(img_size=a.img) if v5 else OpenOBB3Loss(img_size=a.img)
     else:
         crit = build_criterion(num_classes=len(classes), box_loss=a.box_loss, o2m_k=a.o2m_k, aqd=a.aqd,
                                angle_weight=a.angle_weight, cost_iou=a.cost_iou, member_weight=a.vec_ground)
     a.dense = (a.dense or a.dense_queries) and not dense_arch
     if a.dense and a.dense_v3:
-        from openobb.models.vrdet3_loss import DenseOrientedCriterion
+        from openobb.models.openobb3_loss import DenseOrientedCriterion
         dense_crit = DenseOrientedCriterion(img_size=a.img)
     else:
         dense_crit = DenseCriterion() if a.dense else None
@@ -267,7 +267,7 @@ def main(argv=None):
         if v2:
             frozen = {"backbone": [model.backbone], "encoder": [model.backbone, model.neck]}.get(f)
             if frozen is None:
-                raise SystemExit("VRDet2 --freeze must be 'backbone' or 'encoder' (backbone + neck)")
+                raise SystemExit("OpenOBB2 --freeze must be 'backbone' or 'encoder' (backbone + neck)")
         elif f.isdigit():
             if not hasattr(model.backbone, "stages"):
                 raise SystemExit("--freeze N needs the HGNetv2 backbone; use 'backbone' or 'encoder'")
@@ -347,7 +347,7 @@ def main(argv=None):
             ema.module.decoder.decoder.eval_idx = a.eval_layer
             log(f"eval-only on decoder layer {a.eval_layer}")
     n_par = sum(p.numel() for p in model.parameters()) / 1e6
-    log(f"VRDet-{a.size} {n_par:.2f}M params | train patches {len(ds)} | {iters_per_epoch} it/epoch x {a.epochs} "
+    log(f"OpenOBB1-{a.size} {n_par:.2f}M params | train patches {len(ds)} | {iters_per_epoch} it/epoch x {a.epochs} "
         f"| batch {a.batch} | device {device} amp={amp}")
     val_subset, full_val = None, False
     if a.eval_images:
@@ -359,25 +359,25 @@ def main(argv=None):
                if device.type == "cuda" else "CPU")
         extras = [n for n, on in (("LSK", a.lsk), ("P2", a.p2), ("dense", a.dense)) if on]
         n_val = len(list((Path(a.data) / "gt" / "val").glob("*.txt")))
-        say(f"VRDet {__import__('openobb').__version__} | torch {torch.__version__} | {gpu} | "
+        say(f"OpenOBB {__import__('openobb').__version__} | torch {torch.__version__} | {gpu} | "
             f"AMP {('bf16' if scaler is None else 'fp16') if amp else 'off'} | "
             f"compile {'on' if a.compile and device.type == 'cuda' else 'off'}")
         if v2:
-            say(f"model   VRDet2-{a.size} (dense segment-aware, P2-P5, NMS-free), {n_par:.2f}M params, "
+            say(f"model   OpenOBB2-{a.size} (dense segment-aware, P2-P5, NMS-free), {n_par:.2f}M params, "
                 f"top {a.num_top} detections | init: {init_desc}")
         elif v4:
-            say(f"model   VRDet4-{a.size} ({a.backbone} + {'LSK + ' if a.lsk else ''}hybrid encoder + DETR decoder "
+            say(f"model   OpenOBB4-{a.size} ({a.backbone} + {'LSK + ' if a.lsk else ''}hybrid encoder + DETR decoder "
                 f"+ dense oriented branch, output {a.primary}), {n_par:.2f}M params, {a.queries} queries | "
                 f"init: {init_desc}")
         elif v5:
             parts = [a.backbone] + (["LSK"] if a.lsk else []) + ["hybrid encoder", "dense oriented head P3-P5"] +                 (["geometry-aware classes"] if a.geo_cls else []) +                 ([f"relation re-scoring of {a.rel_k} candidates"] if a.relate else [])
-            say(f"model   VRDet5-{a.size} ({' + '.join(parts)}), {n_par:.2f}M params, max {a.num_top} detections | "
+            say(f"model   OpenOBB5-{a.size} ({' + '.join(parts)}), {n_par:.2f}M params, max {a.num_top} detections | "
                 f"init: {init_desc}")
         elif v3:
-            say(f"model   VRDet3-{a.size} ({a.backbone + ' + ' if a.backbone != 'hgnet' else ''}pretrained encoder{' + LSK' if a.lsk else ''}, dense oriented head P3-P5), "
+            say(f"model   OpenOBB3-{a.size} ({a.backbone + ' + ' if a.backbone != 'hgnet' else ''}pretrained encoder{' + LSK' if a.lsk else ''}, dense oriented head P3-P5), "
                 f"{n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")
         else:
-            say(f"model   VRDet-{a.size}{' + ' + ' + '.join(extras) if extras else ''}, {n_par:.2f}M params, "
+            say(f"model   OpenOBB1-{a.size}{' + ' + ' + '.join(extras) if extras else ''}, {n_par:.2f}M params, "
                 f"{a.queries} queries | init: {init_desc}")
         mode = f"whole image, long side {a.img}" if a.fit else f"tiles {a.img}, scale {a.scale}"
         say(f"data    {len(ds)} train tiles, {n_val} val images, {len(classes)} classes | {mode}")

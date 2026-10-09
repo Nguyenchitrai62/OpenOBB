@@ -8,7 +8,7 @@ import torch
 
 from openobb.data.dota import DotaPatches, collate
 from openobb.engine import ctx_batch
-from openobb.models.vrdet import VRDet
+from openobb.models.openobb1 import OpenOBB1
 
 torch.set_num_threads(1)
 S = 256
@@ -73,7 +73,7 @@ def test_vector_points_follow_every_augmentation(tmp_path):
 
 def test_vector_branch_identity_at_init_and_trains():
     torch.manual_seed(0)
-    m = VRDet("s", img_size=256, vectors=True, num_denoising=0).eval()
+    m = OpenOBB1("s", img_size=256, vectors=True, num_denoising=0).eval()
     x = torch.rand(2, 3, 256, 256)
     vec = torch.rand(2, 50, 21)
     vec[..., 0] = torch.randint(0, 4, (2, 50)).float()

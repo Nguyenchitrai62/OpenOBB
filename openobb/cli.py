@@ -1,14 +1,14 @@
-"""VRDet command line and Python API. Arguments are key=value pairs.
+"""OpenOBB command line and Python API. Arguments are key=value pairs.
 
-    openobb train   data=data.yaml model=s epochs=100 imgsz=1024             # -> runs/obb/train, train2, ...
+    openobb train   data=data.yaml model=openobb3x epochs=100 imgsz=1280     # -> runs/obb/train, train2, ...
     openobb train   data=data.yaml model=runs/obb/train/weights/best.pt epochs=50   # fine-tune
     openobb train   resume=True                                                # continue the latest unfinished run
     openobb val     model=runs/obb/train/weights/best.pt data=data.yaml
     openobb predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.25   # -> runs/obb/predict, ...
     openobb prepare data=data.yaml out=datasets/mydata imgsz=1024
 
-    from openobb import Detector
-    model = Detector("s")                       # or Detector("runs/obb/train/weights/best.pt")
+    from openobb import OpenOBB
+    model = OpenOBB("openobb3x")                # or OpenOBB("runs/obb/train/weights/best.pt")
     r = model.train(data="data.yaml", epochs=100, imgsz=1024)    # r.best = runs/obb/train/weights/best.pt
     model.predict("pages/", conf=0.25)
 
@@ -16,7 +16,7 @@ Datasets: data.yaml ('names' + train/val image folders) with labels 'class x1 y1
 [0, 1] in a sibling 'labels' folder. Images of any size work: each image is resized so its long side = imgsz
 (training, validation and prediction alike). tile=True instead cuts large pages into imgsz tiles at native
 resolution (tile_scale= to resize first), for very large pages with tiny objects. Without a val split, val_frac of
-the train images is held out. Prepared data is cached (~/.cache/vrdet). Every train call starts a new run folder
+the train images is held out. Prepared data is cached (~/.cache/openobb). Every train call starts a new run folder
 ({project}/{name}, then name2, name3...; exist_ok=True reuses it); resume=True continues a run from weights/last.pt.
 
 Training defaults follow the usual one-stage recipe: mosaic=1.0, scale=0.5 (random zoom 0.5-1.5), translate=0.1,
@@ -34,11 +34,11 @@ from types import SimpleNamespace
 
 MODES = ("train", "val", "predict", "prepare")
 SIZES = ("s", "m", "l", "x")
-# model names: vrdet1{s,m,l,x} (= s/m/l/x, DETR-style VRDet), vrdet2{n,s,m,l,x} (dense segment-aware VRDet2),
-# vrdet3{s,m,l,x} (pretrained encoder + dense anisotropic oriented head), vrdet4x (DINOv2 + hybrid DETR)
-MODELS = {**{s: ("v1", s) for s in SIZES}, **{f"vrdet1{s}": ("v1", s) for s in SIZES},
-          **{f"vrdet2{s}": ("v2", s) for s in ("n", "s", "m", "l", "x")},
-          **{f"vrdet3{s}": ("v3", s) for s in SIZES}, "vrdet4x": ("v4", "x"), "vrdet5x": ("v5", "x")}
+# model names: openobb1{s,m,l,x} (= s/m/l/x, DETR-style OpenOBB), openobb2{n,s,m,l,x} (dense segment-aware OpenOBB2),
+# openobb3{s,m,l,x} (pretrained encoder + dense anisotropic oriented head), openobb4x (DINOv2 + hybrid DETR)
+MODELS = {**{f"openobb1{s}": ("v1", s) for s in SIZES},
+          **{f"openobb2{s}": ("v2", s) for s in ("n", "s", "m", "l", "x")},
+          **{f"openobb3{s}": ("v3", s) for s in SIZES}, "openobb4x": ("v4", "x"), "openobb5x": ("v5", "x")}
 
 # Best architecture recipe measured on FloorPlanCAD / DOTA (research/LEDGER.md, c6): selective large-kernel
 # adapters (LSK), repeat-factor sampling, one-to-many query group, adaptive query denoising, square-aware angle loss,
@@ -54,7 +54,7 @@ SIZE_DEFAULTS = {          # lr, backbone lr multiplier, weight decay, batch, ~G
     "l": dict(lr=8e-5, backbone_mult=0.05, wd=1.25e-4, batch=8, gb=2.6),
     "x": dict(lr=6e-5, backbone_mult=0.1, wd=1.25e-4, batch=8, gb=4.0),
 }
-# VRDet2 trains from scratch (no pretrained backbone): one LR for every layer, conv-detector regularisation
+# OpenOBB2 trains from scratch (no pretrained backbone): one LR for every layer, conv-detector regularisation
 SIZE_DEFAULTS2 = {
     "n": dict(lr=2e-3, backbone_mult=1.0, wd=0.05, batch=32, gb=0.8),
     "s": dict(lr=2e-3, backbone_mult=1.0, wd=0.05, batch=16, gb=1.4),
@@ -63,7 +63,7 @@ SIZE_DEFAULTS2 = {
     "x": dict(lr=1e-3, backbone_mult=1.0, wd=0.05, batch=8, gb=4.5),
 }
 RECIPE2 = {"rfs": 0.1, "channels_last": True, "clip": 10.0, "num_top": 1000}
-# VRDet3: COCO-pretrained backbone + encoder (lower backbone LR as in VRDet1), new dense head; LSK adapters (c6)
+# OpenOBB3: COCO-pretrained backbone + encoder (lower backbone LR as in OpenOBB1), new dense head; LSK adapters (c6)
 SIZE_DEFAULTS3 = {
     "s": dict(lr=5e-4, backbone_mult=0.5, wd=1e-4, batch=16, gb=1.2),
     "m": dict(lr=5e-4, backbone_mult=0.1, wd=1e-4, batch=16, gb=1.6),
@@ -71,12 +71,12 @@ SIZE_DEFAULTS3 = {
     "x": dict(lr=5e-4, backbone_mult=0.1, wd=1e-4, batch=8, gb=3.6),
 }
 RECIPE3 = {"lsk": True, "rfs": 0.1, "channels_last": True, "clip": 10.0, "num_top": 1000}
-# VRDet4: DINOv2 ViT (self-supervised, Apache-2.0) + D-FINE encoder/decoder (COCO) + VRDet3 oriented head as the
+# OpenOBB4: DINOv2 ViT (self-supervised, Apache-2.0) + D-FINE encoder/decoder (COCO) + OpenOBB3 oriented head as the
 # dense branch (auxiliary one-to-many supervision + query proposals); output = decoder + dense branch through NMS
 SIZE_DEFAULTS4 = {"x": dict(lr=1e-4, backbone_mult=0.5, wd=1e-4, batch=8, gb=6.0)}      # ViT-B/14, accuracy first
 RECIPE4 = dict(RECIPE, dense=True, dense_v3=True, dense_queries=True, primary="union")
 BACKBONE4 = {"x": "dinov2_b"}
-# VRDet5: VRDet3's dense head as the output + DINOv2 + geometry-aware classes + relation re-scoring
+# OpenOBB5: OpenOBB3's dense head as the output + DINOv2 + geometry-aware classes + relation re-scoring
 SIZE_DEFAULTS5 = {"x": dict(lr=5e-4, backbone_mult=0.2, wd=1e-4, batch=8, gb=5.0)}
 RECIPE5 = dict(RECIPE3, geo_cls=True, relate=True, rel_k=600)
 # architecture flags a fine-tune inherits from its source checkpoint (weights only load into the same shape)
@@ -138,7 +138,7 @@ def _is_prepared(p):
 
 
 def _cache_root(cache):
-    return Path(cache or os.environ.get("VRDET_CACHE") or Path.home() / ".cache" / "vrdet" / "datasets")
+    return Path(cache or os.environ.get("OPENOBB_CACHE") or Path.home() / ".cache" / "openobb" / "datasets")
 
 
 def prepare_data(data, imgsz=1024, gap=200, val_frac=0.15, scale=1.0, cache_dir=None, workers=None, seed=0, fit=True):
@@ -309,7 +309,7 @@ def check_keys(kv):
     for k in kv:
         if k not in known:
             near = difflib.get_close_matches(k, sorted(known), n=3, cutoff=0.6)
-            raise SystemExit(f"'{k}' is not a valid VRDet argument." + (f" Similar: {', '.join(near)}" if near else ""))
+            raise SystemExit(f"'{k}' is not a valid OpenOBB argument." + (f" Similar: {', '.join(near)}" if near else ""))
 
 
 def _batch_from(batch, sd, imgsz, n_train):
@@ -343,7 +343,7 @@ def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_
         if not user_ema:                             # EMA half-life ~5% of the run (>= 1 epoch, >= 50 steps)
             opts["ema"] = round(min(0.9998, 0.5 ** (1 / max(ipe, total // 20, 50))), 6)
         argv = ["--data", str(prepared), "--out", str(save_dir)] + _to_argv(opts)
-        args_file = save_dir / "vrdet_args.json"
+        args_file = save_dir / "openobb_args.json"
         saved = json.loads(args_file.read_text()) if args_file.exists() else {}
         args_file.write_text(json.dumps({**saved, "prepared": str(prepared), **opts}, indent=1, default=str))
         if opts.get("verbose"):
@@ -363,7 +363,7 @@ def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_
         print(f"[openobb] WARNING: CUDA out of memory with batch={old}. Reducing to batch={opts['batch']} and retrying.")
 
 
-def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="runs/obb", name=None,
+def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, project="runs/obb", name=None,
           exist_ok=False, resume=False, tile=False, tile_scale=None, gap=200, val_frac=0.15, cache="auto", cache_dir=None, workers=None,
           device=None, recipe=True, warmup_epochs=3, patience=100, lrf=0.01, cos_lr=False, seed=0, optimizer="auto",
           **extra):
@@ -375,7 +375,7 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
             extra[ALIASES[k]] = extra.pop(k)
         elif k in IGNORED:
             extra.pop(k)
-            print(f"[openobb] '{k}' is not used by VRDet (ignored)")
+            print(f"[openobb] '{k}' is not used by OpenOBB (ignored)")
     if extra.pop("amp", True) is False:
         extra["no_amp"] = True
     if extra.pop("rot90", True) is False:
@@ -388,9 +388,9 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
     if resume:
         last = _find_last(resume, model, project, name)
         save_dir = _run_root(last)
-        saved_file = save_dir / "vrdet_args.json"
+        saved_file = save_dir / "openobb_args.json"
         if not saved_file.exists():
-            raise SystemExit(f"{save_dir} has no vrdet_args.json: cannot resume it")
+            raise SystemExit(f"{save_dir} has no openobb_args.json: cannot resume it")
         saved = json.loads(saved_file.read_text())
         prepared = Path(saved.get("prepared", ""))
         if not _is_prepared(prepared):               # new machine / VM: rebuild the same prepared data
@@ -412,7 +412,7 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
         raise SystemExit("openobb train needs data=<data.yaml or dataset folder>")
     save_dir = increment_path(project, name or "train", exist_ok)   # new run: train, train2, ... (never resumes)
     save_dir.mkdir(parents=True, exist_ok=True)
-    saved_file = save_dir / "vrdet_args.json"
+    saved_file = save_dir / "openobb_args.json"
     for f in RUN_FILES:                              # exist_ok=True on an old folder: start over in place
         (save_dir / f).unlink(missing_ok=True)
 
@@ -430,7 +430,7 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
         size = inherited.pop("size", "s")
         imgsz = imgsz or extra.pop("img", None) or src_args.get("img", 1024)
     else:
-        raise SystemExit(f"model must be one of {', '.join(MODELS)} or an existing VRDet .pt checkpoint, "
+        raise SystemExit(f"model must be one of {', '.join(MODELS)} or an existing OpenOBB .pt checkpoint, "
                          f"got '{model}'")
     arch = inherited.get("arch", "v1")
     v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5")
@@ -490,7 +490,7 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
         opts["weights"] = weights
     opts.update(extra)
     if float(opts["lr"]) > 3 * sd["lr"] and not dense_arch:
-        print(f"[openobb] WARNING: lr0={opts['lr']:g} is {float(opts['lr']) / sd['lr']:.0f}x the default for VRDet-{size} "
+        print(f"[openobb] WARNING: lr0={opts['lr']:g} is {float(opts['lr']) / sd['lr']:.0f}x the default for OpenOBB1-{size} "
               f"({sd['lr']:g}). DETR-style detectors usually diverge (NaN boxes) above ~2e-4; the 1e-3 of one-stage "
               f"detectors does not transfer.")
     saved_file.write_text(json.dumps({"data": str(data)}, indent=1))
@@ -575,7 +575,7 @@ def predict(model, source, conf=0.25, save_dir=None, vis=True, imgsz=None, tile=
 class Detector:
     """Convenience wrapper: Detector("s" | "m" | "l" | "x" | "path/to/best.pt")."""
 
-    def __init__(self, model="s"):
+    def __init__(self, model="openobb1s"):
         self.model = str(model)
 
     def train(self, data, **kw):

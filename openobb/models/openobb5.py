@@ -1,20 +1,20 @@
-"""VRDet5: VRDet3's dense oriented detector + DINOv2 features + geometry-aware classes + relation re-scoring.
+"""OpenOBB5: OpenOBB3's dense oriented detector + DINOv2 features + geometry-aware classes + relation re-scoring.
 
 Built from the Wall_Color results (research/LEDGER.md F31-F33, Ultralytics-style mAP):
-  * VRDet3 (HGNetv2 COCO + dense oriented head) 0.712 / 0.467: best on rare classes (many positives per object),
+  * OpenOBB3 (HGNetv2 COCO + dense oriented head) 0.712 / 0.467: best on rare classes (many positives per object),
     fast (23 ms); weak on wall_300 (0.599) - the class that makes ~95% of the gap to YOLO26x (0.746 / 0.499);
-  * VRDet4 (DINOv2 + DETR decoder) 0.663 / 0.457 in one run: better wall_300 (+0.08) and wall fit, but weak rare
+  * OpenOBB4 (DINOv2 + DETR decoder) 0.663 / 0.457 in one run: better wall_300 (+0.08) and wall fit, but weak rare
     classes (one positive per object in the decoder) and 38 ms.
-VRDet5 keeps the dense head as the output (rare classes, speed) and adds what VRDet4 suggested helps:
+OpenOBB5 keeps the dense head as the output (rare classes, speed) and adds what OpenOBB4 suggested helps:
   1. DINOv2 ViT-B backbone (openobb/models/vit.py) - self-supervised features (default; backbone=hgnet for speed);
   2. geometry-aware classification: the class branch reads the geometry the box branch measured on the same point
      (thickness, length, angle, across offset, thickness uncertainty; detached). wall vs wall_300 differ mostly by
-     thickness, which the class branch of VRDet3 could not see;
+     thickness, which the class branch of OpenOBB3 could not see;
   3. relation re-scoring: the ~600 distinct best candidates of an image attend to each other in a small transformer
      (2 layers) and correct their class logits (residual, zero-initialised) - context such as "this wall is thicker
      than the walls it meets" or "this door has no swing arc", at a fraction of a DETR decoder's cost
      (relation-network / DETR self-attention idea on dense candidates).
-Parameter names of the head match VRDet3, so a VRDet3 checkpoint initialises VRDet5's head (weights=).
+Parameter names of the head match OpenOBB3, so a OpenOBB3 checkpoint initialises OpenOBB5's head (weights=).
 """
 import math
 
@@ -24,7 +24,7 @@ import torch.nn as nn
 from openobb.ops.obb_torch import probiou
 
 from .obb_decoder import distinct_topk
-from .vrdet3 import ALONG_BINS, THICK_BINS, OrientedHead, VRDet3, decode, fast_nms
+from .openobb3 import ALONG_BINS, THICK_BINS, OrientedHead, OpenOBB3, decode, fast_nms
 
 GEO_CH = 7
 
@@ -46,7 +46,7 @@ def geometry_maps(r, stride):
 
 
 class GeoOrientedHead(OrientedHead):
-    """VRDet3's head; the class tower gets a zero-initialised embedding of the predicted geometry after its first
+    """OpenOBB3's head; the class tower gets a zero-initialised embedding of the predicted geometry after its first
     two layers (same parameter names as OrientedHead + `geo`)."""
 
     def __init__(self, ch, nc, strides=(8, 16, 32), prior=0.01):
@@ -100,7 +100,7 @@ class RelationRescorer(nn.Module):
         return idx, base + self.out(x)
 
 
-class VRDet5(VRDet3):
+class OpenOBB5(OpenOBB3):
     arch = "v5"
 
     def __init__(self, size="x", num_classes=15, img_size=1024, lsk=True, max_det=1000, nms_iou=0.7,

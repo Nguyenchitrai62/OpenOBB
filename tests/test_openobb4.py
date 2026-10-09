@@ -9,8 +9,8 @@ torch.set_num_threads(1)
 
 
 def _v4(nc=2, img=256):
-    from openobb.models.vrdet import VRDet
-    return VRDet("s", num_classes=nc, img_size=img, backbone="dinov2_s", dense=True, dense_v3=True,
+    from openobb.models.openobb1 import OpenOBB1
+    return OpenOBB1("s", num_classes=nc, img_size=img, backbone="dinov2_s", dense=True, dense_v3=True,
                  dense_queries=True, lsk=True)
 
 
@@ -32,10 +32,10 @@ def test_backbone_maps_any_size():
     assert p3.shape == (1, 256, 40, 32) and p4.shape == (1, 512, 20, 16) and p5.shape == (1, 1024, 10, 8)
 
 
-def test_vrdet4_train_eval():
+def test_openobb4_train_eval():
     from openobb.models.dense_head import dense_predict
-    from openobb.models.vrdet import build_criterion
-    from openobb.models.vrdet3_loss import DenseOrientedCriterion
+    from openobb.models.openobb1 import build_criterion
+    from openobb.models.openobb3_loss import DenseOrientedCriterion
     torch.manual_seed(0)
     m = _v4()
     t = [{"labels": torch.tensor([0, 1]),
@@ -66,7 +66,7 @@ def test_adapter_trains_at_full_lr():
     assert id(m.backbone.adapter["fuse"].conv.weight) not in bb
 
 
-def test_cli_vrdet4_flags(tmp_path, monkeypatch):
+def test_cli_openobb4_flags(tmp_path, monkeypatch):
     import openobb.train as trainer
     from test_cli import _dataset
     from openobb.cli import train
@@ -74,7 +74,7 @@ def test_cli_vrdet4_flags(tmp_path, monkeypatch):
     monkeypatch.setattr(trainer, "main", lambda argv: calls.append(" ".join(argv)))
     data = _dataset(tmp_path / "ds")
     kw = dict(epochs=10, batch=4, imgsz=512, project=str(tmp_path / "runs"), cache_dir=str(tmp_path / "c"), workers=1)
-    train(str(data), model="vrdet4x", name="a", **kw)
+    train(str(data), model="openobb4x", name="a", **kw)
     a = calls[-1] + " "
     for flag in ("--arch v4 ", "--size x ", "--backbone dinov2_b ", "--dense ", "--dense-v3 ", "--dense-queries ",
                  "--primary union ", "--lsk ", "--lr 0.0001 ", "--backbone-mult 0.5 ", "--o2m-queries 900 "):
@@ -93,19 +93,19 @@ def test_predict_loads_v4_checkpoint(tmp_path):
     assert net.backbone_name == "dinov2_s" and names == ["door", "window"]
 
 
-@pytest.mark.skipif(os.environ.get("VRDET_NET") != "1", reason="downloads DINOv2 ViT-S (set VRDET_NET=1)")
+@pytest.mark.skipif(os.environ.get("OPENOBB_NET") != "1", reason="downloads DINOv2 ViT-S (set OPENOBB_NET=1)")
 def test_real_dinov2_checkpoint_loads():
     bb = DinoV2Backbone("dinov2_s", (256, 512, 1024))
     bb.load_pretrained(log=print)                           # raises if any tensor does not fit
     assert float(bb.vit.blocks[0].ls1.gamma.abs().mean()) > 1e-4
 
 
-@pytest.mark.skipif(os.environ.get("VRDET_SLOW") != "1", reason="CPU pipeline check (set VRDET_SLOW=1)")
-def test_vrdet4_cli_smoke(tmp_path):
+@pytest.mark.skipif(os.environ.get("OPENOBB_SLOW") != "1", reason="CPU pipeline check (set OPENOBB_SLOW=1)")
+def test_openobb4_cli_smoke(tmp_path):
     from test_cli import _dataset
     from openobb.cli import Detector
     data = _dataset(tmp_path / "ds")
-    m = Detector("vrdet4x")
+    m = Detector("openobb4x")
     r = m.train(data=str(data), epochs=1, batch=2, imgsz=256, project=str(tmp_path / "runs"), name="t",
                 cache_dir=str(tmp_path / "cache"), workers=0, max_iters=2, threads=1, no_pretrained=True)
     assert os.path.exists(r.best)

@@ -12,10 +12,10 @@ torch.set_num_threads(1)
 
 @pytest.fixture(scope="module")
 def ckpt(tmp_path_factory):
-    from openobb.models.vrdet3 import VRDet3
+    from openobb.models.openobb3 import OpenOBB3
     d = tmp_path_factory.mktemp("m")
     torch.manual_seed(0)
-    m = VRDet3("s", num_classes=2, img_size=256)
+    m = OpenOBB3("s", num_classes=2, img_size=256)
     p = d / "best.pt"
     torch.save({"model": m.state_dict(), "args": {"arch": "v3", "size": "s", "img": 256, "lsk": True, "fit": True},
                 "classes": ["wall", "door"]}, p)
@@ -42,8 +42,6 @@ def test_predict_like_yolo(ckpt, tmp_path):
     from openobb import OpenOBB
     p, d, img = ckpt
     model = OpenOBB(str(p))
-    from openobb import VRDet
-    assert VRDet is OpenOBB
     assert model.names == {0: "wall", 1: "door"} and model.task == "obb"
     res = model.predict(img, conf=0.0, max_det=20, verbose=False)
     assert isinstance(res, list) and len(res) == 1

@@ -1,4 +1,4 @@
-"""VRDet2 assignment + losses (VRDet's own implementation).
+"""OpenOBB2 assignment + losses (OpenOBB's own implementation).
 
 Assignment: rotated task-aligned (TOOD-style metric score^a * IoU^b) with
   * candidates inside the box, the thickness floored to `min_side` px so 1-3 px lines get anchors (YOLO26 STAL idea)
@@ -21,7 +21,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from openobb.models.vrdet2 import REG_BINS, decode
+from openobb.models.openobb2 import REG_BINS, decode
 from openobb.ops.obb_torch import probiou
 
 
@@ -87,7 +87,7 @@ def _ends(b):
     return b[:, :2] - a, b[:, :2] + a
 
 
-class VRDet2Loss(nn.Module):
+class OpenOBB2Loss(nn.Module):
     def __init__(self, w_cls=1.0, w_box=2.0, w_end=1.0, w_across=1.0, w_dfl=0.5, w_angle=0.5, w_o2o=1.0,
                  topk=10, topk_len=16.0, topk_max=48, alpha=1.0, beta=6.0, min_side=8.0, lam=3.0, img_size=1024,
                  mid_prior=4.0, across=0.0):

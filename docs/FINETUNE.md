@@ -1,13 +1,13 @@
-# Train / fine-tune VRDet trên dataset OBB tự gắn nhãn
+# Train / fine-tune OpenOBB trên dataset OBB tự gắn nhãn
 
 Dataset theo chuẩn OBB 8 điểm (cùng định dạng nhãn bản export "training dataset" của AI_Takeoff), dùng trực tiếp, không cần chuyển đổi.
 
-- Kiến trúc model là của VRDet.
+- Kiến trúc model là của OpenOBB.
 - Bộ khung train/infer lấy các ý tưởng quen thuộc của YOLO, tự viết lại: resize cả ảnh, mosaic/scale/translate, warmup, dừng sớm, tự giảm batch, `results.csv`/`results.png`.
 
 **Cách nhanh nhất là chạy notebook Colab:**
-- [`colab/VRDet_wall_color.ipynb`](../colab/VRDet_wall_color.ipynb): bản gọn, chỉ cài, giải nén, `openobb train`.
-- [`colab/VRDet_train.ipynb`](../colab/VRDet_train.ipynb): bản đầy đủ, có chọn dataset, biểu đồ và ảnh dự đoán.
+- [`colab/OpenOBB_wall_color.ipynb`](../colab/OpenOBB_wall_color.ipynb): bản gọn, chỉ cài, giải nén, `openobb train`.
+- [`colab/OpenOBB_train.ipynb`](../colab/OpenOBB_train.ipynb): bản đầy đủ, có chọn dataset, biểu đồ và ảnh dự đoán.
 
 ## 0. Cài đặt
 
@@ -33,33 +33,33 @@ pip install git+https://github.com/Nguyenchitrai62/OpenOBB.git     # hoặc tron
 - **`tile=True`:** cho trang cực lớn có object rất nhỏ.
   - Cắt tile `imgsz` ở độ phân giải gốc, chồng nhau 200 px, giống SAHI.
   - `tile_scale=` để thu nhỏ trước khi cắt; không đặt thì tự chọn theo cỡ object.
-- Dữ liệu đã chuẩn bị được cache ở `~/.cache/vrdet` (đổi chỗ bằng `cache_dir=` hoặc biến `VRDET_CACHE`).
+- Dữ liệu đã chuẩn bị được cache ở `~/.cache/openobb` (đổi chỗ bằng `cache_dir=` hoặc biến `OPENOBB_CACHE`).
 
 > **Deploy (thay YOLO trong code sản phẩm):** xem [DEPLOY.md](DEPLOY.md): `from openobb import OpenOBB; OpenOBB("best.pt").predict(...)`.
 
 ## 2. Train
 
 ```bash
-openobb train data=path/data.yaml model=s epochs=100 imgsz=1024        # -> runs/obb/train
+openobb train data=path/data.yaml model=openobb3x epochs=100 imgsz=1280   # -> runs/obb/train
 ```
 
 ```python
-from openobb import Detector
-r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024)   # r.best = .../weights/best.pt
+from openobb import OpenOBB
+r = OpenOBB("openobb3x").train(data="path/data.yaml", epochs=100, imgsz=1280)   # r.best = .../weights/best.pt
 ```
 
 **`model`:**
-- **`vrdet5x`** (mới nhất, 127.9M): head dense v3 + DINOv2 + phân loại theo hình học + chấm lại theo quan hệ.
-  Chi tiết: [VRDET5.md](VRDET5.md). Cuối mỗi run in thêm các lỗi nhầm class thường gặp (confusion matrix).
-- **`vrdet4x`** (mới nhất, 134.8M, ưu tiên độ chính xác): DINOv2 ViT-B + encoder/decoder DETR pretrained + nhánh dense
-  oriented (giám sát phụ + đề xuất query), đầu ra decoder ∪ dense. Chi tiết: [VRDET4.md](VRDET4.md).
-- **`vrdet3x`** (mới nhất, 64.6M): backbone + encoder pretrained COCO, head dense oriented dị hướng, NMS.
-  Chi tiết: [VRDET3.md](VRDET3.md). Có thể khởi tạo từ checkpoint VRDet1 bằng `weights=<v1 .pt>`.
-- **`vrdet2x`** (mới, 55.6M, train từ đầu, nên dùng `epochs=300`): kiến trúc dense segment-aware, không NMS.
-  Chi tiết: [VRDET2.md](VRDET2.md). Có thêm `vrdet2n/s/m/l`. Chỉ cần đổi `model=`, mọi tham số khác giữ nguyên.
-- `vrdet1s/m/l/x` = `s/m/l/x`: kiến trúc cũ (D-FINE-OBB).
-- `s` (12.5M tham số), `m`, `l`, `x` (71M) để train từ đầu.
-- Đường dẫn `best.pt` để **fine-tune**: kiến trúc lấy theo checkpoint, class trùng tên giữ lại trọng số.
+
+| `model=` | Kiến trúc | Tham số | Ghi chú |
+|---|---|---|---|
+| `openobb5x` | head dense + DINOv2 + phân loại theo hình học + chấm lại theo quan hệ | 127.9M | [OPENOBB5.md](OPENOBB5.md) |
+| `openobb4x` | DINOv2 ViT-B + encoder/decoder DETR + nhánh dense, đầu ra decoder ∪ dense | 134.8M | [OPENOBB4.md](OPENOBB4.md) |
+| `openobb3s/m/l/x` | encoder pretrained COCO + head dense oriented dị hướng, NMS | x: 64.6M | Tốt nhất đã đo trên Wall_Color, nhanh. [OPENOBB3.md](OPENOBB3.md) |
+| `openobb2n/s/m/l/x` | dense segment-aware, train từ đầu, không NMS | x: 55.6M | Đã dừng phát triển. [OPENOBB2.md](OPENOBB2.md) |
+| `openobb1s/m/l/x` | D-FINE-OBB (DETR) | s: 12.5M, x: 71M | [OPENOBB1.md](OPENOBB1.md) |
+| đường dẫn `best.pt` | **fine-tune**: kiến trúc lấy theo checkpoint, class trùng tên giữ lại trọng số | | |
+
+Có thể khởi tạo `openobb3x` từ một checkpoint `openobb1` bằng `weights=<best.pt>`.
 
 **Mặc định, đổi bằng `key=value`:**
 
@@ -92,7 +92,7 @@ r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024)   # r.bes
   - Muốn train lại từ đầu: `resume=False` (sang thư mục mới), hoặc `resume=False exist_ok=True` (ghi đè thư mục cũ).
 - **Tự phục hồi khi diverge:** epoch có nhiều bước NaN hoặc thống kê BatchNorm hỏng thì tự nạp lại `last.pt` của epoch trước và giảm LR một nửa (tối đa 3 lần, như YOLO).
 - **Cache dữ liệu theo nội dung:** sửa ảnh hay nhãn thì lần sau tự chuẩn bị lại.
-- **Gõ sai tên tham số:** báo lỗi kèm gợi ý, ví dụ `'epoch' is not a valid VRDet argument. Similar: epochs`.
+- **Gõ sai tên tham số:** báo lỗi kèm gợi ý, ví dụ `'epoch' is not a valid OpenOBB argument. Similar: epochs`.
 
 **Màn hình** giống YOLO:
 
@@ -137,7 +137,7 @@ openobb predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.3   # 
 
 ## 4. Test nhanh bằng giao diện kéo thả (Streamlit)
 
-Trên máy này đã có sẵn môi trường `.venv` (torch CPU, streamlit, VRDet): **bấm đúp `run_app.bat`** ở thư mục repo.
+Trên máy này đã có sẵn môi trường `.venv` (torch CPU, streamlit, OpenOBB): **bấm đúp `run_app.bat`** ở thư mục repo.
 
 Máy khác thì tạo lại môi trường:
 

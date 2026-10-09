@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 from openobb.data.dota import DotaPatches, collate, dataset_classes
 from openobb.eval.dota import DOTA1_CLASSES, evaluate, load_gt_dir, merge_patches, parse_patch_name
-from openobb.models.vrdet import postprocess
+from openobb.models.openobb1 import postprocess
 from openobb.ops.obb import obb2poly
 
 
@@ -171,7 +171,7 @@ def predict_patches(model, ds, device, batch=32, workers=8, num_top=300, img_siz
         s, l, b, qi = s.cpu().numpy(), l.cpu().numpy(), b.cpu().numpy(), qi.cpu().numpy()
         grounded = "pred_members" in o
         if grounded:                           # H17: snap boxes to the selected CAD primitives
-            from openobb.models.vrdet import snap_boxes
+            from openobb.models.openobb1 import snap_boxes
             out.setdefault("snap", [])
             out.setdefault("snapg", [])
             mem = o["pred_members"].float().cpu().numpy()

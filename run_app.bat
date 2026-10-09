@@ -1,5 +1,5 @@
 @echo off
-REM Mo app test model VRDet (keo tha anh). Dat best.pt vao thu muc models\ truoc.
+REM Mo app test model OpenOBB (keo tha anh). Dat best.pt vao thu muc models\ truoc.
 cd /d "%~dp0"
 if not exist ".venv\Scripts\python.exe" (
   echo Chua co moi truong .venv - xem docs\FINETUNE.md muc 4

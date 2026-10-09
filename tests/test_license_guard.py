@@ -1,4 +1,4 @@
-"""Commercial-use guard: the VRDet package must not depend on AGPL / non-commercial code."""
+"""Commercial-use guard: the OpenOBB package must not depend on AGPL / non-commercial code."""
 import ast
 from pathlib import Path
 
@@ -6,7 +6,7 @@ PKG = Path(__file__).resolve().parents[1] / "openobb"
 FORBIDDEN = ("ultralytics", "mmcv", "mmdet", "mmrotate", "ai4rs")     # AGPL, or carrying NC-derived code
 
 
-def test_vrdet_has_no_forbidden_imports():
+def test_openobb_has_no_forbidden_imports():
     bad = []
     for f in PKG.rglob("*.py"):
         tree = ast.parse(f.read_text(encoding="utf-8"))

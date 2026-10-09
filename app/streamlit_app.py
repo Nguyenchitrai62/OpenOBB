@@ -1,4 +1,4 @@
-"""VRDet quick test: drag and drop a drawing image, see the oriented boxes.
+"""OpenOBB quick test: drag and drop a drawing image, see the oriented boxes.
 
     pip install streamlit
     streamlit run app/streamlit_app.py
@@ -52,7 +52,7 @@ def draw(img_rgb, dets, names, thickness, show_text):
 
 
 def main():
-    st.set_page_config(page_title="VRDet OBB test", page_icon="📐", layout="wide")
+    st.set_page_config(page_title="OpenOBB OBB test", page_icon="📐", layout="wide")
 
     with st.sidebar:
         st.header("Model")
@@ -67,7 +67,7 @@ def main():
             st.stop()
         queries = st.select_slider("Queries", [300, 600, 900], value=900)
         model, names, targs, device = get_model(str(p), queries)
-        st.caption(f"VRDet-{targs.get('size', 's')} · {len(names)} class · tile {targs.get('img', 1024)} · {device}")
+        st.caption(f"OpenOBB{targs.get('arch', 'v1')[1:]}-{targs.get('size', 's')} · {len(names)} class · tile {targs.get('img', 1024)} · {device}")
 
         st.header("Ảnh")
         up = st.file_uploader("Kéo thả ảnh", type=("jpg", "jpeg", "png", "bmp", "tif", "tiff", "webp"))

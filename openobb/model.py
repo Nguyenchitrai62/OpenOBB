@@ -1,7 +1,7 @@
-"""Ultralytics-style model object for deployment (VRDet's own implementation of that public interface).
+"""Ultralytics-style model object for deployment (OpenOBB's own implementation of that public interface).
 
     from openobb import OpenOBB
-    model = OpenOBB("best.pt")                          # any VRDet checkpoint (v1..v5)
+    model = OpenOBB("best.pt")                          # any OpenOBB checkpoint (v1..v5)
     results = model.predict("page.png", conf=0.25, iou=0.7, imgsz=1280)   # or model("page.png")
     for r in results:
         r.obb.xyxyxyxy, r.obb.xywhr, r.obb.conf, r.obb.cls, r.names, r.plot(), r.save_txt("out.txt")
@@ -118,7 +118,7 @@ class OpenOBB:
         dev = torch.device(device if device not in (None, "") else ("cuda" if torch.cuda.is_available() else "cpu"))
         if isinstance(device, int) or (isinstance(device, str) and device.isdigit()):
             dev = torch.device(f"cuda:{int(device)}")
-        self.model, names, self.args = load_model(self.ckpt_path, dev, 900)        # 900 queries (VRDet1), as the CLI
+        self.model, names, self.args = load_model(self.ckpt_path, dev, 900)        # 900 queries (OpenOBB1), as the CLI
         self.device, self._names = dev, {i: n for i, n in enumerate(names)}
 
     @property
@@ -137,7 +137,7 @@ class OpenOBB:
 
     def info(self, verbose=False):
         n = sum(p.numel() for p in self.model.parameters()) if self.model is not None else 0
-        print(f"VRDet {self.args.get('arch', 'v1')}-{self.args.get('size', '?')}: {n / 1e6:.2f}M parameters, "
+        print(f"OpenOBB {self.args.get('arch', 'v1')}-{self.args.get('size', '?')}: {n / 1e6:.2f}M parameters, "
               f"{len(self.names)} classes, imgsz {self.args.get('img')}")
 
     # ---- inference
@@ -230,6 +230,3 @@ class OpenOBB:
     def val(self, data=None, **kw):
         from openobb.cli import val
         return Metrics(val(self.ckpt_path, data, **kw), self.names)
-
-
-VRDet = OpenOBB          # earlier name of this class, kept so existing code keeps working

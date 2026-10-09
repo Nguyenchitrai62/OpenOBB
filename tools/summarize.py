@@ -23,13 +23,13 @@ def info(run):
     else:
         size = re.search(r"--size (\w)", cmd)
         flags = [f for f in ("rfs", "context", "dense", "vectors", "strip-k", "dense-queries") if f"--{f}" in cmd]
-        model = f"VRDet-{(size.group(1) if size else 's').upper()}" + (" +" + "+".join(flags) if flags else "")
+        model = f"OpenOBB1-{(size.group(1) if size else 's').upper()}" + (" +" + "+".join(flags) if flags else "")
     lat = None
     mf = run / "metrics.jsonl"
     if mf.exists():
         for line in mf.read_text().splitlines():
             d = json.loads(line)
-            lat = d.get("latency_ms_pt_fp16_bs1") or d.get("latency_ms_e2e_pt") or lat     # VRDet / YOLO probes
+            lat = d.get("latency_ms_pt_fp16_bs1") or d.get("latency_ms_e2e_pt") or lat     # OpenOBB / YOLO probes
     fusion = {k: v["mAP50"] for k, v in r.get("fusion", {}).items() if k != "dec"}
     c = r["classes"]
     if "helicopter" in c:            # F13: helicopter (72 val instances) swings +-20 AP between runs

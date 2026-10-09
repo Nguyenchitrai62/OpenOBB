@@ -1,4 +1,4 @@
-"""FloorPlanCAD -> VRDet split (raster patches + OBB labels + vector primitives). Our own SVG parser and
+"""FloorPlanCAD -> OpenOBB split (raster patches + OBB labels + vector primitives). Our own SVG parser and
 OpenCV renderer (no third-party renderer licences involved). Research/benchmark data: CC BY-NC.
 
 Each drawing (viewBox 0..140) becomes one SIZE x SIZE image (default 1024 px, ~7.3 px per unit).
@@ -6,7 +6,7 @@ Objects = the 30 "thing" classes (semanticId 1..30), one OBB per (semanticId, in
 rectangle of densely sampled primitive points. Stuff classes (31..35: row chairs, parking, wall, curtain
 wall, railing) are kept only in the vector file for now.
 
-Output (same layout as colab/data/split_dota.py, so every VRDet tool works unchanged):
+Output (same layout as colab/data/split_dota.py, so every OpenOBB tool works unchanged):
   {out}/images/{split}/{name}.png, labels/, meta/{split}.jsonl, gt/{split}/{name}.txt (DOTA format),
   thumbs/{split}/{name}.jpg, classes.json, vectors/{split}/{name}.npz (primitive tokens for the vector branch).
 

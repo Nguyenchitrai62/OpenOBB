@@ -202,7 +202,7 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
   - Warmup 3 epoch, patience 100, tự giảm batch khi OOM, val mỗi epoch.
   - Báo cáo: `results.csv/png`, `labels.jpg`, `val_pred.jpg`. Kiểm tra nhãn lúc nạp.
   - Cắt tile giờ chỉ là tuỳ chọn `tile=True`.
-  - Data Wall_Color: user tự train trên Colab bằng `colab/VRDet_wall_color.ipynb`.
+  - Data Wall_Color: user tự train trên Colab bằng `colab/OpenOBB_wall_color.ipynb`.
   - (bổ sung chiều 10-08, theo user) **Thao tác y như YOLO:**
     - Mỗi lần train là một thư mục mới `runs/obb/train`, `train2`...; weights nằm trong `weights/best.pt` và `weights/last.pt`.
     - **Không tự resume**: chỉ resume khi có `resume=True`.
@@ -250,30 +250,30 @@ Câu hỏi còn mở:
   - Dung tích lớn không tự đóng được khoảng cách.
 - [x] **E7 nhánh vector (H7) trên FloorPlanCAD, cỡ S:** **76.80 / 67.67** (+0.84 / +2.51 so với raster). YOLO26s: 78.51 / 70.54.
 - [x] **E9 trần query (H9):** suy luận với 600 query cho +0.7 (SV +6.3), latency không đổi → dùng 600 khi suy luận. Cờ mới `--eval-queries`.
-- [x] **KIẾN TRÚC CHỐT (2026-10-08 14:50), raster-only: VRDet-S + LSK** (`c6-fpc-raster-lsk-s`). Thẻ: [docs/ARCHITECTURE_CARD.md](docs/ARCHITECTURE_CARD.md).
+- [x] **KIẾN TRÚC CHỐT (2026-10-08 14:50), raster-only: VRDet-S + LSK** (`c6-fpc-raster-lsk-s`). Thẻ: [docs/OPENOBB1.md](docs/OPENOBB1.md).
   - Thành phần: D-FINE-OBB + adapter LSK + RFS + nhóm query một-nhiều 900 + AQD + loss góc + IoU-cost + 900 query khi suy luận.
   - FloorPlanCAD val: **78.16 / 68.81** (12.5M tham số, 11.4 ms) so với YOLO26x 80.16 / 74.96 (57.6M, 11.6 ms). Recall ngang; thua chủ yếu độ khít box object mảnh (F18).
   - Thư viện pip + CLI: `openobb train|val|predict|prepare` (`openobb/cli.py`, API `vrdet.Detector`), mặc định là công thức này.
-    Notebook Colab của user: `colab/VRDet_train.ipynb`, cài từ GitHub `Nguyenchitrai62/OpenOBB` (public). Hướng dẫn: [docs/FINETUNE.md](docs/FINETUNE.md).
+    Notebook Colab của user: `colab/OpenOBB_train.ipynb`, cài từ GitHub `Nguyenchitrai62/OpenOBB` (public). Hướng dẫn: [docs/FINETUNE.md](docs/FINETUNE.md).
   - Đã dừng: watcher tắt, không còn session Colab, số dư khoảng 71.7 CU. Hướng kế tiếp (chờ user): xem cuối F18 trong sổ cái.
 - [x] (cũ) Kiến trúc tạm chốt sáng 10-08: D-FINE-OBB + RFS + nhánh vector + 600 query. Báo cáo: [docs/REPORT_2026-10-08.md](docs/REPORT_2026-10-08.md).
 - [x] **VRDet2 (2026-10-09), kiến trúc mới:**
-  - Dense segment-aware, P2–P5, không NMS, 55.6M, tự viết 100%, train từ đầu. Chi tiết: [docs/VRDET2.md](docs/VRDET2.md).
+  - Dense segment-aware, P2–P5, không NMS, 55.6M, tự viết 100%, train từ đầu. Chi tiết: [docs/OPENOBB2.md](docs/OPENOBB2.md).
   - Dùng: `model=vrdet2x`, CLI giữ nguyên. `model=x` = `vrdet1x` là kiến trúc cũ.
   - User tự train và gửi log. Agent chỉ thiết kế kiến trúc.
   - Mỗi version kiến trúc mới phải nêu chi tiết từng phần và tỉ lệ tận dụng cái có sẵn (luật user, 10-09).
 - [x] **VRDet3 (2026-10-09):**
   - Encoder pretrained COCO (như v1) + LSK + head dense oriented dị hướng (DFL dọc trục / độ dày), NMS. 64.6M tham số.
-  - Dùng: `model=vrdet3x`. Chi tiết: [docs/VRDET3.md](docs/VRDET3.md).
+  - Dùng: `model=vrdet3x`. Chi tiết: [docs/OPENOBB3.md](docs/OPENOBB3.md).
   - Lý do: v2 train từ đầu chỉ đạt 0.27 / 0.10 → pretrained quyết định trên data nhỏ; `end_loss` của v2 bị kẹt (LEDGER F25–F26).
 - [x] **Thước đo kiểu Ultralytics (2026-10-09, F29, F31):** mặc định cho val mỗi epoch và chọn best.pt (`metric=yolo`); thước DOTA in kèm.
   - Cùng thước: **VRDet3-x 0.720 / 0.474 so với YOLO11x 0.74 / 0.50.**
 - [x] **VRDet4-x (2026-10-09, F30):**
   - DINOv2 ViT-B + adapter + LSK + encoder/decoder DETR COCO + nhánh dense oriented (head v3), đầu ra union. 134.8M tham số.
-  - Dùng: `model=vrdet4x`. Chi tiết: [docs/VRDET4.md](docs/VRDET4.md). User chỉ train bản x.
+  - Dùng: `model=vrdet4x`. Chi tiết: [docs/OPENOBB4.md](docs/OPENOBB4.md). User chỉ train bản x.
 - [x] **VRDet5-x (2026-10-09, F34):**
   - Head dense v3 + DINOv2 + phân loại theo hình học + chấm lại theo quan hệ. 127.9M tham số.
-  - Dùng: `model=vrdet5x`. Chi tiết: [docs/VRDET5.md](docs/VRDET5.md).
+  - Dùng: `model=vrdet5x`. Chi tiết: [docs/OPENOBB5.md](docs/OPENOBB5.md).
   - Val in thêm confusion matrix (lỗi nhầm class thường gặp).
 - Kết quả cùng thước YOLO (Wall_Color): YOLO26x 0.746 / 0.499; v3 0.712 / 0.467; v4 0.663 / 0.457 (1 run). Xem LEDGER F32–F33.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
@@ -292,6 +292,23 @@ Câu hỏi còn mở:
 **Cần user:** điền tên chủ sở hữu pháp lý (cá nhân hoặc công ty) vào `LICENSE` (hiện để "the repository owner").
 
 ## 9. Nhật ký
+
+- 2026-10-09 (7): **Đổi toàn bộ tên kiến trúc VRDet → OpenOBB** (theo user; bỏ hẳn tên cũ, không alias).
+  - Tên mới:
+    | Loại | Tên cũ → mới |
+    |---|---|
+    | Model | `model=vrdetNx` → `openobbNx` (`openobb1s..x`, `openobb2n..x`, `openobb3s..x`, `openobb4x`, `openobb5x`). Bỏ các tên tắt `s/m/l/x`. Mặc định `openobb1s` |
+    | Class | `VRDet`, `VRDet2..5` (+Loss) → `OpenOBB1`, `OpenOBB2..5` (+Loss) |
+    | File model | `openobb/models/vrdet*.py` → `openobb/models/openobb*.py` |
+    | API deploy | `from openobb import OpenOBB` |
+    | Tài liệu | `docs/ARCHITECTURE_CARD.md` → `OPENOBB1.md`; `VRDETn.md` → `OPENOBBn.md` |
+    | Notebook | `colab/OpenOBB_*.ipynb` |
+    | Test | `tests/test_openobbN.py` |
+    | Thư mục run, cache | `openobb_args.json`, `~/.cache/openobb` |
+    | Biến môi trường | `OPENOBB_SLOW` / `OPENOBB_NET` / `OPENOBB_CACHE` / `OPENOBB_DEBUG` |
+  - Nhãn nội bộ `--arch v1..v5` giữ nguyên, nên checkpoint `.pt` cũ vẫn nạp được. Run cũ (`vrdet_args.json`) không resume được nữa.
+  - Lịch sử (sổ cái, nhật ký ở trên, tên run nghiên cứu như `e1-vrdet-s-dota-24e`) giữ nguyên chữ VRDet. Đó là hồ sơ những gì đã xảy ra.
+  - README của GitLab giờ lấy từ `tools/gitlab_README.md` (do `push_all.py` quản lý).
 
 - 2026-10-09 (6): **Đổi tên package/CLI thành `openobb`**; kiến trúc vẫn tên VRDet (`vrdet5x`, class `VRDet`).
   - **Hai repo:**
@@ -324,11 +341,11 @@ Câu hỏi còn mở:
 
 - 2026-10-09 (2): VRDet3.
   - Viết `openobb/models/vrdet3.py`, `vrdet3_loss.py`. CLI nhận `vrdet3{s,m,l,x}`. `assign` dùng chung có dải đa tầng (v2 tắt).
-  - Thêm `tests/test_vrdet3.py`; 73 test pass.
+  - Thêm `tests/test_openobb3.py`; 73 test pass.
 
 - 2026-10-09: VRDet2.
   - Viết `openobb/models/vrdet2.py`, `vrdet2_loss.py`. CLI nhận `vrdet1*` / `vrdet2*`. Predict/val nạp được v2.
-  - Test `tests/test_vrdet2.py`; 65 test pass.
+  - Test `tests/test_openobb2.py`; 65 test pass.
   - Overfit CPU tìm ra lỗi gán nhãn cho line dài, đã sửa (LEDGER F24).
 
 - 2026-10-08 (chiều, chốt):
@@ -339,7 +356,7 @@ Câu hỏi còn mở:
   - Đóng gói thư viện:
     - `pyproject.toml`, `openobb/cli.py`, `openobb/data/prepare.py` + `split.py`.
     - `best.pt` cùng fine-tune giữ class theo tên.
-    - `colab/VRDet_train.ipynb` thay `colab/finetune_vrdet.ipynb`.
+    - `colab/OpenOBB_train.ipynb` thay `colab/finetune_vrdet.ipynb`.
   - Push GitHub `Nguyenchitrai62/OpenOBB` (public theo lời user).
   - Tiêu khoảng 30 CU cho c4/c5/c6; còn khoảng 71.7 CU.
 

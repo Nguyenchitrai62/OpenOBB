@@ -1,5 +1,5 @@
 """
-# Vendored into VRDet (Apache-2.0). Changes: removed the config registry / torch.distributed
+# Vendored into OpenOBB (Apache-2.0). Changes: removed the config registry / torch.distributed
 # coupling; pretrained loading simplified. See THIRD_PARTY_NOTICES.md.
 reference
 - https://github.com/PaddlePaddle/PaddleDetection/blob/develop/ppdet/modeling/backbones/hgnet_v2.py

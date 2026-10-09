@@ -1,21 +1,21 @@
-"""VRDet3: pretrained hybrid-encoder features + dense anisotropic oriented head (thin / long / small objects).
+"""OpenOBB3: pretrained hybrid-encoder features + dense anisotropic oriented head (thin / long / small objects).
 
 Lessons it is built on (research/LEDGER.md F23-F25, Wall_Color, 250 images):
-  * VRDet1 (DETR decoder, COCO init) 0.63 / 0.35; VRDet2 (dense, from scratch) 0.27 / 0.10 after 50 epochs:
-    on small data the pretrained features decide. VRDet3 keeps the COCO-pretrained HGNetv2 backbone + hybrid
+  * OpenOBB1 (DETR decoder, COCO init) 0.63 / 0.35; OpenOBB2 (dense, from scratch) 0.27 / 0.10 after 50 epochs:
+    on small data the pretrained features decide. OpenOBB3 keeps the COCO-pretrained HGNetv2 backbone + hybrid
     encoder (D-FINE, Apache-2.0) and the selective-kernel adapters measured on CAD (c6: +1.3 mAP50).
   * The DETR decoder (top-K query cap, one positive per object, 6 refinement layers with grid sampling) is replaced
     by a dense head on every location of P3-P5: many positives per object, no query cap, fast.
-  * VRDet2's segment regression (relative position x log length) left the along-axis error flat (end_loss ~0.93).
-    VRDet3 regresses the two along-axis distances as distributions (DFL, as the YOLO family does for box sides),
+  * OpenOBB2's segment regression (relative position x log length) left the along-axis error flat (end_loss ~0.93).
+    OpenOBB3 regresses the two along-axis distances as distributions (DFL, as the YOLO family does for box sides),
     with an anisotropic grid: along bins = 1 stride (31 strides of reach, long walls), thickness bins = stride / 2
     (sub-stride precision, thin objects), and a signed across offset so points beside a thin object can predict it.
   * Candidates: every level gets a row of points along every object (across band >= 1 stride), so coarse points
     that see both ends of a long wall can be assigned to it; task-aligned assignment picks the best level.
   * Output: class-wise Fast-NMS on ProbIoU inside the model (YOLO-style dense output), padded to `max_det`.
 
-Box convention: (cx, cy, w, h, theta) with w measured along theta. Eval output matches VRDet1:
-{"pred_logits": (B, K, C), "pred_boxes": (B, K, 5) normalised}, read by openobb.models.vrdet.postprocess.
+Box convention: (cx, cy, w, h, theta) with w measured along theta. Eval output matches OpenOBB1:
+{"pred_logits": (B, K, C), "pred_boxes": (B, K, 5) normalised}, read by openobb.models.openobb1.postprocess.
 """
 import copy
 import math
@@ -27,8 +27,8 @@ from openobb.ops.obb_torch import probiou
 
 from .hgnetv2 import HGNetv2
 from .hybrid_encoder import HybridEncoder
-from .vrdet import CONFIGS, SelectiveKernel
-from .vrdet2 import Conv
+from .openobb1 import CONFIGS, SelectiveKernel
+from .openobb2 import Conv
 
 ALONG_BINS = 32          # distance from the point to each end of the object, bin = 1 stride
 THICK_BINS = 32          # thickness (short side), bin = stride / 2
@@ -101,7 +101,7 @@ def fast_nms(logits, boxes, max_det=1000, conf=0.001, iou=0.7, pre=4000):
     return out_l, out_b
 
 
-class VRDet3(nn.Module):
+class OpenOBB3(nn.Module):
     arch = "v3"
 
     def __init__(self, size="x", num_classes=15, img_size=1024, lsk=True, max_det=1000, nms_iou=0.7, backbone="hgnet",
@@ -112,7 +112,7 @@ class VRDet3(nn.Module):
         self.max_det, self.nms_iou = max_det, nms_iou
         bb = dict(freeze_at=-1, freeze_norm=False)
         bb.update(cfg["backbone"])
-        # same module names as VRDet1 / D-FINE: COCO weights (and a VRDet1 checkpoint) load into backbone/encoder/lsk
+        # same module names as OpenOBB1 / D-FINE: COCO weights (and a OpenOBB1 checkpoint) load into backbone/encoder/lsk
         if backbone == "hgnet":
             self.backbone = HGNetv2(**bb, pretrained=False)
         else:                                   # DINOv2 ViT + adapter (openobb/models/vit.py)
@@ -164,9 +164,9 @@ class VRDet3(nn.Module):
 
 
 class DenseOriented(nn.Module):
-    """VRDet3's oriented head as the dense branch of the DETR model (VRDet4): one-to-many auxiliary supervision of
+    """OpenOBB3's oriented head as the dense branch of the DETR model (OpenOBB4): one-to-many auxiliary supervision of
     the encoder (Co-DETR / RT-DETRv3 idea) and distinct top-k proposals for the decoder queries (DDQ idea).
-    Output keys follow the VRDet1 dense interface (normalised boxes) plus what VRDet3Loss needs (pixels)."""
+    Output keys follow the OpenOBB1 dense interface (normalised boxes) plus what OpenOBB3Loss needs (pixels)."""
 
     def __init__(self, ch, nc, img_size, strides=(8, 16, 32)):
         super().__init__()

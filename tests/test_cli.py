@@ -54,16 +54,16 @@ def test_auto_scale(tmp_path):
     assert auto_scale(str(data), 256) == 1.0              # much larger than a tile: tiled at native resolution
 
 
-@pytest.mark.skipif(os.environ.get("VRDET_SLOW") != "1", reason="CPU smoke train (set VRDET_SLOW=1)")
+@pytest.mark.skipif(os.environ.get("OPENOBB_SLOW") != "1", reason="CPU smoke train (set OPENOBB_SLOW=1)")
 def test_train_val_predict_smoke(tmp_path):
     from openobb.cli import Detector
     data = _dataset(tmp_path / "ds")
-    m = Detector("s")
+    m = Detector("openobb1s")
     r = m.train(data=str(data), epochs=1, batch=2, imgsz=512, tile_scale=0.8, project=str(tmp_path / "runs"),
                 name="t", cache_dir=str(tmp_path / "cache"), workers=0, recipe=False, no_pretrained=True,
                 max_iters=1, threads=1)
     assert os.path.exists(r.best) and m.model == r.best
-    args = json.loads((tmp_path / "runs" / "t" / "vrdet_args.json").read_text())
+    args = json.loads((tmp_path / "runs" / "t" / "openobb_args.json").read_text())
     assert args["scale"] == 0.8 and args["img"] == 512
     res = m.val(str(data), cache_dir=str(tmp_path / "cache"), workers=0, batch=2)
     assert "mAP50" in res
@@ -183,7 +183,7 @@ def test_typo_and_resume_rules(tmp_path, monkeypatch):
     data = _dataset(tmp_path / "ds")
     kw = dict(project=str(tmp_path / "runs"), name="r", cache_dir=str(tmp_path / "cache"), workers=1)
     train(str(data), epochs=10, batch=4, imgsz=512, **kw)
-    saved = _json.loads((tmp_path / "runs" / "r" / "vrdet_args.json").read_text())
+    saved = _json.loads((tmp_path / "runs" / "r" / "openobb_args.json").read_text())
     assert saved["batch"] == 4 and saved["epochs"] == 10
     train(str(data), epochs=20, batch=8, imgsz=512, **kw)                     # default: a new run, r2
     assert "r2" in " ".join(calls[-1]) and "--epochs 20" in " ".join(calls[-1])
@@ -249,7 +249,7 @@ def test_optimizer_auto_ignores_lr0(tmp_path, monkeypatch):
     data = _dataset(tmp_path / "ds")
     kw = dict(epochs=10, batch=4, imgsz=512, project=str(tmp_path / "runs"), cache_dir=str(tmp_path / "c"), workers=1)
     train(str(data), name="a", **kw)
-    assert "--lr 0.0001 " in calls[-1]                      # no lr0: measured default for VRDet-s
+    assert "--lr 0.0001 " in calls[-1]                      # no lr0: measured default for OpenOBB1-s
     train(str(data), name="c", lr0=0.001, **kw)
     assert "--lr 0.001 " in calls[-1]                       # lr0 given: used as is
     train(str(data), name="b", lr0=0.0002, optimizer="AdamW", **kw)

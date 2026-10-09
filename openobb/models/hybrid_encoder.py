@@ -5,7 +5,7 @@ Copyright (c) 2024 The DEIM Authors. All Rights Reserved.
 Modified from D-FINE (https://github.com/Peterande/D-FINE/)
 Copyright (c) 2024 D-FINE Authors. All Rights Reserved.
 
-# Vendored into VRDet (Apache-2.0). Changes: removed the config registry / torch.distributed
+# Vendored into OpenOBB (Apache-2.0). Changes: removed the config registry / torch.distributed
 # coupling; pretrained loading simplified. See THIRD_PARTY_NOTICES.md.
 """
 
@@ -393,7 +393,7 @@ class HybridEncoder(nn.Module):
         return torch.concat([out_w.sin(), out_w.cos(), out_h.sin(), out_h.cos()], dim=1)[None, :, :]
 
     def forward(self, feats, ctx_fn=None):
-        """ctx_fn (VRDet H6): optional callable(p5, pos_embed) -> p5 applied right after the AIFI layer."""
+        """ctx_fn (OpenOBB H6): optional callable(p5, pos_embed) -> p5 applied right after the AIFI layer."""
         assert len(feats) == len(self.in_channels)
         proj_feats = [self.input_proj[i](feat) for i, feat in enumerate(feats)]
 

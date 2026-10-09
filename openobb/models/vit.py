@@ -1,4 +1,4 @@
-"""DINOv2 ViT backbone for VRDet4 (VRDet's own implementation; parameter names follow the released DINOv2
+"""DINOv2 ViT backbone for OpenOBB4 (OpenOBB's own implementation; parameter names follow the released DINOv2
 checkpoints, Apache-2.0, so they load directly).
 
 Why: on small datasets from an unusual domain, self-supervised DINOv2 features transfer better than COCO-supervised
@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint
 
-from .vrdet2 import Conv
+from .openobb2 import Conv
 
 # embed dim, heads, depth, checkpoint tag (registers variant: cleaner dense features)
 DINOV2 = {"dinov2_s": (384, 6, 12, "vits14"), "dinov2_b": (768, 12, 12, "vitb14"), "dinov2_l": (1024, 16, 24, "vitl14")}

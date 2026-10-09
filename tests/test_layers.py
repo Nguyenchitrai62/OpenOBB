@@ -59,7 +59,7 @@ def test_dataset_keeps_layers_through_mosaic(tmp_path):
 
 def test_snap_boxes_recovers_exact_primitive_rectangle():
     import cv2
-    from openobb.models.vrdet import snap_boxes
+    from openobb.models.openobb1 import snap_boxes
     from openobb.ops.obb import poly_iou
     S = 1024
     true = cv2.boxPoints(((500.0, 400.0), (120.0, 40.0), 25.0))            # the CAD object's exact rectangle
@@ -82,7 +82,7 @@ def test_snap_boxes_recovers_exact_primitive_rectangle():
 
 def test_snap_box_gate_ignores_far_primitives():
     import cv2
-    from openobb.models.vrdet import snap_boxes
+    from openobb.models.openobb1 import snap_boxes
     from openobb.ops.obb import poly_iou
     S = 1024
     true = cv2.boxPoints(((500.0, 400.0), (120.0, 40.0), 25.0))

@@ -1,4 +1,4 @@
-"""Offline study of how to combine VRDet's decoder (sparse) and dense outputs, from a saved val_preds.npz.
+"""Offline study of how to combine OpenOBB's decoder (sparse) and dense outputs, from a saved val_preds.npz.
 
 python tools/fusion_eval.py runs/<id>/val_preds.npz --gt <dota1_1024>/gt/val   (gt: original labelTxt dir)
 """

@@ -1,4 +1,4 @@
-# VRDet runtime (all permissive licences: BSD / Apache / MIT)
+# OpenOBB runtime (all permissive licences: BSD / Apache / MIT)
 torch>=2.3
 numpy
 opencv-python-headless
