@@ -27,3 +27,19 @@ def test_perfect_and_thin_offset():
     d = evaluate(off, gts, ["wall", "door"])
     u = evaluate_ultra(off, gts, ["wall", "door"])
     assert d["classes"]["wall"]["AP50"] == 0.0 and u["classes"]["wall"]["AP50"] > 0.99    # same box, two verdicts
+
+
+def test_eval_metric_switch_reports_yolo_numbers():
+    """metric='yolo' puts the Ultralytics-style numbers in the main fields and keeps the DOTA ones aside."""
+    import copy
+
+    from vrdet.eval.ultra import evaluate_ultra
+    gts = {"a": [(_poly(100, 100, 200, 3).tolist(), "wall", False)]}
+    off = {"wall": (["a"], np.array([0.9]), np.stack([_poly(100, 101.2, 200, 3)]))}
+    res = evaluate(off, gts, ["wall"])
+    dota = copy.deepcopy(res)
+    u = evaluate_ultra(off, gts, ["wall"])
+    # same swap as vrdet.engine.eval_dota(metric="yolo")
+    res["dota"] = {"mAP50": res["mAP50"], "mAP50_95": res["mAP50_95"]}
+    res["mAP50"], res["mAP50_95"] = u["mAP50"], u["mAP50_95"]
+    assert res["dota"]["mAP50"] == dota["mAP50"] == 0.0 and res["mAP50"] > 0.99

@@ -264,7 +264,7 @@ def load_preds(path):
 
 def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num_top=300, img_size=1024,
               merge_workers=16, log=print, fusion=False, variants=None, save_preds_to=None, context=False,
-              vectors=False, post="flat", merge_iou=0.1, primary="dec", ultra=False):
+              vectors=False, post="flat", merge_iou=0.1, primary="dec", ultra=False, metric="dota"):
     """DOTA-protocol eval of the decoder output (primary). With fusion=True and a dense head, also scores
     the dense-only / union / size-routed variants (res["fusion"])."""
     t0 = time.time()
@@ -295,9 +295,17 @@ def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num
         if name == (primary if primary in sets else "dec"):
             primary_dets = dets
     res = results[primary if primary in results else "dec"]
-    if ultra:                                   # Ultralytics-validator conventions, comparable with YOLO's mAP
+    if ultra or metric == "yolo":               # Ultralytics-validator conventions, comparable with YOLO's mAP
         from vrdet.eval.ultra import evaluate_ultra
         res["ultra"] = evaluate_ultra(primary_dets, gts, classes)
+    if metric == "yolo":                        # report (and select best.pt) on the YOLO-comparable numbers
+        u = res["ultra"]
+        res["dota"] = {"mAP50": res["mAP50"], "mAP50_95": res["mAP50_95"],
+                       "classes": {c: {"AP50": r["AP50"], "AP50_95": r["AP50_95"]} for c, r in res["classes"].items()}}
+        res["mAP50"], res["mAP50_95"] = u["mAP50"], u["mAP50_95"]
+        for c, r in u["classes"].items():
+            res["classes"][c]["AP50"], res["classes"][c]["AP50_95"] = r["AP50"], r["AP50_95"]
+        res["metric"] = "yolo"
     if len(results) > 1:
         res["fusion"] = {k: {"mAP50": v["mAP50"], "mAP50_95": v["mAP50_95"],
                              "per_class_AP50": {c: round(r["AP50"], 4) for c, r in v["classes"].items()}}

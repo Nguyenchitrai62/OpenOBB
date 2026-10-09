@@ -264,6 +264,33 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     - đầu ra union.
   - 134.8M tham số. Đã kiểm: checkpoint DINOv2 thật nạp khớp 176/176 tensor.
   - Tiêu chí: vượt v1 (0.63 / 0.35) cùng thước. Nếu không vượt, chạy `backbone=hgnet` để tách tác dụng của DINOv2.
+- **F31. VRDet3-x sau fine-tune vòng 2 (user, 10-09): ngang YOLO11x khi chấm CÙNG THƯỚC.**
+  - Điều kiện: từ best của F28, lr 1e-3, batch 16, 50 epoch. best = ep31, 23.1 ms / tile 1280 (PyTorch fp16), 64.6M tham số.
+  - Kết quả:
+    | Thước | mAP50 | mAP50-95 |
+    |---|---|---|
+    | DOTA devkit | 0.593 | 0.312 |
+    | **Ultralytics** | **0.720** | **0.474** |
+    | YOLO11x (Ultralytics) | 0.74 | 0.50 |
+    → Khoảng cách thật với YOLO11x chỉ −0.02 / −0.026. Thước DOTA thấp hơn thước Ultralytics +0.13 / +0.16 trên data tường mảnh.
+  - Theo class (thước DOTA, mAP50 / mAP50-95):
+    | Class | mAP50 | mAP50-95 |
+    |---|---|---|
+    | door | 0.90 | 0.64 |
+    | wall | 0.76 | 0.34 |
+    | junction | 0.69 | 0.28 |
+    | double_door | 0.65 | 0.45 |
+    | note | 0.62 | 0.34 |
+    | **wall_300** | **0.32** | **0.08** |
+    | **slide_door** | **0.21** | **0.06** |
+  - Init: checkpoint vòng 1 có `encoder.input_proj.2.norm` (BN tầng P5) bị nổ do lr 1e-3. Cùng lớp đã nổ ở v1 (F22).
+  - Bài học:
+    1. **Mọi so sánh với YOLO phải cùng thước.** Từ giờ val mỗi epoch và chọn best.pt theo thước Ultralytics (`metric=yolo`, mặc định). Kết luận F23 "thua xa YOLO" phần lớn là do thước.
+    2. Pretrained + head dense DFL (v3) học nhanh: plateau sau khoảng 30 epoch fine-tune, nhanh hơn v1 (23 ms).
+    3. Điểm yếu còn lại là **ngữ nghĩa / class hiếm** (wall_300 vs wall, slide_door vs door, 31–141 mẫu), không phải định vị.
+       Độ khít của vật mảnh (wall, junction: tỉ lệ 0.41–0.45) là điểm yếu thứ hai.
+    4. BN của `encoder.input_proj` ở P5 dễ nổ với LR cao → giữ lr ≤ 5e-4 cho encoder pretrained.
+  - → Việc cần làm: đo lại v1 bằng thước Ultralytics để xếp hạng v1 / v3 / v4 cho đúng.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 

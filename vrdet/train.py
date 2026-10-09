@@ -97,6 +97,9 @@ def build_parser():
     ap.add_argument("--hsv", type=float, nargs=3, default=[0.015, 0.5, 0.3])
     ap.add_argument("--skip-final-eval", action="store_true")
     ap.add_argument("--dense", action="store_true", help="add the dense one-to-many rotated head (H4)")
+    ap.add_argument("--metric", default="yolo", choices=["yolo", "dota"],
+                    help="mAP shown each epoch and used for best.pt: 'yolo' = Ultralytics validator conventions "
+                         "(ProbIoU, 101-point AP; comparable with YOLO), 'dota' = DOTA devkit (polygon IoU, VOC07)")
     ap.add_argument("--primary", default="dec", choices=["dec", "union"],
                     help="detections scored as the model output: decoder only, or decoder + dense head (NMS)")
     ap.add_argument("--dense-weight", type=float, default=1.0)
@@ -531,7 +534,7 @@ def main(argv=None):
             res, _ = eval_dota(ema.module, a.data, device, val_subset, batch=a.batch, workers=a.workers,
                                num_top=a.num_top, img_size=a.img, log=log, context=a.context, vectors=a.vectors,
                                post=a.post, merge_iou=a.merge_iou, fusion=a.primary != "dec",
-                               variants=["dec", a.primary], primary=a.primary)
+                               variants=["dec", a.primary], primary=a.primary, metric=a.metric)
             if not a.verbose:
                 val_rows(res, time.time() - t_val)
             rec["sub_mAP50"] = round(res["mAP50"], 4)
@@ -577,7 +580,8 @@ def main(argv=None):
     res, dets = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.num_top,
                           img_size=a.img, log=log, fusion=a.dense or a.vec_ground > 0, variants=["dec", "dense", "union", "snap", "snapg"],
                           save_preds_to=(out / "val_preds.npz") if a.dense else None, context=a.context,
-                          vectors=a.vectors, post=a.post, merge_iou=a.merge_iou, primary=a.primary, ultra=True)
+                          vectors=a.vectors, post=a.post, merge_iou=a.merge_iou, primary=a.primary, ultra=True,
+                          metric=a.metric)
     if not a.eval_only and not full_val:
         save_best(res["mAP50_95"], a.epochs - 1)
     table = summary_table(res, classes)
@@ -589,14 +593,19 @@ def main(argv=None):
         ema.module.decoder.num_queries = a.eval_queries
         rq, _ = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.eval_queries,
                           img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post, merge_iou=a.merge_iou,
-                          fusion=a.primary != "dec", variants=["dec", a.primary], primary=a.primary, ultra=True)
+                          fusion=a.primary != "dec", variants=["dec", a.primary], primary=a.primary, ultra=True,
+                          metric=a.metric)
         (out / f"eval_val_q{a.eval_queries}.txt").write_text(summary_table(rq, classes) + "\n")
         (out / f"eval_val_q{a.eval_queries}.json").write_text(json.dumps(rq, indent=1))
         jlog({"final_q": a.eval_queries, "mAP50": rq["mAP50"], "mAP50_95": rq["mAP50_95"]})
         ema.module.decoder.num_queries = a.queries
     final = rq if a.eval_queries and a.eval_queries != a.queries and not dense_arch else res
     say(summary_table(final, classes))
-    if final.get("ultra"):
+    if final.get("metric") == "yolo":
+        d = final["dota"]
+        say(f"(mAP above: Ultralytics validator conventions, comparable with YOLO. DOTA devkit metric, polygon IoU + "
+            f"VOC07: mAP50 {d['mAP50']:.3f}  mAP50-95 {d['mAP50_95']:.3f})")
+    elif final.get("ultra"):
         u = final["ultra"]
         say(f"Ultralytics-style metric (ProbIoU matching, 101-point AP; compare with YOLO's printed mAP): "
             f"mAP50 {u['mAP50']:.3f}  mAP50-95 {u['mAP50_95']:.3f}")

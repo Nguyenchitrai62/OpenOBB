@@ -266,7 +266,8 @@ Câu hỏi còn mở:
   - Encoder pretrained COCO (như v1) + LSK + head dense oriented dị hướng (DFL dọc trục / độ dày), NMS. 64.6M tham số.
   - Dùng: `model=vrdet3x`. Chi tiết: [docs/VRDET3.md](docs/VRDET3.md).
   - Lý do: v2 train từ đầu chỉ đạt 0.27 / 0.10 → pretrained quyết định trên data nhỏ; `end_loss` của v2 bị kẹt (LEDGER F25–F26).
-- [x] **Thước đo kiểu Ultralytics (2026-10-09, F29):** val in thêm ProbIoU + AP 101 điểm để so với YOLO.
+- [x] **Thước đo kiểu Ultralytics (2026-10-09, F29, F31):** mặc định cho val mỗi epoch và chọn best.pt (`metric=yolo`); thước DOTA in kèm.
+  - Cùng thước: **VRDet3-x 0.720 / 0.474 so với YOLO11x 0.74 / 0.50.**
 - [x] **VRDet4-x (2026-10-09, F30):**
   - DINOv2 ViT-B + adapter + LSK + encoder/decoder DETR COCO + nhánh dense oriented (head v3), đầu ra union. 134.8M tham số.
   - Dùng: `model=vrdet4x`. Chi tiết: [docs/VRDET4.md](docs/VRDET4.md). User chỉ train bản x.
