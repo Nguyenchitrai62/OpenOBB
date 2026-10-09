@@ -351,6 +351,30 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Thêm confusion matrix (thước YOLO, conf 0.25, IoU 0.5) vào mọi lần val, để xác nhận wall_300 bị nhầm thành gì.
   - Tiêu chí: vượt v3 (0.712 / 0.467) và YOLO26x (0.746 / 0.499). wall_300 phải > 0.683 (mức của v4).
   - Nếu không đạt, tách tác dụng bằng `backbone=hgnet`, `relate=False`, `geo_cls=False`.
+- **F35. VRDet5-x với backbone=hgnet, fine-tune 30 epoch từ `vrdet3x.pt` (user, 10-09). KHÔNG cải thiện; confusion matrix đổi giả thuyết.**
+  - Điều kiện:
+    - Checkpoint là bản vòng 1 của v3 (BN `encoder.input_proj.2` đã nổ, phải reset), không phải best 0.712.
+    - lr 2e-4, batch 16, 450 bước.
+    - rotate_p 0.5: có vẻ code cũ, chỉ xoay trong 10 epoch tắt mosaic. angle_loss từ 0.045 lên 0.098 ở ep21.
+  - Kết quả:
+    - mAP: ep1 **0.672 / 0.433** → best ep10 **0.671 / 0.448** → ep30 0.659 / 0.429 (thước YOLO). DOTA 0.556 / 0.293.
+    - 24.9 ms (v3: 23.1).
+    - `rel_loss` 0.30 → 0.19 (có học), nhưng mAP đứng yên. Ở 10 epoch cuối (có xoay) mAP giảm nhẹ.
+    - Theo class: thấp hơn v3 best (3 vòng) ở mọi class. slide_door .140 so với .273.
+  - **Confusion matrix (lần đầu có):**
+    | true → predicted | Số lượng | Tỉ lệ |
+    |---|---|---|
+    | **wall_300 → junction** | **45** | **32% của wall_300** |
+    | wall_300 → background | 26 | 18% |
+    | slide_door → wall | 14 | 45% |
+    | wall → background | 87 | 8% |
+    | junction → background | 93 | 5% |
+    | wall → junction | 25 | 2% |
+    → wall_300 KHÔNG bị nhầm thành wall như giả thuyết F32 (độ dày). Nó bị nhầm thành **junction** (khối nhỏ ở giao tường?). Cần user cho biết wall_300 nghĩa là gì.
+  - Kết luận:
+    - "v3 + 2 phần mới" không cải thiện trong 30 epoch.
+    - Phần chính của v5 (DINOv2, thứ đã giúp wall_300 ở v4) chưa được thử.
+    - Chưa so sạch được vì checkpoint khởi đầu, xoay và LR đều khác.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
