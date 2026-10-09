@@ -9,7 +9,7 @@ Deployment (same interface as an Ultralytics OBB model):
 
 Training: `openobb train data=data.yaml model=openobb5x ...` (CLI) or OpenOBB("openobb5x").train(data="data.yaml").
 """
-__version__ = "0.2.0"   # bumped by tools/push_all.py when the package changes
+__version__ = "0.3.0"   # bumped by tools/push_all.py when the package changes
 
 
 def __getattr__(name):              # lazy: `python -m openobb.cli` must not import openobb.cli twice
