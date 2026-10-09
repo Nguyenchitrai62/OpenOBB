@@ -254,7 +254,7 @@ Câu hỏi còn mở:
   - Thành phần: D-FINE-OBB + adapter LSK + RFS + nhóm query một-nhiều 900 + AQD + loss góc + IoU-cost + 900 query khi suy luận.
   - FloorPlanCAD val: **78.16 / 68.81** (12.5M tham số, 11.4 ms) so với YOLO26x 80.16 / 74.96 (57.6M, 11.6 ms). Recall ngang; thua chủ yếu độ khít box object mảnh (F18).
   - Thư viện pip + CLI: `openobb train|val|predict|prepare` (`openobb/cli.py`, API `vrdet.Detector`), mặc định là công thức này.
-    Notebook Colab của user: `colab/VRDet_train.ipynb`, cài từ GitHub `Nguyenchitrai62/openobb` (public). Hướng dẫn: [docs/FINETUNE.md](docs/FINETUNE.md).
+    Notebook Colab của user: `colab/VRDet_train.ipynb`, cài từ GitHub `Nguyenchitrai62/OpenOBB` (public). Hướng dẫn: [docs/FINETUNE.md](docs/FINETUNE.md).
   - Đã dừng: watcher tắt, không còn session Colab, số dư khoảng 71.7 CU. Hướng kế tiếp (chờ user): xem cuối F18 trong sổ cái.
 - [x] (cũ) Kiến trúc tạm chốt sáng 10-08: D-FINE-OBB + RFS + nhánh vector + 600 query. Báo cáo: [docs/REPORT_2026-10-08.md](docs/REPORT_2026-10-08.md).
 - [x] **VRDet2 (2026-10-09), kiến trúc mới:**
@@ -297,7 +297,7 @@ Câu hỏi còn mở:
   - **Hai repo:**
     | Repo | Vai trò | Nội dung |
     |---|---|---|
-    | GitHub `Nguyenchitrai62/openobb` (đổi tên từ `vrdet`, URL cũ tự chuyển hướng) | Repo nghiên cứu, nơi phát triển | Đầy đủ: research, tools, colab, kaggle |
+    | GitHub `Nguyenchitrai62/OpenOBB` (đổi tên từ `vrdet`, URL cũ tự chuyển hướng) | Repo nghiên cứu, nơi phát triển | Đầy đủ: research, tools, colab, kaggle |
     | GitLab công ty `git.anybim.vn/CxDP/service/hicasai/openanything/openobb` | Repo sản phẩm, lịch sử mới | Chỉ phần sạch: `openobb/`, tests (bỏ 4 test cần script nghiên cứu), docs sản phẩm, app, LICENSE, notices, README riêng |
   - Chính sách của user: mỗi repo `open*` (sau này opencls, openocr, openpdf...) tự đứng riêng, không phụ thuộc phần cấm thương mại.
   - Đồng bộ sang GitLab: chép lại các file trong danh sách cho phép rồi commit mới lên `main`. Không force-push.
@@ -333,7 +333,7 @@ Câu hỏi còn mở:
     - `pyproject.toml`, `openobb/cli.py`, `openobb/data/prepare.py` + `split.py`.
     - `best.pt` cùng fine-tune giữ class theo tên.
     - `colab/VRDet_train.ipynb` thay `colab/finetune_vrdet.ipynb`.
-  - Push GitHub `Nguyenchitrai62/openobb` (public theo lời user).
+  - Push GitHub `Nguyenchitrai62/OpenOBB` (public theo lời user).
   - Tiêu khoảng 30 CU cho c4/c5/c6; còn khoảng 71.7 CU.
 
 - 2026-10-08 (đêm):

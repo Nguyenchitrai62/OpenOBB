@@ -6,11 +6,11 @@ VRDet tự viết phần giao diện này; package không phụ thuộc Ultralyt
 ## Cài đặt
 
 ```bash
-pip install "openobb @ git+https://github.com/Nguyenchitrai62/openobb.git"
+pip install "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"
 ```
 
 - Phụ thuộc: torch, numpy, opencv-python, shapely, scipy, pyyaml. Pillow là tuỳ chọn, chỉ cần khi đưa ảnh PIL vào.
-- Nếu repo chuyển sang private: `pip install "openobb @ git+https://<token>@github.com/Nguyenchitrai62/openobb.git"`.
+- Nếu repo chuyển sang private: `pip install "openobb @ git+https://<token>@github.com/Nguyenchitrai62/OpenOBB.git"`.
 - Chỉ cần file `best.pt`. Mọi thông tin kiến trúc (v1–v5), class và imgsz đều nằm trong checkpoint.
 
 ## Đổi code

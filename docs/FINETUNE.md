@@ -12,7 +12,7 @@ Dataset theo chuẩn OBB 8 điểm (cùng định dạng nhãn bản export "tra
 ## 0. Cài đặt
 
 ```bash
-pip install git+https://github.com/Nguyenchitrai62/openobb.git     # hoặc trong repo: pip install -e .
+pip install git+https://github.com/Nguyenchitrai62/OpenOBB.git     # hoặc trong repo: pip install -e .
 ```
 
 - Cần torch (CUDA), opencv-python, shapely ≥ 2, scipy, numpy, pyyaml. Colab có sẵn.
