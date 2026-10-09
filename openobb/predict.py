@@ -21,6 +21,7 @@ import cv2
 import numpy as np
 import torch
 
+from openobb.data.imgio import IMG_EXT, imread, imwrite
 from openobb.data.vectors import cut_tile
 from openobb.eval.dota import merge_patches
 from openobb.models.dense_head import dense_predict
@@ -28,7 +29,6 @@ from openobb.models.openobb1 import OpenOBB1, postprocess
 from openobb.ops.obb import obb2poly
 
 PAD_BGR = (104, 116, 124)
-IMG_EXT = (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")
 
 
 def windows(length, size, gap):
@@ -181,7 +181,7 @@ def run(ckpt, source, out=None, conf=0.25, names=None, size=None, gap=200, queri
         out.mkdir(parents=True, exist_ok=True)
     results = {}
     for f in files:
-        img = cv2.imread(str(f), cv2.IMREAD_COLOR)
+        img = imread(f)
         if img is None:
             print(f"skip unreadable {f}")
             continue
@@ -200,7 +200,7 @@ def run(ckpt, source, out=None, conf=0.25, names=None, size=None, gap=200, queri
             (out / f"{f.stem}.txt").write_text("\n".join(rows) + ("\n" if rows else ""))
             (out / f"{f.stem}.json").write_text(json.dumps(js, ensure_ascii=False))
             if vis:
-                cv2.imwrite(str(out / f"{f.stem}_vis.jpg"), draw(img, js))
+                imwrite(out / f"{f.stem}_vis.jpg", draw(img, js))
         if verbose:
             print(f"{f.name}: {len(js)} objects")
     return results

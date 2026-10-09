@@ -60,7 +60,8 @@ def _ap(rec, prec):
 
 def evaluate_ultra(dets, gts, classes, conf=0.001, max_det=300, iou_thrs=None):
     """dets {class_name: (image_ids, scores, polys)}, gts {image_id: [(poly, cls, difficult)]} (as openobb.eval.dota)
-    -> {"mAP50", "mAP50_95", "classes": {name: {"AP50", "AP50_95"}}}. Difficult objects count as normal GT."""
+    -> {"mAP50", "mAP75", "mAP50_95", "P", "R", "classes": {name: {"AP50", "AP75", "AP50_95", "P", "R"}}}.
+    P / R are taken at the confidence of the best mean F1 (IoU 0.5). Difficult objects count as normal GT."""
     thrs = np.round(np.arange(0.5, 0.96, 0.05), 2) if iou_thrs is None else np.asarray(iou_thrs)
     per_img = {}
     for ci, c in enumerate(classes):
@@ -92,6 +93,7 @@ def evaluate_ultra(dets, gts, classes, conf=0.001, max_det=300, iou_thrs=None):
         sc_all.append(ds)
         cl_all.append(dc)
     res = {"classes": {}}
+    grid, pr_p, pr_r = np.linspace(0, 1, 1000), [], []
     tp = np.concatenate(tp_all) if tp_all else np.zeros((0, len(thrs)), bool)
     sc = np.concatenate(sc_all) if sc_all else np.zeros(0)
     cl = np.concatenate(cl_all) if cl_all else np.zeros(0, int)
@@ -105,12 +107,38 @@ def evaluate_ultra(dets, gts, classes, conf=0.001, max_det=300, iou_thrs=None):
         fpc = np.cumsum(~t, 0)
         aps = [_ap(tpc[:, k] / (npos[ci] + 1e-16), tpc[:, k] / np.maximum(tpc[:, k] + fpc[:, k], 1e-16))
                if len(t) else 0.0 for k in range(len(thrs))]
-        res["classes"][c] = {"AP50": aps[0], "AP50_95": float(np.mean(aps))}
+        k75 = int(np.argmin(np.abs(thrs - 0.75)))
+        res["classes"][c] = {"AP50": aps[0], "AP75": aps[k75], "AP50_95": float(np.mean(aps))}
+        if len(t):                                  # P / R curves over confidence at IoU 0.5 (as Ultralytics)
+            conf_c = sc[m][o]
+            pr_r.append(np.interp(-grid, -conf_c, tpc[:, 0] / (npos[ci] + 1e-16), left=0))
+            pr_p.append(np.interp(-grid, -conf_c, tpc[:, 0] / np.maximum(tpc[:, 0] + fpc[:, 0], 1e-16), left=1))
+        else:
+            pr_r.append(np.zeros_like(grid))
+            pr_p.append(np.zeros_like(grid))
+    if pr_p:                                        # P and R at the confidence of the best mean F1
+        p_, r_ = np.stack(pr_p), np.stack(pr_r)
+        f1 = 2 * p_ * r_ / (p_ + r_ + 1e-16)
+        i = int(_smooth(f1.mean(0), 0.1).argmax())
+        for c, pc, rc in zip(res["classes"], p_[:, i], r_[:, i]):
+            res["classes"][c]["P"], res["classes"][c]["R"] = float(pc), float(rc)
+        res["conf_best_f1"] = float(grid[i])
     res["confusion"] = confusion(per_img, gts, classes)
     vals = list(res["classes"].values())
     res["mAP50"] = float(np.mean([v["AP50"] for v in vals])) if vals else 0.0
+    res["mAP75"] = float(np.mean([v["AP75"] for v in vals])) if vals else 0.0
     res["mAP50_95"] = float(np.mean([v["AP50_95"] for v in vals])) if vals else 0.0
+    res["P"] = float(np.mean([v.get("P", 0.0) for v in vals])) if vals else 0.0
+    res["R"] = float(np.mean([v.get("R", 0.0) for v in vals])) if vals else 0.0
     return res
+
+
+def _smooth(y, f=0.05):
+    """Box filter of fraction f (the F1-curve smoothing of the Ultralytics metrics)."""
+    nf = round(len(y) * f * 2) // 2 + 1
+    pad = np.ones(nf // 2)
+    yp = np.concatenate((pad * y[0], y, pad * y[-1]), 0)
+    return np.convolve(yp, np.ones(nf) / nf, mode="valid")
 
 
 def confusion(per_img, gts, classes, conf=0.25, iou_thr=0.5):

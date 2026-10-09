@@ -1,9 +1,15 @@
 """Labelled OBB dataset -> OpenOBB tiled training layout.
 
-Accepts a data.yaml (names + train/val image folders; relative paths incl. the "../train/images" form)
-or a dataset folder (images/{split} + labels/{split}, or {split}/images + {split}/labels, plus data.yaml).
-Labels: 'class_id x1 y1 x2 y2 x3 y3 x4 y4' normalised to [0, 1]. Images are tiled SIZE x SIZE with GAP overlap;
-evaluation merges tiles back per original image. When no val split exists, VAL_FRAC of the train images is held out.
+The dataset is read with the Ultralytics conventions, so any dataset that trains with YOLO-OBB trains here unchanged:
+- data.yaml: `names` (list or {id: name}), optional `path` (dataset root), `train` / `val` given as an image folder
+  (searched recursively), a .txt file listing image paths, or a list of these; relative entries resolve against
+  `path`, then the yaml folder (the Roboflow '../train/images' form included). A dataset folder works too
+  (images/{split} + labels/{split}, or {split}/images + {split}/labels, plus data.yaml).
+- labels: for every image, the last '/images/' of its path becomes '/labels/' and the suffix '.txt' (images and
+  .txt side by side also work); lines 'class_id x1 y1 x2 y2 x3 y3 x4 y4' normalised to [0, 1]; a missing label file
+  is a background image; duplicate lines are dropped.
+Images are tiled SIZE x SIZE with GAP overlap (or resized whole with fit=True); evaluation merges tiles back per
+original image. When no val split exists, VAL_FRAC of the train images is held out.
 """
 import hashlib
 import json
@@ -11,11 +17,8 @@ import random
 import tempfile
 from pathlib import Path
 
-import cv2
-
+from openobb.data.imgio import IMG_EXT, imread
 from openobb.data.split import split_items
-
-IMG_EXT = (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp")
 
 
 def _load_yaml(path):
@@ -32,36 +35,64 @@ def _names(cfg):
     raise SystemExit("data.yaml has no 'names'")
 
 
+def _images_in(p):
+    """Images of one source: a folder (recursive), a .txt list of image paths ('./x' relative to the list), or a file."""
+    if p.is_dir():
+        return sorted(f for f in p.rglob("*") if f.suffix.lower() in IMG_EXT and f.is_file())
+    if p.is_file() and p.suffix.lower() == ".txt":
+        out = []
+        for line in p.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line:
+                f = Path(line)
+                f = f if f.is_absolute() else p.parent / (line[2:] if line.startswith("./") else line)
+                if f.suffix.lower() in IMG_EXT:
+                    out.append(f)
+        return out
+    if p.is_file() and p.suffix.lower() in IMG_EXT:
+        return [p]
+    return []
+
+
 def _resolve(entry, yaml_dir, root):
-    """Image folder resolution: absolute, relative to `path`, relative to the yaml, or the '../x' form."""
+    """Image list of a split entry (absolute, relative to `path`, relative to the yaml, or the '../x' form; a list of
+    entries is concatenated). None when nothing is found."""
     if not entry:
         return None
+    if isinstance(entry, (list, tuple)):
+        found = [_resolve(e, yaml_dir, root) for e in entry]
+        imgs = [f for fs in found if fs for f in fs]
+        return imgs or None
     cands = [Path(entry)]
     for base in (root, yaml_dir):
         if base is not None:
             cands += [base / entry, base / str(entry).lstrip("./").removeprefix("../")]
     for c in cands:
-        if c.is_dir() and any(p.suffix.lower() in IMG_EXT for p in c.iterdir()):
-            return c.resolve()
+        imgs = _images_in(c)
+        if imgs:
+            return [f.resolve() for f in imgs]
     return None
 
 
-def _labels_for(img_dir):
-    parts = list(img_dir.parts)
-    for i in range(len(parts) - 1, -1, -1):        # last 'images' path component -> 'labels'
+def label_path(img):
+    """Label file of an image, as Ultralytics: the last 'images' folder of the path -> 'labels', suffix -> .txt.
+    Without an 'images' folder: the .txt next to the image, else <folder>/labels or <folder>/../labels."""
+    img = Path(img)
+    parts = list(img.parts)
+    for i in range(len(parts) - 2, -1, -1):
         if parts[i] == "images":
             parts[i] = "labels"
-            return Path(*parts)
-    if any(img_dir.glob("*.txt")):                  # images and label files side by side (train/a.png + a.txt)
-        return img_dir
-    for c in (img_dir / "labels", img_dir.parent / "labels"):
-        if c.is_dir():
-            return c
-    return img_dir.parent / "labels"
+            return Path(*parts).with_suffix(".txt")
+    side = img.with_suffix(".txt")
+    if not side.exists():
+        for d in (img.parent / "labels", img.parent.parent / "labels"):
+            if (d / f"{img.stem}.txt").exists():
+                return d / f"{img.stem}.txt"
+    return side
 
 
 def find_splits(data):
-    """-> (names, {"train": img_dir, "val": img_dir or None})"""
+    """-> (names, {"train": [image paths], "val": [image paths] or None})"""
     data = Path(data)
     yaml_path = data if data.suffix in (".yaml", ".yml") else next(
         (p for p in (data / "data.yaml", data / "dataset.yaml") if p.exists()), None)
@@ -82,7 +113,7 @@ def find_splits(data):
     return _names(cfg) if cfg else None, splits
 
 
-PREP_VERSION = 2             # bump when the prepared layout changes: old caches are rebuilt
+PREP_VERSION = 3             # bump when the prepared layout changes: old caches are rebuilt
 
 
 def _fingerprint(paths):
@@ -98,21 +129,27 @@ def _fingerprint(paths):
     return h.hexdigest()
 
 
-def _to_dota(img_paths, lbl_dir, names, out_dir):
+def _to_dota(img_paths, names, out_dir):
     """Normalised OBB txt labels -> polygon label files (pixels + class names); images are NOT copied.
-    Unreadable images are skipped with a warning; duplicate label lines are removed."""
+    Each image gets a unique name (its stem, numbered when two images share one). Unreadable images are skipped with
+    a warning; duplicate label lines are removed."""
     out_dir.mkdir(parents=True, exist_ok=True)
     safe = [n.replace(" ", "_") for n in names]
-    items, n_obj = [], 0
+    items, n_obj, used = [], 0, set()
     stats = {"backgrounds": 0, "missing labels": 0, "corrupt lines": 0, "unreadable images": 0}
     for p in img_paths:
-        lp = lbl_dir / f"{p.stem}.txt"
-        dst = out_dir / f"{p.stem}.txt"
-        im = cv2.imread(str(p), cv2.IMREAD_COLOR)       # same decoding (EXIF orientation) as the tiling step
+        lp = label_path(p)
+        stem, k = p.stem, 1
+        while stem in used:                         # same file name in two folders of a recursive split
+            k += 1
+            stem = f"{p.stem}_{k}"
+        im = imread(p)                              # same decoding (EXIF orientation) as the tiling step
         if im is None or min(im.shape[:2]) < 10:
             stats["unreadable images"] += 1
             print(f"[data] WARNING: skipping unreadable or tiny image {p}")
             continue
+        used.add(stem)
+        dst = out_dir / f"{stem}.txt"
         h, w = im.shape[:2]
         lines = []
         if not lp.exists():
@@ -148,10 +185,8 @@ def prepare(data, out, size=1024, gap=200, val_frac=0.15, seed=0, names=None, wo
     names = list(names) if names else yaml_names
     if not names:
         raise SystemExit("class names unknown: provide data.yaml with 'names'")
-    tr = sorted(p for p in splits["train"].iterdir() if p.suffix.lower() in IMG_EXT)
-    va = sorted(p for p in splits["val"].iterdir() if p.suffix.lower() in IMG_EXT) if splits["val"] else []
-    files = [q for d, imgs in ((splits["train"], tr), (splits["val"], va)) if d is not None
-             for p in imgs for q in (p, _labels_for(d) / f"{p.stem}.txt")]
+    tr, va = splits["train"], splits["val"] or []
+    files = [q for p in tr + va for q in (p, label_path(p))]
     stamp = {"data": str(Path(data).resolve()), "size": size, "gap": gap, "val_frac": val_frac, "seed": seed,
              "scale": scale, "fit": fit, "ext": ext, "names": names, "version": PREP_VERSION,
              "files": _fingerprint(files)}
@@ -164,21 +199,20 @@ def prepare(data, out, size=1024, gap=200, val_frac=0.15, seed=0, names=None, wo
             print(f"[data] reuse {out}")
             return out
     if splits["val"] is not None:
-        plan = {"train": (tr, _labels_for(splits["train"])), "val": (va, _labels_for(splits["val"]))}
+        plan = {"train": tr, "val": va}
     else:
         rng = random.Random(seed)
         idx = list(range(len(tr)))
         rng.shuffle(idx)
         n_val = max(1, int(round(len(tr) * val_frac))) if len(tr) > 1 else 0
         hold = set(idx[:n_val])
-        lbl = _labels_for(splits["train"])
-        plan = {"train": ([p for i, p in enumerate(tr) if i not in hold], lbl),
-                "val": ([p for i, p in enumerate(tr) if i in hold], lbl)}
+        plan = {"train": [p for i, p in enumerate(tr) if i not in hold],
+                "val": [p for i, p in enumerate(tr) if i in hold]}
         print(f"[data] no val split: holding out {n_val}/{len(tr)} train images")
     summary = []
     with tempfile.TemporaryDirectory(prefix="openobb_lbl_") as tmp:
-        for split, (imgs, lbl_dir) in plan.items():
-            items, safe, n_obj, st = _to_dota(imgs, lbl_dir, names, Path(tmp) / split)
+        for split, imgs in plan.items():
+            items, safe, n_obj, st = _to_dota(imgs, names, Path(tmp) / split)
             summary.append(f"[data] {split}: {len(items)} images, {n_obj} objects, "
                            + ", ".join(f"{v} {k}" for k, v in st.items()))
             print(summary[-1])

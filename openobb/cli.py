@@ -5,6 +5,8 @@
     openobb train   resume=True                                                # continue the latest unfinished run
     openobb val     model=runs/obb/train/weights/best.pt data=data.yaml
     openobb predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.25   # -> runs/obb/predict, ...
+                    (the arguments, defaults and outputs of `yolo obb predict`: save=True writes the annotated
+                    images, save_txt=True labels/<image>.txt, save_conf, save_crop, iou, imgsz, max_det, classes...)
     openobb prepare data=data.yaml out=datasets/mydata imgsz=1024
 
     from openobb import OpenOBB
@@ -103,6 +105,8 @@ def _value(v):
             return t(v)
         except ValueError:
             pass
+    if v.startswith("[") and v.endswith("]"):
+        return [_value(x.strip().strip("'\"")) for x in v[1:-1].split(",") if x.strip()]
     return v
 
 
@@ -223,21 +227,20 @@ def page_stats(data, n=40):
     """(median image long side, p99 object long side, p5 object short side) in pixels from a sample of train images."""
     import random
 
-    import cv2
     import numpy as np
 
-    from openobb.data.prepare import IMG_EXT, _labels_for, find_splits
+    from openobb.data.imgio import imread
+    from openobb.data.prepare import find_splits, label_path
     _, splits = find_splits(data)
-    imgs = sorted(p for p in splits["train"].iterdir() if p.suffix.lower() in IMG_EXT)
-    lbl_dir = _labels_for(splits["train"])
+    imgs = splits["train"]
     sides, longs, shorts = [], [], []
     for p in random.Random(0).sample(imgs, min(n, len(imgs))):
-        im = cv2.imread(str(p), cv2.IMREAD_COLOR)
+        im = imread(p)
         if im is None:
             continue
         h, w = im.shape[:2]
         sides.append(max(h, w))
-        lp = lbl_dir / f"{p.stem}.txt"
+        lp = label_path(p)
         for row in (lp.read_text().splitlines() if lp.exists() else []):
             v = row.split()
             if len(v) >= 9:
@@ -594,15 +597,47 @@ class Detector:
         return self.predict(source, **kw)
 
 
+LEGACY_PREDICT = {"save_dir", "vis", "tile_scale", "gap", "queries", "names"}
+
+
+def _predict_cli(kv):
+    """`openobb predict`: OpenOBB(model).predict(...) with the YOLO CLI defaults (save=True). The old arguments
+    (save_dir, vis, tile_scale, gap, queries, names) still run the previous writer (txt + json per image)."""
+    if "model" not in kv or "source" not in kv:
+        raise SystemExit("openobb predict needs model=<best.pt> and source=<image, folder, glob or URL>")
+    if LEGACY_PREDICT & set(kv):
+        predict(**kv)
+        return 0
+    import inspect
+
+    from openobb.model import UNSUPPORTED, OpenOBB
+    ok = set(inspect.signature(OpenOBB.predict).parameters) - {"self", "kw"} | UNSUPPORTED
+    bad = [k for k in kv if k not in ok and k != "model"]
+    if bad:
+        import difflib
+        near = difflib.get_close_matches(bad[0], sorted(ok), n=3, cutoff=0.6)
+        raise SystemExit(f"'{bad[0]}' is not a valid argument for openobb predict."
+                         + (f" Similar: {', '.join(near)}" if near else ""))
+    if isinstance(kv.get("classes"), str):                      # classes=0,2 or classes=door,window
+        kv["classes"] = [_value(c.strip()) for c in kv["classes"].split(",") if c.strip()]
+    kv.setdefault("save", True)
+    model = OpenOBB(kv.pop("model"))
+    for _ in model.predict(stream=True, **kv):
+        pass
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or argv[0] in ("-h", "--help", "help") or argv[0] not in MODES:
         print(__doc__)
         return 0 if (not argv or argv[0] in ("-h", "--help", "help")) else 2
     mode, kv = argv[0], parse_kv(argv[1:])
-    if mode in ("val", "predict"):
+    if mode == "predict":
+        return _predict_cli(kv)
+    if mode == "val":
         import inspect
-        fn = val if mode == "val" else predict
+        fn = val
         ok = set(inspect.signature(fn).parameters) | {"save"}
         bad = [k for k in kv if k not in ok]
         if bad:
@@ -616,8 +651,6 @@ def main(argv=None):
         train(**kv)
     elif mode == "val":
         val(**kv)
-    elif mode == "predict":
-        predict(**kv)
     elif mode == "prepare":
         out = kv.pop("out", None)
         tile = bool(kv.get("tile", False))

@@ -39,19 +39,20 @@ for r in results:
 | Ultralytics | OpenOBB | Ghi chú |
 |---|---|---|
 | `YOLO("best.pt")` | `OpenOBB("best.pt")` | Mọi checkpoint OpenOBB v1–v5 |
-| `model.predict(source, conf, iou, imgsz, device, max_det, classes, agnostic_nms, save, save_txt, save_conf, stream, verbose, project, name, exist_ok, line_width, show, show_labels, show_conf)` | giống | Tham số khác bị bỏ qua |
+| `model.predict(source, conf, iou, imgsz, device, batch, max_det, classes, agnostic_nms, save, save_txt, save_conf, save_crop, stream, verbose, project, name, exist_ok, line_width, show, show_labels, show_conf, show_boxes)` | giống | Tên tham số sai thì báo lỗi như YOLO; tham số chỉ dành cho video (`vid_stride`, `stream_buffer`, `visualize`, `augment`, `embed`...) chỉ cảnh báo rồi bỏ qua |
 | `model(source)` | giống | |
-| `source`: path, thư mục, glob, URL, list, numpy BGR, PIL, tensor (B,3,H,W) RGB 0–1 | giống | **Chưa hỗ trợ video/webcam/stream** |
-| `r.obb.xywhr` | giống | cx, cy, w, h, góc (rad); **w ≥ h, góc trong [0, π)** như Ultralytics |
-| `r.obb.xyxyxyxy`, `.xyxyxyxyn`, `.xyxy`, `.conf`, `.cls`, `.data` (N,7), `.id` (= None) | giống | Tensor torch trên CPU; `.cpu()`, `.numpy()`, `.to()` dùng được |
+| `source`: path / `Path`, thư mục, glob, URL, file `.txt` liệt kê ảnh, list, numpy BGR, PIL, tensor (B,3,H,W) RGB 0–1 | giống | Ảnh đọc giống loader của YOLO (`IMREAD_COLOR`: BGR, áp xoay EXIF, bỏ alpha, đường dẫn Unicode được), đọc lần lượt từng ảnh. **Không hỗ trợ video/webcam/stream** (bản vẽ là ảnh tĩnh) |
+| `r.obb.xywhr` | giống | cx, cy, w, h, góc (rad); **góc trong [0, π/2)**, đổi chỗ w/h khi cần, đúng quy ước `regularize_rboxes` của Ultralytics |
+| `r.obb.xyxyxyxy`, `.xyxyxyxyn`, `.xyxy`, `.conf`, `.cls`, `.data` (N,7), `.id` (= None) | giống | Tensor torch nằm trên device của model (GPU nếu có), thứ tự 4 góc như YOLO; `.cpu()`, `.numpy()`, `.to()` dùng được |
 | `r.boxes` | `None` | Như model OBB của YOLO |
 | `r.names`, `r.orig_img` (BGR), `r.orig_shape`, `r.path`, `r.speed`, `r.save_dir` | giống | |
-| `r.plot()`, `r.save()`, `r.show()`, `r.save_txt(f, save_conf)`, `r.summary()`, `r.to_json()`, `r.to_df()`, `r.verbose()` | giống | `save_txt` theo định dạng nhãn YOLO-OBB (toạ độ chuẩn hoá) |
+| `r.plot()`, `r.save()`, `r.show()`, `r.save_txt(f, save_conf)`, `r.save_crop(dir, name)`, `r.summary()`, `r.to_json()`, `r.to_df()`, `r.to_csv()`, `r.verbose()`, `r.new()`, `r.update(obb=...)` | giống | `save_txt` theo định dạng nhãn YOLO-OBB (toạ độ chuẩn hoá, `%g`), không tạo file khi ảnh không có object; `save_crop` cắt xoay theo box |
 | `len(r)`, `r[i]` | giống | |
 | `model.names`, `model.task` (= "obb") | giống | |
-| `model.val(data=...)` → `metrics.box.map`, `.map50`, `.maps`, `.mp`, `.mr`, `metrics.results_dict` | giống | mAP tính theo cách chấm của YOLO |
+| `model.val(data=...)` → `metrics.box.map`, `.map50`, `.map75`, `.maps`, `.mp`, `.mr`, `.p`, `.r`, `.ap50`, `.ap`, `.ap_class_index`, `metrics.results_dict`, `metrics.fitness` | giống | mAP và P/R tính theo cách chấm của YOLO (P/R tại conf có F1 trung bình cao nhất) |
 | `model.train(...)` | `OpenOBB("openobb5x").train(data=..., epochs=...)` | Hoặc CLI `openobb train ...` |
-| `model.export(...)`, `model.track(...)` | chưa có | |
+| `model.export(...)`, `model.track(...)` | chưa có | Gọi sẽ báo `NotImplementedError` |
+| CLI `yolo obb predict model=... source=...` | `openobb predict model=... source=...` | Cùng tham số và mặc định (`save=True`); ảnh vẽ box lưu `runs/obb/predict/<tên gốc>`, nhãn ở `labels/<tên>.txt` khi `save_txt=True`; log `image i/n ...`, `Speed: ...`, `Results saved to ...` |
 
 ## Khác biệt cần biết
 
@@ -65,3 +66,5 @@ for r in results:
 | `tile` | không có | `tile=True` cắt trang rất lớn thành tile ở độ phân giải gốc |
 
 Kết quả của `OpenOBB.predict` giống hệt `openobb predict` (CLI) và app Streamlit: cùng tiền xử lý như lúc train và cùng bước ghép NMS.
+
+Tiền xử lý so với YOLO: YOLO letterbox ảnh về `imgsz` (pad màu xám 114); OpenOBB resize cạnh dài về `imgsz` rồi pad thành ô vuông bằng màu nền lúc train. Cả hai đều đổi kết quả về toạ độ ảnh gốc, nên đầu ra dùng y như nhau.

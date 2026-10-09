@@ -18,6 +18,8 @@ import shapely
 import torch
 from torch.utils.data import Dataset
 
+from openobb.data.imgio import imread
+
 cv2.setNumThreads(0)
 PAD_BGR = (104, 116, 124)
 SQUARE_NAMES = ("storage-tank", "roundabout")    # DOTA: only 90-degree rotations (RTMDet-R / O2 practice)
@@ -102,7 +104,7 @@ class DotaPatches(Dataset):
             from concurrent.futures import ThreadPoolExecutor
             files = [self.root / "images" / self.split / m.get("file", f"{m['name']}.jpg") for m in self.items]
             with ThreadPoolExecutor(8) as ex:
-                imgs = list(ex.map(lambda f: cv2.imread(str(f), cv2.IMREAD_COLOR), files))
+                imgs = list(ex.map(imread, files))
             self.cache = {m["name"]: im for m, im in zip(self.items, imgs)}
         self.keep_difficult = keep_difficult
 
@@ -112,7 +114,7 @@ class DotaPatches(Dataset):
     def _load(self, m):
         img = self.cache.get(m["name"])
         if img is None:
-            img = cv2.imread(str(self.root / "images" / self.split / m.get("file", f"{m['name']}.jpg")), cv2.IMREAD_COLOR)
+            img = imread(self.root / "images" / self.split / m.get("file", f"{m['name']}.jpg"))
         objs = m["objs"] if self.keep_difficult else [o for o in m["objs"] if o[1] == 0]
         polys = np.array([o[3:] for o in objs], dtype=np.float32).reshape(-1, 8)
         labels = np.array([o[0] for o in objs], dtype=np.int64)
@@ -147,7 +149,7 @@ class DotaPatches(Dataset):
         T = self.thumb
         canvas = np.empty((T, T, 3), np.uint8)
         canvas[:] = PAD_BGR
-        th = cv2.imread(str(self.root / "thumbs" / self.split / f"{m['src']}.jpg"), cv2.IMREAD_COLOR)
+        th = imread(self.root / "thumbs" / self.split / f"{m['src']}.jpg")
         if th is None or "img_w" not in m:
             return {"thumb": canvas, "tile": np.array([0, 0, T, T], np.float32), "valid": False}
         h, w = th.shape[:2]

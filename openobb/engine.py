@@ -300,11 +300,12 @@ def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num
         res["ultra"] = evaluate_ultra(primary_dets, gts, classes)
     if metric == "yolo":                        # report (and select best.pt) on the YOLO-comparable numbers
         u = res["ultra"]
-        res["dota"] = {"mAP50": res["mAP50"], "mAP50_95": res["mAP50_95"],
-                       "classes": {c: {"AP50": r["AP50"], "AP50_95": r["AP50_95"]} for c, r in res["classes"].items()}}
-        res["mAP50"], res["mAP50_95"] = u["mAP50"], u["mAP50_95"]
+        res["dota"] = {"mAP50": res["mAP50"], "mAP50_95": res["mAP50_95"], "P": res.get("P"), "R": res.get("R"),
+                       "classes": {c: {k: r.get(k) for k in ("AP50", "AP50_95", "P", "R")}
+                                   for c, r in res["classes"].items()}}
+        res["mAP50"], res["mAP50_95"], res["P"], res["R"] = u["mAP50"], u["mAP50_95"], u["P"], u["R"]
         for c, r in u["classes"].items():
-            res["classes"][c]["AP50"], res["classes"][c]["AP50_95"] = r["AP50"], r["AP50_95"]
+            res["classes"][c].update({k: r[k] for k in ("AP50", "AP50_95", "P", "R") if k in r})
         res["metric"] = "yolo"
     if len(results) > 1:
         res["fusion"] = {k: {"mAP50": v["mAP50"], "mAP50_95": v["mAP50_95"],

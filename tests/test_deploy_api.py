@@ -49,8 +49,7 @@ def test_predict_like_yolo(ckpt, tmp_path):
     assert r.orig_shape == (300, 400) and r.boxes is None and len(r) <= 20
     o = r.obb
     assert o.data.shape[1] == 7 and o.xywhr.shape[1] == 5 and o.xyxyxyxy.shape[1:] == (4, 2)
-    assert (o.xywhr[:, 2] >= o.xywhr[:, 3] - 1e-3).all()                       # w >= h
-    assert ((o.xywhr[:, 4] >= 0) & (o.xywhr[:, 4] < math.pi)).all()            # rotation in [0, pi)
+    assert ((o.xywhr[:, 4] >= 0) & (o.xywhr[:, 4] < math.pi / 2)).all()        # rotation in [0, pi/2) as YOLO
     assert (o.conf[:-1] >= o.conf[1:]).all()                                    # sorted by confidence
     xs = o.cpu().numpy().xyxyxyxy
     assert isinstance(xs, np.ndarray)

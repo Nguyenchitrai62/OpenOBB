@@ -8,6 +8,8 @@ import cv2
 import numpy as np
 import torch
 
+from openobb.data.imgio import imwrite
+
 COLUMNS = ["epoch", "time_s", "lr", "cls_loss", "box_loss", "kld_loss", "angle_loss", "dfl_loss",
            "P", "R", "mAP50", "mAP50-95"]
 LOSS_KEYS = {"cls_loss": "loss_mal", "box_loss": "loss_bbox", "kld_loss": "loss_kld", "angle_loss": "loss_angle",
@@ -110,7 +112,7 @@ def plot_train_batch(path, imgs, targets, classes, n=4):
         return
     while len(tiles) < 4:
         tiles.append(np.full_like(tiles[0], 255))
-    cv2.imwrite(str(path), np.vstack([np.hstack(tiles[:2]), np.hstack(tiles[2:4])]), [cv2.IMWRITE_JPEG_QUALITY, 90])
+    imwrite(path, np.vstack([np.hstack(tiles[:2]), np.hstack(tiles[2:4])]), [cv2.IMWRITE_JPEG_QUALITY, 90])
 
 
 @torch.no_grad()
@@ -145,4 +147,4 @@ def plot_val_predictions(out, model, data_root, device, img_size, classes, num_t
     while len(tiles) < 4:
         tiles.append(np.full_like(tiles[0], 255))
     grid = np.vstack([np.hstack(tiles[:2]), np.hstack(tiles[2:4])])
-    cv2.imwrite(str(Path(out) / "val_pred.jpg"), grid, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    imwrite(Path(out) / "val_pred.jpg", grid, [cv2.IMWRITE_JPEG_QUALITY, 90])

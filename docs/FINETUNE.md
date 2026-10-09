@@ -21,12 +21,14 @@ pip install git+https://github.com/Nguyenchitrai62/OpenOBB.git     # hoặc tron
 ## 1. Dữ liệu
 
 ```
-<root>/data.yaml                 names: [...] hoặc {0: ..., 1: ...}; train:/val: thư mục ảnh
+<root>/data.yaml                 names: [...] hoặc {0: ..., 1: ...}; train:/val: thư mục ảnh, file .txt liệt kê ảnh, hoặc list
 <root>/train/images, train/labels     (hoặc images/train + labels/train)
 <root>/valid/images, valid/labels     (tuỳ chọn: không có thì tự tách 15% ảnh train)
 ```
 
 - Mỗi dòng nhãn: `class_id x1 y1 x2 y2 x3 y3 x4 y4`, toạ độ chuẩn hoá [0, 1] theo ảnh.
+  - Đọc giống Ultralytics: thư mục ảnh được quét cả thư mục con; nhãn của mỗi ảnh là đường dẫn ảnh với `/images/` cuối cùng
+    đổi thành `/labels/` và đuôi `.txt` (ảnh và `.txt` để chung thư mục cũng được). Ảnh không có file nhãn là ảnh nền.
   - `train: ../train/images` (kiểu Roboflow) cũng đọc được.
   - Dòng nhãn sai bị bỏ qua và có cảnh báo; log in số ảnh nền và số dòng hỏng.
 - **Ảnh cỡ nào cũng được.** Mỗi ảnh được resize riêng về cạnh dài `imgsz`, giữ tỉ lệ, rồi pad thành ô vuông. Train, val và predict đều làm giống nhau, kết quả đổi về toạ độ ảnh gốc.
@@ -129,11 +131,11 @@ openobb predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.3   # 
   - Bảng val có cột F2 theo class.
 - **`classes=`:** chỉ giữ các class này, theo id hoặc tên (ví dụ `classes=wall,door`). `names=` dùng cho checkpoint không có tên class.
 - `openobb val model=best.pt` không cần `data=` nếu chạy trên cùng máy lúc train. Lệch thứ tự class giữa data và model thì báo lỗi.
-- Mỗi ảnh ra:
-  - `<tên>.txt`: `class x1 y1 ... x4 y4 score`, chuẩn hoá theo ảnh;
-  - `<tên>.json`: toạ độ pixel và tên class;
-  - `<tên>_vis.jpg`: ảnh có vẽ box.
-- Dùng trong Python: `Detector("best.pt").predict("page.png", conf=0.3, save_dir=None)`.
+- Đầu ra giống `yolo obb predict`, trong `runs/obb/predict`, `predict2`...:
+  - `<tên gốc>` (ví dụ `page.png`): ảnh có vẽ box (`save=True`, mặc định của CLI);
+  - `labels/<tên>.txt` khi `save_txt=True`: `class x1 y1 ... x4 y4` chuẩn hoá, thêm `conf` khi `save_conf=True`;
+  - `crops/<class>/<tên>.jpg` khi `save_crop=True`.
+- Dùng trong Python: `OpenOBB("best.pt").predict("page.png", conf=0.3)`, chi tiết ở [DEPLOY.md](DEPLOY.md).
 
 ## 4. Test nhanh bằng giao diện kéo thả (Streamlit)
 

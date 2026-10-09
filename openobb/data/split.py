@@ -25,6 +25,7 @@ import cv2
 import numpy as np
 import shapely
 
+from openobb.data.imgio import imread, imwrite
 from openobb.eval.dota import parse_dota_txt
 
 PAD_BGR = (104, 116, 124)       # ImageNet mean, so padding is ~0 after normalisation
@@ -43,10 +44,15 @@ def _fmt_rate(r):
     return f"{r:g}" if r != 1 else "1.0"
 
 
+def item_name(img_path, lbl_path):
+    """Name of a source image in the tiled layout: the stem of its (prepared, unique) label file, else its own."""
+    return Path(lbl_path).stem if lbl_path else Path(img_path).stem
+
+
 def split_image(item, out, split, size, gap, rates, iof_thr, classes, quality, fit=False, ext=".jpg"):
     img_path, lbl_path = item
-    name = Path(img_path).stem
-    img0 = cv2.imread(str(img_path), cv2.IMREAD_COLOR)
+    name = item_name(img_path, lbl_path)
+    img0 = imread(img_path)
     if img0 is None:
         return [], f"unreadable {img_path}"
     objs0 = parse_dota_txt(lbl_path) if lbl_path and Path(lbl_path).exists() else []
@@ -55,7 +61,7 @@ def split_image(item, out, split, size, gap, rates, iof_thr, classes, quality, f
     H0, W0 = img0.shape[:2]
     ts = THUMB / max(H0, W0)
     thumb = cv2.resize(img0, (max(1, round(W0 * ts)), max(1, round(H0 * ts))), interpolation=cv2.INTER_AREA)
-    cv2.imwrite(str(out / "thumbs" / split / f"{name}.jpg"), thumb, [cv2.IMWRITE_JPEG_QUALITY, 92])
+    imwrite(out / "thumbs" / split / f"{name}.jpg", thumb, [cv2.IMWRITE_JPEG_QUALITY, 92])
     metas = []
     seen = set()                                    # objects kept (whole or truncated) in at least one tile
     for rate in ((size / max(H0, W0),) if fit else rates):
@@ -101,9 +107,9 @@ def split_image(item, out, split, size, gap, rates, iof_thr, classes, quality, f
                             kept.append([cls_idx[objs0[k][1]], int(objs0[k][2]), trunc] + [round(v, 2) for v in q])
                             seen.add(int(k))
                 if ext == ".png":                   # lossless: JPEG chroma subsampling smears thin coloured lines
-                    cv2.imwrite(str(out / "images" / split / f"{pname}.png"), patch, [cv2.IMWRITE_PNG_COMPRESSION, 1])
+                    imwrite(out / "images" / split / f"{pname}.png", patch, [cv2.IMWRITE_PNG_COMPRESSION, 1])
                 else:
-                    cv2.imwrite(str(out / "images" / split / f"{pname}.jpg"), patch, [cv2.IMWRITE_JPEG_QUALITY, quality])
+                    imwrite(out / "images" / split / f"{pname}.jpg", patch, [cv2.IMWRITE_JPEG_QUALITY, quality])
                 with open(out / "labels" / split / f"{pname}.txt", "w") as fh:
                     for o in kept:
                         fh.write(f"{o[0]} " + " ".join(f"{v / size:.6f}" for v in o[3:]) + "\n")
@@ -135,7 +141,7 @@ def split_items(items, out, split, size=1024, gap=200, rates=(1.0,), iof_thr=0.7
                 n_obj += len(m["objs"])
     for img, lbl in items:
         if lbl and Path(lbl).exists():
-            shutil.copy(lbl, out / "gt" / split / f"{Path(img).stem}.txt")
+            shutil.copy(lbl, out / "gt" / split / f"{item_name(img, lbl)}.txt")
     print(f"[split] {split}: {len(items)} images -> {n_patch} tiles, {n_obj} objects", flush=True)
     if n_lost:
         print(f"[split] WARNING {split}: {n_lost} objects are too long/large to be >= {iof_thr:.0%} inside any "

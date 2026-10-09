@@ -293,6 +293,19 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-09 (9): **Rà soát và sửa cho infer + đọc data khớp Ultralytics.**
+  - Góc `xywhr` nằm trong [0, π/2), theo quy ước `regularize_rboxes`; trước đây là [0, π) với w ≥ h. Tensor nằm trên device của model.
+  - Ảnh đọc qua `openobb/data/imgio.py` (dùng `IMREAD_COLOR`, an toàn với Unicode) ở mọi chỗ: train, val, predict. Trước đây predict dùng `IMREAD_UNCHANGED`, bỏ qua xoay EXIF.
+  - `predict`:
+    - Tên tham số sai thì báo lỗi; tham số video thì cảnh báo.
+    - Thêm `save_crop` và `show_boxes`; nhận `imgsz` dạng list.
+    - Lưu ảnh kèm tên gốc; log `Speed:`.
+    - Đọc lần lượt từng ảnh; nhận nguồn là file `.txt`.
+  - CLI `openobb predict` đi qua `OpenOBB.predict` (mặc định `save=True`). Tham số cũ (`save_dir`, `vis`...) vẫn chạy đường cũ.
+  - Dataset: thư mục ảnh quét cả thư mục con, `train:`/`val:` nhận file `.txt` hoặc list, nhãn tìm theo từng ảnh (`/images/` → `/labels/`), tên trùng không đè nhau. `PREP_VERSION` = 3, nên cache cũ sẽ được dựng lại.
+  - `val`: P/R tính tại conf có F1 trung bình cao nhất (như YOLO), thêm `map75`, `.p`, `.r`, `.ap50`, `.ap`, `fitness`. Bảng P/R lúc train đổi theo.
+  - Thêm `tests/test_ultralytics_compat.py`.
+
 - 2026-10-09 (8): **Phiên bản.**
   - Một nguồn duy nhất là `openobb/__init__.py` (`__version__`); `pyproject.toml` đọc động từ đó.
   - `tools/push_all.py` tự tăng số patch khi `openobb/`, `pyproject.toml` hoặc `requirements.txt` đổi so với commit đặt version gần nhất.
