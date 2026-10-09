@@ -218,6 +218,22 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Tham số: 64.6M, 83% từ code D-FINE. Fine-tune v2 của user (lr 1e-3, batch 16) ở epoch 7 mới 0.280 / 0.098.
   - Có thể khởi tạo từ VRDet1 của user bằng `weights=`.
   - Tiêu chí: ≥ v1 (0.63 / 0.35); mAP50-95 của wall tăng; nhanh hơn v1.
+- **F27. VRDet2-x fine-tune vòng 2 trên Wall_Color (user, 10-09): chạm trần, BÁC BỎ hướng v2 cho data nhỏ.**
+  - Điều kiện: từ best.pt của F25, lr 1e-3 → 1e-5, batch 16, 100 epoch.
+  - mAP50 / mAP50-95 theo epoch: ep1 0.252 / 0.088 → ep30 0.315 / 0.110 → ep50 0.351 / 0.127 → ep66 0.356 / 0.133. Từ ep50 chỉ tăng khoảng +0.005 mỗi 16 epoch.
+  - **Loss train gần như phẳng suốt 66 epoch:**
+    | Loss | ep1 → ep66 |
+    |---|---|
+    | box | 0.449 → 0.435 |
+    | end | 0.93 → khoảng 0.91 |
+    | thick | 0.66 → 0.62 |
+    | cls | 0.29 → 0.24 |
+    → Model **underfit**: không khớp nổi cả tập train, không phải overfit. Trần do thiết kế, không do thiếu epoch.
+  - Tỉ lệ khít mAP50-95/mAP50 đứng yên ở 0.35–0.37 từ đầu tới cuối (v1 0.56, YOLO11x 0.68). mAP tăng là nhờ phát hiện / calibration, box không khít hơn.
+  - Nguyên nhân (khớp F24–F25):
+    1. Hồi quy dọc trục "vị trí × log(chiều dài)" + L1 đầu mút không học được (end_loss kẹt).
+    2. Không có pretrained.
+  - → Không đầu tư thêm cho v2. Thay bằng VRDet3 (F26): DFL hai khoảng cách đầu mút, feature COCO.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
