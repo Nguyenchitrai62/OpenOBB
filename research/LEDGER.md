@@ -376,6 +376,19 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     - Phần chính của v5 (DINOv2, thứ đã giúp wall_300 ở v4) chưa được thử.
     - Chưa so sạch được vì checkpoint khởi đầu, xoay và LR đều khác.
 
+- **F36. Tốc độ infer openobb3x so với YOLO11x-obb (10-09): khác biệt chủ yếu do imgsz, không do kiến trúc.**
+  - User đo trên server: openobb3x khoảng 375 ms/ảnh, YOLO11x khoảng 200–230 ms. Nhưng YOLO là `yolo11x_obb_960` (imgsz 960),
+    còn openobb3x train và infer ở 1280.
+  - FLOPs (thước Ultralytics = 2×MAC, đo cùng máy; YOLO dựng từ yaml, chỉ để đo):
+    | imgsz | YOLO11x-obb | openobb3x | Tỉ lệ |
+    |---|---|---|---|
+    | 960 | 458 G | 511 G | 1.12× |
+    | 1280 | 817 G | 909 G | 1.11× |
+  - 909 G (openobb3x ở 1280) / 458 G (YOLO ở 960) = **1.98×**, khớp tỉ lệ 375/210 ≈ 1.8 user đo. Cùng imgsz thì openobb3x chỉ nặng hơn khoảng 11%.
+  - Phân bổ của openobb3x: backbone HGNetv2-B5 47%, encoder lai 41%, LSK 7%, head 5%.
+  - Ghi chú nếu cần tăng tốc sau này (user nói chưa cần): `fast_nms` tính ma trận ProbIoU 4000×4000. Trên CPU tốn khoảng 0.3 s (GPU thì không đáng kể).
+    Thời gian CPU local nhiễu, nên chỉ dùng FLOPs để kết luận.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
