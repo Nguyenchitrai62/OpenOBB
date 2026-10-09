@@ -20,7 +20,7 @@ from torch.utils.data import Dataset
 
 cv2.setNumThreads(0)
 PAD_BGR = (104, 116, 124)
-SQUARE_CLASSES = (9, 11)     # storage-tank, roundabout: only 90-degree rotations (RTMDet-R / O2 practice)
+SQUARE_NAMES = ("storage-tank", "roundabout")    # DOTA: only 90-degree rotations (RTMDet-R / O2 practice)
 
 
 def polys_to_obb(polys):
@@ -93,6 +93,10 @@ class DotaPatches(Dataset):
         if limit:
             items = items[:limit]
         self.items = items
+        try:                                     # by name: class ids of another dataset must not match DOTA's
+            self.square_ids = [i for i, n in enumerate(dataset_classes(root)) if n in SQUARE_NAMES]
+        except Exception:  # noqa: BLE001
+            self.square_ids = []
         self.cache = {}
         if cache:                               # decode once in the main process; forked workers share the pages
             from concurrent.futures import ThreadPoolExecutor
@@ -163,7 +167,7 @@ class DotaPatches(Dataset):
     def _rotate(self, img, polys, labels, ctx=None, vec=None):
         """Arbitrary-angle rotation about the centre (images with square-like classes: 90-degree steps only)."""
         S = img.shape[0]
-        if np.isin(labels, SQUARE_CLASSES).any():
+        if self.square_ids and np.isin(labels, self.square_ids).any():
             ang = 90.0 * random.randint(0, 3)
         else:
             ang = random.uniform(-180, 180)
