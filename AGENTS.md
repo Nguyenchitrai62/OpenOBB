@@ -293,6 +293,15 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-09 (6): **Đổi tên package/CLI thành `openobb`**; kiến trúc vẫn tên VRDet (`vrdet5x`, class `VRDet`).
+  - **Hai repo:**
+    | Repo | Vai trò | Nội dung |
+    |---|---|---|
+    | GitHub `Nguyenchitrai62/openobb` (đổi tên từ `vrdet`, URL cũ tự chuyển hướng) | Repo nghiên cứu, nơi phát triển | Đầy đủ: research, tools, colab, kaggle |
+    | GitLab công ty `git.anybim.vn/CxDP/service/hicasai/openanything/openobb` | Repo sản phẩm, lịch sử mới | Chỉ phần sạch: `openobb/`, tests (bỏ 4 test cần script nghiên cứu), docs sản phẩm, app, LICENSE, notices, README riêng |
+  - Chính sách của user: mỗi repo `open*` (sau này opencls, openocr, openpdf...) tự đứng riêng, không phụ thuộc phần cấm thương mại.
+  - Đồng bộ sang GitLab: chép lại các file trong danh sách cho phép rồi commit mới lên `main`. Không force-push.
+
 - 2026-10-09 (5):
   - API deploy giống Ultralytics: `from openobb import VRDet` → `predict` → `Results.obb.*`, `plot`, `save_txt`, `summary`, `val().box.map`.
     Code ở `openobb/model.py`, `openobb/results.py`; tài liệu [docs/DEPLOY.md](docs/DEPLOY.md).
