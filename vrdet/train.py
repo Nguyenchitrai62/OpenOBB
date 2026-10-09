@@ -31,6 +31,8 @@ def build_parser():
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2"],
+                    help="v1: VRDet (DETR-style decoder); v2: VRDet2 (dense segment-aware, NMS-free)")
     ap.add_argument("--img", type=int, default=1024)
     ap.add_argument("--scale", type=float, default=1.0,
                     help="image scale the data was tiled at (recorded for inference; set by vrdet.data.prepare)")
@@ -182,11 +184,17 @@ def main(argv=None):
     torch.backends.cudnn.allow_tf32 = True
 
     classes = dataset_classes(a.data)
-    model = VRDet(a.size, num_classes=len(classes), num_queries=a.queries, img_size=a.img,
-                  rotate_sampling=not a.no_rotate_sampling, num_denoising=a.denoising, dense=a.dense,
-                  strip_k=a.strip_k, ortho_heads=a.ortho_heads, context=a.context,
-                  dense_queries=a.dense_queries, vectors=a.vectors, vec_dim=a.vec_dim, vec_layers=a.vec_layers,
-                  o2m_queries=a.o2m_queries, lsk=a.lsk, vec_lfe=a.vec_lfe, vec_ground=a.vec_ground > 0, p2=a.p2)
+    v2 = a.arch == "v2"
+    if v2:
+        from vrdet.models.vrdet2 import VRDet2
+        from vrdet.models.vrdet2_loss import VRDet2Loss
+        model = VRDet2(a.size, num_classes=len(classes), img_size=a.img)
+    else:
+        model = VRDet(a.size, num_classes=len(classes), num_queries=a.queries, img_size=a.img,
+                      rotate_sampling=not a.no_rotate_sampling, num_denoising=a.denoising, dense=a.dense,
+                      strip_k=a.strip_k, ortho_heads=a.ortho_heads, context=a.context,
+                      dense_queries=a.dense_queries, vectors=a.vectors, vec_dim=a.vec_dim, vec_layers=a.vec_layers,
+                      o2m_queries=a.o2m_queries, lsk=a.lsk, vec_lfe=a.vec_lfe, vec_ground=a.vec_ground > 0, p2=a.p2)
     last = wdir / "last.pt"
     if not last.exists() and a.weights:
         # shape-tolerant copy of a VRDet checkpoint; class rows are matched by name (new classes start fresh)
@@ -195,18 +203,21 @@ def main(argv=None):
         load_dfine_coco(model, a.weights, log=lambda m: log(m, console=True), class_map=cmap)
         log(f"[init] fine-tuning from {a.weights} ({len(cmap)}/{len(classes)} classes carried over)")
         init_desc = f"fine-tune from {a.weights} ({len(cmap)}/{len(classes)} classes carried over)"
-    elif not last.exists() and not a.no_pretrained:
+    elif not last.exists() and not a.no_pretrained and not v2:
         load_dfine_coco(model, a.size, class_names=classes, log=lambda m: log(m, console=True), init=a.init)
         init_desc = "D-FINE COCO weights (Apache-2.0)"
     else:
-        init_desc = "resume" if last.exists() else "random"
+        init_desc = "resume" if last.exists() else "random (trained from scratch)"
     sanitize_batchnorm(model, log=lambda m: log(m, console=True))
     model.to(device)
     if a.channels_last:
         model.to(memory_format=torch.channels_last)
-    crit = build_criterion(num_classes=len(classes), box_loss=a.box_loss, o2m_k=a.o2m_k, aqd=a.aqd,
-                           angle_weight=a.angle_weight, cost_iou=a.cost_iou, member_weight=a.vec_ground)
-    a.dense = a.dense or a.dense_queries
+    if v2:
+        crit = VRDet2Loss(img_size=a.img)
+    else:
+        crit = build_criterion(num_classes=len(classes), box_loss=a.box_loss, o2m_k=a.o2m_k, aqd=a.aqd,
+                               angle_weight=a.angle_weight, cost_iou=a.cost_iou, member_weight=a.vec_ground)
+    a.dense = (a.dense or a.dense_queries) and not v2
     dense_crit = DenseCriterion() if a.dense else None
     ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,
                      rotate_p=a.rotate_p, mosaic_p=a.mosaic_p, context=a.context, ctx_dropout=a.ctx_dropout,
@@ -216,7 +227,11 @@ def main(argv=None):
     frozen = []
     if a.freeze:                                # fine-tuning on small data: keep the pretrained early layers fixed
         f = str(a.freeze).lower()
-        if f.isdigit():
+        if v2:
+            frozen = {"backbone": [model.backbone], "encoder": [model.backbone, model.neck]}.get(f)
+            if frozen is None:
+                raise SystemExit("VRDet2 --freeze must be 'backbone' or 'encoder' (backbone + neck)")
+        elif f.isdigit():
             frozen = [model.backbone.stem] + list(model.backbone.stages[:int(f)])
         elif f == "backbone":
             frozen = [model.backbone]
@@ -280,7 +295,10 @@ def main(argv=None):
     if a.compile and device.type == "cuda" and not a.eval_only:
         try:
             model.backbone.forward = torch.compile(model.backbone.forward)
-            model.encoder.forward = torch.compile(model.encoder.forward, dynamic=False)
+            if v2:
+                model.neck.forward = torch.compile(model.neck.forward, dynamic=False)
+            else:
+                model.encoder.forward = torch.compile(model.encoder.forward, dynamic=False)
             log("torch.compile enabled for backbone + encoder (training model only)")
         except Exception as e:  # noqa: BLE001
             log(f"torch.compile unavailable, eager mode: {e}", console=True)
@@ -305,8 +323,12 @@ def main(argv=None):
         say(f"VRDet {__import__('vrdet').__version__} | torch {torch.__version__} | {gpu} | "
             f"AMP {('bf16' if scaler is None else 'fp16') if amp else 'off'} | "
             f"compile {'on' if a.compile and device.type == 'cuda' else 'off'}")
-        say(f"model   VRDet-{a.size}{' + ' + ' + '.join(extras) if extras else ''}, {n_par:.2f}M params, "
-            f"{a.queries} queries | init: {init_desc}")
+        if v2:
+            say(f"model   VRDet2-{a.size} (dense segment-aware, P2-P5, NMS-free), {n_par:.2f}M params, "
+                f"top {a.num_top} detections | init: {init_desc}")
+        else:
+            say(f"model   VRDet-{a.size}{' + ' + ' + '.join(extras) if extras else ''}, {n_par:.2f}M params, "
+                f"{a.queries} queries | init: {init_desc}")
         mode = f"whole image, long side {a.img}" if a.fit else f"tiles {a.img}, scale {a.scale}"
         say(f"data    {len(ds)} train tiles, {n_val} val images, {len(classes)} classes | {mode}")
         say(f"train   {a.epochs} epochs x {iters_per_epoch} it, batch {a.batch}, AdamW lr {a.lr:g} -> "
@@ -354,7 +376,7 @@ def main(argv=None):
         if device.type == "cuda":
             torch.cuda.reset_peak_memory_stats()
         prof = None
-        bar = EpochBar(epoch, a.epochs, iters_per_epoch, a.img) if not a.verbose else None
+        bar = EpochBar(epoch, a.epochs, iters_per_epoch, a.img, v2=v2) if not a.verbose else None
         for bi, (imgs, targets) in enumerate(dl):
             if bi >= iters_per_epoch:
                 break
@@ -432,8 +454,7 @@ def main(argv=None):
             n += 1
             it += 1
             if bar is not None:
-                bar.update(bi + 1, {k: float(sums[k]) / n for k in sums if k in ("loss_mal", "loss_bbox", "loss_kld",
-                                                                             "loss_angle", "loss_fgl")},
+                bar.update(bi + 1, {k: float(sums[k]) / n for k in sums if k in bar.keys},
                            sum(len(t["labels"]) for t in targets),
                            torch.cuda.memory_reserved() / 2**30 if device.type == "cuda" else None,
                            force=bi + 1 == iters_per_epoch)
@@ -529,7 +550,7 @@ def main(argv=None):
     (out / "eval_val.txt").write_text(table + "\n")
     (out / "eval_val.json").write_text(json.dumps(res, indent=1))
     write_task1(dets, out / "val_task1", classes)
-    if a.eval_queries and a.eval_queries != a.queries:       # extra eval, main numbers stay at --queries
+    if a.eval_queries and a.eval_queries != a.queries and not v2:   # extra eval, main numbers stay at --queries
         ema.module.decoder.num_queries = a.eval_queries
         rq, _ = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.eval_queries,
                           img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post, merge_iou=a.merge_iou)
@@ -537,7 +558,7 @@ def main(argv=None):
         (out / f"eval_val_q{a.eval_queries}.json").write_text(json.dumps(rq, indent=1))
         jlog({"final_q": a.eval_queries, "mAP50": rq["mAP50"], "mAP50_95": rq["mAP50_95"]})
         ema.module.decoder.num_queries = a.queries
-    final = rq if a.eval_queries and a.eval_queries != a.queries else res
+    final = rq if a.eval_queries and a.eval_queries != a.queries and not v2 else res
     say(summary_table(final, classes))
     if not a.eval_only and (wdir / "best.pt").exists():  # per-class confidence (best F2) for predict conf=auto
         ck = torch.load(wdir / "best.pt", map_location="cpu", weights_only=False)

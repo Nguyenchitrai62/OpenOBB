@@ -184,6 +184,14 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Tỉ lệ khít (mAP50-95/mAP50): VRDet-X 0.56, YOLO 0.68.
   - VRDet-X suy luận chậm hơn YOLO11x rõ (user đánh giá, chưa đo bằng số).
   - → Thua cả phát hiện lẫn độ khít trên data dày object mảnh, ít ảnh. Phân tích kiến trúc: xem tin trả lời ngày 10-09 (dense-first hybrid).
+- **F24. VRDet2 (10-09): kiến trúc mới, chưa có số GPU.** Chi tiết: [docs/VRDET2.md](../docs/VRDET2.md).
+  - Thiết kế: dense P2–P5, segment head (vị trí dọc, log-length, độ dày phân phối), o2o chỉ cls và dùng chung box, không NMS.
+  - Ngân sách: 55.6M tham số, 0% code mượn, không pretrained. Dùng: `model=vrdet2x`.
+  - Overfit CPU 1 ảnh (vrdet2n, 300 bước): block học nhanh; line dài mảnh chậm hơn. Nguyên nhân:
+    - top-k chỉ chọn vài điểm, các điểm giống hệt còn lại bị ép thành nền;
+    - nhánh box o2o chỉ có 1 mẫu dương.
+  - → Đã sửa bằng vùng bỏ qua (o2m) + ưu tiên điểm giữa (o2o) + o2o dùng chung box. Line từ lệch góc 0.4 rad xuống box đúng (154.5/156 px, dày 3.4/3).
+  - Chờ log Wall_Color của user để so YOLO11x (0.74 / 0.50).
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 

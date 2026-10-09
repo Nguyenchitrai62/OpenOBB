@@ -46,6 +46,11 @@ def load_model(ckpt_path, device, queries=None, classes=None):
     names = ck.get("classes") or classes
     if not names:
         raise SystemExit("class names unknown: pass --classes (classes.json of the training data or a,b,c)")
+    if a.get("arch") == "v2":
+        from vrdet.models.vrdet2 import VRDet2
+        m = VRDet2(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024))
+        m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
+        return m.to(device).eval(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
     m = VRDet(a.get("size", "s"), num_classes=len(names), num_queries=a.get("queries", 300),
               img_size=a.get("img", 1024), rotate_sampling=not a.get("no_rotate_sampling", False),
               num_denoising=a.get("denoising", 100), dense=a.get("dense", False) or a.get("dense_queries", False),

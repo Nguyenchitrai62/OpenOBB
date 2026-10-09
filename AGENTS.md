@@ -257,6 +257,11 @@ Câu hỏi còn mở:
     Notebook Colab của user: `colab/VRDet_train.ipynb`, cài từ GitHub `Nguyenchitrai62/vrdet` (public). Hướng dẫn: [docs/FINETUNE.md](docs/FINETUNE.md).
   - Đã dừng: watcher tắt, không còn session Colab, số dư khoảng 71.7 CU. Hướng kế tiếp (chờ user): xem cuối F18 trong sổ cái.
 - [x] (cũ) Kiến trúc tạm chốt sáng 10-08: D-FINE-OBB + RFS + nhánh vector + 600 query. Báo cáo: [docs/REPORT_2026-10-08.md](docs/REPORT_2026-10-08.md).
+- [x] **VRDet2 (2026-10-09), kiến trúc mới:**
+  - Dense segment-aware, P2–P5, không NMS, 55.6M, tự viết 100%, train từ đầu. Chi tiết: [docs/VRDET2.md](docs/VRDET2.md).
+  - Dùng: `model=vrdet2x`, CLI giữ nguyên. `model=x` = `vrdet1x` là kiến trúc cũ.
+  - User tự train và gửi log. Agent chỉ thiết kế kiến trúc.
+  - Mỗi version kiến trúc mới phải nêu chi tiết từng phần và tỉ lệ tận dụng cái có sẵn (luật user, 10-09).
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.
@@ -273,6 +278,11 @@ Câu hỏi còn mở:
 **Cần user:** điền tên chủ sở hữu pháp lý (cá nhân hoặc công ty) vào `LICENSE` (hiện để "the repository owner").
 
 ## 9. Nhật ký
+
+- 2026-10-09: VRDet2.
+  - Viết `vrdet/models/vrdet2.py`, `vrdet2_loss.py`. CLI nhận `vrdet1*` / `vrdet2*`. Predict/val nạp được v2.
+  - Test `tests/test_vrdet2.py`; 65 test pass.
+  - Overfit CPU tìm ra lỗi gán nhãn cho line dài, đã sửa (LEDGER F24).
 
 - 2026-10-08 (chiều, chốt):
   - Đợt raster-CAD trên FloorPlanCAD (S, 24 epoch, so c4 = 76.83 / 66.57):

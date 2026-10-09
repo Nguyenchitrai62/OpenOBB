@@ -34,6 +34,9 @@ from types import SimpleNamespace
 
 MODES = ("train", "val", "predict", "prepare")
 SIZES = ("s", "m", "l", "x")
+# model names: vrdet1{s,m,l,x} (= s/m/l/x, DETR-style VRDet) and vrdet2{n,s,m,l,x} (dense segment-aware VRDet2)
+MODELS = {**{s: ("v1", s) for s in SIZES}, **{f"vrdet1{s}": ("v1", s) for s in SIZES},
+          **{f"vrdet2{s}": ("v2", s) for s in ("n", "s", "m", "l", "x")}}
 
 # Best architecture recipe measured on FloorPlanCAD / DOTA (research/LEDGER.md, c6): selective large-kernel
 # adapters (LSK), repeat-factor sampling, one-to-many query group, adaptive query denoising, square-aware angle loss,
@@ -49,8 +52,17 @@ SIZE_DEFAULTS = {          # lr, backbone lr multiplier, weight decay, batch, ~G
     "l": dict(lr=8e-5, backbone_mult=0.05, wd=1.25e-4, batch=8, gb=2.6),
     "x": dict(lr=6e-5, backbone_mult=0.1, wd=1.25e-4, batch=8, gb=4.0),
 }
+# VRDet2 trains from scratch (no pretrained backbone): one LR for every layer, conv-detector regularisation
+SIZE_DEFAULTS2 = {
+    "n": dict(lr=2e-3, backbone_mult=1.0, wd=0.05, batch=32, gb=0.8),
+    "s": dict(lr=2e-3, backbone_mult=1.0, wd=0.05, batch=16, gb=1.4),
+    "m": dict(lr=1.5e-3, backbone_mult=1.0, wd=0.05, batch=16, gb=2.5),
+    "l": dict(lr=1e-3, backbone_mult=1.0, wd=0.05, batch=8, gb=3.5),
+    "x": dict(lr=1e-3, backbone_mult=1.0, wd=0.05, batch=8, gb=4.5),
+}
+RECIPE2 = {"rfs": 0.1, "channels_last": True, "clip": 10.0, "num_top": 1000}
 # architecture flags a fine-tune inherits from its source checkpoint (weights only load into the same shape)
-ARCH_KEYS = ("size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_queries", "denoising",
+ARCH_KEYS = ("arch", "size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_queries", "denoising",
              "no_rotate_sampling", "context")
 MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / per epoch on small datasets
 ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every", "lrf": "min_lr_ratio"}
@@ -390,8 +402,9 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
     hsv = [extra.pop(k, d) for k, d in (("hsv_h", 0.015), ("hsv_s", 0.5), ("hsv_v", 0.3))]
     weights = None
     m = str(model)
-    if m.lower() in SIZES:
-        size, inherited = m.lower(), {}
+    if m.lower() in MODELS:
+        arch, size = MODELS[m.lower()]
+        inherited = {"arch": arch} if arch == "v2" else {}
     elif m.endswith(".pt") and Path(m).exists():
         weights = m
         src_args, _ = _ckpt_args(m)
@@ -399,7 +412,9 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
         size = inherited.pop("size", "s")
         imgsz = imgsz or extra.pop("img", None) or src_args.get("img", 1024)
     else:
-        raise SystemExit(f"model must be one of {SIZES} or an existing VRDet .pt checkpoint, got '{model}'")
+        raise SystemExit(f"model must be one of {', '.join(MODELS)} or an existing VRDet .pt checkpoint, "
+                         f"got '{model}'")
+    v2 = inherited.get("arch") == "v2"
     imgsz = int(imgsz or extra.pop("img", None) or 1024)
     if imgsz % 32:
         imgsz = int(math.ceil(imgsz / 32) * 32)
@@ -418,7 +433,7 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
     else:
         scale = auto_scale(data, imgsz) if tile_scale in (None, "auto") else float(tile_scale)
 
-    sd = SIZE_DEFAULTS[size]
+    sd = (SIZE_DEFAULTS2 if v2 else SIZE_DEFAULTS)[size]
     if str(optimizer).lower() not in ("auto", "adamw"):
         raise SystemExit("optimizer must be 'auto' or 'AdamW'")   # lr0 given -> used; otherwise the measured LR
     prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, seed, fit=fit)
@@ -438,13 +453,13 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
             "eval_every": _eval_every(prepared, int(epochs)), "eval_images": 10**9, "patience": int(patience or 0),
             "seed": seed}
     q = _queries_for(prepared)
-    if q > 300:
+    if q > 300 and not v2:
         opts.update(queries=q, num_top=q)
         print(f"[vrdet] dense images (p99 objects/image > 240): {q} queries")
     if workers is not None:
         opts["workers"] = int(workers)
     if recipe:
-        opts.update(RECIPE)
+        opts.update(RECIPE2 if v2 else RECIPE)
     if aug["mosaic"]:
         opts["mosaic_mode"] = "yolo"
     opts.update({AUG_FLAGS[k]: v for k, v in aug.items()})
@@ -452,7 +467,7 @@ def train(data=None, model="s", epochs=100, batch=None, imgsz=None, project="run
     if weights:
         opts["weights"] = weights
     opts.update(extra)
-    if float(opts["lr"]) > 3 * sd["lr"]:
+    if float(opts["lr"]) > 3 * sd["lr"] and not v2:
         print(f"[vrdet] WARNING: lr0={opts['lr']:g} is {float(opts['lr']) / sd['lr']:.0f}x the default for VRDet-{size} "
               f"({sd['lr']:g}). DETR-style detectors usually diverge (NaN boxes) above ~2e-4; the 1e-3 of one-stage "
               f"detectors does not transfer.")

@@ -4,7 +4,9 @@ import sys
 import time
 
 COLS = ("cls_loss", "box_loss", "kld_loss", "angle_loss", "dfl_loss")
-KEYS = ("loss_mal", "loss_bbox", "loss_kld", "loss_angle", "loss_fgl")      # final decoder layer losses
+KEYS = ("loss_mal", "loss_bbox", "loss_kld", "loss_angle", "loss_fgl")      # VRDet1: final decoder layer losses
+COLS2 = ("cls_loss", "box_loss", "end_loss", "thick_loss", "angle_loss")
+KEYS2 = ("loss_cls", "loss_box", "loss_end", "loss_dfl", "loss_angle")      # VRDet2: one-to-many head
 
 
 def _bar(i, n, width=12):
@@ -26,11 +28,12 @@ def _dur(s):
 class EpochBar:
     """Usage: bar = EpochBar(epoch, epochs, n_iters, size); bar.update(i, means, inst, mem) ...; bar.close()."""
 
-    def __init__(self, epoch, epochs, n, size, stream=sys.stdout, every=1.0):
+    def __init__(self, epoch, epochs, n, size, stream=sys.stdout, every=1.0, v2=False):
         self.epoch, self.epochs, self.n, self.size = epoch, epochs, n, size
+        self.cols, self.keys = (COLS2, KEYS2) if v2 else (COLS, KEYS)
         self.stream, self.every = stream, every
         self.t0 = self.last = time.time()
-        print("\n" + f"{'Epoch':>11}{'GPU_mem':>11}" + "".join(f"{c:>11}" for c in COLS)
+        print("\n" + f"{'Epoch':>11}{'GPU_mem':>11}" + "".join(f"{c:>11}" for c in self.cols)
               + f"{'Instances':>11}{'Size':>11}", file=stream, flush=True)
 
     def update(self, i, means, instances, mem_gb, force=False):
@@ -38,7 +41,7 @@ class EpochBar:
         if not force and now - self.last < self.every and i < self.n:
             return
         self.last = now
-        vals = "".join(f"{means.get(k, 0.0):>11.4f}" for k in KEYS)
+        vals = "".join(f"{means.get(k, 0.0):>11.4f}" for k in self.keys)
         mem = f"{mem_gb:.1f}G" if mem_gb is not None else "-"
         self.row = (f"{f'{self.epoch + 1}/{self.epochs}':>11}{mem:>11}{vals}{instances:>11}{self.size:>11}: "
                     f"{100 * i / max(self.n, 1):3.0f}% {_bar(i, self.n)} {i}/{self.n} {_rate(i, now - self.t0)} "

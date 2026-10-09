@@ -47,6 +47,9 @@ r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024)   # r.bes
 ```
 
 **`model`:**
+- **`vrdet2x`** (mới, 55.6M, train từ đầu, nên dùng `epochs=300`): kiến trúc dense segment-aware, không NMS.
+  Chi tiết: [VRDET2.md](VRDET2.md). Có thêm `vrdet2n/s/m/l`. Chỉ cần đổi `model=`, mọi tham số khác giữ nguyên.
+- `vrdet1s/m/l/x` = `s/m/l/x`: kiến trúc cũ (D-FINE-OBB).
 - `s` (12.5M tham số), `m`, `l`, `x` (71M) để train từ đầu.
 - Đường dẫn `best.pt` để **fine-tune**: kiến trúc lấy theo checkpoint, class trùng tên giữ lại trọng số.
 
