@@ -55,3 +55,25 @@ def test_rotation_and_mosaic_keep_boxes_on_objects(tmp_path):
             assert img.shape == (3, 256, 256) and img.dtype == torch.uint8
             assert len(t["boxes"]) > 0
             assert _colour_hit(img, t["boxes"], t["labels"], 256) > 0.9, kw
+
+
+def test_rotation_also_applies_to_mosaic_samples(tmp_path):
+    """rotate_p must act on mosaic samples too (mosaic is on for all but the last epochs)."""
+    import math
+    import random as _r
+
+    import numpy as np
+
+    from test_cli import _dataset
+    from vrdet.data.dota import DotaPatches
+    from vrdet.data.prepare import prepare
+    out = prepare(str(_dataset(tmp_path / "ds", n_train=4)), tmp_path / "prep", size=512, fit=True, workers=1)
+    ds = DotaPatches(str(out), "train", size=512, augment=True, mosaic_p=1.0, mosaic_mode="yolo", rotate_p=1.0,
+                     rot90=False, flip=False, scale_jitter=0.0, translate=0.0)
+    _r.seed(1)
+    angles = []
+    for k in range(8):
+        b = ds[k % len(ds)][1]["boxes"].numpy()
+        angles += [abs(math.degrees(t)) % 90 for t in b[:, 4]]
+    off = [min(a, 90 - a) for a in angles]
+    assert angles and max(off) > 5                       # some boxes are no longer axis-aligned

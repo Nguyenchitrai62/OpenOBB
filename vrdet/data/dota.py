@@ -342,6 +342,8 @@ class DotaPatches(Dataset):
         if self.augment and self.mosaic_p and random.random() < self.mosaic_p:
             img, polys, labels, vec = self._mosaic_yolo(i) if self.mosaic_mode == "yolo" else self._mosaic(i)
             img = self._hsv(img)
+            if self.rotate_p and random.random() < self.rotate_p:      # arbitrary angle after mosaic (YOLO order)
+                img, polys, labels = self._rotate(img, np.asarray(polys, np.float32).reshape(-1, 8), labels, vec=vec)
             if self.context:                    # a mosaic has no single parent image: no context
                 ctx = self._load_ctx(m)
                 ctx["valid"] = False
