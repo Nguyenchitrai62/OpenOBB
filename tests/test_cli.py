@@ -305,3 +305,13 @@ def test_yaml_copied_out_with_path_to_dataset(tmp_path, layout):
     (tmp_path / "data.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False))
     names, splits = find_splits(tmp_path / "data.yaml")
     assert names == ["wall"] and splits["train"] is not None and splits["val"] is not None
+
+
+def test_single_version_source():
+    """pyproject reads the version from openobb.__version__ (tools/push_all.py bumps it)."""
+    import re
+
+    import openobb
+    assert re.fullmatch(r"\d+\.\d+\.\d+", openobb.__version__)
+    py = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+    assert 'dynamic = ["version"]' in py and 'attr = "openobb.__version__"' in py and "\nversion = \"" not in py

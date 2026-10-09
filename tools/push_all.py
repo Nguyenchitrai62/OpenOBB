@@ -3,6 +3,11 @@
     python tools/push_all.py              # git push (GitHub) -> sync -> test -> push GitLab
     python tools/push_all.py --dry-run    # show what would change on GitLab, push nothing
     python tools/push_all.py --no-test    # skip the test run on the GitLab copy (not recommended)
+    python tools/push_all.py --minor      # bump 0.X.0 instead of the patch number (breaking / larger changes)
+
+Versioning: openobb/__init__.py `__version__` is the only version (pyproject reads it). When the package
+(openobb/, pyproject.toml, requirements.txt) changed since the commit that last set the version, the patch number is
+bumped and committed first ("Version x.y.z"); every released version is tagged vX.Y.Z on GitHub and on GitLab.
 
 GitHub (github.com/Nguyenchitrai62/OpenOBB) holds everything: research, Colab notebooks (Colab installs from it).
 GitLab (openanything/openobb) holds only the commercial-clean product: ALLOW below, minus EXCLUDE (tests that need
@@ -88,24 +93,71 @@ def build_tree(dst):
         sys.exit(f"refusing to sync: forbidden imports in {bad}")
 
 
+VERSION_FILE = ROOT / "openobb" / "__init__.py"
+CODE_PATHS = ["openobb", "pyproject.toml", "requirements.txt"]
+VERSION_RE = re.compile(r'__version__ = "(\d+)\.(\d+)\.(\d+)"')
+
+
+def read_version():
+    m = VERSION_RE.search(VERSION_FILE.read_text(encoding="utf-8"))
+    if not m:
+        sys.exit("no __version__ = \"x.y.z\" in openobb/__init__.py")
+    return tuple(int(v) for v in m.groups())
+
+
+def next_version(kind, dry_run):
+    """Bump when package code changed since the commit that last set the version; returns the version to release."""
+    cur = read_version()
+    base = run(["git", "log", "-1", "--format=%H", "-G", '__version__ = "', "--", "openobb/__init__.py"],
+               capture=True).stdout.strip()
+    changed = run(["git", "diff", "--name-only", f"{base}..HEAD", "--", *CODE_PATHS], capture=True).stdout.split() \
+        if base else ["(no version commit yet)"]
+    if not changed:
+        return cur, False
+    major, minor, patch = cur
+    new = (major, minor + 1, 0) if kind == "minor" else (major, minor, patch + 1)
+    tag = ".".join(map(str, new))
+    print(f"== version {'.'.join(map(str, cur))} -> {tag} ({len(changed)} package files changed since the last release)")
+    if not dry_run:
+        text = VERSION_FILE.read_text(encoding="utf-8")
+        VERSION_FILE.write_text(VERSION_RE.sub(f'__version__ = "{tag}"', text, count=1), encoding="utf-8")
+        run(["git", "add", str(VERSION_FILE)])
+        subprocess.run(["git", "commit", "-q", "-F", "-"], cwd=ROOT, check=True, text=True,
+                       input=f"Version {tag}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n")
+    return new, True
+
+
+def ensure_tag(tag, cwd):
+    """Tag HEAD of `cwd` as `tag` and push it, unless the remote already has that tag."""
+    if run(["git", "ls-remote", "--tags", "origin", f"refs/tags/{tag}"], cwd=cwd, capture=True).stdout.strip():
+        return
+    run(["git", "tag", "-f", tag], cwd=cwd, capture=True)
+    run(["git", "push", "-q", "origin", f"refs/tags/{tag}"], cwd=cwd)
+    print(f"   tagged {tag}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--no-test", action="store_true")
+    ap.add_argument("--minor", action="store_true", help="bump the minor version instead of the patch number")
     a = ap.parse_args()
-    head = run(["git", "rev-parse", "--short", "HEAD"], capture=True).stdout.strip()
-    subject = run(["git", "log", "-1", "--format=%s"], capture=True).stdout.strip()
     dirty = run(["git", "status", "--porcelain", "--", *ALLOW], capture=True).stdout.strip()
     if dirty:
         print("note: uncommitted changes are NOT synced:\n" + dirty)
+    version, _ = next_version("minor" if a.minor else "patch", a.dry_run)
+    tag = "v" + ".".join(map(str, version))
+    head = run(["git", "rev-parse", "--short", "HEAD"], capture=True).stdout.strip()
+    subject = run(["git", "log", "-1", "--format=%s"], capture=True).stdout.strip()
 
     if not a.dry_run:
-        print("== GitHub: git push")
+        print(f"== GitHub: git push ({tag})")
         run(["git", "push", "origin", "HEAD:main"])
+        ensure_tag(tag, ROOT)
 
     print("== GitLab: update the working clone")
     if (CHECKOUT / ".git").exists():
-        run(["git", "fetch", "-q", "origin"], cwd=CHECKOUT)
+        run(["git", "fetch", "-q", "--tags", "origin"], cwd=CHECKOUT)
         run(["git", "reset", "-q", "--hard", "origin/main"], cwd=CHECKOUT)
         run(["git", "clean", "-qfdx"], cwd=CHECKOUT)
     else:
@@ -130,6 +182,8 @@ def main():
     diff = run(["git", "diff", "--cached", "--stat"], cwd=CHECKOUT, capture=True).stdout.strip()
     if not diff:
         print("GitLab already up to date.")
+        if not a.dry_run:
+            ensure_tag(tag, CHECKOUT)
         return
     print(diff)
     if a.dry_run:
@@ -143,11 +197,12 @@ def main():
         if r.returncode:
             sys.exit("tests failed on the GitLab copy: nothing pushed to GitLab (GitHub already pushed)")
         run(["git", "clean", "-qfdX"], cwd=CHECKOUT)       # __pycache__ etc. created by the test run
-    msg = (f"Sync from GitHub {head}: {subject}\n\n"
+    msg = (f"Sync from GitHub {head} ({tag}): {subject}\n\n"
            "Product subset of github.com/Nguyenchitrai62/OpenOBB (tools/push_all.py).\n\n"
            "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n")
     subprocess.run(["git", "commit", "-q", "-F", "-"], cwd=CHECKOUT, input=msg, text=True, check=True)
     run(["git", "push", "-q", "origin", "HEAD:main"], cwd=CHECKOUT)
+    ensure_tag(tag, CHECKOUT)
     print("GitLab:", run(["git", "log", "--oneline", "-1"], cwd=CHECKOUT, capture=True).stdout.strip())
 
 

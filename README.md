@@ -10,8 +10,12 @@ Train, predict và đọc kết quả giống YOLO-OBB. Không phụ thuộc Ult
 ## Cài đặt
 
 ```bash
-pip install "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"
+pip install "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"           # bản mới nhất
+pip install "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git@v0.2.0"    # đúng một phiên bản
 ```
+
+Kiểm tra phiên bản đã cài: `python -c "import openobb; print(openobb.__version__)"`.
+Mỗi lần code thư viện thay đổi, `tools/push_all.py` tự tăng phiên bản và gắn tag `vX.Y.Z` trên cả GitHub lẫn GitLab.
 
 ## Train trên Colab
 

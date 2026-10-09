@@ -7,8 +7,11 @@ Giao diện train / predict / kết quả giống YOLO-OBB.
 ## Cài đặt
 
 ```bash
-pip install "openobb @ git+http://git.anybim.vn/CxDP/service/hicasai/openanything/openobb.git"
+pip install "openobb @ git+http://git.anybim.vn/CxDP/service/hicasai/openanything/openobb.git"           # mới nhất
+pip install "openobb @ git+http://git.anybim.vn/CxDP/service/hicasai/openanything/openobb.git@v0.2.0"    # đúng một phiên bản
 ```
+
+Phiên bản: `openobb.__version__`; mỗi phiên bản có tag `vX.Y.Z`.
 
 ## Suy luận (thay YOLO)
 

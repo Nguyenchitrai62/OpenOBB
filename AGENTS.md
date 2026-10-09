@@ -293,6 +293,12 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-09 (8): **Phiên bản.**
+  - Một nguồn duy nhất là `openobb/__init__.py` (`__version__`); `pyproject.toml` đọc động từ đó.
+  - `tools/push_all.py` tự tăng số patch khi `openobb/`, `pyproject.toml` hoặc `requirements.txt` đổi so với commit đặt version gần nhất.
+    `--minor` để tăng số minor.
+  - Gắn tag `vX.Y.Z` trên cả GitHub lẫn GitLab. Bản đổi tên OpenOBB là **0.2.0**.
+
 - 2026-10-09 (7): **Đổi toàn bộ tên kiến trúc VRDet → OpenOBB** (theo user; bỏ hẳn tên cũ, không alias).
   - Tên mới:
     | Loại | Tên cũ → mới |
