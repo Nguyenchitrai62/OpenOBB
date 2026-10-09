@@ -35,6 +35,8 @@ pip install git+https://github.com/Nguyenchitrai62/vrdet.git     # hoặc trong 
   - `tile_scale=` để thu nhỏ trước khi cắt; không đặt thì tự chọn theo cỡ object.
 - Dữ liệu đã chuẩn bị được cache ở `~/.cache/vrdet` (đổi chỗ bằng `cache_dir=` hoặc biến `VRDET_CACHE`).
 
+> **Deploy (thay YOLO trong code sản phẩm):** xem [DEPLOY.md](DEPLOY.md): `from vrdet import VRDet; VRDet("best.pt").predict(...)`.
+
 ## 2. Train
 
 ```bash

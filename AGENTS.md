@@ -293,6 +293,11 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-09 (5):
+  - API deploy giống Ultralytics: `from vrdet import VRDet` → `predict` → `Results.obb.*`, `plot`, `save_txt`, `summary`, `val().box.map`.
+    Code ở `vrdet/model.py`, `vrdet/results.py`; tài liệu [docs/DEPLOY.md](docs/DEPLOY.md).
+  - `rotate_p` giờ áp dụng cả lên ảnh mosaic. 94 test pass.
+
 - 2026-10-09 (4):
   - VRDet5 (`vrdet/models/vrdet5.py`, `vrdet5_loss.py`, `--arch v5`, `--geo-cls`, `--relate`, `--rel-k`).
   - v3 nhận `--backbone`. Confusion matrix trong `vrdet/eval/ultra.py`. 90 test pass.
