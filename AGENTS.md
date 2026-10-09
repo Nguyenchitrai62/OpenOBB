@@ -300,7 +300,14 @@ Câu hỏi còn mở:
     | GitHub `Nguyenchitrai62/OpenOBB` (đổi tên từ `vrdet`, URL cũ tự chuyển hướng) | Repo nghiên cứu, nơi phát triển | Đầy đủ: research, tools, colab, kaggle |
     | GitLab công ty `git.anybim.vn/CxDP/service/hicasai/openanything/openobb` | Repo sản phẩm, lịch sử mới | Chỉ phần sạch: `openobb/`, tests (bỏ 4 test cần script nghiên cứu), docs sản phẩm, app, LICENSE, notices, README riêng |
   - Chính sách của user: mỗi repo `open*` (sau này opencls, openocr, openpdf...) tự đứng riêng, không phụ thuộc phần cấm thương mại.
-  - Đồng bộ sang GitLab: chép lại các file trong danh sách cho phép rồi commit mới lên `main`. Không force-push.
+  - **Đẩy code: `python tools/push_all.py`.** Lệnh này đẩy GitHub (nhánh local `main`), rồi đồng bộ phần sạch sang GitLab:
+    - dùng danh sách file cho phép + luật đổi chữ trong script;
+    - chạy test trên bản GitLab, chỉ đẩy khi pass;
+    - không force-push.
+
+    Dùng `--dry-run` để xem trước. Colab cài từ GitHub, vì cài từ GitLab trên Colab rất khó.
+  - Bài học 10-09: dòng `models/` trong `.gitignore` của GitLab từng nuốt mất `openobb/models/`.
+    Giờ các luật ignore đã neo gốc (`/models/`), và script từ chối đẩy nếu thiếu file package.
 
 - 2026-10-09 (5):
   - API deploy giống Ultralytics: `from openobb import VRDet` → `predict` → `Results.obb.*`, `plot`, `save_txt`, `summary`, `val().box.map`.

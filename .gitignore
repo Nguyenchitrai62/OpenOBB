@@ -20,3 +20,5 @@ research/jobs/.lock
 research/jobs/queue.txt
 research/jobs/.bundle-*.tar.gz
 .venv/
+
+.gitlab_export/
