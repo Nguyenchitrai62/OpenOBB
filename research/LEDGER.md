@@ -179,6 +179,12 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     và cơ chế tự phục hồi (nạp last.pt, giảm LR một nửa).
   - **Hướng đáng đo:** tìm LR tối ưu giữa 6e-5 và 1e-3 (ví dụ 2e-4, 4e-4), cùng số epoch.
 
+- **F23. Wall_Color, kết quả tốt nhất user báo (10-09, cách chấm của từng bên):**
+  - VRDet-X: **0.63 / 0.35**. VRDet-S: mAP50 khoảng 0.30–0.35. YOLO11x: **0.74 / 0.50**.
+  - Tỉ lệ khít (mAP50-95/mAP50): VRDet-X 0.56, YOLO 0.68.
+  - VRDet-X suy luận chậm hơn YOLO11x rõ (user đánh giá, chưa đo bằng số).
+  - → Thua cả phát hiện lẫn độ khít trên data dày object mảnh, ít ảnh. Phân tích kiến trúc: xem tin trả lời ngày 10-09 (dense-first hybrid).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
