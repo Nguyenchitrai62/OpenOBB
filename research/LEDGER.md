@@ -192,6 +192,32 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     - nhánh box o2o chỉ có 1 mẫu dương.
   - → Đã sửa bằng vùng bỏ qua (o2m) + ưu tiên điểm giữa (o2o) + o2o dùng chung box. Line từ lệch góc 0.4 rad xuống box đúng (154.5/156 px, dày 3.4/3).
   - Chờ log Wall_Color của user để so YOLO11x (0.74 / 0.50).
+- **F25. VRDet2-x Wall_Color, train từ đầu (user, 10-09):**
+  - Điều kiện: 50 epoch, imgsz 1280, AdamW lr 0.01 → 1e-4, batch 8, 1550 bước. User coi đây là vòng "pretrain", sẽ fine-tune tiếp.
+  - Kết quả: **0.272 / 0.095**, vẫn đang tăng ở epoch cuối. So sánh: VRDet1-X (init COCO) 0.63 / 0.35; YOLO11x (pretrained) 0.74 / 0.50.
+  - Theo class (mAP50 / mAP50-95):
+    | Class | mAP50 | mAP50-95 |
+    |---|---|---|
+    | door | 0.65 | 0.31 |
+    | wall | 0.52 | 0.17 |
+    | junction | 0.42 | 0.12 |
+    | wall_300 | 0.15 | 0.03 |
+    | double_door | 0.15 | 0.04 |
+    | slide_door | 0.02 | – |
+    | note | 0.01 | – |
+  - Loss: `box_loss` 1.08 → 0.42 và `thick` 1.35 → 0.69, nhưng `end_loss` 1.20 → 0.93 gần như đứng yên. Khớp với overfit CPU: tường 450 px đúng dài/dày, tâm lệch khoảng 160 px dọc tường.
+  - Tốc độ: 29.3 ms / tile 1280 (PyTorch fp16, batch 1).
+  - Kết luận chưa công bằng về kiến trúc vì bị gây nhiễu bởi pretrained (YOLO có COCO). Cần đối chứng: YOLO11x train từ đầu, cùng 50 epoch.
+  - Hai lỗi rõ:
+    1. Độ khít dọc trục của object dài (tỉ lệ AP50-95/AP50 của wall = 0.32, door = 0.48).
+    2. Class hiếm (≤ 60 mẫu val) gần như chết khi train từ đầu.
+- **F26. VRDet3 (10-09): thiết kế từ F23–F25, chưa có số GPU.** Chi tiết: [docs/VRDET3.md](../docs/VRDET3.md).
+  - Thành phần: backbone HGNetv2-B5 + hybrid encoder pretrained COCO (như v1) + LSK + head dense P3–P5, Fast-NMS ProbIoU 0.7.
+  - Head dense: 2 khoảng cách dọc trục dạng DFL (bin = 1 stride) + độ dày DFL (bin = stride / 2) + lệch ngang có dấu.
+  - Mục tiêu tính theo hệ trục gần góc dự đoán. Dải ứng viên đa tầng (≥ 1 stride).
+  - Tham số: 64.6M, 83% từ code D-FINE. Fine-tune v2 của user (lr 1e-3, batch 16) ở epoch 7 mới 0.280 / 0.098.
+  - Có thể khởi tạo từ VRDet1 của user bằng `weights=`.
+  - Tiêu chí: ≥ v1 (0.63 / 0.35); mAP50-95 của wall tăng; nhanh hơn v1.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 

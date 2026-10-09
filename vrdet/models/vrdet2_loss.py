@@ -1,7 +1,10 @@
 """VRDet2 assignment + losses (VRDet's own implementation).
 
 Assignment: rotated task-aligned (TOOD-style metric score^a * IoU^b) with
-  * candidates inside the box, the thickness floored to `min_side` px so 1-3 px lines get anchors (YOLO26 STAL idea);
+  * candidates inside the box, the thickness floored to `min_side` px so 1-3 px lines get anchors (YOLO26 STAL idea)
+    and, per level, to `across` x the level stride: every level gets a row of candidates along every segment, so
+    coarse points (large receptive field, they see both ends of a long wall) can predict it through the across
+    offset; the task-aligned metric then picks the level that predicts it best;
   * a length-adaptive top-k: long objects get more positives along their axis (k = topk + length / topk_len);
   * one-to-many head: points inside an object that are not selected are ignored, not negatives (every point of a
     line looks the same; pushing most of them to background contradicts the few positives);
@@ -23,8 +26,10 @@ from vrdet.ops.obb_torch import probiou
 
 
 @torch.no_grad()
-def assign(scores, boxes, pts, gl, gb, k_per_gt, alpha=1.0, beta=6.0, min_side=8.0, chunk=64, mid_prior=0.0):
-    """scores (A, C) sigmoid, boxes (A, 5) px, pts (A, 2) px; gl (M,), gb (M, 5) px, k_per_gt (M,) int.
+def assign(scores, boxes, pts, gl, gb, k_per_gt, alpha=1.0, beta=6.0, min_side=8.0, chunk=64, mid_prior=0.0,
+           strides=None, across=0.0):
+    """scores (A, C) sigmoid, boxes (A, 5) px, pts (A, 2) px, strides (A,) px; gl (M,), gb (M, 5) px,
+    k_per_gt (M,) int.
     -> fg (A,) bool, gi (A,) long, target_scores (A, C), inside_any (A,) bool (point inside some object)."""
     A, C = scores.shape
     M = gb.shape[0]
@@ -43,6 +48,8 @@ def assign(scores, boxes, pts, gl, gb, k_per_gt, alpha=1.0, beta=6.0, min_side=8
         u, v = dx * c + dy * s, -dx * s + dy * c
         hw = g[:, 2:3].clamp(min=min_side) / 2
         hh = g[:, 3:4].clamp(min=min_side) / 2
+        if across and strides is not None:
+            hh = torch.maximum(hh, strides[None, :] * (across / 2))
         inside = (u.abs() <= hw) & (v.abs() <= hh)
         inside_any |= inside.any(0)
         mi, ai = inside.nonzero(as_tuple=True)
@@ -83,12 +90,12 @@ def _ends(b):
 class VRDet2Loss(nn.Module):
     def __init__(self, w_cls=1.0, w_box=2.0, w_end=1.0, w_across=1.0, w_dfl=0.5, w_angle=0.5, w_o2o=1.0,
                  topk=10, topk_len=16.0, topk_max=48, alpha=1.0, beta=6.0, min_side=8.0, lam=3.0, img_size=1024,
-                 mid_prior=4.0):
+                 mid_prior=4.0, across=0.0):
         super().__init__()
         self.w = dict(cls=w_cls, box=w_box, end=w_end, across=w_across, dfl=w_dfl, angle=w_angle)
         self.w_o2o, self.topk, self.topk_len, self.topk_max = w_o2o, topk, topk_len, topk_max
         self.alpha, self.beta, self.min_side, self.lam, self.img_size = alpha, beta, min_side, lam, img_size
-        self.mid_prior = mid_prior
+        self.mid_prior, self.across = mid_prior, across
 
     def head_loss(self, cls, reg, pts, st, targets, one2one):
         boxes = decode(reg, pts, st)                                                   # (B, A, 5) px
@@ -103,7 +110,8 @@ class VRDet2Loss(nn.Module):
             else:
                 k = (self.topk + gb[:, 2] / self.topk_len).round().clamp(max=self.topk_max).long()
             fg, gi, ts, ins = assign(scores[b], boxes[b].detach(), pts, gl, gb, k, self.alpha, self.beta,
-                                     self.min_side, mid_prior=self.mid_prior if one2one else 0.0)
+                                     self.min_side, mid_prior=self.mid_prior if one2one else 0.0,
+                                     strides=st, across=self.across)
             tsc.append(ts)
             fgs.append(fg)
             igns.append(ins & ~fg if not one2one else torch.zeros_like(fg))

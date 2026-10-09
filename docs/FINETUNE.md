@@ -47,6 +47,8 @@ r = Detector("s").train(data="path/data.yaml", epochs=100, imgsz=1024)   # r.bes
 ```
 
 **`model`:**
+- **`vrdet3x`** (mới nhất, 64.6M): backbone + encoder pretrained COCO, head dense oriented dị hướng, NMS.
+  Chi tiết: [VRDET3.md](VRDET3.md). Có thể khởi tạo từ checkpoint VRDet1 bằng `weights=<v1 .pt>`.
 - **`vrdet2x`** (mới, 55.6M, train từ đầu, nên dùng `epochs=300`): kiến trúc dense segment-aware, không NMS.
   Chi tiết: [VRDET2.md](VRDET2.md). Có thêm `vrdet2n/s/m/l`. Chỉ cần đổi `model=`, mọi tham số khác giữ nguyên.
 - `vrdet1s/m/l/x` = `s/m/l/x`: kiến trúc cũ (D-FINE-OBB).

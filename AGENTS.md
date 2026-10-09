@@ -262,6 +262,10 @@ Câu hỏi còn mở:
   - Dùng: `model=vrdet2x`, CLI giữ nguyên. `model=x` = `vrdet1x` là kiến trúc cũ.
   - User tự train và gửi log. Agent chỉ thiết kế kiến trúc.
   - Mỗi version kiến trúc mới phải nêu chi tiết từng phần và tỉ lệ tận dụng cái có sẵn (luật user, 10-09).
+- [x] **VRDet3 (2026-10-09):**
+  - Encoder pretrained COCO (như v1) + LSK + head dense oriented dị hướng (DFL dọc trục / độ dày), NMS. 64.6M tham số.
+  - Dùng: `model=vrdet3x`. Chi tiết: [docs/VRDET3.md](docs/VRDET3.md).
+  - Lý do: v2 train từ đầu chỉ đạt 0.27 / 0.10 → pretrained quyết định trên data nhỏ; `end_loss` của v2 bị kẹt (LEDGER F25–F26).
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.
@@ -278,6 +282,10 @@ Câu hỏi còn mở:
 **Cần user:** điền tên chủ sở hữu pháp lý (cá nhân hoặc công ty) vào `LICENSE` (hiện để "the repository owner").
 
 ## 9. Nhật ký
+
+- 2026-10-09 (2): VRDet3.
+  - Viết `vrdet/models/vrdet3.py`, `vrdet3_loss.py`. CLI nhận `vrdet3{s,m,l,x}`. `assign` dùng chung có dải đa tầng (v2 tắt).
+  - Thêm `tests/test_vrdet3.py`; 73 test pass.
 
 - 2026-10-09: VRDet2.
   - Viết `vrdet/models/vrdet2.py`, `vrdet2_loss.py`. CLI nhận `vrdet1*` / `vrdet2*`. Predict/val nạp được v2.

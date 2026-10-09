@@ -82,7 +82,7 @@ def test_cli_model_names(tmp_path, monkeypatch):
     train(str(data), model="x", name="c", **kw)
     assert "--arch" not in calls[-1] and "--lsk" in calls[-1]                  # bare sizes stay VRDet1
     with pytest.raises(SystemExit):
-        train(str(data), model="vrdet3x", name="d", **kw)
+        train(str(data), model="vrdet9x", name="d", **kw)
 
 
 def test_predict_loads_v2_checkpoint(tmp_path):

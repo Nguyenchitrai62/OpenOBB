@@ -31,8 +31,9 @@ def build_parser():
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2"],
-                    help="v1: VRDet (DETR-style decoder); v2: VRDet2 (dense segment-aware, NMS-free)")
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3"],
+                    help="v1: VRDet (DETR-style decoder); v2: VRDet2 (dense segment-aware, NMS-free); "
+                         "v3: VRDet3 (pretrained encoder + dense anisotropic oriented head)")
     ap.add_argument("--img", type=int, default=1024)
     ap.add_argument("--scale", type=float, default=1.0,
                     help="image scale the data was tiled at (recorded for inference; set by vrdet.data.prepare)")
@@ -184,11 +185,16 @@ def main(argv=None):
     torch.backends.cudnn.allow_tf32 = True
 
     classes = dataset_classes(a.data)
-    v2 = a.arch == "v2"
+    v2, v3 = a.arch == "v2", a.arch == "v3"
+    dense_arch = v2 or v3                       # dense heads: no queries / decoder
     if v2:
         from vrdet.models.vrdet2 import VRDet2
         from vrdet.models.vrdet2_loss import VRDet2Loss
         model = VRDet2(a.size, num_classes=len(classes), img_size=a.img)
+    elif v3:
+        from vrdet.models.vrdet3 import VRDet3
+        from vrdet.models.vrdet3_loss import VRDet3Loss
+        model = VRDet3(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top)
     else:
         model = VRDet(a.size, num_classes=len(classes), num_queries=a.queries, img_size=a.img,
                       rotate_sampling=not a.no_rotate_sampling, num_denoising=a.denoising, dense=a.dense,
@@ -214,10 +220,12 @@ def main(argv=None):
         model.to(memory_format=torch.channels_last)
     if v2:
         crit = VRDet2Loss(img_size=a.img)
+    elif v3:
+        crit = VRDet3Loss(img_size=a.img)
     else:
         crit = build_criterion(num_classes=len(classes), box_loss=a.box_loss, o2m_k=a.o2m_k, aqd=a.aqd,
                                angle_weight=a.angle_weight, cost_iou=a.cost_iou, member_weight=a.vec_ground)
-    a.dense = (a.dense or a.dense_queries) and not v2
+    a.dense = (a.dense or a.dense_queries) and not dense_arch
     dense_crit = DenseCriterion() if a.dense else None
     ds = DotaPatches(a.data, "train", size=a.img, augment=True, hsv=tuple(a.hsv), limit=a.limit_train,
                      rotate_p=a.rotate_p, mosaic_p=a.mosaic_p, context=a.context, ctx_dropout=a.ctx_dropout,
@@ -326,6 +334,9 @@ def main(argv=None):
         if v2:
             say(f"model   VRDet2-{a.size} (dense segment-aware, P2-P5, NMS-free), {n_par:.2f}M params, "
                 f"top {a.num_top} detections | init: {init_desc}")
+        elif v3:
+            say(f"model   VRDet3-{a.size} (pretrained encoder{' + LSK' if a.lsk else ''}, dense oriented head P3-P5), "
+                f"{n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")
         else:
             say(f"model   VRDet-{a.size}{' + ' + ' + '.join(extras) if extras else ''}, {n_par:.2f}M params, "
                 f"{a.queries} queries | init: {init_desc}")
@@ -376,7 +387,7 @@ def main(argv=None):
         if device.type == "cuda":
             torch.cuda.reset_peak_memory_stats()
         prof = None
-        bar = EpochBar(epoch, a.epochs, iters_per_epoch, a.img, v2=v2) if not a.verbose else None
+        bar = EpochBar(epoch, a.epochs, iters_per_epoch, a.img, v2=v2, v3=v3) if not a.verbose else None
         for bi, (imgs, targets) in enumerate(dl):
             if bi >= iters_per_epoch:
                 break
@@ -550,7 +561,7 @@ def main(argv=None):
     (out / "eval_val.txt").write_text(table + "\n")
     (out / "eval_val.json").write_text(json.dumps(res, indent=1))
     write_task1(dets, out / "val_task1", classes)
-    if a.eval_queries and a.eval_queries != a.queries and not v2:   # extra eval, main numbers stay at --queries
+    if a.eval_queries and a.eval_queries != a.queries and not dense_arch:   # extra eval, main numbers stay at --queries
         ema.module.decoder.num_queries = a.eval_queries
         rq, _ = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.eval_queries,
                           img_size=a.img, log=log, context=a.context, vectors=a.vectors, post=a.post, merge_iou=a.merge_iou)
@@ -558,7 +569,7 @@ def main(argv=None):
         (out / f"eval_val_q{a.eval_queries}.json").write_text(json.dumps(rq, indent=1))
         jlog({"final_q": a.eval_queries, "mAP50": rq["mAP50"], "mAP50_95": rq["mAP50_95"]})
         ema.module.decoder.num_queries = a.queries
-    final = rq if a.eval_queries and a.eval_queries != a.queries and not v2 else res
+    final = rq if a.eval_queries and a.eval_queries != a.queries and not dense_arch else res
     say(summary_table(final, classes))
     if not a.eval_only and (wdir / "best.pt").exists():  # per-class confidence (best F2) for predict conf=auto
         ck = torch.load(wdir / "best.pt", map_location="cpu", weights_only=False)
