@@ -318,6 +318,30 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     1. Tìm vì sao v3 bỏ sót wall_300: nhầm sang wall? (cần confusion matrix).
     2. Hướng kiến trúc: phân loại có điều kiện theo hình học (độ dày dự đoán đưa vào nhánh class).
     3. Xem wall_300 ở v4.
+- **F33. VRDet4-x Wall_Color, 1 run 100 epoch (user, 10-09).**
+  - Điều kiện: init DINOv2 + COCO; lr 1e-3 (user đặt, gấp 10 lần mặc định); batch 8 (OOM ở 16); 400 query.
+  - Kết quả: best ep96 **0.663 / 0.457** (thước YOLO) | 0.587 / 0.306 (DOTA) | **38.1 ms**, 134.8M tham số.
+  - Theo class, thước YOLO (mAP50 / mAP50-95):
+    | Class | VRDet4 | VRDet3 (sau 3 vòng) | YOLO26x |
+    |---|---|---|---|
+    | wall | .886 / **.602** | .894 / .575 | .919 / .624 |
+    | wall_300 | **.683 / .366** | .599 / .256 | .824 / .441 |
+    | note | .650 / .466 | .744 / .470 | .764 / .517 |
+    | door | .934 / .784 | .975 / .820 | .965 / .811 |
+    | slide_door | .146 / .072 | .273 / .119 | .345 / .123 |
+    | double_door | .471 / .363 | .589 / .476 | .494 / .392 |
+    | junction | .874 / .544 | .907 / .556 | .910 / .584 |
+  - So sánh không cùng ngân sách:
+    - v3 0.712 / 0.467 là kết quả sau 3 vòng train (100 + 50 + 50 epoch).
+    - **Cùng ngân sách 1 run 100 epoch từ init pretrained** (thước DOTA): v4 0.587 / 0.306, v3 khoảng 0.55 / 0.28 (best vòng 1, đọc từ ep1 của vòng 2) → **v4 +0.035 / +0.028**.
+  - Kết luận:
+    - DINOv2 + decoder giúp đúng chỗ v3 yếu: wall_300 +0.08 / +0.11, độ khít của wall +0.027.
+    - Kém hơn ở class hiếm (slide_door, double_door, note) và door. Decoder one-to-one ít mẫu dương với class hiếm (giống E1b).
+    - Chậm hơn 1.65 lần.
+  - Ghi nhận phụ: lúc tắt mosaic (ep91), box_loss tăng từ 0.08 lên 0.28, angle từ 0.004 lên 0.12 (đổi phân phối ảnh); mAP vẫn tăng nhẹ.
+  - Việc tiếp:
+    - Thí nghiệm một yếu tố: **head v3 + backbone DINOv2** (tách tác dụng DINOv2 khỏi decoder).
+    - Xem `eval_val.json` → `fusion` (dec / dense / union) để biết class hiếm nhờ nhánh nào.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
