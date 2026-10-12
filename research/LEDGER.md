@@ -389,6 +389,38 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Ghi chú nếu cần tăng tốc sau này (user nói chưa cần): `fast_nms` tính ma trận ProbIoU 4000×4000. Trên CPU tốn khoảng 0.3 s (GPU thì không đáng kể).
     Thời gian CPU local nhiễu, nên chỉ dùng FLOPs để kết luận.
 
+- **F37. Phân tích từng mảnh của OpenOBB3-x đã train (10-12). Chi tiết: [ARCH_ANALYSIS.md](ARCH_ANALYSIS.md).**
+  - Đo trên `vrdet3x_1.pt` (bản tốt nhất F31) với một trang Wall_Color thật. Script: `research/analysis/`.
+  - **Đường P5 của backbone đã chết ở cả 3 checkpoint v3.**
+    - Đầu ra stage 4 có độ lớn trung bình 3566 / 53 / 25 (P3 / P4 chỉ 0.4–0.5).
+    - LSK P5 khuếch đại thêm tới 1.3·10¹⁰; BN của `input_proj.2` có running var 3·10²⁶.
+    - Đặt P5 của backbone = 0 thì detection không đổi (59/59 tường, 105/105 junction), điểm số lệch tối đa 0.02.
+    - Hệ quả: khoảng 75 G (8% FLOPs: stage 4 + LSK P5 + chiếu P5 + AIFI) không đóng góp.
+      AIFI nhận đầu vào hằng số nên attention gần đều (khoảng cách 682 px so với 667 px nếu đều tuyệt đối).
+    - Nguyên nhân: BN đóng băng ở backbone + fine-tune lr 1e-3 + phép nhân không chặn `x·(1+m)` của LSK.
+  - **LSK:** cổng nhánh xa không chọn theo nội dung (trên nét 0.40, trên nền 0.38). Khoảng 95% FLOPs của LSK là conv 1×1, kernel lớn thật chỉ khoảng 3 G.
+  - **Định vị không phải nút thắt.**
+    - Dịch ảnh 1–7 px: tâm lệch 0.2–0.5 px, độ dày lệch 0.3–0.8 px.
+    - DFL không bão hoà; độ dày một đỉnh, bất định khoảng 2.7 px.
+  - **Nút thắt là phân loại vật tí hon.**
+    - Ở 1280 px: wall_300 cỡ 13 × 7.5 px, junction 11 × 11 px; 86% được phát hiện ở P3.
+    - 43% wall_300 có biên top1 − top2 < 0.2.
+    - 75–93% bằng chứng của logit class nằm ngoài box. Bán kính nửa bằng chứng khoảng 40 px, 90% khoảng 120–186 px.
+  - **Phân bổ FLOPs ở 1280 px** (YOLO26x-obb 905 G so với OpenOBB3-x 909 G):
+    | Phần | YOLO26x-obb | OpenOBB3-x |
+    |---|---|---|
+    | Head | 20% | 5% |
+    | Stride 1/4 | 13% | 7% |
+    | Khối nặng nhất | | FPN P3 của encoder, 23% |
+  - Ghi chú:
+    - Trước đây ghi YOLO26x là 578.9 GFLOPs: con số đó lấy từ comment trong file yaml. Đo lại: 225 G ở 640 px, 898–905 G ở 1280 px.
+    - YOLO26:
+      - bỏ DFL;
+      - STAL: phóng box nhỏ hơn stride khi chọn ứng viên;
+      - hai head một-nhiều / một-một, trọng số một-nhiều giảm 0.8 → 0.1;
+      - pretrain DOTA.
+  - Tám nguyên lý thiết kế rút ra (N1–N8) ở mục 7 của ARCH_ANALYSIS. Đó là cơ sở cho kiến trúc mới (chưa viết code, chờ user duyệt hướng).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

@@ -293,6 +293,14 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-12: **Phân tích từng mảnh kiến trúc trước khi thiết kế mới** (theo user: không lắp ghép, phải hiểu thiết kế gốc).
+  - Báo cáo [research/ARCH_ANALYSIS.md](research/ARCH_ANALYSIS.md) (F37) phân tích từng mảnh: thiết kế gốc, số đo trên v3 đã train, kết luận giữ / bỏ.
+    Các mảnh: HGNetv2, LSK, hybrid encoder, head v3, YOLO11 / 26.
+  - Phát hiện chính:
+    - Đường P5 của backbone v3 chết ở cả 3 checkpoint (khoảng 8% FLOPs vô ích).
+    - Lỗi chính là phân loại vật tí hon dựa vào ngữ cảnh, không phải định vị.
+  - Bản nháp OpenOBB6 (refiner ngữ cảnh + adapter nét) đã gỡ khỏi repo theo lời user, chưa dùng.
+
 - 2026-10-09 (9): **Rà soát và sửa cho infer + đọc data khớp Ultralytics.**
   - Góc `xywhr` nằm trong [0, π/2), theo quy ước `regularize_rboxes`; trước đây là [0, π) với w ≥ h. Tensor nằm trên device của model.
   - Ảnh đọc qua `openobb/data/imgio.py` (dùng `IMREAD_COLOR`, an toàn với Unicode) ở mọi chỗ: train, val, predict. Trước đây predict dùng `IMREAD_UNCHANGED`, bỏ qua xoay EXIF.
