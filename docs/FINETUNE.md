@@ -78,7 +78,7 @@ Có thể khởi tạo `openobb3x` từ một checkpoint `openobb1` bằng `weig
 | `translate` | 0.1 | dịch ngẫu nhiên ±10% |
 | `hsv_h`, `hsv_s`, `hsv_v` | 0.015, 0.5, 0.3 | đổi màu |
 | `warmup_epochs` | 3 | khởi động learning rate |
-| `lrf` | 0.01 | learning rate giảm tuyến tính từ `lr0` về `lr0 × lrf` ở cuối run (`cos_lr=True`: giảm theo cosine) |
+| `lrf` | 0.01 | learning rate giảm theo **cosine** (mặc định từ 0.7.1) từ `lr0` về `lr0 × lrf` ở cuối run (`cos_lr=False`: giảm tuyến tính như mặc định của YOLO) |
 | `cache` | auto | giải mã ảnh train một lần vào RAM nếu chiếm dưới 25% RAM (`cache=False` để tắt) |
 | `patience` | 100 | dừng nếu mAP50-95 val không tăng sau N epoch |
 | `optimizer` | auto | AdamW; không truyền `lr0` thì dùng LR đã đo cho từng cỡ (S 1e-4, X 6e-5) |

@@ -24,7 +24,7 @@ the train images is held out. Prepared data is cached (~/.cache/openobb). Every 
 ({project}/{name}, then name2, name3...; exist_ok=True reuses it); resume=True continues a run from weights/last.pt.
 
 Training defaults follow the usual one-stage recipe: mosaic=1.0, scale=0.5 (random zoom 0.5-1.5), translate=0.1,
-close_mosaic=10, warmup_epochs=3, LR decayed linearly to lr0 * lrf (lrf=0.01; cos_lr=True for cosine), patience=100,
+close_mosaic=10, warmup_epochs=3, LR decayed by cosine to lr0 * lrf (lrf=0.01; cos_lr=False for linear, the YOLO default), patience=100,
 cache=auto (decoded images in RAM when they fit), batch fitted to the GPU / dataset and halved on out-of-memory.
 """
 import gc
@@ -393,7 +393,7 @@ def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_
 
 def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, project="runs/obb", name=None,
           exist_ok=False, resume=False, tile=False, tile_scale=None, gap=200, val_frac=0.15, cache="auto", cache_dir=None, workers=None,
-          device=None, recipe=True, warmup_epochs=3, patience=100, lrf=0.01, cos_lr=False, seed=0, optimizer="auto",
+          device=None, recipe=True, warmup_epochs=3, patience=100, lrf=0.01, cos_lr=True, seed=0, optimizer="auto",
           **extra):
     """Train (or fine-tune when `model` is a .pt path). Returns SimpleNamespace(save_dir, best, last, metrics)."""
     check_keys(extra)
