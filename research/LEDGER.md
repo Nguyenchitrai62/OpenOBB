@@ -600,6 +600,31 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - → **Bài học:** mảnh thêm vào phải được đo cả tốc độ GPU (T1) trước khi train.
     v9 đang mang nguyên head + tầng quan hệ của v8, nên T1 của v9 phải đo cả **có / không tầng quan hệ** (`v8_off=refine`).
 
+- **F44. Vòng 2 của v8, kết quả v9, và giả thuyết "tiên nghiệm DOTA" (user, 10-12).**
+  - **v8 vòng 2** (50 epoch từ best vòng 1, cùng lịch với v3 F31): best ep36 **0.699 / 0.460** | DOTA 0.576 / 0.299.
+    - v3 cùng ngân sách: 0.720 / 0.474 (DOTA 0.593 / 0.312) → **v8 kém −0.021 / −0.014** và chậm hơn 35% (F43).
+    - Phần thêm của v8 **không được xác nhận**. **v3 vẫn là bản tốt nhất.**
+    - Theo class, v8 so với v3:
+      | Hơn | Ngang | Kém |
+      |---|---|---|
+      | note .796 / .490 so với .744 / .470; junction .916 / .566 so với .907 / .556 | wall, door | slide_door .209 so với .273, double_door .545 so với .589, wall_300 .582 so với .599 |
+
+      Class hiếm chỉ có 25–31 mẫu val nên nhiễu lớn.
+    - wall_300 → junction 28% (v3 32%).
+  - **Độ khít box không còn là khoảng cách với YOLO.**
+    - Tỉ lệ mAP50-95 / mAP50: v8 0.66, YOLO26x 0.67, v3 0.66.
+    - Khoảng cách với YOLO26x (0.746 / 0.499) **dồn vào class tí hon / hiếm**: wall_300 .58–.60 so với .824, slide_door .21–.27 so với .345.
+      Các class khác ngang hoặc hơn: door .974 so với .965, junction .916 so với .910, note .796 so với .764, double .545 so với .494; chỉ wall .875 so với .919.
+  - **v9** (`results.csv` user gửi, vòng 1 100 epoch + vòng 2 50 epoch): **0.541 / 0.331**, ngang v6 train từ đầu.
+    Chưa rõ user có chạy `openobb pretrain` không. Nếu không, đây đúng bài học L1. Nếu có, cần log T2 để biết chưng cất có đạt không.
+  - Lỗi khung đã sửa: `results.csv` của các bản dense chỉ ghi `angle_loss`, vì cột loss dùng tên của v1. Nay đã map đúng tên, thêm cột `acr_loss` và `ref_loss`.
+  - **Giả thuyết H-DOTA (thí nghiệm tiếp theo, có lập luận):**
+    - Lợi thế của YOLO26x nằm ở tiên nghiệm **pretrain DOTA** (`yolo26x-obb.pt`): ảnh viễn thám với vật xoay rất nhỏ (xe 10–20 px), đúng loại vật wall_300 (9.9 × 6 px).
+    - Bằng chứng: khoảng cách chỉ nằm ở vật tí hon, các class khác ngang (ở trên).
+    - Phép thử một yếu tố: v3 khởi tạo từ **lõi HGNet + encoder đã train DOTA** (`runs/e6-vrdet-x-dota-24e`, tách thành `openobb_dota_core_x.pt` 207 MB, nạp 1196/1196 tensor) thay vì COCO. Cùng lịch 100 + 50 epoch.
+    - Dự đoán: wall_300 tăng rõ (về phía .8). Nếu không tăng → bác bỏ, khoảng cách do thứ khác (công thức train của YOLO, 150 epoch, gán nhãn).
+    - License: weights train trên DOTA chỉ dùng nghiên cứu.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

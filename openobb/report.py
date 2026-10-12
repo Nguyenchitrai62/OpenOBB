@@ -10,10 +10,12 @@ import torch
 
 from openobb.data.imgio import imwrite
 
-COLUMNS = ["epoch", "time_s", "lr", "cls_loss", "box_loss", "kld_loss", "angle_loss", "dfl_loss",
-           "P", "R", "mAP50", "mAP50-95"]
-LOSS_KEYS = {"cls_loss": "loss_mal", "box_loss": "loss_bbox", "kld_loss": "loss_kld", "angle_loss": "loss_angle",
-             "dfl_loss": "loss_fgl"}
+COLUMNS = ["epoch", "time_s", "lr", "cls_loss", "box_loss", "kld_loss", "angle_loss", "dfl_loss", "acr_loss",
+           "ref_loss", "P", "R", "mAP50", "mAP50-95"]
+# column -> trainer loss keys (DETR-style OpenOBB1 / dense OpenOBB2-9); several keys are summed (refiner losses)
+LOSS_KEYS = {"cls_loss": ("loss_mal", "loss_cls"), "box_loss": ("loss_bbox", "loss_box"), "kld_loss": ("loss_kld",),
+             "angle_loss": ("loss_angle",), "dfl_loss": ("loss_fgl", "loss_dfl"), "acr_loss": ("loss_across",),
+             "ref_loss": ("loss_ref_cls", "loss_ref_box", "loss_rel")}
 PALETTE = [(75, 25, 230), (75, 180, 60), (200, 130, 0), (48, 130, 245), (180, 30, 145), (240, 240, 70),
            (230, 50, 240), (60, 245, 210), (212, 190, 250), (128, 128, 0)]         # BGR
 
@@ -21,7 +23,10 @@ PALETTE = [(75, 25, 230), (75, 180, 60), (200, 130, 0), (48, 130, 245), (180, 30
 def append_results(out, rec, res=None):
     """One row per epoch; val columns stay empty on epochs without validation."""
     row = {"epoch": rec["epoch"] + 1, "time_s": rec.get("epoch_s"), "lr": f"{rec.get('lr', 0):.3g}"}
-    row.update({k: round(rec[v], 5) for k, v in LOSS_KEYS.items() if v in rec})
+    for k, keys in LOSS_KEYS.items():
+        vals = [rec[v] for v in keys if v in rec]
+        if vals:
+            row[k] = round(sum(vals) if k == "ref_loss" else vals[0], 5)
     if res is not None:
         row.update({"P": round(res["P"], 4), "R": round(res["R"], 4), "mAP50": round(res["mAP50"], 4),
                     "mAP50-95": round(res["mAP50_95"], 4)})
@@ -45,8 +50,9 @@ def plot_results(out):
     if not p.exists():
         return
     rows = list(csv.DictReader(open(p)))
-    keys = ["cls_loss", "box_loss", "kld_loss", "angle_loss", "dfl_loss", "P", "R", "mAP50", "mAP50-95", "lr"]
-    fig, axes = plt.subplots(2, 5, figsize=(18, 6.5), tight_layout=True)
+    keys = [k for k in ("cls_loss", "box_loss", "kld_loss", "angle_loss", "dfl_loss", "acr_loss", "ref_loss")
+            if any(r.get(k) not in (None, "") for r in rows)] + ["P", "R", "mAP50", "mAP50-95", "lr"]
+    fig, axes = plt.subplots(2, (len(keys) + 1) // 2, figsize=(3.6 * ((len(keys) + 1) // 2), 6.5), tight_layout=True)
     for ax, k in zip(axes.ravel(), keys):
         pts = [(float(r["epoch"]), float(r[k])) for r in rows if r.get(k) not in (None, "")]
         if pts:
