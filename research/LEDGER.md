@@ -699,6 +699,12 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     | box (conf 0.25) | 264 | 297 |
     → v10 **chậm hơn** v8 khoảng 2.1 s CPU ngoài lõi (+15% so với lõi): 3 lần số anchor qua decode / chọn ứng viên / lan delta / NMS, và nhiều box hơn (box trùng).
     Phần tăng tốc của đợt này đến từ suy luận ảnh chữ nhật trong code 0.7.x, áp dụng như nhau cho mọi model, không đến từ kiến trúc v10.
+  - **Cảnh báo: CPU local không đo tốc độ được.** Cùng `openobb10x.pt`, cùng đầu vào 928 × 1280, 1 luồng: 9.1 s ở một tiến trình,
+    30.5 s ở tiến trình sau. Thứ tự v8 / v10 đảo giữa các lần chạy; YOLO lúc 1.5 s, lúc 7.0 s. Máy thiếu bộ nhớ (commit còn khoảng 4–6 GB).
+    - Kiểm tra denormal (`research/analysis/denormal_test.py`): 0% ở mọi stage backbone của v8 / v10 → không phải nguyên nhân.
+      Bật flush-denormal nhanh hơn khoảng 30% nhưng lượt có bật luôn chạy sau, nên chưa loại được thứ tự → chưa đổi gì.
+    - Kết luận "v10 chậm gấp 10 lần YOLO" (68.7 s so với 7.0 s, các model chạy nối tiếp) **không có cơ sở**.
+      Từ nay so tốc độ chỉ trên GPU (Colab, cùng GPU, cùng ảnh); script đưa user ở hội thoại 10-12.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
