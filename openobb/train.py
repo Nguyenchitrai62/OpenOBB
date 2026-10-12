@@ -4,6 +4,7 @@
 python -u -m openobb.train --data /content/datasets/dota1_1024 --out OUT --size s --epochs 24 --batch 32
 """
 import argparse
+import copy
 import itertools
 import json
 import math
@@ -637,7 +638,13 @@ def main(argv=None):
         say(f"\nTraining finished. Validating best.pt (epoch {best_epoch + 1}) on all val images...")
     else:
         say(f"\nTraining finished. Validating the final EMA model on all val images...")
-    res, dets = eval_dota(ema.module, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.num_top,
+    vm = copy.deepcopy(ema.module).eval()            # validated like YOLO's best.pt: BatchNorm folded (same outputs)
+    if hasattr(vm, "fuse"):
+        vm.fuse()
+    else:
+        from openobb.models.openobb7 import fuse_model
+        fuse_model(vm)
+    res, dets = eval_dota(vm, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.num_top,
                           img_size=a.img, log=log, fusion=a.dense or a.vec_ground > 0, variants=["dec", "dense", "union", "snap", "snapg"],
                           save_preds_to=(out / "val_preds.npz") if a.dense else None, context=a.context,
                           vectors=a.vectors, post=a.post, merge_iou=a.merge_iou, primary=a.primary, ultra=True,
@@ -668,11 +675,10 @@ def main(argv=None):
         if lines:
             say("Most frequent errors (true -> predicted, conf 0.25, IoU 0.5; background = missed / false box): "
                 + " | ".join(lines))
-    if final.get("metric") == "yolo":
-        d = final["dota"]
-        say(f"(mAP above: Ultralytics validator conventions, comparable with YOLO. DOTA devkit metric, polygon IoU + "
-            f"VOC07: mAP50 {d['mAP50']:.3f}  mAP50-95 {d['mAP50_95']:.3f})")
-    elif final.get("ultra"):
+        from openobb.eval.ultra import duplicate_line
+        if duplicate_line(final["ultra"]["confusion"]):
+            say(duplicate_line(final["ultra"]["confusion"]))
+    if final.get("metric") != "yolo" and final.get("ultra"):
         u = final["ultra"]
         say(f"Ultralytics-style metric (ProbIoU matching, 101-point AP; compare with YOLO's printed mAP): "
             f"mAP50 {u['mAP50']:.3f}  mAP50-95 {u['mAP50_95']:.3f}")
@@ -687,25 +693,12 @@ def main(argv=None):
     except Exception as e:  # noqa: BLE001 - a report must never fail the run
         log(f"val_pred.jpg skipped: {e}")
     lat = None
-    if device.type == "cuda":
-        m = ema.module.eval()
-        x = torch.rand(1, 3, a.img, a.img, device=device)
-        side = None
-        if a.vectors:                           # latency includes the vector branch (1000 primitives)
-            v = torch.rand(1, 1000, 21, device=device)
-            v[..., 0] = 0
-            side = {"vec": v, "vec_mask": torch.ones(1, 1000, dtype=torch.bool, device=device)}
-        with torch.no_grad(), torch.autocast(device_type="cuda", dtype=torch.float16):
-            for _ in range(20):
-                m(x, ctx=side)
-            torch.cuda.synchronize()
-            t = time.time()
-            for _ in range(100):
-                m(x, ctx=side)
-            torch.cuda.synchronize()
-        lat = (time.time() - t) / 100 * 1000
-    if lat is not None:
-        say(f"Speed: {lat:.1f} ms per {a.img}px tile (batch 1, fp16, PyTorch)")
+    sp = res.get("speed")
+    if sp and sp.get("images"):
+        from openobb.speed import speed_line
+        lat = round(sp["inference"] + sp["postprocess"], 2)
+        say(speed_line(sp) + f" ({sp['images']} val images after a warm-up batch, fused, bf16, "
+            f"{torch.cuda.get_device_name(device) if device.type == 'cuda' else 'CPU'})")
     say(f"Results saved to {out}\n  {wdir / 'best.pt'} (deploy / fine-tune), {wdir / 'last.pt'} (resume=True), "
         f"results.csv/png, val_pred.jpg")
     jlog({"final": True, "split": "val", "weights": weights, "mAP50": res["mAP50"], "mAP50_95": res["mAP50_95"],

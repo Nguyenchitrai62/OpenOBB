@@ -78,8 +78,11 @@ class OrientedHead(nn.Module):
 
 
 @torch.no_grad()
-def fast_nms(logits, boxes, max_det=1000, conf=0.001, iou=0.7, pre=4000):
-    """Per image class-wise Fast-NMS on ProbIoU -> padded (B, max_det, C) logits and (B, max_det, 5) boxes px."""
+def fast_nms(logits, boxes, max_det=1000, conf=0.001, iou=0.7, pre=4000, min_side=0.0):
+    """Per image class-wise Fast-NMS on ProbIoU -> padded (B, max_det, C) logits and (B, max_det, 5) boxes px.
+    min_side > 0: the overlap test sees every side at least min_side px (the kept boxes are unchanged). For thin
+    objects IoU is dominated by a few px of lateral noise (thickness uncertainty ~2.7 px, F37): two 5 px walls 2.5 px
+    apart have IoU 0.33 and both survive; with a floor of ~12 px they are recognised as the same wall."""
     B, A, C = logits.shape
     out_l = logits.new_full((B, max_det, C), -30.0)
     out_b = boxes.new_zeros((B, max_det, 5))
@@ -92,7 +95,11 @@ def fast_nms(logits, boxes, max_det=1000, conf=0.001, iou=0.7, pre=4000):
         if not len(s):
             continue
         lab, b = idx % C, boxes[i][idx // C]
-        ov = probiou(b[:, None, :], b[None, :, :]) * (lab[:, None] == lab[None, :])
+        bn = b
+        if min_side > 0:
+            bn = b.clone()
+            bn[:, 2:4] = bn[:, 2:4].clamp(min=min_side)
+        ov = probiou(bn[:, None, :], bn[None, :, :]) * (lab[:, None] == lab[None, :])
         keep = torch.triu(ov, diagonal=1).amax(0) <= iou
         s, lab, b = s[keep][:max_det], lab[keep][:max_det], b[keep][:max_det]
         n = len(s)
@@ -157,7 +164,8 @@ class OpenOBB3(nn.Module):
         if self.training:
             return {"cls": cls, "reg": reg, "points": pts, "strides": st}
         boxes = decode(reg, pts, st)
-        logits, boxes = fast_nms(cls, boxes, self.max_det, conf=getattr(self, "nms_conf", 0.001), iou=self.nms_iou)
+        logits, boxes = fast_nms(cls, boxes, self.max_det, conf=getattr(self, "nms_conf", 0.001), iou=self.nms_iou,
+                                 min_side=getattr(self, "nms_min_side", 0.0))
         boxes[..., :4] = boxes[..., :4] / self.img_size
         boxes[..., 4] = torch.remainder(boxes[..., 4] + math.pi / 2, math.pi) - math.pi / 2
         return {"pred_logits": logits, "pred_boxes": boxes}

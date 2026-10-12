@@ -547,7 +547,7 @@ def _summary(save_dir):
 
 
 def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, batch=8, workers=8, queries=900,
-        cache_dir=None, device=None, seed=0, metric="yolo"):
+        cache_dir=None, device=None, seed=0, metric="yolo", nms_min_side=0.0):
     """DOTA-protocol mAP of a checkpoint on the val split of `data` (same hold-out and resizing as training).
     Without `data`, the checkpoint's own prepared data is used when it is available."""
     _set_device(device)
@@ -559,6 +559,7 @@ def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, b
     from openobb.predict import load_model
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net, names, targs = load_model(model, dev, queries)
+    net.nms_min_side = float(nms_min_side)             # thickness floor for the NMS overlap test (fast_nms)
     imgsz = int(imgsz or targs.get("img", 1024))
     fit = bool(targs.get("fit", False)) and tile_scale is None
     scale = float(tile_scale if tile_scale is not None else targs.get("scale", 1.0))
@@ -577,14 +578,15 @@ def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, b
                        post=targs.get("post", "flat"), primary=targs.get("primary", "dec"),
                        fusion=targs.get("primary", "dec") != "dec", ultra=True, metric=metric)
     print(summary_table(res, classes))
-    from openobb.eval.ultra import top_confusions
+    from openobb.eval.ultra import duplicate_line, top_confusions
+    from openobb.speed import speed_line
     for line in top_confusions(res["ultra"]["confusion"], k=10):
         print("  confusion  " + line)
-    if res.get("metric") == "yolo":
-        d = res["dota"]
-        print(f"(mAP above: Ultralytics validator conventions, comparable with YOLO. DOTA devkit metric: "
-              f"mAP50 {d['mAP50']:.3f}  mAP50-95 {d['mAP50_95']:.3f})")
-    else:
+    if duplicate_line(res["ultra"]["confusion"]):
+        print(duplicate_line(res["ultra"]["confusion"]))
+    if res.get("speed"):
+        print(speed_line(res["speed"]) + f" ({res['speed']['images']} images after a warm-up batch, fused, batch {batch})")
+    if res.get("metric") != "yolo":
         u = res["ultra"]
         print(f"Ultralytics-style metric (ProbIoU matching, 101-point AP): mAP50 {u['mAP50']:.3f}  "
               f"mAP50-95 {u['mAP50_95']:.3f}")

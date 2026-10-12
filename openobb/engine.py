@@ -162,13 +162,21 @@ def predict_patches(model, ds, device, batch=32, workers=8, num_top=300, img_siz
     has_dense = getattr(model, "dense_head", None) is not None
     if has_dense:
         out["dense"] = []
+    from openobb.speed import SpeedMeter, nms_timer, sync
+    meter = SpeedMeter()
     for imgs, tg in dl:
+        t0 = time.perf_counter()
         x = imgs.to(device, non_blocking=True).float().div_(255.0)
         ctx = ctx_batch(tg, device)
-        with torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=amp and device.type == "cuda"):
+        sync(device)
+        t1 = time.perf_counter()
+        with nms_timer(device) as nms,                 torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=amp and device.type == "cuda"):
             o = model(x, ctx=ctx) if ctx is not None else model(x)
+        sync(device)
+        t2 = time.perf_counter()
         s, l, b, qi = postprocess(o, num_top, img_size, mode=post, return_query=True)
         s, l, b, qi = s.cpu().numpy(), l.cpu().numpy(), b.cpu().numpy(), qi.cpu().numpy()
+        meter.add(len(x), t1 - t0, t2 - t1 - nms[0], time.perf_counter() - t2 + nms[0], tuple(x.shape))
         grounded = "pred_members" in o
         if grounded:                           # H17: snap boxes to the selected CAD primitives
             from openobb.models.openobb1 import snap_boxes
@@ -191,6 +199,7 @@ def predict_patches(model, ds, device, batch=32, workers=8, num_top=300, img_siz
             for t, (ds_, dl_, db_) in zip(tg, dense_predict(o, img_size=img_size)):
                 for sc, lab, p in zip(ds_.cpu().numpy(), dl_.cpu().numpy(), obb2poly(db_.cpu().numpy())):
                     out["dense"].append((t["name"], int(lab), float(sc), p))
+    out["_speed"] = meter.result()
     return out
 
 
@@ -273,6 +282,7 @@ def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num
         keep = set(image_ids)
         ds.items = [m for m in ds.items if m["src"] in keep]
     preds = predict_patches(model, ds, device, batch, workers, num_top, img_size, post=post)
+    speed = preds.pop("_speed", None)
     for k, v in preds.items():                  # drop non-finite boxes (diverging training) before merge / eval
         good = [d for d in v if np.isfinite(d[2]) and np.isfinite(np.asarray(d[3], dtype=np.float64)).all()]
         if len(good) < len(v):
@@ -313,4 +323,5 @@ def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num
                          for k, v in results.items()}
     log(f"[eval] {len(ds)} patches / {len(gts)} images: predict {t1 - t0:.0f}s, merge+eval {time.time() - t1:.0f}s, "
         + " | ".join(f"{k} mAP50 {100 * v['mAP50']:.2f}" for k, v in results.items()))
+    res["speed"] = speed
     return res, primary_dets

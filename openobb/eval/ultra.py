@@ -146,6 +146,7 @@ def confusion(per_img, gts, classes, conf=0.25, iou_thr=0.5):
     defaults). Rows = true class (+ background), columns = predicted class (+ background)."""
     n = len(classes)
     cm = np.zeros((n + 1, n + 1), int)
+    dup = np.zeros(n, int)                  # same class, overlapping an object another box already detected
     for img, objs in gts.items():
         gc = np.array([classes.index(o[1]) for o in objs if o[1] in classes], int)
         gp = np.array([o[0] for o in objs if o[1] in classes], np.float64).reshape(-1, 8)
@@ -162,10 +163,24 @@ def confusion(per_img, gts, classes, conf=0.25, iou_thr=0.5):
                     cm[gc[j], dc[i]] += 1
                 else:
                     cm[n, dc[i]] += 1
+                    same = taken & (gc == dc[i])
+                    if same.any() and iou[i][same].max() >= iou_thr:
+                        dup[dc[i]] += 1
         elif len(d):
             np.add.at(cm[n], dc, 1)
         np.add.at(cm[:, n], gc[~taken], 1)
-    return {"classes": list(classes) + ["background"], "matrix": cm.tolist()}
+    return {"classes": list(classes) + ["background"], "matrix": cm.tolist(),
+            "duplicates": {c: int(v) for c, v in zip(classes, dup)}, "detections": int(cm[:, :n].sum())}
+
+
+def duplicate_line(cm):
+    """'Duplicate boxes ...' summary of confusion() (TIDE's duplicate error at conf 0.25, ProbIoU 0.5)."""
+    d = cm.get("duplicates")
+    if d is None:
+        return ""
+    tot, det = sum(d.values()), max(cm.get("detections", 0), 1)
+    top = ", ".join(f"{k} {v}" for k, v in sorted(d.items(), key=lambda kv: -kv[1]) if v)
+    return f"Duplicate boxes (same class on an already detected object, conf 0.25): {tot} ({100 * tot / det:.1f}% of "            f"detections){': ' + top if top else ''}"
 
 
 def top_confusions(cm, k=6):

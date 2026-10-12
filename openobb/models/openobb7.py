@@ -195,7 +195,8 @@ class OpenOBB7(OpenOBB3):
         if self.training:
             return {"cls": cls, "reg": reg, "points": pts, "strides": st}
         boxes = decode(reg, pts, st)
-        logits, boxes = fast_nms(cls, boxes, self.max_det, conf=getattr(self, "nms_conf", 0.001), iou=self.nms_iou)
+        logits, boxes = fast_nms(cls, boxes, self.max_det, conf=getattr(self, "nms_conf", 0.001), iou=self.nms_iou,
+                                 min_side=getattr(self, "nms_min_side", 0.0))
         boxes[..., :4] = boxes[..., :4] / self.img_size
         boxes[..., 4] = torch.remainder(boxes[..., 4] + math.pi / 2, math.pi) - math.pi / 2
         return {"pred_logits": logits, "pred_boxes": boxes}

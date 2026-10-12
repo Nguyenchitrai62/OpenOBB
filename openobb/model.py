@@ -271,6 +271,7 @@ class OpenOBB:
         from openobb.data.dota import polys_to_obb
         from openobb.ops.obb import nms_poly
         from openobb.predict import conf_thresholds, merge_dets, predict_image
+        from openobb.speed import nms_timer
         if self.model is None or (device not in (None, "") and _device(device) != self.device):
             self._load(device)
         a = self.args
@@ -301,11 +302,12 @@ class OpenOBB:
             img = img() if callable(img) else img
             scale = size / max(img.shape[:2]) if fit else float(a.get("scale", 1.0))
             t1 = time.perf_counter()
-            raw = predict_image(self.model, img, size, 200, 8 * batch, self.device, max(max_det, 300) * 3,
-                                scale=scale)
+            with nms_timer(self.device) as nms:          # NMS runs inside the network: counted as postprocess (YOLO)
+                raw = predict_image(self.model, img, size, 200, 8 * batch, self.device, max(max_det, 300) * 3,
+                                    scale=scale)
             if self.device.type == "cuda":
                 torch.cuda.synchronize(self.device)
-            t2 = time.perf_counter()
+            t2 = time.perf_counter() - nms[0]
             raw = [d for d in raw if d[2] >= thr[d[1]] and (keep_cls is None or d[1] in keep_cls)]
             dets = merge_dets(raw, names, 0.0, iou=iou)
             if agnostic_nms and dets:
