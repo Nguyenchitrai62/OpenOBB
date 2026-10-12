@@ -440,6 +440,42 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     - OpenOBB6-x (pretrain) ≥ OpenOBB3-x cùng thước, cùng ngân sách epoch trên Wall_Color;
     - sau đó so YOLO26x trên DOTA / FloorPlanCAD.
 
+- **F39. OpenOBB6-x Wall_Color, train từ đầu, 50 epoch (user, 10-12). Chưa hội tụ.**
+  - Điều kiện: không pretrain, batch 16, 750 bước, lr 1e-3 giảm tuyến tính về 1e-5, mosaic, 1280 px.
+  - Kết quả cuối (best = ep50):
+    - Thước YOLO: **0.379 / 0.196**. Thước DOTA: 0.274 / 0.088.
+    - mAP50 vẫn tăng khoảng +0.006 / epoch ở cuối, dù lr đã gần 1e-5.
+  - Theo class (thước YOLO, mAP50 / mAP50-95):
+    | Class | mAP50 / mAP50-95 |
+    |---|---|
+    | junction | .715 / .370 |
+    | door | .643 / .429 |
+    | wall | .641 / .320 |
+    | note | .439 / .170 |
+    | wall_300 | .145 / .053 |
+    | double_door | .059 / .026 |
+    | slide_door | .013 / .006 |
+  - So cùng số epoch (thước DOTA):
+    | Model | Kết quả |
+    |---|---|
+    | v2 train từ đầu, ep50 (F25; 1550 bước, gấp đôi) | 0.272 / 0.095 |
+    | **v6 train từ đầu, ep50 (750 bước)** | **0.274 / 0.088** |
+    | v3 init COCO, ep26 / ep55 (F28) | 0.367 / 0.148 và 0.502 / 0.250 |
+    → Ở 50 epoch, pretrain COCO cho khoảng gấp đôi mAP50-95. v6 ngang v2 dù chỉ có một nửa số bước.
+    Câu hỏi thật là v6 có vượt mức trần 0.356 (thước DOTA) của v2 khi train lâu không.
+  - Loss vẫn giảm đều (box 1.45 → 0.54, dfl 1.60 → 0.69): đây là underfit vì thiếu bước, không phải trần.
+  - Tỉ lệ khít mAP50-95 / mAP50 = 0.52 (v3 0.66, YOLO 0.67).
+  - Lỗi chính (conf 0.25):
+    - bỏ sót junction 20%, wall 24%, door 27%: model còn thiếu tự tin;
+    - **wall_300 → junction 49%** (v3: 32%), cùng kiểu nhầm của v3;
+    - class hiếm gần như bằng 0, đúng như dự đoán khi train từ đầu.
+  - Tốc độ lúc val **25.7 ms / tile 1280** (fp16, batch 1, **chưa gộp BN**). v3 là 23.1 ms.
+    → FLOPs bằng 55% nhưng GPU không nhanh hơn. Depthwise + nhiều op nhỏ là loại việc GPU bị giới hạn bởi băng thông bộ nhớ.
+    Cần đo bản đã gộp BN (`OpenOBB(best.pt)` tự gộp) và tìm chỗ chậm trước khi kết luận về tốc độ.
+  - Việc tiếp:
+    - User train tiếp từ best.pt. Khuyến nghị: batch 8 (31 bước / epoch), 300 epoch, lr0 1e-3.
+    - Nếu chững dưới khoảng 0.5 (thước YOLO) sau 150 epoch → pretrain chưng cất là bắt buộc.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
