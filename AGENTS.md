@@ -293,6 +293,18 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-12 (2): **OpenOBB6: kiến trúc tổng quát tự thiết kế** (F38, [docs/OPENOBB6.md](docs/OPENOBB6.md)).
+  - Code:
+    - `openobb/models/openobb6.py`;
+    - lệnh pretrain chưng cất `openobb/pretrain.py` (`openobb pretrain`);
+    - công tắc ablation `v6_off`;
+    - `fuse()` gộp BN khi suy luận;
+    - notebook `colab/OpenOBB6_wall_color.ipynb`.
+  - `model=openobb6n|s|m|l|x`; train với `weights=<file pretrain>`.
+  - Test: `tests/test_openobb6.py`. Toàn bộ 117 test pass.
+  - Data Wall_Color có sẵn ở `datasets/dataset_wall_color` (250 train / 53 val, gitignored).
+  - User: Wall_Color chỉ là bài test nhỏ; kiến trúc phải tổng quát cho detection.
+
 - 2026-10-12: **Phân tích từng mảnh kiến trúc trước khi thiết kế mới** (theo user: không lắp ghép, phải hiểu thiết kế gốc).
   - Báo cáo [research/ARCH_ANALYSIS.md](research/ARCH_ANALYSIS.md) (F37) phân tích từng mảnh: thiết kế gốc, số đo trên v3 đã train, kết luận giữ / bỏ.
     Các mảnh: HGNetv2, LSK, hybrid encoder, head v3, YOLO11 / 26.

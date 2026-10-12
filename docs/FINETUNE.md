@@ -54,6 +54,7 @@ r = OpenOBB("openobb3x").train(data="path/data.yaml", epochs=100, imgsz=1280)   
 
 | `model=` | Kiến trúc | Tham số | Ghi chú |
 |---|---|---|---|
+| `openobb6n/s/m/l/x` | **mới:** kiến trúc tự thiết kế (backbone + neck + head), không thừa kế mạng phân loại; nhanh (x: 504 GFLOPs ở 1280, khoảng 55% YOLO26x). Cần `openobb pretrain` trước | x: 37.4M | [OPENOBB6.md](OPENOBB6.md) |
 | `openobb5x` | head dense + DINOv2 + phân loại theo hình học + chấm lại theo quan hệ | 127.9M | [OPENOBB5.md](OPENOBB5.md) |
 | `openobb4x` | DINOv2 ViT-B + encoder/decoder DETR + nhánh dense, đầu ra decoder ∪ dense | 134.8M | [OPENOBB4.md](OPENOBB4.md) |
 | `openobb3s/m/l/x` | encoder pretrained COCO + head dense oriented dị hướng, NMS | x: 64.6M | Tốt nhất đã đo trên Wall_Color, nhanh. [OPENOBB3.md](OPENOBB3.md) |

@@ -31,15 +31,18 @@ def build_parser():
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5"],
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6"],
                     help="v1: OpenOBB (DETR-style decoder); v2: OpenOBB2 (dense segment-aware, NMS-free); "
                          "v3: OpenOBB3 (pretrained encoder + dense anisotropic oriented head); "
-                         "v4: OpenOBB4 (DINOv2 backbone + DETR decoder + dense oriented branch)")
+                         "v4: OpenOBB4 (DINOv2 backbone + DETR decoder + dense oriented branch); "
+                         "v6: OpenOBB6 (own backbone / neck / head, docs/OPENOBB6.md)")
     ap.add_argument("--backbone", default="hgnet", choices=["hgnet", "dinov2_s", "dinov2_b", "dinov2_l"])
     ap.add_argument("--dense-v3", action="store_true", help="dense branch = OpenOBB3's oriented head (OpenOBB4)")
     ap.add_argument("--geo-cls", action="store_true", help="OpenOBB5: class branch reads the predicted geometry")
     ap.add_argument("--relate", action="store_true", help="OpenOBB5: relation re-scoring of the best candidates")
     ap.add_argument("--rel-k", type=int, default=600, help="OpenOBB5: candidates per image for relation re-scoring")
+    ap.add_argument("--v6-off", default="", help="OpenOBB6 ablation: parts switched off, comma-separated "
+                                                  "(strip, axis, attn, spd, maxpool, cls_ctx)")
     ap.add_argument("--img", type=int, default=1024)
     ap.add_argument("--scale", type=float, default=1.0,
                     help="image scale the data was tiled at (recorded for inference; set by openobb.data.prepare)")
@@ -196,7 +199,8 @@ def main(argv=None):
     torch.backends.cudnn.allow_tf32 = True
 
     classes = dataset_classes(a.data)
-    v2, v3, v4, v5 = a.arch == "v2", a.arch in ("v3", "v5"), a.arch == "v4", a.arch == "v5"
+    v2, v3, v4, v5 = a.arch == "v2", a.arch in ("v3", "v5", "v6"), a.arch == "v4", a.arch == "v5"
+    v6 = a.arch == "v6"
     dense_arch = v2 or v3                       # dense heads: no queries / decoder
     if v4:                                      # DETR decoder fed and supervised by the dense oriented branch
         a.dense = a.dense_queries = a.dense_v3 = True
@@ -207,7 +211,10 @@ def main(argv=None):
     elif v3:
         from openobb.models.openobb3 import OpenOBB3
         from openobb.models.openobb3_loss import OpenOBB3Loss
-        if v5:
+        if v6:
+            from openobb.models.openobb6 import OpenOBB6
+            model = OpenOBB6(a.size, num_classes=len(classes), img_size=a.img, max_det=a.num_top, off=a.v6_off)
+        elif v5:
             from openobb.models.openobb5 import OpenOBB5
             from openobb.models.openobb5_loss import OpenOBB5Loss
             model = OpenOBB5(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
@@ -230,7 +237,7 @@ def main(argv=None):
         load_dfine_coco(model, a.weights, log=lambda m: log(m, console=True), class_map=cmap)
         log(f"[init] fine-tuning from {a.weights} ({len(cmap)}/{len(classes)} classes carried over)")
         init_desc = f"fine-tune from {a.weights} ({len(cmap)}/{len(classes)} classes carried over)"
-    elif not last.exists() and not a.no_pretrained and not v2:
+    elif not last.exists() and not a.no_pretrained and not v2 and not v6:
         load_dfine_coco(model, a.size, class_names=classes, log=lambda m: log(m, console=True), init=a.init)
         init_desc = "D-FINE COCO weights (Apache-2.0)"
         if a.backbone != "hgnet":               # ViT backbone: its own weights; encoder input projections restart
@@ -264,10 +271,10 @@ def main(argv=None):
     frozen = []
     if a.freeze:                                # fine-tuning on small data: keep the pretrained early layers fixed
         f = str(a.freeze).lower()
-        if v2:
+        if v2 or v6:
             frozen = {"backbone": [model.backbone], "encoder": [model.backbone, model.neck]}.get(f)
             if frozen is None:
-                raise SystemExit("OpenOBB2 --freeze must be 'backbone' or 'encoder' (backbone + neck)")
+                raise SystemExit("OpenOBB2 / OpenOBB6 --freeze must be 'backbone' or 'encoder' (backbone + neck)")
         elif f.isdigit():
             if not hasattr(model.backbone, "stages"):
                 raise SystemExit("--freeze N needs the HGNetv2 backbone; use 'backbone' or 'encoder'")
@@ -334,7 +341,7 @@ def main(argv=None):
     if a.compile and device.type == "cuda" and not a.eval_only:
         try:
             model.backbone.forward = torch.compile(model.backbone.forward)
-            if v2:
+            if v2 or v6:
                 model.neck.forward = torch.compile(model.neck.forward, dynamic=False)
             else:
                 model.encoder.forward = torch.compile(model.encoder.forward, dynamic=False)
@@ -369,6 +376,10 @@ def main(argv=None):
             say(f"model   OpenOBB4-{a.size} ({a.backbone} + {'LSK + ' if a.lsk else ''}hybrid encoder + DETR decoder "
                 f"+ dense oriented branch, output {a.primary}), {n_par:.2f}M params, {a.queries} queries | "
                 f"init: {init_desc}")
+        elif v6:
+            say(f"model   OpenOBB6-{a.size} (own backbone + neck + context-aware dense oriented head P3-P5"
+                f"{', off: ' + a.v6_off if a.v6_off else ''}), "
+                f"{n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")
         elif v5:
             parts = [a.backbone] + (["LSK"] if a.lsk else []) + ["hybrid encoder", "dense oriented head P3-P5"] +                 (["geometry-aware classes"] if a.geo_cls else []) +                 ([f"relation re-scoring of {a.rel_k} candidates"] if a.relate else [])
             say(f"model   OpenOBB5-{a.size} ({' + '.join(parts)}), {n_par:.2f}M params, max {a.num_top} detections | "

@@ -421,6 +421,25 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
       - pretrain DOTA.
   - Tám nguyên lý thiết kế rút ra (N1–N8) ở mục 7 của ARCH_ANALYSIS. Đó là cơ sở cho kiến trúc mới (chưa viết code, chờ user duyệt hướng).
 
+- **F38. OpenOBB6 (10-12): kiến trúc tổng quát tự thiết kế từ F37 + phân tích các kiến trúc mạnh. Chưa có số độ chính xác.** Chi tiết: [docs/OPENOBB6.md](../docs/OPENOBB6.md).
+  - Không thừa kế mạng phân loại. Backbone + neck + head của riêng OpenOBB:
+    - StripMix: depthwise 3×3 + dải 1×k nối tiếp k×1 + MLP, residual khởi tạo 0;
+    - CSP nửa kênh đi thẳng;
+    - hạ độ phân giải có nhánh max-pool;
+    - ngữ cảnh theo hàng / cột + một lớp attention ở 1/32;
+    - chi tiết stride 4 vào P3 bằng space-to-depth;
+    - head class có đơn vị ngữ cảnh;
+    - head hộp dị hướng của v3.
+  - Bản x: 37.4M tham số, **504 GFLOPs ở 1280** (OpenOBB3-x 909, YOLO26x 905).
+    CPU 4 luồng cùng máy: 2.7 s so với 10.3 s (v3) và 7.9 s (YOLO26x). Tốc độ GPU chưa đo.
+  - Pretrain: `openobb pretrain` chưng cất DINOv2 (thầy, Apache-2.0) vào backbone trên ảnh chưa gán nhãn (ước tính 30–45 CU với COCO, 20 epoch).
+  - Đo tác dụng từng mảnh: `v6_off=strip|axis|attn|spd|maxpool|cls_ctx`. Mỗi lần chỉ đổi một yếu tố, chạy 2 seed để biết mức nhiễu.
+  - Data Wall_Color (thống kê ở 1280 px): 96–100% object thẳng trục; junction 9.5 px; wall_300 9.9 × 6 px, cách junction 3.9 px; tường dày 5.6 px.
+    Kiến trúc cố ý **không** dựa vào thẳng trục (theo user: phải tổng quát).
+  - Tiêu chí:
+    - OpenOBB6-x (pretrain) ≥ OpenOBB3-x cùng thước, cùng ngân sách epoch trên Wall_Color;
+    - sau đó so YOLO26x trên DOTA / FloorPlanCAD.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

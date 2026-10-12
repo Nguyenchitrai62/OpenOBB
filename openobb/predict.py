@@ -51,6 +51,12 @@ def load_model(ckpt_path, device, queries=None, classes=None):
         m = OpenOBB2(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
+    if a.get("arch") == "v6":
+        from openobb.models.openobb6 import OpenOBB6
+        m = OpenOBB6(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024),
+                     max_det=max(int(a.get("num_top", 1000)), int(queries or 0)), off=a.get("v6_off") or None)
+        m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
+        return m.to(device).eval().fuse(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
     if a.get("arch") == "v5":
         from openobb.models.openobb5 import OpenOBB5
         m = OpenOBB5(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),

@@ -8,6 +8,7 @@
                     (the arguments, defaults and outputs of `yolo obb predict`: save=True writes the annotated
                     images, save_txt=True labels/<image>.txt, save_conf, save_crop, iou, imgsz, max_det, classes...)
     openobb prepare data=data.yaml out=datasets/mydata imgsz=1024
+    openobb pretrain model=openobb6x data=<image folders> epochs=20 imgsz=640   # OpenOBB6 backbone, no labels
 
     from openobb import OpenOBB
     model = OpenOBB("openobb3x")                # or OpenOBB("runs/obb/train/weights/best.pt")
@@ -34,13 +35,14 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-MODES = ("train", "val", "predict", "prepare")
+MODES = ("train", "val", "predict", "prepare", "pretrain")
 SIZES = ("s", "m", "l", "x")
 # model names: openobb1{s,m,l,x} (= s/m/l/x, DETR-style OpenOBB), openobb2{n,s,m,l,x} (dense segment-aware OpenOBB2),
 # openobb3{s,m,l,x} (pretrained encoder + dense anisotropic oriented head), openobb4x (DINOv2 + hybrid DETR)
 MODELS = {**{f"openobb1{s}": ("v1", s) for s in SIZES},
           **{f"openobb2{s}": ("v2", s) for s in ("n", "s", "m", "l", "x")},
-          **{f"openobb3{s}": ("v3", s) for s in SIZES}, "openobb4x": ("v4", "x"), "openobb5x": ("v5", "x")}
+          **{f"openobb3{s}": ("v3", s) for s in SIZES}, "openobb4x": ("v4", "x"), "openobb5x": ("v5", "x"),
+          **{f"openobb6{s}": ("v6", s) for s in ("n", "s", "m", "l", "x")}}
 
 # Best architecture recipe measured on FloorPlanCAD / DOTA (research/LEDGER.md, c6): selective large-kernel
 # adapters (LSK), repeat-factor sampling, one-to-many query group, adaptive query denoising, square-aware angle loss,
@@ -81,9 +83,20 @@ BACKBONE4 = {"x": "dinov2_b"}
 # OpenOBB5: OpenOBB3's dense head as the output + DINOv2 + geometry-aware classes + relation re-scoring
 SIZE_DEFAULTS5 = {"x": dict(lr=5e-4, backbone_mult=0.2, wd=1e-4, batch=8, gb=5.0)}
 RECIPE5 = dict(RECIPE3, geo_cls=True, relate=True, rel_k=600)
+# OpenOBB6: own backbone / neck / head (no ImageNet / COCO weights): one LR for every layer, conv-detector
+# regularisation; start from `openobb pretrain` weights (weights=) when available (docs/OPENOBB6.md)
+SIZE_DEFAULTS6 = {
+    "n": dict(lr=2e-3, backbone_mult=1.0, wd=0.05, batch=32, gb=0.5),
+    "s": dict(lr=2e-3, backbone_mult=1.0, wd=0.05, batch=32, gb=0.8),
+    "m": dict(lr=1.5e-3, backbone_mult=1.0, wd=0.05, batch=16, gb=1.2),
+    "l": dict(lr=1e-3, backbone_mult=1.0, wd=0.05, batch=16, gb=1.8),
+    "x": dict(lr=1e-3, backbone_mult=1.0, wd=0.05, batch=16, gb=2.6),
+}
+RECIPE6 = {"rfs": 0.1, "channels_last": True, "clip": 10.0, "num_top": 1000}
 # architecture flags a fine-tune inherits from its source checkpoint (weights only load into the same shape)
 ARCH_KEYS = ("arch", "size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_queries", "denoising",
-             "no_rotate_sampling", "context", "backbone", "dense_v3", "primary", "geo_cls", "relate", "rel_k")
+             "no_rotate_sampling", "context", "backbone", "dense_v3", "primary", "geo_cls", "relate", "rel_k",
+             "v6_off")
 MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / per epoch on small datasets
 ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every", "lrf": "min_lr_ratio"}
 IGNORED = ("save_period", "plots", "momentum", "degrees", "shear", "perspective", "mixup", "cutmix",
@@ -436,7 +449,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         raise SystemExit(f"model must be one of {', '.join(MODELS)} or an existing OpenOBB .pt checkpoint, "
                          f"got '{model}'")
     arch = inherited.get("arch", "v1")
-    v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5")
+    v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5", "v6")
     imgsz = int(imgsz or extra.pop("img", None) or 1024)
     if imgsz % 32:
         imgsz = int(math.ceil(imgsz / 32) * 32)
@@ -456,7 +469,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         scale = auto_scale(data, imgsz) if tile_scale in (None, "auto") else float(tile_scale)
 
     sd = {"v2": SIZE_DEFAULTS2, "v3": SIZE_DEFAULTS3, "v4": SIZE_DEFAULTS4,
-          "v5": SIZE_DEFAULTS5}.get(arch, SIZE_DEFAULTS)[size]
+          "v5": SIZE_DEFAULTS5, "v6": SIZE_DEFAULTS6}.get(arch, SIZE_DEFAULTS)[size]
     if str(optimizer).lower() not in ("auto", "adamw"):
         raise SystemExit("optimizer must be 'auto' or 'AdamW'")   # lr0 given -> used; otherwise the measured LR
     prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, seed, fit=fit)
@@ -482,7 +495,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
     if workers is not None:
         opts["workers"] = int(workers)
     if recipe:
-        opts.update({"v2": RECIPE2, "v3": RECIPE3, "v4": RECIPE4, "v5": RECIPE5}.get(arch, RECIPE))
+        opts.update({"v2": RECIPE2, "v3": RECIPE3, "v4": RECIPE4, "v5": RECIPE5, "v6": RECIPE6}.get(arch, RECIPE))
     if arch in ("v4", "v5") and "backbone" not in inherited:
         opts["backbone"] = BACKBONE4[size]
     if aug["mosaic"]:
@@ -491,6 +504,9 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
     opts.update(inherited)
     if weights:
         opts["weights"] = weights
+    if extra.get("v6_off"):                          # OpenOBB6 ablation: v6_off=strip,attn or v6_off=[strip,attn]
+        from openobb.models.openobb6 import parse_off
+        extra["v6_off"] = ",".join(sorted(parse_off(extra["v6_off"])))
     opts.update(extra)
     if float(opts["lr"]) > 3 * sd["lr"] and not dense_arch:
         print(f"[openobb] WARNING: lr0={opts['lr']:g} is {float(opts['lr']) / sd['lr']:.0f}x the default for OpenOBB1-{size} "
@@ -635,6 +651,16 @@ def main(argv=None):
     mode, kv = argv[0], parse_kv(argv[1:])
     if mode == "predict":
         return _predict_cli(kv)
+    if mode == "pretrain":
+        import inspect
+
+        from openobb.pretrain import pretrain
+        bad = [k for k in kv if k not in inspect.signature(pretrain).parameters]
+        if bad:
+            raise SystemExit(f"'{bad[0]}' is not a valid argument for openobb pretrain "
+                             f"({', '.join(inspect.signature(pretrain).parameters)})")
+        pretrain(**kv)
+        return 0
     if mode == "val":
         import inspect
         fn = val

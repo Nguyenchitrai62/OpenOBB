@@ -1,4 +1,4 @@
-# Phân tích các mảnh kiến trúc: thiết kế gốc, số đo trên bản vẽ CAD, kết luận (2026-10-12)
+# Phân tích các mảnh kiến trúc: thiết kế gốc, số đo, kết luận (2026-10-12)
 
 Mục đích: trước khi tạo kiến trúc mới, hiểu từng mảnh đang dùng hoặc đang so sánh. Với mỗi mảnh, trả lời ba câu:
 1. Người thiết kế làm như vậy vì sao (cho bài toán nào)?
@@ -176,34 +176,44 @@ Mục đích: trước khi tạo kiến trúc mới, hiểu từng mảnh đang 
 
 ---
 
-## 7. Nguyên lý rút ra (cơ sở cho kiến trúc mới)
+## 7. Các kiến trúc detection tổng quát mạnh hiện có: cái gì làm nên điểm mạnh, cái gì là giá phải trả
+
+Kiến trúc mới phải tổng quát (DOTA, ảnh tự nhiên, bản vẽ...). Wall_Color chỉ là một bài test. Bảng dưới gom các họ kiến trúc
+detection mạnh nhất hiện có (theo bài báo và mã nguồn công bố; số liệu trích để định hướng, không phải số tự đo).
+
+| Kiến trúc | Ý tưởng cốt lõi (vì sao mạnh) | Giá phải trả / điểm yếu | Lấy gì |
+|---|---|---|---|
+| **YOLO11 / YOLO26** (Ultralytics) | CSP / ELAN (C3k2): nửa kênh đi thẳng, nối mọi đầu ra trung gian → nhiều đường gradient, rẻ. SPPF max-pool đa tầm. Head nặng, tách nhánh. TAL; YOLO26 thêm STAL, hai head một-nhiều / một-một, không NMS. Train từ đầu trên COCO 300+ epoch | Kernel 3×3 nên vùng nhìn tăng chậm, phải chồng sâu. Attention C2PSA chỉ ở 1/32. Pretrain COCO tốn hàng nghìn giờ GPU | CSP nửa kênh đi thẳng, max-pool giữ đỉnh tín hiệu, head nặng, STAL, hai head + giảm dần trọng số một-nhiều |
+| **RTMDet / RTMDet-R** (OpenMMLab) | CSPNeXt: khối CSP với **depthwise 5×5** (kernel lớn vừa phải, rẻ). Head dùng chung conv giữa các tầng nhưng BN riêng. Gán nhãn động (soft label). Bản xoay là một trong các detector một giai đoạn tốt nhất trên DOTA | Kernel 5×5 vẫn hạn chế vùng nhìn. Head chia sẻ giảm khả năng chuyên biệt từng tầng | Depthwise kernel lớn trong khối CSP; soft label theo IoU |
+| **ConvNeXt** | Đưa thiết kế Transformer về CNN: depthwise 7×7, inverted bottleneck, ít activation / norm, layer scale | LayerNorm chậm hơn BN trên GPU và không gộp vào conv khi suy luận | Inverted bottleneck + depthwise lớn + residual khởi tạo nhỏ |
+| **RepLKNet / UniRepLKNet** | Kernel rất lớn (31×31) cho vùng nhìn hiệu dụng lớn; nhánh kernel nhỏ song song lúc train, gộp lại lúc suy luận (re-parameterization) | Depthwise 31×31 tốn băng thông bộ nhớ; tốc độ phụ thuộc kernel tối ưu | Ý tưởng nhánh song song gộp lúc suy luận: train giàu, suy luận rẻ |
+| **Strip R-CNN** (2025) | Thay kernel vuông lớn bằng **kernel dải 1×k nối tiếp k×1** (k khoảng 19): vùng nhìn k×k với chi phí 2k; rất hợp vật dài (cầu, tàu, đường băng). SOTA DOTA khi công bố | Thiết kế hai giai đoạn (Oriented R-CNN) nên chậm | **Dải nối tiếp 1×k → k×1** làm kernel lớn tách được, rẻ, tổng quát |
+| **PKINet** (CVPR 2024) | Nhiều depthwise kích thước khác nhau song song (đa tầm, không giãn); attention neo ngữ cảnh dùng dải ngang / dọc sau avg-pool | Nhiều nhánh nên tăng độ trễ | Ngữ cảnh dài bằng pool theo hàng / cột (rất rẻ) |
+| **LSKNet** | Chọn tầm ngữ cảnh theo vị trí | Đã đo (mục 3): cổng không chọn theo nội dung; phép nhân không chặn gây nổ | Chỉ giữ depthwise lớn tách chuỗi |
+| **YOLOv12** | Attention vùng (area attention) thay cho conv ở nhiều tầng | Cần FlashAttention để nhanh; chậm trên GPU cũ | Attention cục bộ theo vùng, nếu cần |
+| **RT-DETR / D-FINE / DEIM** | Decoder DETR, ghép một-một, tinh chỉnh phân phối cạnh (FDR); hybrid encoder | Một mẫu dương / vật nên class hiếm học chậm (E1b, F33). Decoder tốn với ảnh dày đặc vật (300–900 query) | Phân phối cạnh (đã có trong DFL dị hướng của v3) |
+| **SPD-Conv** | Space-to-depth thay conv stride: không mất điểm ảnh khi hạ độ phân giải, giúp vật tí hon / ảnh thấp phân giải | Kênh tăng ×4 | Đưa chi tiết stride 4 vào P3 mà không thêm head P2 |
+| **Oriented R-CNN / RoI Transformer** | Hai giai đoạn, RoIAlign xoay: box rất khít | Chậm; khó với 300+ vật / ảnh | Không lấy (tốc độ) |
+| **ViT / DINOv2** | Đặc trưng tự giám sát rất tổng quát | Chậm ở độ phân giải cao; patch 14 thô cho vật nhỏ (v4: 38 ms, F33) | **Làm "thầy" để chưng cất** cho backbone mới (pretrain rẻ) |
+
+## 8. Nguyên lý thiết kế (tổng quát, có bằng chứng)
 
 | # | Nguyên lý | Bằng chứng |
 |---|---|---|
-| N1 | **Tính toán đặt ở 1/4–1/16**; tầng 1/32 chỉ cần mỏng (hoặc bỏ) | 86–100% detection ở P3; stage 4 + AIFI chết mà detection không đổi; YOLO chỉ 10% ở 1/32 |
-| N2 | **Ngữ cảnh 40–170 px phải có ở 1/8–1/16**, không phải attention ở 1/32 | 75–93% bằng chứng class nằm ngoài box; r50 khoảng 40 px; AIFI ở 1/32 bằng phẳng |
-| N3 | **Ngữ cảnh rẻ:** bản vẽ phần lớn theo trục ngang / dọc. Trộn theo hàng / cột (strip, axial) hoặc depthwise kernel lớn phù hợp hơn attention toàn ảnh | Tường H / V chiếm đa số; LSK cho thấy depthwise lớn rẻ (3 G) |
-| N4 | **Ổn định số học là yêu cầu thiết kế:** chuẩn hoá được train (không đóng băng), cổng bị chặn, residual có layer-scale. Không nhân `x·(1+m)` không chặn | P5 nổ ở cả 3 checkpoint; LSK khuếch đại tới 10¹⁰ |
-| N5 | **Giữ nét:** nhánh max-pool khi hạ độ phân giải là đủ; không cần cơ chế chống răng cưa phức tạp | Dịch ảnh lệch < 1 px |
-| N6 | **Head class mạnh hơn và có quan hệ giữa các vật:** wall_300 / junction / wall phân biệt bằng vật bên cạnh (khung cửa, giao tường) | Biên < 0.2 ở 43% wall_300; nhầm sang junction 32% (F35); YOLO head 20% FLOPs |
-| N7 | **Gán nhãn cho vật tí hon** (kiểu STAL) | wall_300 13 × 7.5 px; YOLO26 làm STAL và recall wall_300 0.87 so với 0.33 |
-| N8 | **Pretrain vẫn cần, nhưng nên đúng miền:** tầng sâu nhất của ImageNet không được dùng trong cả 3 checkpoint (do nổ số, chưa chứng minh là vô dụng về nguyên tắc); giá trị chắc chắn của pretrain là các tầng đầu (nét, góc) | Stage 4 chết; v2 train từ đầu trên 250 ảnh thì hỏng (F25) |
+| N1 | **Tính toán ưu tiên độ phân giải cao.** Tầng 1/32 chỉ mỏng, đủ cho vật lớn và ngữ cảnh toàn ảnh | Ở v3: stage 4 + AIFI chết mà detection không đổi; 86–100% detection ở P3. YOLO26x chỉ 10% ở 1/32. DOTA / ảnh tự nhiên cũng nhiều vật nhỏ |
+| N2 | **Ngữ cảnh rộng phải có sẵn ở 1/8–1/16**, không chỉ ở 1/32 | 75–93% bằng chứng class nằm ngoài box (vật nhỏ phân loại nhờ hàng xóm); attention ở 1/32 của v3 bằng phẳng |
+| N3 | **Kernel lớn rẻ, tổng quát:** depthwise 3×3 + dải 1×k nối tiếp k×1 (vùng k×k với chi phí 2k) + pool theo hàng / cột cho ngữ cảnh rất dài. Không dựa vào việc vật thẳng trục: dải nối tiếp phủ cả ô vuông k×k | Strip R-CNN, PKINet, RepLKNet; LSK cho thấy depthwise lớn chỉ tốn khoảng 3 G |
+| N4 | **Ổn định số học là yêu cầu thiết kế:** BN được train (gộp vào conv lúc suy luận), residual khởi tạo 0, mọi cổng bị chặn, không nhân `x·(1+m)` | P5 nổ ở cả 3 checkpoint v3; LSK khuếch đại tới 10¹⁰ |
+| N5 | **Hạ độ phân giải không làm mất đỉnh tín hiệu:** nhánh max-pool song song với conv stride; chi tiết stride 4 đưa vào P3 bằng space-to-depth | Nét 4 px vẫn ổn định ở v3 (dịch ảnh lệch < 1 px); YOLO SPPF, HGNet stem đều dùng max-pool |
+| N6 | **Head class nặng hơn và có ngữ cảnh** (không chỉ đọc một điểm) | Lỗi chính của v3 là phân loại (biên < 0.2 ở 43% wall_300); YOLO26 dành 20% FLOPs cho head |
+| N7 | **Gán nhãn đủ mẫu dương cho vật tí hon** (STAL) và nhiều mẫu dương / vật cho class hiếm (one-to-many) | YOLO26 STAL; decoder một-một yếu với class hiếm (E1b, F33) |
+| N8 | **Không thừa kế mạng phân loại.** Pretrain backbone riêng bằng chưng cất từ một "thầy" tổng quát (DINOv2) trên ảnh chưa gán nhãn, rồi pretrain detection (DOTA, như YOLO-OBB), rồi fine-tune | Train từ đầu trên data nhỏ thì hỏng (v2, F25). Train trên COCO như YOLO quá đắt với ngân sách Colab. Chưng cất hội tụ nhanh hơn nhiều |
+| N9 | **Nhanh trên GPU thật:** chỉ conv chuẩn + depthwise + 1×1 + một lớp attention nhỏ ở 1/32; không có op tự viết (deformable, sampling). Export ONNX / TensorRT dễ | Mục tiêu "nhanh hơn YOLO cùng hạng" |
 
-## 8. Hệ quả cho kiến trúc mới (để thảo luận trước khi viết code)
+## 9. Kiến trúc mới
 
-Một backbone + neck **thiết kế lại cho CAD**, không ghép từ mạng ImageNet:
-- Rộng ở 1/4–1/8, vừa ở 1/16, mỏng ở 1/32 (N1).
-- Khối cơ bản kiểu CSP nửa kênh đi thẳng. Hạ độ phân giải có nhánh max-pool (N5).
-- Ngữ cảnh dài 40–200 px ở 1/8–1/16 bằng trộn theo hàng / cột và depthwise lớn (N2, N3).
-- Chuẩn hoá được train, cổng bị chặn, layer-scale (N4).
-- Head class nặng hơn, có lớp quan hệ giữa ứng viên. Gán nhãn kiểu STAL (N6, N7).
+Thiết kế cụ thể, phần tận dụng và cách đo tác dụng từng mảnh: [docs/OPENOBB6.md](../docs/OPENOBB6.md).
 
-Đánh đổi cần quyết:
-- Backbone mới **không có pretrain ImageNet**. Theo N8 và F25, cần pretrain riêng trên ảnh bản vẽ.
-  Cách khả thi: tự giám sát (masked image modeling cho mạng conv, kiểu SparK) trên nhiều trang bản vẽ chưa gán nhãn.
-  Có thể khởi tạo stem và hai stage đầu từ phần HGNetv2 còn hữu ích (các tầng nét / góc), phần còn lại học từ pretrain CAD.
-- Chi phí: một đợt pretrain tự giám sát trên Colab (ước lượng vài chục CU, tuỳ số trang).
-
-Việc ngay được, không cần kiến trúc mới:
-- **v3 hiện tại đang mang khoảng 8% FLOPs chết** (stage 4 + LSK P5 + chiếu P5 + AIFI). PAN P5 vẫn sống nhờ thông tin đi lên từ P3 / P4 (17% detection tường).
+Việc ngay được với v3 (không cần kiến trúc mới):
+- **v3 đang mang khoảng 8% FLOPs chết** (stage 4 + LSK P5 + chiếu P5 + AIFI). PAN P5 vẫn sống nhờ thông tin đi lên từ P3 / P4 (17% detection tường).
 - **Lỗi mất ổn định cần sửa trong recipe:** lr của backbone / encoder và BN đóng băng ở P5.
