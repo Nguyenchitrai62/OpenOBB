@@ -476,6 +476,25 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     - User train tiếp từ best.pt. Khuyến nghị: batch 8 (31 bước / epoch), 300 epoch, lr0 1e-3.
     - Nếu chững dưới khoảng 0.5 (thước YOLO) sau 150 epoch → pretrain chưng cất là bắt buộc.
 
+- **F40. OpenOBB6-x train từ đầu, vòng 2 (user, 10-12): chững ở khoảng 0.55 / 0.32, thấp hơn v3 có pretrain rất xa.**
+  - Điều kiện: từ best của F39 (0.379 / 0.196), 100 epoch, batch 16, lr 1e-3 → 1e-5. Tổng cộng 150 epoch, khoảng 2250 bước.
+  - mAP50 / mAP50-95 (thước YOLO):
+    | Epoch | Kết quả |
+    |---|---|
+    | ep1 | 0.416 / 0.213 |
+    | ep30 | 0.492 / 0.283 |
+    | ep61 | 0.545 / 0.310 |
+    | ep81 | **0.554 / 0.322** |
+    - 20 epoch cuối chỉ tăng +0.009 mAP50.
+    - Dự kiến kết thúc khoảng 0.56–0.58 / 0.33 (còn 10 epoch tắt mosaic).
+  - Loss train vẫn giảm (box 0.51 → 0.43, dfl 0.60 → 0.53, cls 0.28 → 0.21) trong khi val gần đứng.
+    → Giới hạn nằm ở **khả năng tổng quát hoá từ 250 ảnh khi không có tiên nghiệm**, không phải thiếu dung lượng hay thiếu bước.
+  - So sánh:
+    - v3 có pretrain 0.720 / 0.474: v6 kém khoảng 0.16 / 0.15.
+    - Ước tính trước đó cho train từ đầu là 0.55–0.65 / 0.33–0.42: kết quả nằm ở cận dưới.
+  - Chưa tách được kiến trúc và khởi tạo. Cần đối chứng v3 train từ đầu, cùng điều kiện, với BN / stem của HGNet được mở (bản x đang đóng băng).
+  - Log in `[init] D-FINE coco: 997 full...` khi fine-tune từ best.pt: chỉ là nhãn log sai (hàm nạp dùng chung), weights nạp đúng.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
