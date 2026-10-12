@@ -132,7 +132,7 @@ class OpenOBB5(OpenOBB3):
         if rel is not None:                     # output = the re-scored distinct candidates
             idx, cls = rel
             boxes = boxes.gather(1, idx[..., None].expand(-1, -1, 5))
-        logits, boxes = fast_nms(cls, boxes, self.max_det, iou=self.nms_iou)
+        logits, boxes = fast_nms(cls, boxes, self.max_det, conf=getattr(self, "nms_conf", 0.001), iou=self.nms_iou)
         boxes[..., :4] = boxes[..., :4] / self.img_size
         boxes[..., 4] = torch.remainder(boxes[..., 4] + math.pi / 2, math.pi) - math.pi / 2
         return {"pred_logits": logits, "pred_boxes": boxes}

@@ -293,6 +293,16 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-12 (4): **Sửa tốc độ suy luận cho họ v3, thêm OpenOBB9** (F42).
+  - Tốc độ: gộp BN khi suy luận + lọc `conf` trước NMS, áp dụng cho v3 / v5 / v7 / v8; CPU −18%, đầu ra không đổi.
+  - OpenOBB9: lõi mới tự thiết kế (conv dày tái tham số hoá), 543 GFLOPs so với 969 của v8, cùng head với v8.
+    Pretrain chưng cất 2 thầy: `openobb pretrain`, [docs/PRETRAIN.md](docs/PRETRAIN.md).
+  - Làm song song bằng 2 sub-agent (kiến trúc / pretrain). 174 test pass.
+  - User yêu cầu: mọi bản mới phải qua đo tốc độ GPU (T1) trước khi tốn CU train.
+
+- 2026-10-12 (4): **Bài học theo lớp model** ([research/LESSONS_BY_LAYER.md](research/LESSONS_BY_LAYER.md)) tổng hợp v1–v8 so với D-FINE và SOTA.
+  Log v8 đang chạy ghi ở LEDGER F42 (ep37 0.607 / 0.375 thước YOLO, hội tụ nhanh nhất từ trước tới nay).
+
 - 2026-10-12 (3): **OpenOBB8: bản tốt nhất hiện tại**
   (F41, [docs/OPENOBB8.md](docs/OPENOBB8.md)). OpenOBB8 = lõi OpenOBB7 (v3 đã sửa lỗi, [docs/OPENOBB7.md](docs/OPENOBB7.md)) + tầng suy luận quan hệ.
   - Viết song song bằng 2 sub-agent.

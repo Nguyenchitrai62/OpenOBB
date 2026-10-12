@@ -32,7 +32,7 @@ GITLAB_PIP = "git.anybim.vn/CxDP/service/hicasai/openanything/openobb.git"
 CHECKOUT = ROOT / ".gitlab_export"                     # persistent working clone of GitLab (gitignored)
 ALLOW = ["openobb", "tests", "docs/DEPLOY.md", "docs/FINETUNE.md", "docs/OPENOBB2.md", "docs/OPENOBB3.md",
          "docs/OPENOBB4.md", "docs/OPENOBB5.md", "docs/OPENOBB6.md", "docs/OPENOBB7.md",
-         "docs/OPENOBB8.md", "docs/OPENOBB1.md", "app/streamlit_app.py",
+         "docs/OPENOBB8.md", "docs/OPENOBB9.md", "docs/PRETRAIN.md", "docs/OPENOBB1.md", "app/streamlit_app.py",
          "run_app.bat",
          "LICENSE", "LICENSES", "THIRD_PARTY_NOTICES.md", "pyproject.toml", "requirements.txt"]
 # files from older layouts removed from GitLab when present (renamed in the research repo)
@@ -62,6 +62,8 @@ TRANSFORMS = [
     ("docs/DEPLOY.md", r"https://github\.com/Nguyenchitrai62/OpenOBB\.git", f"https://{GITLAB_PIP}", True),
     ("docs/FINETUNE.md", r"https://github\.com/Nguyenchitrai62/OpenOBB\.git", f"https://{GITLAB_PIP}", True),
     ("docs/OPENOBB7.md", r", \[research/ARCH_ANALYSIS\.md\]\(\.\./research/ARCH_ANALYSIS\.md\)", "", True),
+    ("docs/OPENOBB9.md", r"\[research/LEDGER\.md\]\(\.\./research/LEDGER\.md\)",
+     "sổ cái của repo nghiên cứu", True),
     ("docs/OPENOBB6.md", r"\[research/ARCH_ANALYSIS\.md\]\(\.\./research/ARCH_ANALYSIS\.md\)",
      "báo cáo phân tích của repo nghiên cứu (không nằm trong repo này)", True),
 ]

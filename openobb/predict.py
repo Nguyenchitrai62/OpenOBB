@@ -26,6 +26,7 @@ from openobb.data.vectors import cut_tile
 from openobb.eval.dota import merge_patches
 from openobb.models.dense_head import dense_predict
 from openobb.models.openobb1 import OpenOBB1, postprocess
+from openobb.models.openobb7 import fuse_model
 from openobb.ops.obb import obb2poly
 
 PAD_BGR = (104, 116, 124)
@@ -51,6 +52,13 @@ def load_model(ckpt_path, device, queries=None, classes=None):
         m = OpenOBB2(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
+    if a.get("arch") == "v9":
+        from openobb.models.openobb9 import OpenOBB9
+        m = OpenOBB9(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024),
+                     max_det=max(int(a.get("num_top", 1000)), int(queries or 0)), off=a.get("v9_off") or None,
+                     off8=a.get("v8_off") or None, rel_k=a.get("rel_k", 600))
+        m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
+        return m.to(device).eval().fuse(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
     if a.get("arch") in ("v7", "v8"):
         common = dict(num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
                       max_det=max(int(a.get("num_top", 1000)), int(queries or 0)))
@@ -78,13 +86,13 @@ def load_model(ckpt_path, device, queries=None, classes=None):
                    max_det=max(int(a.get("num_top", 1000)), int(queries or 0)), backbone=a.get("backbone", "dinov2_b"),
                    geo_cls=a.get("geo_cls", True), relate=a.get("relate", True), rel_k=a.get("rel_k", 600))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
-        return m.to(device).eval(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
+        return fuse_model(m.to(device).eval()), list(names), dict(a, conf_thr=ck.get("conf_thr"))
     if a.get("arch") == "v3":
         from openobb.models.openobb3 import OpenOBB3
         m = OpenOBB3(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
                    max_det=max(int(a.get("num_top", 1000)), int(queries or 0)), backbone=a.get("backbone", "hgnet"))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
-        return m.to(device).eval(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
+        return fuse_model(m.to(device).eval()), list(names), dict(a, conf_thr=ck.get("conf_thr"))
     m = OpenOBB1(a.get("size", "s"), num_classes=len(names), num_queries=a.get("queries", 300),
               img_size=a.get("img", 1024), rotate_sampling=not a.get("no_rotate_sampling", False),
               num_denoising=a.get("denoising", 100), dense=a.get("dense", False) or a.get("dense_queries", False),
@@ -192,6 +200,7 @@ def run(ckpt, source, out=None, conf=0.25, names=None, size=None, gap=200, queri
         cl = classes if isinstance(classes, (list, tuple)) else str(classes).split(",")
         keep = {int(c) if str(c).strip().isdigit() else names.index(str(c).strip()) for c in cl}
     thr = conf_thresholds(names, targs, conf)
+    model.nms_conf = max(0.001, min(thr))            # pre-NMS score filter (does not change the kept boxes)
     size = size or targs.get("img", 1024)
     scale = scale or targs.get("scale", 1.0)
     fit = targs.get("fit", False) if tile is None else not tile

@@ -5,6 +5,7 @@ everything that has a matching shape; oriented-specific rows/columns start from 
 """
 import copy
 import logging
+from pathlib import Path
 
 import torch
 import torch.nn as nn
@@ -250,7 +251,9 @@ def load_dfine_coco(model, ckpt_or_size, class_names=None, log=print, init="coco
             v[sl].copy_(s[sl])
             partial += 1
     model.load_state_dict(dst)
-    msg = f"[init] D-FINE {init}: {full} full, {partial} partial, {len(skipped)} new tensors"
+    src_name = (f"D-FINE {init} (pretrained, downloaded)" if isinstance(ckpt_or_size, str) and len(ckpt_or_size) == 1
+                else f"checkpoint {Path(str(ckpt_or_size)).name}")
+    msg = f"[init] {src_name}: {full} full, {partial} partial, {len(skipped)} new tensors"
     log(msg)
     logging.info(msg)
     return skipped

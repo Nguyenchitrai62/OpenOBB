@@ -282,6 +282,9 @@ class OpenOBB:
         if iou is None:
             iou = 0.7 if fit else 0.1
         thr = conf_thresholds(names, a, conf)
+        # boxes below every class threshold are dropped before the in-model NMS (same result: a lower-scored box
+        # never suppresses a higher-scored one), so NMS works on hundreds of boxes, not 4000
+        self.model.nms_conf = max(0.001, min(thr))
         keep_cls = None
         if classes is not None:
             cl = classes if isinstance(classes, (list, tuple)) else [classes]

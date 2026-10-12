@@ -1,4 +1,6 @@
-# OpenOBB9: lập luận thiết kế (đề xuất, CHƯA viết code, chờ user duyệt, 2026-10-12)
+# OpenOBB9: lập luận thiết kế (đã có code, chưa train, 2026-10-12)
+
+`model=openobb9s | m | l | x`. Code: [openobb/models/openobb9.py](../openobb/models/openobb9.py). Kiến trúc đã viết và số đo: mục 9.
 
 Theo luật của user: một version mới phải có lập luận **trước** khi code. Tài liệu này nêu từng lựa chọn thiết kế xuất phát từ bài học nào
 (số F trong [research/LEDGER.md](../research/LEDGER.md)), dựa trên lý thuyết nào, kỳ vọng gì, và **phép thử nào bác bỏ được nó**.
@@ -136,3 +138,140 @@ Chi phí ước tính dựa trên số đo F39 (17 ảnh/s cho v6-x ở 1280 tr�
 - Hằng số L của head không đo được dễ dàng. Vì vậy cận chỉ có ý nghĩa định tính: ε càng nhỏ thì càng gần thầy. Phép thử T2 đo ε, phép thử T3 đo kết quả cuối.
 - Độ trễ kỳ vọng dựa trên roofline với băng thông lấy từ thông số công bố. T1 sẽ đo thật trước khi tốn CU.
 - Thầy D-FINE là lõi của v3. Nếu chưng cất quá tốt và DINOv2 không thêm gì, v9 sẽ chỉ là **v8 nhanh hơn**. Đó vẫn là một kết quả có giá trị (sở hữu trọn, nhanh hơn), nhưng không phải đột phá về độ chính xác.
+
+## 9. Kiến trúc đã viết (2026-10-12, chưa train)
+
+Mục 0–8 ở trên là lập luận, giữ nguyên. Mục này ghi những gì đã viết thành code và số đo được (CPU, weights ngẫu nhiên).
+
+```
+ảnh 1280 ─ Stem: conv 3×3 s2 (3→96) → [conv 3×3 s2 (96→192) ‖ max-pool 2] → 1×1 (288→192)          stride 4
+         ─ S4:  RepCSP 192, 1 RepConv                                                                   f4 (c4 = 192)
+         ─ Down [conv 3×3 s2 → 160 ‖ max-pool] → 1×1 → 320 ─ S8:  RepCSP 320, 4 RepConv, giãn 1,2,1,3     stride 8
+         ─ Down → 576 ─ S16: RepCSP 576, 4 RepConv, giãn 1,2,1,3                                        stride 16
+         ─ Down → 576 ─ S32: RepCSP 576, 2 RepConv ─ SPPF ─ 1 lớp attention (8 head)                    stride 32
+Neck: PAN 2 chiều bằng RepCSP (3 RepConv mỗi khối); f4 vào P3 bằng space-to-depth + 1×1; P3 / P4 / P5 đều 384 kênh (hid)
+Head: ContextOrientedHead của v7 + bộ tinh chỉnh quan hệ của v8 (K = 600), dùng nguyên bằng import
+RepConv (train): SiLU(BN(3×3 giãn d) + BN(1×1) + BN(đồng nhất, khi số kênh vào = ra))
+RepConv (suy luận, fuse()): SiLU(một conv 3×3 giãn d có bias). Gộp chính xác: 1×1 và đồng nhất nằm ở ô giữa của kernel 3×3
+RepCSP: 1×1 lên 2h → chia đôi → một nửa qua n RepConv → nối mọi đầu ra trung gian → 1×1
+```
+
+### 9.1 Từng phần (cỡ x, ảnh 1280, 7 class)
+
+GFLOPs = 2×MAC, đếm bằng `torch.utils.flop_counter` (cùng cách đếm với con số 969 của v8-x), trên model chưa gộp.
+Bộ đếm trên CPU không thấy phép nhân ma trận bên trong `scaled_dot_product_attention`. Phần này được tính tay và ghi riêng.
+
+| Phần | Làm gì | Bài học / lập luận nó thực hiện | Tham số | GFLOPs |
+|---|---|---|---|---|
+| Stem | conv 3×3 s2 → [conv 3×3 s2 ‖ max-pool 2] → 1×1, về stride 4 | N5: max-pool giữ đỉnh của nét mảnh. L7 / N1: tính toán ở độ phân giải cao | 0.22M | 47.4 |
+| S4 | RepCSP 192 kênh, 1 RepConv | Chi tiết stride 4 cho nét 4–6 px. f4 đi vào P3 (space-to-depth) và vào bộ tinh chỉnh | 0.19M | 37.7 |
+| Down + S8 | [conv 3×3 s2 dày ‖ max-pool] → 1×1; RepCSP 320, 4 RepConv giãn 1, 2, 1, 3 | L4: ngữ cảnh 40–170 px phải có ở 1/8. L2: chỉ conv dày, không depthwise. Phần nặng nhất của lõi | 1.83M | 93.3 |
+| Down + S16 | như trên, 576 kênh | L4: ngữ cảnh ở 1/16 | 5.84M | 74.6 |
+| Down + S32 | RepCSP 576, 2 RepConv | N1: tầng 1/32 mỏng (v3 có 2048 kênh ở đây và tầng đó chết, F37) | 4.65M | 14.9 |
+| SPPF | 1×1 xuống 288, max-pool 5 ba lần (vùng 5 / 9 / 13), nối, 1×1 | Vùng nhìn rộng gần như miễn phí; max-pool giữ đỉnh | 0.83M | 2.7 |
+| Attention 1/32 | 1 lớp pre-norm, 8 head, 1600 token; vị trí bằng depthwise 3×3 nhỏ; hệ số residual g1 / g2 khởi tạo 0 (khối `GlobalAttention` của v6) | Ngữ cảnh toàn ảnh. L3 / N4: residual bắt đầu bằng 0, không cổng nhân. P5 có loss chưng cất riêng | 2.67M | 8.5 + 5.9 (SDPA) |
+| Neck, nhánh xuống | lat5, td4 (1/16), spd + td3 (1/8 → P3) | Chi tiết stride 4 vào P3 không mất mát (junction 9.5 px). P3 nặng nhất (86–100% detection ở P3, F37) | 4.04M | 125.0 |
+| Neck, nhánh lên | dn3 + bu4 (P4), dn4 + bu5 (P5) | PAN 2 chiều; mọi đầu ra 384 kênh (head v8 cần độ rộng bằng nhau) | 5.32M | 42.5 |
+| Head | ContextOrientedHead của v7 / v8, không đổi | Giữ nguyên để so v9 với v8 là so đúng một yếu tố (mục 5) | 2.63M | 58.7 |
+| Bộ tinh chỉnh | OrientedRelationalRefiner của v8, K = 600, không đổi | Như OPENOBB8 mục 2 | 1.23M | 37.8 + 2.0 (SDPA) |
+| **Tổng** | | | **29.45M** (sau fuse 28.36M) | **543** (+ 7.9 SDPA ≈ **551**) |
+
+- So với v8-x: **543 so với 969 GFLOPs = 0.56×** (cùng cách đếm). Sau fuse, v9-x còn khoảng 534 G (các nhánh 1×1 đã gộp vào 3×3).
+- Phân bổ theo stride (conv, x): stride ≤ 4: 85 G (16%); 1/8: 239 G (44%, gồm head 45 G); 1/16: 143 G (26%); 1/32: 30 G + attention 14 G (8%); bộ tinh chỉnh 40 G (7%).
+  So với YOLO26x (13% / 26% / 32% / 10%, head 20%) và v3 (7% ở stride ≤ 4, 1/32 rộng 2048 kênh): v9 dồn tính toán vào stride 4–8, đúng N1.
+
+Các cỡ (độ rộng × độ sâu; kênh làm tròn bội 32, riêng x bội 64):
+
+| Cỡ | Hệ số rộng / sâu | Kênh stride 4 / 8 / 16 / 32 | hid | RepConv mỗi stage; mỗi khối neck | Tham số | GFLOPs (1280) |
+|---|---|---|---|---|---|---|
+| s | 0.5 / 0.5 | 64 / 128 / 192 / 192 | 128 | 1, 2, 2, 1; 2 | 4.42M | 99 (+4 SDPA) |
+| m | 0.75 / 0.75 | 96 / 160 / 288 / 288 | 192 | 1, 3, 3, 2; 2 | 8.11M | 161 (+5) |
+| l | 1.0 / 1.0 | 128 / 224 / 384 / 384 | 256 | 1, 4, 4, 2; 3 | 14.38M | 278 (+6) |
+| x | 1.5 / 1.0 | 192 / 320 / 576 / 576 | 384 | 1, 4, 4, 2; 3 | 29.45M | 543 (+8) |
+
+- Bộ tinh chỉnh của v8 có độ rộng cố định (d = 192, K = 600). Ở cỡ s nó chiếm khoảng 1/3 FLOPs (34 G trên 99 G).
+- hid của x = 384, bằng hidden_dim của thầy D-FINE-X. Phép chiếu chưng cất ở P3–P5 vì vậy là 384 → 384.
+- Cách chọn độ rộng cho x: đo vài cấu hình, giữ cấu hình nằm giữa khoảng 500–600 G và dồn tính toán vào stride 4–8.
+  Stride 4 rộng 128 thay vì 192 cho 483 G, nhưng chỉ 8% tính toán ở stride ≤ 4 (như v3), trái với N1 / L7.
+
+Công tắc (`v9_off=`, tên sai báo lỗi; `v8_off=` vẫn dùng cho head / bộ tinh chỉnh, ví dụ `v8_off=refine`):
+
+| `v9_off=` | Tắt gì | Câu hỏi được trả lời |
+|---|---|---|
+| `rep` | Nhánh 1×1 và đồng nhất của RepConv (còn conv 3×3 + BN thường) | Tái tham số hoá có giúp khi train không? (suy luận như nhau) |
+| `dilate` | Mọi độ giãn về 1 | Vùng nhìn rộng ở 1/8–1/16 có cần không? (L4) |
+| `attn` | Lớp attention ở 1/32 | Ngữ cảnh toàn ảnh có cần không? |
+| `spd` | Đường space-to-depth từ f4 vào P3 | Chi tiết stride 4 có giúp vật tí hon / nét mảnh không? |
+| `maxpool` | Nhánh max-pool ở stem và mọi Down | Max-pool có giữ được nét mảnh không? (N5) |
+
+### 9.2 Bằng chứng cho lập luận tốc độ (mục 4), đo trên CPU
+
+| Đo (x, 1280, đã fuse) | v9-x | v8-x |
+|---|---|---|
+| BatchNorm còn lại | 0 | 0 |
+| FLOPs trong conv dày (groups = 1, ≥ 64 kênh vào và ra) | 472.9 G = **95.6% của lõi + head** (88.5% cả model; phần còn lại chủ yếu là GEMM của transformer trong bộ tinh chỉnh, cũng là phép dày) | |
+| Conv khác (depthwise trong head v8, conv vị trí của attention) | 3.0 G (0.6%) | |
+| Số conv trên bản đồ ≥ lưới stride 8 (lõi + head) | 33 | 66 |
+| Op không phải conv trên bản đồ ≥ lưới stride 8 | 27 SiLU (ngay sau conv, khi export gộp được vào conv), 6 nối kênh, 2 phép cộng (residual trong StripMix của head v8), 2 max-pool, 1 upsample, 1 pixel_unshuffle | 29 ReLU + 21 SiLU, 8 nối kênh, 8 cộng, 4 chia, 3 nhân, 2 pad, 2 abs, 2 pow, mean, amax, sigmoid, tanh (ScaleGuard, LSK), upsample, pixel_unshuffle (max-pool không đếm) |
+| Độ trễ CPU, 2 luồng, lấy min của 3 lần, lõi + head (trước NMS) | **7.36 s** | 13.96 s (v9 = **0.53×**) |
+| Độ trễ CPU, cả model gồm bộ tinh chỉnh + NMS | **8.84 s** | 15.58 s (v9 = **0.57×**) |
+
+- Số CPU chỉ để tham khảo. CPU gần như không phân biệt lớp nghẽn bộ nhớ với lớp nghẽn tính toán, nên tỉ lệ ở đây gần bằng tỉ lệ FLOPs (0.56).
+  Lợi thế mà lập luận roofline dự đoán (không còn BN / cộng riêng lẻ, không depthwise trong lõi) chỉ lộ ra trên GPU. Đó là việc của T1.
+- Head v8 vẫn còn depthwise (tháp class và StripMix: 5 depthwise mỗi tầng, chạy cả ở P3). Chúng chỉ chiếm 0.6% FLOPs nhưng là lớp nghẽn bộ nhớ.
+  v9 giữ nguyên head để so đúng một yếu tố. Nếu T1 cho thấy chúng đáng kể thì đó là một thay đổi riêng, đo riêng.
+
+### 9.3 Cách chạy T1 (độ trễ GPU, không cần train)
+
+Cách 1, nhanh nhất (weights ngẫu nhiên, Colab G4, khoảng 0.2 CU). Chạy trong môi trường đã cài `openobb`:
+
+```python
+import time, torch
+from openobb.models.openobb8 import OpenOBB8
+from openobb.models.openobb9 import OpenOBB9
+torch.backends.cudnn.benchmark = True
+x = torch.rand(1, 3, 1280, 1280, device="cuda").contiguous(memory_format=torch.channels_last)
+for name, m in (("v9", OpenOBB9("x", 7, 1280)), ("v8", OpenOBB8("x", 7, 1280))):
+    m = m.cuda().eval().fuse().to(memory_format=torch.channels_last)
+    for conf in (0.001, 0.5):             # 0.5: weights ngẫu nhiên cho điểm ~0.01, NMS gần như rỗng -> đo riêng mạng
+        m.nms_conf = conf
+        with torch.no_grad(), torch.autocast("cuda", torch.bfloat16):
+            for _ in range(20):
+                m(x)
+            torch.cuda.synchronize()
+            t = time.perf_counter()
+            for _ in range(100):
+                m(x)
+            torch.cuda.synchronize()
+        print(name, "nms_conf", conf, f"{(time.perf_counter() - t) * 10:.2f} ms")
+```
+
+Cách 2, khi đã có checkpoint của cả hai: chạy `openobb predict` cùng một ảnh, cùng `imgsz=1280`, cho `best.pt` của openobb9x và openobb8x. So dòng `Speed:` trong log.
+
+- **Đạt nếu** độ trễ v9 ≤ 0.6× v8 (mục 6). Không đạt thì chỉnh độ rộng / số khối (hằng số `WIDTHS9`, `HID9`, `DEPTHS9`, `NECK_DEPTH9`, `SCALES9` đầu file) rồi đo lại, chưa pretrain.
+
+### 9.4 Tỉ lệ tận dụng cái có sẵn
+
+| Loại | Phần | Tỉ lệ |
+|---|---|---|
+| **Weights pretrained trong model** | Không có. Lõi mới khởi tạo ngẫu nhiên, học bằng chưng cất. Hai thầy (D-FINE COCO, DINOv2) chỉ chạy lúc pretrain, không nằm trong model | **0%** |
+| Code của OpenOBB dùng lại (import, không chép) | Head `ContextOrientedHead` (v7); bộ tinh chỉnh, `apply_refinement`, `_with_jitter` và đường forward của v8 (gọi thẳng `OpenOBB8.forward` / `OpenOBB7.forward` trên lõi v9); `ConvBN`, `Stem`, `GlobalAttention` (v6); `space_to_depth`, `fold_bn`, `fuse_model` (v7); `decode`, `fast_nms`, `anchors` (v3); loss `OpenOBB8Loss` | head + bộ tinh chỉnh: 3.86M = 13% tham số, 96.5 G = 18% FLOPs. Khối v6 trong lõi (stem, attention): 2.9M |
+| Code mới viết cho v9 | `RepConv` (kể cả gộp chính xác khi có giãn), `RepCSP`, `Down` dày, `SPPF`, `Backbone9`, `Neck9`, `OpenOBB9`, `parse_off9` | phần còn lại của lõi (khoảng 22.7M tham số) |
+| Ý tưởng lấy từ công bố | RepVGG (tái tham số hoá), CSPNet / ELAN (YOLOv7, C3k2 của YOLO11), SPPF (YOLOv5), SPD-Conv (space-to-depth), PANet (PAN 2 chiều), conv giãn (DeepLab), max-pool song song conv stride (stem HGNet, YOLO), 1 lớp attention ở 1/32 (AIFI của RT-DETR, C2PSA của YOLO) | ý tưởng, tự viết lại |
+| Code chép từ nơi khác | Không có. Chỉ dùng khối chuẩn của PyTorch (BSD) | 0% |
+
+### 9.5 Test (CPU, `tests/test_openobb9.py`, 21 test)
+
+- Giao diện: `features` cho stride 4 / 8 / 16 / 32, `c4`, `hid`; khoá state-dict chỉ có `backbone.`, `neck.`, `head.`, `refiner.`; không có depthwise trong lõi (trừ conv vị trí của attention) và neck.
+- Train: forward + `OpenOBB8Loss` + backward hữu hạn, cả khi có ảnh không nhãn và cả batch không nhãn. Mọi tham số của lõi có gradient ngay bước đầu (trừ phần bên trong attention, nằm sau g1 / g2 = 0).
+- Gộp chính xác: `RepConv` với giãn 1 / 2 / 3, có và không có nhánh đồng nhất. Cả model với thống kê BN khác mặc định: f4, P3–P5, đầu ra thô của head, đầu ra bộ tinh chỉnh khớp trước / sau `fuse()`. Sau `fuse()` không còn BatchNorm.
+- Bộ tinh chỉnh lúc khởi tạo là phép đồng nhất: đầu ra bằng đúng (`torch.equal`) bản `v8_off=refine` cùng weights.
+- Lưu / nạp state-dict cho ra đúng đầu ra cũ. Mọi công tắc chạy được (train, suy luận, fuse) và tắt đúng phần nó nói. Ảnh kích thước lẻ chạy được.
+
+### 9.6 Rủi ro đã biết
+
+- **Chưa train.** Mọi kỳ vọng về độ chính xác (mục 3) chờ T2 / T3.
+- Forward của v9 gọi thẳng forward của v8 (và của v7 khi tắt bộ tinh chỉnh) trên lõi v9. Sửa forward của v8 thì v9 đổi theo (đúng ý: head như nhau).
+  Nhưng nếu forward của v8 cần thuộc tính mới thì v9 cũng phải có thuộc tính đó (test của v9 sẽ báo).
+- Train tốn bộ nhớ hơn suy luận: RepConv có 3 nhánh và 3 BN. Tốc độ train thật chỉ đo được ở T2 (epoch đầu).
+- Bộ đếm FLOPs trên CPU bỏ sót SDPA ở cả v8 lẫn v9 (v9 khoảng 8 G, v8 khoảng 6 G). Tỉ lệ 0.56 gần như không đổi.

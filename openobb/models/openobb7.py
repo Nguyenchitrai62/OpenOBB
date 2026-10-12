@@ -130,6 +130,34 @@ def _is_bn(m):
     return isinstance(m, (nn.BatchNorm2d, FrozenBatchNorm2d))
 
 
+def fuse_model(model):
+    """Inference only, any OpenOBB3-family model (v3 / v5 / v7 / v8): fold every BatchNorm (trainable or frozen) into
+    the convolution before it and merge the encoder's re-parameterisable VGG blocks. Outputs are unchanged (up to
+    float rounding)."""
+    from .hgnetv2 import ConvBNAct
+    from .hybrid_encoder import ConvNormLayer, ConvNormLayer_fuse, VGGBlock
+    for m in list(model.modules()):                      # first: VGG blocks read their branches' BN
+        if isinstance(m, VGGBlock) and hasattr(m, "conv1"):
+            m.convert_to_deploy()
+    for m in list(model.modules()):
+        if isinstance(m, ConvBNAct) and _is_bn(m.bn):  # act(bn(conv(x))) then lab; 'same' padding = (pad, conv)
+            if isinstance(m.conv, nn.Sequential):
+                m.conv[1] = fold_bn(m.conv[1], m.bn)
+            else:
+                m.conv = fold_bn(m.conv, m.bn)
+            m.bn = nn.Identity()
+        elif isinstance(m, (ConvNormLayer, ConvNormLayer_fuse)) and hasattr(m, "conv") and _is_bn(m.norm):
+            m.conv, m.norm = fold_bn(m.conv, m.norm), nn.Identity()     # act(norm(conv(x)))
+        elif isinstance(m, (Conv, ConvBN)) and _is_bn(m.bn):
+            m.conv, m.bn = fold_bn(m.conv, m.bn), nn.Identity()
+        elif isinstance(m, StripMix) and _is_bn(getattr(m, "bn", None)):
+            m.v, m.bn = fold_bn(m.v, m.bn), nn.Identity()               # bn(v(h(x)))
+    for p in getattr(getattr(model, "encoder", None), "input_proj", []):    # Sequential(conv, norm)
+        if _is_bn(p.norm):
+            p.conv, p.norm = fold_bn(p.conv, p.norm), nn.Identity()
+    return model
+
+
 class OpenOBB7(OpenOBB3):
     arch = "v7"
 
@@ -167,34 +195,12 @@ class OpenOBB7(OpenOBB3):
         if self.training:
             return {"cls": cls, "reg": reg, "points": pts, "strides": st}
         boxes = decode(reg, pts, st)
-        logits, boxes = fast_nms(cls, boxes, self.max_det, iou=self.nms_iou)
+        logits, boxes = fast_nms(cls, boxes, self.max_det, conf=getattr(self, "nms_conf", 0.001), iou=self.nms_iou)
         boxes[..., :4] = boxes[..., :4] / self.img_size
         boxes[..., 4] = torch.remainder(boxes[..., 4] + math.pi / 2, math.pi) - math.pi / 2
         return {"pred_logits": logits, "pred_boxes": boxes}
 
     @torch.no_grad()
     def fuse(self):
-        """Inference only: fold every BatchNorm (trainable or frozen) into the convolution before it and merge the
-        encoder's re-parameterisable VGG blocks. Outputs are unchanged (up to float rounding)."""
-        from .hgnetv2 import ConvBNAct
-        from .hybrid_encoder import ConvNormLayer, ConvNormLayer_fuse, VGGBlock
-        for m in list(self.modules()):                      # first: VGG blocks read their branches' BN
-            if isinstance(m, VGGBlock) and hasattr(m, "conv1"):
-                m.convert_to_deploy()
-        for m in list(self.modules()):
-            if isinstance(m, ConvBNAct) and _is_bn(m.bn):  # act(bn(conv(x))) then lab; 'same' padding = (pad, conv)
-                if isinstance(m.conv, nn.Sequential):
-                    m.conv[1] = fold_bn(m.conv[1], m.bn)
-                else:
-                    m.conv = fold_bn(m.conv, m.bn)
-                m.bn = nn.Identity()
-            elif isinstance(m, (ConvNormLayer, ConvNormLayer_fuse)) and hasattr(m, "conv") and _is_bn(m.norm):
-                m.conv, m.norm = fold_bn(m.conv, m.norm), nn.Identity()     # act(norm(conv(x)))
-            elif isinstance(m, (Conv, ConvBN)) and _is_bn(m.bn):
-                m.conv, m.bn = fold_bn(m.conv, m.bn), nn.Identity()
-            elif isinstance(m, StripMix) and _is_bn(getattr(m, "bn", None)):
-                m.v, m.bn = fold_bn(m.v, m.bn), nn.Identity()               # bn(v(h(x)))
-        for p in self.encoder.input_proj:                   # Sequential(conv, norm)
-            if _is_bn(p.norm):
-                p.conv, p.norm = fold_bn(p.conv, p.norm), nn.Identity()
-        return self
+        """Inference only: fold every BatchNorm into its convolution (see fuse_model)."""
+        return fuse_model(self)

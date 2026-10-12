@@ -525,6 +525,57 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Tiêu chí: hơn v3 (0.720 / 0.474) cùng thước; wall_300 (v3 0.599) và mAP50-95 của wall / junction tăng; mục tiêu cuối YOLO26x 0.746 / 0.499.
   - Điều sẽ chứng minh sai: mục 2 của OPENOBB8.md (mỗi mảnh có một phép thử).
 
+- **F42. OpenOBB8-x Wall_Color, đang chạy (user, 10-12): hội tụ nhanh nhất từ trước tới nay.**
+  - Điều kiện: init D-FINE COCO, cả trang 1280, batch 16 (15 bước / epoch), 100 epoch, AdamW lr 1e-3 → 1e-5, warmup 45 bước, mosaic (tắt 10 ep cuối).
+    Cùng công thức với v3 vòng 1 (F28: lr 1e-3, batch 16, 100 epoch, COCO).
+  - mAP50 / mAP50-95 (thước YOLO):
+    | Epoch | Bước | Kết quả | P / R |
+    |---|---|---|---|
+    | 5 | 75 | 0.295 / 0.131 | 0.42 / 0.31 |
+    | 10 | 150 | 0.411 / 0.217 | 0.56 / 0.42 |
+    | 20 | 300 | 0.493 / 0.279 | 0.61 / 0.48 |
+    | 30 | 450 | 0.561 / 0.339 | 0.67 / 0.54 |
+    | 37 | 555 | **0.607 / 0.375** | 0.73 / 0.58 |
+    - Ep27 → ep37 vẫn tăng khoảng +0.006 mAP50 / epoch.
+  - So sánh:
+    - v6 từ đầu (F39, cùng thước) đạt 0.379 ở ep50; v8 đạt mức đó ở **ep8**.
+    - v3 vòng 1 (F28) chỉ có số thước DOTA: ep26 0.367 / 0.148. Quy đổi thô bằng tỉ lệ DOTA / YOLO của v3 (F31: 0.82 / 0.66),
+      v8 ep26 khoảng 0.44 / 0.21 thước DOTA → **nhanh hơn v3 cùng công thức, ước tính**, chưa phải số đo.
+    - v3 0.720 / 0.474 là sau 3 vòng (khoảng 200 epoch); chưa so được với 1 vòng của v8.
+  - Tỉ lệ khít mAP50-95 / mAP50 = 0.62 và đang tăng (v6 0.52, v3 0.66, YOLO26x 0.67).
+  - Recall là phần chậm: P 0.43 → 0.73, R 0.34 → 0.58 (ep6 → ep37). Có thể do class hiếm chưa bắt được; cần bảng theo class.
+  - lr 1e-3 không làm nổ BN ở ep37 (v1 / v3 vòng 1 đều nổ ở mức lr này, F22 / F31). Phù hợp với giả thuyết sửa lỗi chặn độ lớn của v7,
+    nhưng chưa phải bằng chứng: cần phép thử "đặt P5 = 0 sau train" (OPENOBB8 §2).
+  - Chi phí: 17.2 s / epoch so với v3 13 s cùng batch (**+32%**, OPENOBB8 dự kiến +5–10%). GPU 89.2 / 95 GB.
+  - Nguyên nhân hội tụ nhanh (giả thuyết, chưa tách): lõi pretrained + head dense một-nhiều; tầng hai học từ bước đầu nhờ bản rung box nhãn;
+    lr cao chịu được nhờ chặn độ lớn.
+  - Việc tiếp khi xong: bảng theo class + confusion matrix (ô wall_300 → junction); phép thử P5 = 0;
+    đối chứng `v8_off=refine` cùng công thức để tách tầng quan hệ khỏi 4 sửa lỗi lõi.
+  - Tổng hợp bài học theo lớp model từ v1 tới v8: [LESSONS_BY_LAYER.md](LESSONS_BY_LAYER.md).
+    Phát hiện treo trong đó: v1 (0.63 / 0.35 thước DOTA) cao hơn v3 (0.593 / 0.312 thước DOTA) nhưng chưa từng đo thước YOLO,
+    nên thứ hạng v3 > v1 trên Wall_Color chưa được chứng minh.
+
+- **F42. Tốc độ suy luận họ v3 + OpenOBB9 (10-12). Chưa có số GPU.**
+  - **Tốc độ v3:** user đo v3 chậm hơn YOLO11x khoảng 60% ở cùng 1280, dù FLOPs chỉ hơn 12% (909 so với 812).
+    - Đo phân rã trên CPU: phần ngoài mạng (`merge_dets` 9.7 ms, `polys_to_obb` 0.7 ms) không đáng kể. `fast_nms` 4000×4000 mất 432 ms trên CPU.
+    - Hai lãng phí:
+      1. Không gộp BN: hàng trăm FrozenBN chạy riêng, VGGBlock của encoder chạy 2 nhánh.
+      2. NMS không lọc theo `conf` của người dùng.
+    - Đã sửa:
+      - `fuse_model` (openobb7.py) cho v3 / v5 / v7 / v8 khi nạp;
+      - `nms_conf` = min(ngưỡng conf) trước NMS. Kết quả không đổi, vì box điểm thấp không loại được box điểm cao.
+    - Checkpoint v3 thật trên CPU: 9019 → 8059 → 7405 ms (−18%). Test bảo toàn đầu ra: `tests/test_infer_speed.py`.
+  - **OpenOBB9** (thiết kế: docs/OPENOBB9.md, đã có code, chưa train):
+    - lõi conv 3×3 dày tái tham số hoá + RepCSP, giãn 1,2,1,3, SPPF + 1 lớp attention, max-pool khi hạ độ phân giải, chi tiết stride 4 vào P3;
+    - head + tầng suy luận quan hệ của v8 giữ nguyên.
+    - x: 29.45M tham số, **543 GFLOPs** (v8-x 969). 95.6% FLOPs của lõi + head nằm ở conv dày ≥ 64 kênh.
+    - CPU (đã gộp): 0.53–0.57× v8.
+    - Pretrain: `openobb pretrain model=openobb9x` chưng cất từ D-FINE-X COCO (P3 / P4 / P5) + DINOv2 (P4 / P5). Có cổng T2 (cosine ≥ 0.8 trên ảnh giữ lại) và in ảnh/s để tính CU thật.
+  - Việc tiếp:
+    - T1: đo độ trễ GPU của v9-x so với v8-x (weights ngẫu nhiên là đủ), khoảng 0.2 CU;
+    - rồi T2 (pretrain 1 epoch để đo tốc độ, sau đó pretrain đầy đủ);
+    - rồi T3.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

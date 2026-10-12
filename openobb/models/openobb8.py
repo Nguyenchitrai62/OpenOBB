@@ -309,7 +309,7 @@ class OpenOBB8(OpenOBB7):
             return out
         cls, boxes = apply_refinement(cls, boxes, idx, cand, ref_logits - base.detach().float(), ref_logits,
                                       ref_boxes, self.spread_iou)
-        logits, boxes = fast_nms(cls, boxes, self.max_det, iou=self.nms_iou)
+        logits, boxes = fast_nms(cls, boxes, self.max_det, conf=getattr(self, "nms_conf", 0.001), iou=self.nms_iou)
         boxes[..., :4] = boxes[..., :4] / self.img_size
         boxes[..., 4] = torch.remainder(boxes[..., 4] + math.pi / 2, math.pi) - math.pi / 2
         return {"pred_logits": logits, "pred_boxes": boxes}

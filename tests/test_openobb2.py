@@ -82,7 +82,7 @@ def test_cli_model_names(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):                                            # short names (s/m/l/x) were removed
         train(str(data), model="x", name="c", **kw)
     with pytest.raises(SystemExit):
-        train(str(data), model="openobb9x", name="d", **kw)
+        train(str(data), model="openobb99x", name="d", **kw)
 
 
 def test_predict_loads_v2_checkpoint(tmp_path):
