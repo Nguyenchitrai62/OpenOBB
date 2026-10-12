@@ -135,6 +135,32 @@ openobb train model=openobb10x data=/content/data.yaml imgsz=1280 epochs=100
   Lần đó chính là v8 train tiếp.
 - Xem theo class (thước YOLO) và confusion matrix: ô **wall_300 → junction**, ô **slide_door → wall**, dòng `Duplicate boxes`.
 
+### Chỉ số kỳ vọng (ghi TRƯỚC khi train, 2026-10-12)
+
+Điều kiện: đi tiếp 50 epoch từ best của v8 (ep36: **0.699 / 0.460**), thước YOLO, val 53 ảnh.
+Mốc YOLO26x: 0.746 / 0.499.
+
+| Class (số mẫu val) | v8 best | v10 kỳ vọng mAP50 / mAP50-95 | Lý do | Mảnh chịu trách nhiệm |
+|---|---|---|---|---|
+| wall (1044) | .875 / .580 | .87–.89 / .58–.60 | 15% tường không có điểm riêng → 1%; 7% điểm P3 hết học box cụt | slots, reach |
+| note (60) | .796 / .490 | .79–.82 / **.50–.54** | 78% điểm P3 hết học box cụt → box khít hơn, ít box trùng | reach |
+| door (391) | .974 / .816 | .97 / .81–.82 (giữ) | không bị tranh điểm (0%), không cụt | — |
+| slide_door (31) | .209 / .090 | .20–.35 / .09–.15 | cân bằng ×4; giới hạn bởi data (130 mẫu train), YOLO cũng chỉ .345 | balance |
+| double_door (25) | .545 / .444 | .52–.62 / .42–.50 | cân bằng; val rất ít mẫu nên nhiễu ±0.05 | balance |
+| **wall_300 (141)** | **.582 / .231** (R .411) | **.65–.78 / .28–.38** (R .55–.70) | 72% không có điểm riêng → 1%; nhắm ô wall_300 → junction | slots (+ balance) |
+| junction (1773) | .916 / .566 | .91–.93 / .56–.58 | 60% không có điểm riêng → 1% | slots |
+| **all** | **.699 / .460** | **.70–.77 / .46–.51**, giữa khoảng ≈ **.73 / .48** | trung bình 7 class | |
+
+Cách đọc kết quả:
+- Mức nhiễu giữa các lần train khoảng ±0.02 mAP50 (v3 / v8 cùng ngân sách lệch 0.02).
+  Train tiếp v8 thêm 50 epoch không đổi gì cũng có thể tăng khoảng +0.005–0.01. Lần đối chứng `v10_off=slots,reach,balance` cho số này chính xác.
+- **Slot được xác nhận** nếu wall_300 ≥ .65 mAP50 **và** ô wall_300 → junction giảm rõ (v8 khoảng 28%).
+  **Bác bỏ** nếu wall_300 < .62 hoặc ô đó không giảm.
+- **Theo tầm với được xác nhận** nếu mAP50-95 của note ≥ .50 và `Duplicate boxes` giảm.
+- **Không làm hại class đang tốt:** wall / door / junction không được giảm quá 0.02 mAP50.
+  Nếu giảm, tắt từng mảnh (`v10_off=balance` trước, vì nó đổi loss của mọi class hiếm) để tìm thủ phạm.
+- Cận trên .77 chỉ đạt khi wall_300 về gần mức YOLO (.824). Cận dưới .70 nghĩa là chỉ ngang v8 → giả thuyết tranh điểm không phải nguyên nhân chính.
+
 ## 7. Đo tác dụng từng mảnh (`v10_off=`)
 
 | `v10_off=` | Tắt gì | Câu hỏi |

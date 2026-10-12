@@ -647,6 +647,8 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     clamp(√(n_max / n_c), 1, 4). 66.67M tham số (+84k), +0.2% FLOPs. Đầu vào NMS lúc khởi tạo y hệt v8; nạp được checkpoint v8.
     Chưa có số GPU. Tiêu chí bác bỏ ở OPENOBB10 mục 3: ô wall_300 → junction, mAP50-95 note + `Duplicate boxes`, AP slide_door / double_door.
   - Khuyến nghị train: `weights=<best v8>`, 50 epoch; đối chứng (tuỳ ngân sách) `v10_off=slots,reach,balance` cùng checkpoint.
+  - **Dự đoán ghi trước khi train** (bảng đầy đủ: OPENOBB10 mục 6): từ v8 best 0.699 / 0.460 → v10 **0.70–0.77 / 0.46–0.51** (giữa khoảng 0.73 / 0.48); wall_300 .582 → .65–.78; note mAP50-95 .490 → .50–.54; wall / door / junction giảm không quá 0.02.
+    Slot bị bác bỏ nếu wall_300 < .62 hoặc ô wall_300 → junction (khoảng 28%) không giảm.
 
 - **F46. Phép thử "đặt P5 = 0 sau train" (OPENOBB8 §2): P5 chết ở v3 nhưng SỐNG ở v8 → không cắt P5 ở v10 (10-12).**
   - Trang thật, `research/analysis/p5_zero_test.py` (đặt đầu ra stage 4 của backbone = 0, conf 0.25, CPU):
