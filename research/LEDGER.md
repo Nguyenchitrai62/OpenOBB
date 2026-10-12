@@ -661,6 +661,34 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
       Tiêu chí bác bỏ của mảnh "chặn độ lớn" (OPENOBB8 §2) **không xảy ra** → mảnh này được xác nhận.
     - User đồng ý cắt P5 với giả định nó vô dụng; giả định đó chỉ đúng với v3. Ở v8 / v10 cắt P5 sẽ đổi kết quả → **giữ P5**.
 
+- **F47. OpenOBB10-x Wall_Color, 1 run 100 epoch (user, 10-12): tổng không hơn v8; giả thuyết "tranh điểm" BỊ BÁC BỎ theo tiêu chí ghi trước.**
+  - best ep87 **0.693 / 0.456** (thước YOLO). Ep84–100 dao động 0.684–0.697, đã chững.
+    So sánh: v8 best (2 vòng, 150 epoch) 0.699 / 0.460; v8 vòng 1 (100 epoch từ COCO, F43) 0.671 / 0.444.
+  - Theo class, v10 so với v8 best (v8 vòng 1 trong ngoặc):
+    | Class | v10 | v8 best | Đổi |
+    |---|---|---|---|
+    | wall | .875 / .548 | .875 / .580 (.873 / .571) | 50-95 −.03 |
+    | note | .682 / .453 | .796 / .490 (.735 / .454) | **−.11** |
+    | door | .968 / .817 | .974 / .816 | 0 |
+    | slide_door | .326 / .140 | .209 / .090 (.111) | **+.12** |
+    | double_door | .493 / .427 | .545 / .444 | −.05 (25 mẫu) |
+    | wall_300 | .649 / .292, R .504 | .582 / .231, R .411 | **+.07 / +.06** |
+    | junction | .855 / .517, P .794 R .837 | .916 / .566, P .838 R .896 | **−.06 / −.05** |
+  - Đối chiếu dự đoán (OPENOBB10 mục 6):
+    - wall_300 .649: sát cận dưới .65. Nhưng **ô wall_300 → junction vẫn 27%** (v8 khoảng 28%) → theo tiêu chí ghi trước, **slot bị bác bỏ**: phần tăng của wall_300 không đến từ việc gỡ tranh điểm.
+    - note mAP50-95 .453 < .50 → mảnh "theo tầm với" không được xác nhận.
+    - junction giảm .06 (> 0.02) → v10 **làm hại class đang tốt**, vi phạm tiêu chí.
+    - Class hiếm tăng (slide_door +.12, wall_300 R +.09): khớp với tác dụng của **cân bằng class**.
+  - **Box trùng: 1367 (16.7% số detection)**: junction 761 (43% số junction thật), wall 390, wall_300 105.
+    v8 chưa có số đếm này (dòng in ra từ 0.6.2) → cần val lại `openobb8x.pt` bằng code mới để so.
+    Giả thuyết: slot phụ cũng bắn vào junction, và NMS IoU 0.7 không gộp được box 9.5 px lệch 1–2 px → P và R của junction đều giảm.
+  - Tốc độ val: 45.8 ms / ảnh (batch 16, chữ nhật trung bình 976 × 1280, fused, bf16). Chưa so được với v8 (31.2 ms / tile, batch 1, chưa fuse);
+    lần val đầu với nhiều cỡ ảnh chữ nhật còn bị cudnn.benchmark tune lại theo từng cỡ.
+  - Bài học:
+    1. Thêm slot làm tăng số ứng viên trùng ở vật tí hon, mà NMS ProbIoU không xử lý được. Nếu cần nhiều object mỗi điểm, phải có cơ chế khử trùng một-một (kiểu YOLO26 / DETR), không phải NMS.
+    2. Ô wall_300 → junction đứng yên qua mọi thay đổi ở head / ngữ cảnh / chi tiết / slot (v3 → v10). Nguyên nhân nằm chỗ khác: tiên nghiệm (H-DOTA), nhãn, hoặc công thức train.
+    3. Cân bằng class là mảnh duy nhất có dấu hiệu tốt; cần thử riêng (`v10_off=slots,reach`) để xác nhận.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
