@@ -293,6 +293,16 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-12 (3): **OpenOBB8: bản tốt nhất hiện tại**
+  (F41, [docs/OPENOBB8.md](docs/OPENOBB8.md)). OpenOBB8 = lõi OpenOBB7 (v3 đã sửa lỗi, [docs/OPENOBB7.md](docs/OPENOBB7.md)) + tầng suy luận quan hệ.
+  - Viết song song bằng 2 sub-agent.
+  - `model=openobb8s|m|l|x`; không có tên `openobb7*` (lõi = `v8_off=refine`).
+  - **Luật mới của user:** mọi version mới phải có lập luận (bài học cũ → cơ chế → kỳ vọng → điều chứng minh sai), không thử mù.
+    Bản nào lý thuyết chứa trọn bản kia thì gộp, không test cả hai.
+  - v6 thất bại (F39–F40, khoảng 0.55 / 0.32 khi train từ đầu) → v6 chỉ còn là thử nghiệm.
+  - Bản đột phá tiếp theo là **v9**: kiến trúc mới, tự pretrain bằng chưng cất 2 thầy (DINOv2 + lõi D-FINE COCO), lõi conv tái tham số hoá cho GPU.
+    Phải viết lập luận trước khi code.
+
 - 2026-10-12 (2): **OpenOBB6: kiến trúc tổng quát tự thiết kế** (F38, [docs/OPENOBB6.md](docs/OPENOBB6.md)).
   - Code:
     - `openobb/models/openobb6.py`;

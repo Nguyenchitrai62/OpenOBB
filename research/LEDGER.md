@@ -495,6 +495,36 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Chưa tách được kiến trúc và khởi tạo. Cần đối chứng v3 train từ đầu, cùng điều kiện, với BN / stem của HGNet được mở (bản x đang đóng băng).
   - Log in `[init] D-FINE coco: 997 full...` khi fine-tune từ best.pt: chỉ là nhãn log sai (hàm nạp dùng chung), weights nạp đúng.
 
+- **F41. OpenOBB8 = lõi OpenOBB7 (v3 đã sửa lỗi) + tầng suy luận quan hệ theo hướng (10-12). Gộp thành một bản, theo user. Chưa có số GPU.**
+  Chi tiết: [docs/OPENOBB8.md](../docs/OPENOBB8.md), lập luận ở mục 2; lõi ở [docs/OPENOBB7.md](../docs/OPENOBB7.md).
+  - Lõi (v7) sửa 4 lỗi F37, mỗi chỗ bắt đầu bằng phép đồng nhất:
+    1. chặn độ lớn ở 4 đầu ra backbone (đồng nhất khi RMS ≤ 4);
+    2. LSK `x + x·tanh(m)`;
+    3. space-to-depth stride 4 vào P3 (BN gamma 0);
+    4. StripMix k=11 trong tháp class.
+
+    Thêm `fuse()` gộp mọi BN khi suy luận.
+  - Tầng mới (v8): K = 600 ứng viên khác nhau.
+    - Mỗi ứng viên được đọc trong khung xoay của nó: lưới 8×3 ở f4 + P3, vòng 18 điểm ở P3 + P4.
+    - Transformer cục bộ 2 lớp, rồi 1 lớp quan hệ có bias attention từ hình học tương đối (bất biến khi xoay và khi θ → θ + π).
+    - Đầu ra dư khởi tạo 0 cho class và box.
+    - Lúc train có bản rung của box nhãn, kèm mask để chúng không lộ đáp án.
+  - Kiểm chứng trên CPU:
+    - lõi nạp COCO hoặc một v3 chưa train cho ra đúng đầu ra v3;
+    - nạp v3 đã train (`vrdet3x_1.pt`) giữ 219/224 detection, điểm lệch trung vị 0.004 (do tanh nén LSK P4 đã học);
+    - v8 nạp v7 cho ra `torch.equal` ở bước 0.
+    - 146 test pass; train → predict end-to-end chạy được.
+  - Chi phí bản x ở 1280:
+
+    | Model | Tham số | GFLOPs |
+    |---|---|---|
+    | v3 | 64.6M | 909 |
+    | v7 | 65.4M | 933 (915 sau `fuse`) |
+    | v8 | 66.6M | khoảng 969 (tầng mới +35 G, +3.8%) |
+  - Không train v7 riêng: v8 chứa trọn v7, và bắt đầu y hệt (user: không thử mù, gộp bản lý thuyết tốt hơn).
+  - Tiêu chí: hơn v3 (0.720 / 0.474) cùng thước; wall_300 (v3 0.599) và mAP50-95 của wall / junction tăng; mục tiêu cuối YOLO26x 0.746 / 0.499.
+  - Điều sẽ chứng minh sai: mục 2 của OPENOBB8.md (mỗi mảnh có một phép thử).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

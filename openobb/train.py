@@ -31,16 +31,22 @@ def build_parser():
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6"],
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8"],
                     help="v1: OpenOBB (DETR-style decoder); v2: OpenOBB2 (dense segment-aware, NMS-free); "
                          "v3: OpenOBB3 (pretrained encoder + dense anisotropic oriented head); "
                          "v4: OpenOBB4 (DINOv2 backbone + DETR decoder + dense oriented branch); "
-                         "v6: OpenOBB6 (own backbone / neck / head, docs/OPENOBB6.md)")
+                         "v6: OpenOBB6 (own backbone / neck / head, docs/OPENOBB6.md); "
+                         "v7: OpenOBB7 (OpenOBB3 repaired, docs/OPENOBB7.md); "
+                         "v8: OpenOBB8 (OpenOBB7 + oriented relational refiner, docs/OPENOBB8.md)")
     ap.add_argument("--backbone", default="hgnet", choices=["hgnet", "dinov2_s", "dinov2_b", "dinov2_l"])
     ap.add_argument("--dense-v3", action="store_true", help="dense branch = OpenOBB3's oriented head (OpenOBB4)")
     ap.add_argument("--geo-cls", action="store_true", help="OpenOBB5: class branch reads the predicted geometry")
     ap.add_argument("--relate", action="store_true", help="OpenOBB5: relation re-scoring of the best candidates")
     ap.add_argument("--rel-k", type=int, default=600, help="OpenOBB5: candidates per image for relation re-scoring")
+    ap.add_argument("--v7-off", default="", help="OpenOBB7 ablation: parts switched off, comma-separated "
+                                                  "(guard, lsk_bound, spd, cls_ctx)")
+    ap.add_argument("--v8-off", default="", help="OpenOBB8 ablation: refiner parts switched off, comma-separated "
+                                                  "(relate, geo_bias, ring, p2, jitter, refine)")
     ap.add_argument("--v6-off", default="", help="OpenOBB6 ablation: parts switched off, comma-separated "
                                                   "(strip, axis, attn, spd, maxpool, cls_ctx)")
     ap.add_argument("--img", type=int, default=1024)
@@ -199,8 +205,8 @@ def main(argv=None):
     torch.backends.cudnn.allow_tf32 = True
 
     classes = dataset_classes(a.data)
-    v2, v3, v4, v5 = a.arch == "v2", a.arch in ("v3", "v5", "v6"), a.arch == "v4", a.arch == "v5"
-    v6 = a.arch == "v6"
+    v2, v3, v4, v5 = a.arch == "v2", a.arch in ("v3", "v5", "v6", "v7", "v8"), a.arch == "v4", a.arch == "v5"
+    v6, v7, v8 = a.arch == "v6", a.arch == "v7", a.arch == "v8"
     dense_arch = v2 or v3                       # dense heads: no queries / decoder
     if v4:                                      # DETR decoder fed and supervised by the dense oriented branch
         a.dense = a.dense_queries = a.dense_v3 = True
@@ -211,7 +217,15 @@ def main(argv=None):
     elif v3:
         from openobb.models.openobb3 import OpenOBB3
         from openobb.models.openobb3_loss import OpenOBB3Loss
-        if v6:
+        if v8:
+            from openobb.models.openobb8 import OpenOBB8
+            model = OpenOBB8(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
+                             off=a.v8_off or None, off7=a.v7_off or None, rel_k=a.rel_k)
+        elif v7:
+            from openobb.models.openobb7 import OpenOBB7
+            model = OpenOBB7(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
+                             off=a.v7_off or None)
+        elif v6:
             from openobb.models.openobb6 import OpenOBB6
             model = OpenOBB6(a.size, num_classes=len(classes), img_size=a.img, max_det=a.num_top, off=a.v6_off)
         elif v5:
@@ -253,7 +267,11 @@ def main(argv=None):
     if v2:
         crit = OpenOBB2Loss(img_size=a.img)
     elif v3:
-        crit = OpenOBB5Loss(img_size=a.img) if v5 else OpenOBB3Loss(img_size=a.img)
+        if v8:
+            from openobb.models.openobb8_loss import OpenOBB8Loss
+            crit = OpenOBB8Loss(img_size=a.img)
+        else:
+            crit = OpenOBB5Loss(img_size=a.img) if v5 else OpenOBB3Loss(img_size=a.img)
     else:
         crit = build_criterion(num_classes=len(classes), box_loss=a.box_loss, o2m_k=a.o2m_k, aqd=a.aqd,
                                angle_weight=a.angle_weight, cost_iou=a.cost_iou, member_weight=a.vec_ground)
@@ -376,6 +394,11 @@ def main(argv=None):
             say(f"model   OpenOBB4-{a.size} ({a.backbone} + {'LSK + ' if a.lsk else ''}hybrid encoder + DETR decoder "
                 f"+ dense oriented branch, output {a.primary}), {n_par:.2f}M params, {a.queries} queries | "
                 f"init: {init_desc}")
+        elif v7 or v8:
+            off = ", ".join(f"off: {v}" for v in (a.v7_off, a.v8_off if v8 else "") if v)
+            say(f"model   OpenOBB{8 if v8 else 7}-{a.size} (pretrained HGNetv2 + LSK + hybrid encoder, repaired; dense "
+                f"oriented head P3-P5{' + oriented relational refiner of ' + str(a.rel_k) + ' candidates' if v8 else ''}"
+                f"{'; ' + off if off else ''}), {n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")
         elif v6:
             say(f"model   OpenOBB6-{a.size} (own backbone + neck + context-aware dense oriented head P3-P5"
                 f"{', off: ' + a.v6_off if a.v6_off else ''}), "

@@ -51,6 +51,21 @@ def load_model(ckpt_path, device, queries=None, classes=None):
         m = OpenOBB2(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
+    if a.get("arch") in ("v7", "v8"):
+        common = dict(num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
+                      max_det=max(int(a.get("num_top", 1000)), int(queries or 0)))
+        if a["arch"] == "v8":
+            from openobb.models.openobb8 import OpenOBB8
+            m = OpenOBB8(a.get("size", "x"), off=a.get("v8_off") or None, off7=a.get("v7_off") or None,
+                         rel_k=a.get("rel_k", 600), **common)
+        else:
+            from openobb.models.openobb7 import OpenOBB7
+            m = OpenOBB7(a.get("size", "x"), off=a.get("v7_off") or None, **common)
+        m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
+        m = m.to(device).eval()
+        if hasattr(m, "fuse"):
+            m.fuse()
+        return m, list(names), dict(a, conf_thr=ck.get("conf_thr"))
     if a.get("arch") == "v6":
         from openobb.models.openobb6 import OpenOBB6
         m = OpenOBB6(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024),
