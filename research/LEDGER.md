@@ -648,6 +648,17 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     Chưa có số GPU. Tiêu chí bác bỏ ở OPENOBB10 mục 3: ô wall_300 → junction, mAP50-95 note + `Duplicate boxes`, AP slide_door / double_door.
   - Khuyến nghị train: `weights=<best v8>`, 50 epoch; đối chứng (tuỳ ngân sách) `v10_off=slots,reach,balance` cùng checkpoint.
 
+- **F46. Phép thử "đặt P5 = 0 sau train" (OPENOBB8 §2): P5 chết ở v3 nhưng SỐNG ở v8 → không cắt P5 ở v10 (10-12).**
+  - Trang thật, `research/analysis/p5_zero_test.py` (đặt đầu ra stage 4 của backbone = 0, conf 0.25, CPU):
+    | Checkpoint | Độ lớn P5 | Box giữ nguyên khi P5 = 0 | Thay đổi |
+    |---|---|---|---|
+    | `openobb3x.pt` | 102 | **100%** (214 / 214), điểm lệch 0.000 | không |
+    | `openobb8x.pt` | 4.3·10⁴ (vẫn nổ ở backbone) | **80.7%** (264 → 256 box) | note 4 → 6, slide_door 9 → 7, double_door 6 → 4, wall 71 → 67; điểm lệch trung vị 0.02 |
+  - Kết luận:
+    - Chặn độ lớn (ScaleGuard, v7) **làm P5 sống lại**: backbone vẫn nổ, nhưng đưa về RMS 4 thì đặc trưng có nghĩa, và đóng góp vào class box lớn / hiếm.
+      Tiêu chí bác bỏ của mảnh "chặn độ lớn" (OPENOBB8 §2) **không xảy ra** → mảnh này được xác nhận.
+    - User đồng ý cắt P5 với giả định nó vô dụng; giả định đó chỉ đúng với v3. Ở v8 / v10 cắt P5 sẽ đổi kết quả → **giữ P5**.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

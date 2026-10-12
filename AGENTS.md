@@ -300,6 +300,8 @@ Câu hỏi còn mở:
     78% điểm P3 của note học box cụt → gán nhãn theo tầm với; RFS không tác dụng với class hiếm → cân bằng mức object.
   - User: không cắt nhánh P5, không thay phần pretrained (rủi ro độ chính xác); không train trên CPU local; không mặc định giao sub-agent.
   - `model=openobb10s|m|l|x`, `v10_off=slots|reach|balance`. Test: `tests/test_openobb10.py`.
+  - F46: đặt P5 = 0 trên trang thật: v3 không đổi (P5 chết), v8 giữ 80.7% box (P5 sống nhờ ScaleGuard) → giữ P5.
+  - 0.7.1: LR mặc định giảm theo cosine (`cos_lr=True`), theo user.
 
 - 2026-10-12 (4): **Sửa tốc độ suy luận cho họ v3, thêm OpenOBB9** (F42).
   - Tốc độ: gộp BN khi suy luận + lọc `conf` trước NMS, áp dụng cho v3 / v5 / v7 / v8; CPU −18%, đầu ra không đổi.
