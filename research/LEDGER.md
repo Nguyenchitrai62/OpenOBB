@@ -688,6 +688,17 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     1. Thêm slot làm tăng số ứng viên trùng ở vật tí hon, mà NMS ProbIoU không xử lý được. Nếu cần nhiều object mỗi điểm, phải có cơ chế khử trùng một-một (kiểu YOLO26 / DETR), không phải NMS.
     2. Ô wall_300 → junction đứng yên qua mọi thay đổi ở head / ngữ cảnh / chi tiết / slot (v3 → v10). Nguyên nhân nằm chỗ khác: tiên nghiệm (H-DOTA), nhãn, hoặc công thức train.
     3. Cân bằng class là mảnh duy nhất có dấu hiệu tốt; cần thử riêng (`v10_off=slots,reach`) để xác nhận.
+  - **Tốc độ `openobb10x.pt` so với `openobb8x.pt`** (trang thật, ảnh chữ nhật 928 × 1280, CPU 1 luồng, xen kẽ trong cùng tiến trình,
+    `research/analysis/speed_v8_v10_parts.py`):
+    | Phần | v8 | v10 |
+    |---|---|---|
+    | lõi (backbone + LSK + encoder) | 21.5 s | 12.7 s (cùng kiến trúc: chênh lệch là nhiễu do máy thiếu bộ nhớ) |
+    | head | 0.52 s | 1.32 s |
+    | tầng quan hệ + decode + phần còn lại | 0.90 s | 2.01 s |
+    | NMS | 0.05 s | 0.27 s |
+    | box (conf 0.25) | 264 | 297 |
+    → v10 **chậm hơn** v8 khoảng 2.1 s CPU ngoài lõi (+15% so với lõi): 3 lần số anchor qua decode / chọn ứng viên / lan delta / NMS, và nhiều box hơn (box trùng).
+    Phần tăng tốc của đợt này đến từ suy luận ảnh chữ nhật trong code 0.7.x, áp dụng như nhau cho mọi model, không đến từ kiến trúc v10.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
