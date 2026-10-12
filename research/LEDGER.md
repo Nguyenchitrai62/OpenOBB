@@ -576,6 +576,30 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     - rồi T2 (pretrain 1 epoch để đo tốc độ, sau đó pretrain đầy đủ);
     - rồi T3.
 
+- **F43. OpenOBB8-x Wall_Color, 1 vòng 100 epoch từ COCO (user, 10-12): bằng v3 cùng ngân sách, chưa thấy lợi ích; chậm hơn 35%.**
+  - Điều kiện: lr 1e-3, batch 16 (GPU 89 GB), 100 epoch. Cùng công thức với v3 vòng 1 (F28).
+  - Kết quả: best ep84 **0.671 / 0.444** (thước YOLO) | DOTA 0.550 / 0.291.
+  - Cùng ngân sách (1 vòng 100 epoch, thước DOTA): v3 khoảng 0.55 / 0.28 (F33) → **chênh khoảng 0 / +0.01, trong mức nhiễu**.
+    v3 0.720 / 0.474 là sau 3 vòng (khoảng 200 epoch), không so trực tiếp được.
+  - Theo class, v8 vòng 1 so với v3 sau 3 vòng (thước YOLO):
+    | Class | v8 vòng 1 | v3 sau 3 vòng |
+    |---|---|---|
+    | wall | .873 / .571 | .894 / .575 |
+    | junction | .900 / .550 | .907 / .556 |
+    | door | .966 / .802 | .975 / .820 |
+    | note | .735 / .454 | .744 / .470 |
+    | double_door | .543 / .455 | .589 / .476 |
+    | wall_300 | .571 / .223 | .599 / .256 |
+    | slide_door | .111 | .273 |
+  - **wall_300 → junction 40%** (v3: 32%), slide_door → wall 71%: tầng suy luận quan hệ và ngữ cảnh trong head class **chưa sửa được lỗi chính** sau 1 vòng.
+    Theo tiêu chí bác bỏ ở OPENOBB8 mục 2, mảnh "ngữ cảnh head class" và "tầng quan hệ" **chưa được xác nhận**.
+  - **Tốc độ:**
+    - 31.2 ms / tile (val, chưa gộp BN), v3 là 23.1 ms → **+35%**, trong khi FLOPs chỉ +7%.
+    - Thủ phạm khả dĩ là tầng quan hệ: 600 × 43 token + `grid_sample`, `distinct_topk` 1200², lan delta 4000 × 600 ProbIoU. Toàn op nhỏ, nghẽn bộ nhớ.
+    - Bộ nhớ train 89 GB ở batch 16.
+  - → **Bài học:** mảnh thêm vào phải được đo cả tốc độ GPU (T1) trước khi train.
+    v9 đang mang nguyên head + tầng quan hệ của v8, nên T1 của v9 phải đo cả **có / không tầng quan hệ** (`v8_off=refine`).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
