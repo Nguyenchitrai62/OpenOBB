@@ -293,6 +293,14 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-12 (5): **OpenOBB10 + suy luận ảnh chữ nhật** (F45, [docs/OPENOBB10.md](docs/OPENOBB10.md)).
+  - Đo tốc độ trên trang thật (CPU 1 luồng): v3-x 1.32×, v8-x 1.77× YOLO26x cùng đầu vào. Trên trang A, OpenOBB còn đệm vuông
+    (thêm 38% điểm ảnh) → suy luận chữ nhật (bội số 32) thành mặc định cho mọi model, không cần train lại.
+  - Đo trên nhãn: 72% wall_300 không có điểm lưới riêng (tranh với junction) → head 3 slot / điểm;
+    78% điểm P3 của note học box cụt → gán nhãn theo tầm với; RFS không tác dụng với class hiếm → cân bằng mức object.
+  - User: không cắt nhánh P5, không thay phần pretrained (rủi ro độ chính xác); không train trên CPU local; không mặc định giao sub-agent.
+  - `model=openobb10s|m|l|x`, `v10_off=slots|reach|balance`. Test: `tests/test_openobb10.py`.
+
 - 2026-10-12 (4): **Sửa tốc độ suy luận cho họ v3, thêm OpenOBB9** (F42).
   - Tốc độ: gộp BN khi suy luận + lọc `conf` trước NMS, áp dụng cho v3 / v5 / v7 / v8; CPU −18%, đầu ra không đổi.
   - OpenOBB9: lõi mới tự thiết kế (conv dày tái tham số hoá), 543 GFLOPs so với 969 của v8, cùng head với v8.

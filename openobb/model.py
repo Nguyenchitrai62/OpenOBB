@@ -297,14 +297,17 @@ class OpenOBB:
             save_dir.mkdir(parents=True, exist_ok=True)
         srcs = list_sources(source)
         n_img, t_sum = 0, np.zeros(3)
+        shape = (1, 3, size, size)
         for k, (path, img) in enumerate(srcs):
             t0 = time.perf_counter()
             img = img() if callable(img) else img
             scale = size / max(img.shape[:2]) if fit else float(a.get("scale", 1.0))
             t1 = time.perf_counter()
+            info = {}
             with nms_timer(self.device) as nms:          # NMS runs inside the network: counted as postprocess (YOLO)
                 raw = predict_image(self.model, img, size, 200, 8 * batch, self.device, max(max_det, 300) * 3,
-                                    scale=scale)
+                                    scale=scale, info=info)
+            shape = info.get("shape", shape)             # real network input (rect: padded to multiples of 32)
             if self.device.type == "cuda":
                 torch.cuda.synchronize(self.device)
             t2 = time.perf_counter() - nms[0]
@@ -327,7 +330,8 @@ class OpenOBB:
             n_img += 1
             r = Results(img, path, self._names, OBB(data, img.shape[:2]), speed, str(save_dir) if save_dir else None)
             if verbose:
-                print(f"image {k + 1}/{len(srcs)} {path}: {size}x{size} {r.verbose()}{speed['inference']:.1f}ms")
+                hw = f"{shape[2]}x{shape[3]}"
+                print(f"image {k + 1}/{len(srcs)} {path}: {hw} {r.verbose()}{speed['inference']:.1f}ms")
             if save_dir is not None:
                 p = Path(path)
                 plot_kw = dict(line_width=line_width, labels=show_labels, conf=show_conf, boxes=show_boxes)
@@ -343,7 +347,7 @@ class OpenOBB:
         if verbose and n_img:
             t = t_sum / n_img
             print(f"Speed: {t[0]:.1f}ms preprocess, {t[1]:.1f}ms inference, {t[2]:.1f}ms postprocess per image at "
-                  f"shape (1, 3, {size}, {size})")
+                  f"shape {(1, 3, *shape[2:])}")
         if verbose and save_dir is not None:
             n_lbl = len(list((save_dir / "labels").glob("*.txt"))) if save_txt else 0
             print(f"Results saved to {save_dir}"

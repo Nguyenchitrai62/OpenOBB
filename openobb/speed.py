@@ -56,6 +56,8 @@ class SpeedMeter:
         self.skip, self.batches, self.images = skip, 0, 0
         self.t = {"preprocess": 0.0, "inference": 0.0, "postprocess": 0.0}
         self.shape = None
+        self.shapes = set()                                 # rect validation: several input shapes
+        self.hw = [0.0, 0.0]                                # image-weighted sums of the input H and W
 
     def add(self, n, pre, inf, post, shape=None):
         self.batches += 1
@@ -64,11 +66,19 @@ class SpeedMeter:
         self.images += n
         for k, v in (("preprocess", pre), ("inference", inf), ("postprocess", post)):
             self.t[k] += v
-        self.shape = shape or self.shape
+        if shape:
+            self.shape = shape if self.shape is None else tuple(max(a, b) for a, b in zip(self.shape, shape))
+            self.shapes.add(tuple(shape[-2:]))
+            self.hw[0] += n * shape[-2]
+            self.hw[1] += n * shape[-1]
 
     def result(self):
+        """shape: the largest (B, 3, H, W) seen; rect: True when the input shape varied (rect batches), with
+        mean_hw the mean input (H, W) per image."""
         n = max(self.images, 1)
-        return {k: v * 1e3 / n for k, v in self.t.items()} | {"shape": self.shape, "images": self.images}
+        return {k: v * 1e3 / n for k, v in self.t.items()} | {
+            "shape": self.shape, "images": self.images, "rect": len(self.shapes) > 1,
+            "mean_hw": (round(self.hw[0] / n), round(self.hw[1] / n))}
 
 
 def speed_line(sp):
@@ -78,4 +88,6 @@ def speed_line(sp):
         return ""
     shape = tuple(sp["shape"]) if sp.get("shape") else ""
     return (f"Speed: {sp['preprocess']:.1f}ms preprocess, {sp['inference']:.1f}ms inference, 0.0ms loss, "
-            f"{sp['postprocess']:.1f}ms postprocess per image at shape {shape}")
+            f"{sp['postprocess']:.1f}ms postprocess per image at shape {shape}"
+            + (f" max, mean {sp['mean_hw'][0]}x{sp['mean_hw'][1]} (rect: padded to multiples of 32)"
+               if sp.get("rect") and sp.get("mean_hw") else ""))

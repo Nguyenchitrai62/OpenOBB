@@ -73,8 +73,11 @@ class DotaPatches(Dataset):
                  hsv=(0.015, 0.5, 0.3), rot90=True, flip=True, limit=None, keep_difficult=True, rotate_p=0.0,
                  mosaic_p=0.0, context=False, thumb=512, ctx_dropout=0.0, vectors=False, max_tokens=4096,
                  scale_jitter=0.0, translate=0.0, mosaic_mode="half", layer_drop=0.0, aug_iof=0.7, cache=False,
-                 fliplr=0.5, flipud=0.5):
+                 fliplr=0.5, flipud=0.5, rect=False):
         self.root, self.split, self.size = Path(root), split, size
+        # rect (evaluation only, YOLO rect): a tile whose valid area (meta w x h) is smaller than the stored square is
+        # cropped to that area padded up to multiples of 32 (rect_hw); collate pads a batch to its largest shape
+        self.rect = rect and not augment
         # H11 (YOLO recipe idea): random scale in [1 - scale_jitter, 1 + scale_jitter] and translation of
         # +-translate x size on every training sample; mosaic_mode "yolo" = 4 full-resolution patches around a
         # random centre on a 2S canvas, then the same scale/translate warp to S (objects keep their size)
@@ -371,6 +374,9 @@ class DotaPatches(Dataset):
         obb, labels = obb[keep], labels[keep]
         obb[:, 2:4] = np.maximum(obb[:, 2:4], self.min_size)
         obb[:, :4] /= self.size
+        if self.rect:
+            rh, rw = self.rect_hw(m, img.shape[:2])
+            img = img[:rh, :rw]
         img = np.ascontiguousarray(img[..., ::-1].transpose(2, 0, 1))      # BGR HWC -> RGB CHW
         tgt = {"labels": torch.from_numpy(labels), "boxes": torch.from_numpy(obb), "name": m["name"]}
         if ctx is not None:
@@ -382,6 +388,23 @@ class DotaPatches(Dataset):
                 vec["attr"][:, 5] = np.minimum(vec["attr"][:, 5], 1.0)
             tgt["vec"] = self._vec_out(vec)
         return torch.from_numpy(img), tgt
+
+    @staticmethod
+    def rect_hw(m, shape, stride=32):
+        """Network input (H, W) of a stored tile in rect mode: its valid area rounded up to `stride` (the rest is
+        the split's padding), never larger than the stored tile."""
+        H, W = shape
+        if "h" not in m or "w" not in m:
+            return H, W
+        return (min(math.ceil(m["h"] / stride) * stride, H), min(math.ceil(m["w"] / stride) * stride, W))
+
+    def rect_batches(self, batch, stride=32):
+        """Index batches for rect evaluation (YOLO rect): tiles sorted by their input shape so a batch shares one
+        shape and pads little. Tiles of unknown size count as full squares."""
+        big = 1 << 30
+        key = [self.rect_hw(m, (big, big), stride) for m in self.items]
+        order = sorted(range(len(self.items)), key=lambda i: (key[i][0] / key[i][1], key[i], i))
+        return [order[i:i + batch] for i in range(0, len(order), batch)]
 
 
 def repeat_factors(items, num_classes, t):
@@ -404,5 +427,13 @@ def dataset_classes(root):
 
 
 def collate(batch):
-    imgs = torch.stack([b[0] for b in batch])
+    shapes = {tuple(b[0].shape[-2:]) for b in batch}
+    if len(shapes) == 1:
+        imgs = torch.stack([b[0] for b in batch])
+    else:                                       # rect evaluation: pad to the batch's largest H and W (top-left)
+        H, W = max(s[0] for s in shapes), max(s[1] for s in shapes)
+        imgs = torch.empty((len(batch), 3, H, W), dtype=batch[0][0].dtype)
+        imgs[:] = torch.tensor(PAD_BGR[::-1], dtype=imgs.dtype).view(1, 3, 1, 1)     # RGB
+        for i, b in enumerate(batch):
+            imgs[i, :, :b[0].shape[1], :b[0].shape[2]] = b[0]
     return imgs, [b[1] for b in batch]

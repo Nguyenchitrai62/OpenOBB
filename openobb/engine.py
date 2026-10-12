@@ -157,7 +157,11 @@ def predict_patches(model, ds, device, batch=32, workers=8, num_top=300, img_siz
     """-> {"dec": [(patch, cls, score, poly8)], "dense": [...] (only if the model has a dense head)}."""
     from openobb.models.dense_head import dense_predict
     model.eval()
-    dl = DataLoader(ds, batch_size=batch, shuffle=False, num_workers=workers, collate_fn=collate, pin_memory=True)
+    if getattr(ds, "rect", False):              # rect: batches of same-shape tiles (sorted), padded to 32-multiples
+        dl = DataLoader(ds, batch_sampler=ds.rect_batches(batch), num_workers=workers, collate_fn=collate,
+                        pin_memory=True)
+    else:
+        dl = DataLoader(ds, batch_size=batch, shuffle=False, num_workers=workers, collate_fn=collate, pin_memory=True)
     out = {"dec": []}
     has_dense = getattr(model, "dense_head", None) is not None
     if has_dense:
@@ -271,13 +275,28 @@ def load_preds(path):
     return out
 
 
+def prepared_fit(data_root):
+    """True when `data_root` was prepared with fit=True (one whole-image tile per image, openobb.data.prepare)."""
+    import json
+    from pathlib import Path
+    try:
+        return bool(json.loads((Path(data_root) / ".prepared.json").read_text()).get("fit", False))
+    except (OSError, ValueError):
+        return False
+
+
 def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num_top=300, img_size=1024,
               merge_workers=16, log=print, fusion=False, variants=None, save_preds_to=None, context=False,
-              vectors=False, post="flat", merge_iou=0.1, primary="dec", ultra=False, metric="dota"):
+              vectors=False, post="flat", merge_iou=0.1, primary="dec", ultra=False, metric="dota", rect=None):
     """DOTA-protocol eval of the decoder output (primary). With fusion=True and a dense head, also scores
-    the dense-only / union / size-routed variants (res["fusion"])."""
+    the dense-only / union / size-routed variants (res["fusion"]).
+    rect (None = auto: data prepared with fit=True): whole-image tiles go through the network padded only to
+    multiples of 32, in shape-sorted batches (YOLO rect validation); context / vector inputs stay square."""
     t0 = time.time()
-    ds = DotaPatches(data_root, "val", augment=False, context=context, vectors=vectors)
+    if rect is None:
+        rect = prepared_fit(data_root)
+    rect = bool(rect) and not context and not vectors
+    ds = DotaPatches(data_root, "val", augment=False, context=context, vectors=vectors, rect=rect)
     if image_ids is not None:
         keep = set(image_ids)
         ds.items = [m for m in ds.items if m["src"] in keep]

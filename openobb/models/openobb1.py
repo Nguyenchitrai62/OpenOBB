@@ -222,7 +222,8 @@ def load_dfine_coco(model, ckpt_or_size, class_names=None, log=print, init="coco
                 continue
             s = src[k]
             is_cls = (("score_head" in k) or ("denoising_class_embed" in k) or (".cls." in k and ".4." in k)  # v2 cls out
-                      or "head.cls_out." in k)                                                              # v6 cls out
+                      or "head.cls_out." in k                                                               # v6 cls out
+                      or "head.cls_slot." in k or k.startswith("refiner.cls_out."))      # v10 slots, v8 refiner
             if s.shape == v.shape and not (is_cls and class_map is not None):
                 v.copy_(s)
                 full += 1
@@ -278,7 +279,7 @@ def postprocess(outputs, num_top=300, img_size=1024, mode="flat", return_query=F
         labels = idx % C
         q = idx // C
     b = boxes.gather(1, q.unsqueeze(-1).expand(-1, -1, 5)).clone()
-    b[..., :4] *= img_size
+    b[..., :4] *= outputs.get('box_norm', img_size)      # DETR decoder on a rectangular input: N px units
     if return_query:
         return s, labels, b, q
     return s, labels, b

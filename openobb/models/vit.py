@@ -96,7 +96,12 @@ class ViT(nn.Module):
     def _pos(self, h, w, dtype):
         p = self.pos_embed.float()
         cls, grid = p[:, :1], p[:, 1:].reshape(1, self.pos_grid, self.pos_grid, self.d).permute(0, 3, 1, 2)
-        if (h, w) != (self.pos_grid, self.pos_grid):
+        if h != w:                  # rectangular input: top-left crop of the square grid the weights were tuned on
+            n = max(h, w)
+            if n != self.pos_grid:
+                grid = F.interpolate(grid, size=(n, n), mode="bicubic", align_corners=False)
+            grid = grid[:, :, :h, :w]
+        elif (h, w) != (self.pos_grid, self.pos_grid):
             grid = F.interpolate(grid, size=(h, w), mode="bicubic", align_corners=False)
         return torch.cat([cls, grid.flatten(2).transpose(1, 2)], 1).to(dtype)
 
@@ -144,11 +149,27 @@ class DinoV2Backbone(nn.Module):
         ph, pw = math.ceil(H / PATCH) * PATCH - H, math.ceil(W / PATCH) * PATCH - W
         f = self.adapter["fuse"](torch.cat(self.vit(F.pad(xn, (0, pw, 0, ph)), self.layers), 1))
         s8, s16, s32 = (H // 8, W // 8), (H // 16, W // 16), (H // 32, W // 32)
+        if H != W:                  # rectangular input: resample as the square N x N input would, then crop
+            return self._rect_levels(x, f, s8, s16, s32, max(H, W))
         p3 = F.interpolate(self.adapter["up"](f), size=s8, mode="bilinear", align_corners=False)
         p3 = self.adapter["p3"](p3 + self.adapter["spm"](x))
         p4 = self.adapter["p4"](F.interpolate(f, size=s16, mode="bilinear", align_corners=False))
         p5 = self.adapter["p5"](F.adaptive_avg_pool2d(f, s32))
         return [p3, p4, p5]
+
+    def _rect_levels(self, x, f, s8, s16, s32, N):
+        """The /14 token map of a rectangular input is resampled to /8, /16, /32 with the square N x N geometry
+        (same sampling positions as in training), not stretched to the rectangle: pad it (edge values) to the
+        square token grid, resample, crop the top-left."""
+        n = math.ceil(N / PATCH)
+        fs = F.pad(f, (0, n - f.shape[-1], 0, n - f.shape[-2]), mode="replicate")
+        up = self.adapter["up"](f)              # 2x2 transposed conv: per token, so pad after it (cheaper)
+        up = F.pad(up, (0, 2 * n - up.shape[-1], 0, 2 * n - up.shape[-2]), mode="replicate")
+        p3 = F.interpolate(up, size=(N // 8, N // 8), mode="bilinear", align_corners=False)[..., :s8[0], :s8[1]]
+        p3 = self.adapter["p3"](p3 + self.adapter["spm"](x))
+        p4 = F.interpolate(fs, size=(N // 16, N // 16), mode="bilinear", align_corners=False)[..., :s16[0], :s16[1]]
+        p5 = F.adaptive_avg_pool2d(fs, (N // 32, N // 32))[..., :s32[0], :s32[1]]
+        return [p3, self.adapter["p4"](p4), self.adapter["p5"](p5)]
 
     def load_pretrained(self, log=print):
         """Download the DINOv2 (registers) weights; fail loudly if they do not fit (never train a random ViT)."""

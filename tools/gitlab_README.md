@@ -39,6 +39,7 @@ DOTA và các lỗi nhầm class thường gặp. Hướng dẫn: [docs/FINETUNE
 
 | `model=` | Mô tả | Tài liệu |
 |---|---|---|
+| `openobb10s/m/l/x` | mới, chưa train: v8 + head 3 slot / điểm (vật nhỏ chồng nhau như wall_300 cạnh junction), gán nhãn theo tầm với (box lớn), cân bằng class hiếm; nạp được checkpoint v8 | [docs/OPENOBB10.md](docs/OPENOBB10.md) |
 | `openobb9s/m/l/x` | mới, chưa train: lõi tự thiết kế (conv 3×3 dày tái tham số hoá) + head v8; pretrain bằng chưng cất 2 thầy | [docs/OPENOBB9.md](docs/OPENOBB9.md) |
 | `openobb8s/m/l/x` | bản tốt nhất: v3 sửa lỗi + tầng suy luận quan hệ theo hướng (bắt đầu y hệt v3) | [docs/OPENOBB8.md](docs/OPENOBB8.md) |
 | `openobb6n/s/m/l/x` | kiến trúc tự thiết kế từ phân tích (backbone + neck + head riêng), pretrain bằng chưng cất DINOv2 (`openobb pretrain`) | [docs/OPENOBB6.md](docs/OPENOBB6.md) |

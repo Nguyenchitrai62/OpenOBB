@@ -22,8 +22,12 @@ class OpenOBB8Loss(OpenOBB3Loss):
         super().__init__(**kw)
         self.w_ref_cls, self.w_ref_box, self.ref_thr, self.w_ref_l1 = w_ref_cls, w_ref_box, ref_thr, w_ref_l1
 
+    def dense_losses(self, outputs, targets):
+        """Losses of the dense head (OpenOBB3's); OpenOBB10Loss overrides this."""
+        return super().forward(outputs, targets)
+
     def forward(self, outputs, targets):
-        losses = super().forward(outputs, targets)
+        losses = self.dense_losses(outputs, targets)
         if "ref_logits" not in outputs:
             return losses
         lg, rb, cand = outputs["ref_logits"].float(), outputs["ref_boxes"].float(), outputs["ref_cand"].float()

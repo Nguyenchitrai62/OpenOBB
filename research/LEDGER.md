@@ -625,6 +625,29 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     - Dự đoán: wall_300 tăng rõ (về phía .8). Nếu không tăng → bác bỏ, khoảng cách do thứ khác (công thức train của YOLO, 150 epoch, gán nhãn).
     - License: weights train trên DOTA chỉ dùng nghiên cứu.
 
+- **F45. Tốc độ v3 / v8 so với YOLO26x trên một trang thật, và nguyên nhân gốc của lỗi wall_300 / note / class hiếm đo trên nhãn (10-12). → OpenOBB10.**
+  Script: `research/analysis/speed_*.py`, `research/analysis/v10_*.py`. Chi tiết: [docs/OPENOBB10.md](../docs/OPENOBB10.md).
+  - **Tốc độ** (CPU 1 luồng, máy local, chỉ để so tương đối; số tuyệt đối nhiễu do máy thiếu bộ nhớ):
+    - Cùng đầu vào 1280 × 1280: YOLO26x (`wall_color.pt`) 7.9 s, v3-x 10.4 s (1.32×), v8-x 14.0 s (1.77×). FLOPs v3 ≈ YOLO (909 so với 905 G).
+    - Trang A 1683 × 2381: YOLO chỉ chạy **928 × 1280** (đệm lên bội số 32), còn OpenOBB đệm vuông 1280 × 1280, tức nhiều hơn 1.38× điểm ảnh.
+      Khi đó khoảng cách thực tế là khoảng 1.8×.
+    - v3-x chạy ảnh chữ nhật 928 × 1280 (position embedding sincos dựng theo lưới thật): 7.8 s so với 10.4 s; 214 / 215 box, 98% trùng khớp.
+      → Suy luận chữ nhật thành mặc định cho mọi model, không cần train lại.
+    - Phần còn lại của khoảng cách: cùng FLOPs nhưng nhiều phép nghẽn bộ nhớ (depthwise trong HGNet / LSK, tháp class). Nằm trong phần pretrained,
+      nên user quyết định không đụng (rủi ro độ chính xác); cũng không cắt nhánh P5 chết.
+  - **wall_300 → junction là tranh điểm, không phải thiếu ngữ cảnh** (nhãn train, luật ứng viên của v3):
+    - Ở stride 8, mỗi wall_300 có 1.5 điểm, 75% bị tranh (chủ yếu với junction). **72% wall_300 không có điểm riêng** (junction 60%, wall 15%).
+    - Tâm wall_300 cách junction 3.9 px và hai box chồng nhau thật: stride 4 vẫn còn 60%. Giải thích vì sao v7 (ngữ cảnh) và v8 (chi tiết stride 4 + quan hệ) không sửa được.
+    - Cho mỗi điểm 2 / 3 slot: 17% / **1%** wall_300 không có chỗ (junction 15% / 1%, wall 5% / 1%).
+  - **note học box cụt:** DFL với tới 31 bin (P3: 248 px dọc trục). 78% điểm P3 của note có mục tiêu bị kẹp; 39% note không có điểm P3 nào vẽ đủ (P4: 30% điểm).
+    Wall 7%, slide_door 2%. Box cụt có điểm cao sống qua NMS thành box trùng.
+  - **Class hiếm không được cân bằng:** RFS (t = 0.1) cho hệ số 1.0 mọi class (slide_door ở 22% ảnh, double_door 26%, wall_300 35%),
+    trong khi mất cân bằng theo object là 54 : 1 (junction 6986 / slide_door 130).
+  - **OpenOBB10** = v8 + (1) head 3 slot / điểm, ghép slot bằng EMD (CrowdDet); (2) ứng viên theo tầm với DFL; (3) trọng số điểm dương
+    clamp(√(n_max / n_c), 1, 4). 66.67M tham số (+84k), +0.2% FLOPs. Đầu vào NMS lúc khởi tạo y hệt v8; nạp được checkpoint v8.
+    Chưa có số GPU. Tiêu chí bác bỏ ở OPENOBB10 mục 3: ô wall_300 → junction, mAP50-95 note + `Duplicate boxes`, AP slide_door / double_door.
+  - Khuyến nghị train: `weights=<best v8>`, 50 epoch; đối chứng (tuỳ ngân sách) `v10_off=slots,reach,balance` cùng checkpoint.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

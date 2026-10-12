@@ -91,8 +91,9 @@ class RotatedMSDeformableAttention(nn.Module):
         init.constant_(self.attention_weights.weight, 0)
         init.constant_(self.attention_weights.bias, 0)
 
-    def forward(self, query, reference_points, value, value_spatial_shapes):
-        """reference_points: [bs, Lq, 1, 5] oriented boxes (normalised, theta in radians)."""
+    def forward(self, query, reference_points, value, value_spatial_shapes, loc_scale=None):
+        """reference_points: [bs, Lq, 1, 5] oriented boxes (normalised, theta in radians). loc_scale (sx, sy): boxes
+        normalised by N = the long input side on a rectangular input; the maps span W x H, so x * N / W, y * N / H."""
         bs, Len_q = query.shape[:2]
         off = self.sampling_offsets(query).reshape(bs, Len_q, self.num_heads, sum(self.num_points_list), 2)
         attw = F.softmax(self.attention_weights(query).reshape(bs, Len_q, self.num_heads, sum(self.num_points_list)), -1)
@@ -108,6 +109,8 @@ class RotatedMSDeformableAttention(nn.Module):
         else:
             dx, dy = ou, ov
         loc = torch.stack([ref[..., 0] + dx, ref[..., 1] + dy], -1)
+        if loc_scale is not None:
+            loc = loc * loc.new_tensor(loc_scale)
         if _DEBUG and not torch.isfinite(loc).all():
             raise FloatingPointError(f'non-finite sampling locations; ref finite={torch.isfinite(reference_points).all().item()}'
                                      f' off finite={torch.isfinite(off).all().item()}')
@@ -148,12 +151,13 @@ class TransformerDecoderLayer(nn.Module):
         init.xavier_uniform_(self.linear1.weight)
         init.xavier_uniform_(self.linear2.weight)
 
-    def forward(self, target, reference_points, value, spatial_shapes, attn_mask=None, query_pos_embed=None):
+    def forward(self, target, reference_points, value, spatial_shapes, attn_mask=None, query_pos_embed=None,
+                loc_scale=None):
         q = k = target if query_pos_embed is None else target + query_pos_embed
         target2, _ = self.self_attn(q, k, value=target, attn_mask=attn_mask)
         target = self.norm1(target + self.dropout1(target2))
         target2 = self.cross_attn(target if query_pos_embed is None else target + query_pos_embed,
-                                  reference_points, value, spatial_shapes)
+                                  reference_points, value, spatial_shapes, loc_scale=loc_scale)
         target = self.gateway(target, self.dropout2(target2))
         target2 = self.linear2(self.dropout3(self.activation(self.linear1(target))))
         target = target + self.dropout4(target2)
@@ -202,7 +206,7 @@ class OBBTransformerDecoder(nn.Module):
         return value.permute(0, 2, 3, 1).split(split_shape, dim=-1)
 
     def forward(self, target, ref_unact, memory, spatial_shapes, bbox_head, score_head, query_pos_head,
-                pre_bbox_head, up, reg_scale, attn_mask=None):
+                pre_bbox_head, up, reg_scale, attn_mask=None, loc_scale=None):
         output = target
         output_detach = pred_corners_undetach = 0
         value = self.value_op(memory, spatial_shapes)
@@ -212,7 +216,8 @@ class OBBTransformerDecoder(nn.Module):
         ref_detach = unact_to_box(ref_unact.float())          # box geometry always in fp32
         for i, layer in enumerate(self.layers):
             query_pos_embed = query_pos_head(pos_features(ref_detach)).clamp(min=-10, max=10)
-            output = layer(output, ref_detach.unsqueeze(2), value, spatial_shapes, attn_mask, query_pos_embed)
+            output = layer(output, ref_detach.unsqueeze(2), value, spatial_shapes, attn_mask, query_pos_embed,
+                           loc_scale=loc_scale)
             if i == 0:
                 pre = pre_bbox_head(output).float()                       # 4 logit deltas + (cos, sin) of 2*dtheta
                 pre_xywh = F.sigmoid(pre[..., :4] + inverse_sigmoid(ref_detach[..., :4]))
@@ -404,15 +409,34 @@ class OBBDFINETransformer(nn.Module):
             spatial_shapes.append([h, w])
         return torch.concat(feat_flatten, 1), spatial_shapes
 
-    def _generate_anchors(self, spatial_shapes=None, grid_size=0.05, dtype=torch.float32, device='cpu'):
+    def _eval_shapes(self):
+        eval_h, eval_w = self.eval_spatial_size
+        return [[int(eval_h / s), int(eval_w / s)] for s in self.feat_strides]
+
+    def _frame(self, spatial_shapes):
+        """Box frame of an input: None on a square input (boxes normalised by its side, as trained); on a
+        rectangular input (H, W) boxes are normalised by N = max(H, W) on both axes (isotropic, so angles and the
+        square-trained scale stay valid) -> (N, loc_scale (N / W, N / H) for the deformable sampling)."""
+        h0, w0 = spatial_shapes[0]
+        s0 = self.feat_strides[0]
+        H, W = int(h0) * s0, int(w0) * s0
+        if H == W:
+            return None, None
+        N = max(H, W)
+        return N, (N / W, N / H)
+
+    def _generate_anchors(self, spatial_shapes=None, grid_size=0.05, dtype=torch.float32, device='cpu', norm=None):
+        """norm: None -> centres normalised by each map's own size; N (rectangular input) -> by N pixels."""
         if spatial_shapes is None:
-            eval_h, eval_w = self.eval_spatial_size
-            spatial_shapes = [[int(eval_h / s), int(eval_w / s)] for s in self.feat_strides]
+            spatial_shapes = self._eval_shapes()
         anchors = []
         for lvl, (h, w) in enumerate(spatial_shapes):
             grid_y, grid_x = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
             grid_xy = torch.stack([grid_x, grid_y], dim=-1)
-            grid_xy = (grid_xy.unsqueeze(0) + 0.5) / torch.tensor([w, h], dtype=dtype)
+            if norm is None:
+                grid_xy = (grid_xy.unsqueeze(0) + 0.5) / torch.tensor([w, h], dtype=dtype)
+            else:
+                grid_xy = (grid_xy.unsqueeze(0).to(dtype) + 0.5) * (self.feat_strides[lvl] / norm)
             wh = torch.ones_like(grid_xy) * grid_size * (self.feat_strides[lvl] / min(self.feat_strides))
             anchors.append(torch.concat([grid_xy, wh], dim=-1).reshape(-1, h * w, 4))
         anchors = torch.concat(anchors, dim=1).to(device)
@@ -421,11 +445,20 @@ class OBBDFINETransformer(nn.Module):
         anchors = torch.where(valid_mask, anchors, torch.inf)
         return anchors, valid_mask
 
-    def _get_decoder_input(self, memory, spatial_shapes, denoising_logits=None, denoising_unact=None, dense=None):
+    def _get_decoder_input(self, memory, spatial_shapes, denoising_logits=None, denoising_unact=None, dense=None,
+                           norm=None):
         if self.training or self.eval_spatial_size is None:
-            anchors, valid_mask = self._generate_anchors(spatial_shapes, device=memory.device)
-        else:
+            anchors, valid_mask = self._generate_anchors(spatial_shapes, device=memory.device, norm=norm)
+        elif [list(s) for s in spatial_shapes] == self._eval_shapes():
             anchors, valid_mask = self.anchors, self.valid_mask
+        else:                                   # another input shape (rectangular, other size): cached per shape
+            key = (tuple(tuple(int(v) for v in s) for s in spatial_shapes), str(memory.device))
+            cache = self.__dict__.setdefault('_anchor_cache', {})
+            if key not in cache:
+                if len(cache) > 16:
+                    cache.clear()
+                cache[key] = self._generate_anchors(spatial_shapes, device=memory.device, norm=norm)
+            anchors, valid_mask = cache[key]
         memory = valid_mask.to(memory.dtype) * memory
         output_memory = self.enc_output(memory)
         if dense is not None:      # OpenOBB hybrid (H4c): queries come from the dense one-to-many head (distinct top-k)
@@ -482,8 +515,9 @@ class OBBDFINETransformer(nn.Module):
                 box_noise_scale=self.box_noise_scale)
         else:
             dn_logits = dn_unact = attn_mask = dn_meta = None
+        norm, loc_scale = self._frame(spatial_shapes)
         content, ref_unact, enc_boxes_list, enc_logits_list, o2m = self._get_decoder_input(
-            memory, spatial_shapes, dn_logits, dn_unact, dense=dense)
+            memory, spatial_shapes, dn_logits, dn_unact, dense=dense, norm=norm)
         n_o2m = 0
         if o2m is not None:        # H10: append the one-to-many group; it neither sees nor is seen by dn/main
             n_main = content.shape[1]
@@ -498,7 +532,8 @@ class OBBDFINETransformer(nn.Module):
             attn_mask = full
         out_boxes, out_logits, out_corners, out_refs, pre_boxes, pre_logits, hs = self.decoder(
             content, ref_unact, memory, spatial_shapes, self.dec_bbox_head, self.dec_score_head,
-            self.query_pos_head, self.pre_bbox_head, self.up, self.reg_scale, attn_mask=attn_mask)
+            self.query_pos_head, self.pre_bbox_head, self.up, self.reg_scale, attn_mask=attn_mask,
+            loc_scale=loc_scale)
         if n_o2m:
             hs = hs[:, :hs.shape[1] - n_o2m]
         if self.training and dn_meta is not None:
@@ -519,7 +554,10 @@ class OBBDFINETransformer(nn.Module):
             dn_out_corners, out_corners = torch.split(out_corners, dn_meta['dn_num_split'], dim=2)
             dn_out_refs, out_refs = torch.split(out_refs, dn_meta['dn_num_split'], dim=2)
         if not self.training:
-            return {'pred_logits': out_logits[-1], 'pred_boxes': out_boxes[-1], 'pred_hs': hs}
+            out = {'pred_logits': out_logits[-1], 'pred_boxes': out_boxes[-1], 'pred_hs': hs}
+            if norm is not None:
+                out['box_norm'] = norm          # rectangular input: boxes are in units of N pixels
+            return out
         out = {'pred_logits': out_logits[-1], 'pred_boxes': out_boxes[-1], 'pred_corners': out_corners[-1],
                'ref_points': out_refs[-1], 'up': self.up, 'reg_scale': self.reg_scale, 'pred_hs': hs}
         if self.aux_loss:

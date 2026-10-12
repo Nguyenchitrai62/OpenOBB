@@ -27,19 +27,30 @@ from openobb.models.dense_head import DenseCriterion
 from openobb.models.openobb1 import OpenOBB1, build_criterion, load_dfine_coco
 
 
+def _has_keys(path, prefix):
+    """True if the checkpoint at `path` holds a parameter whose name starts with `prefix`."""
+    ck = torch.load(path, map_location="cpu", weights_only=False, mmap=True)
+    sd = ck.get("ema") or ck.get("model") or ck if isinstance(ck, dict) else {}
+    if isinstance(sd, dict) and "module" in sd and isinstance(sd["module"], dict):
+        sd = sd["module"]
+    return any(isinstance(k, str) and k.startswith(prefix) for k in sd)
+
+
 def build_parser():
     ap = argparse.ArgumentParser(allow_abbrev=False)          # a typo must fail, not match another flag
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9"],
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10"],
                     help="v1: OpenOBB (DETR-style decoder); v2: OpenOBB2 (dense segment-aware, NMS-free); "
                          "v3: OpenOBB3 (pretrained encoder + dense anisotropic oriented head); "
                          "v4: OpenOBB4 (DINOv2 backbone + DETR decoder + dense oriented branch); "
                          "v6: OpenOBB6 (own backbone / neck / head, docs/OPENOBB6.md); "
                          "v7: OpenOBB7 (OpenOBB3 repaired, docs/OPENOBB7.md); "
                          "v8: OpenOBB8 (OpenOBB7 + oriented relational refiner, docs/OPENOBB8.md); "
-                         "v9: OpenOBB9 (new re-parameterised core + OpenOBB8's head, docs/OPENOBB9.md)")
+                         "v9: OpenOBB9 (new re-parameterised core + OpenOBB8's head, docs/OPENOBB9.md); "
+                         "v10: OpenOBB10 (OpenOBB8 + multi-slot head, reach-aware assignment, class balance, "
+                         "docs/OPENOBB10.md)")
     ap.add_argument("--backbone", default="hgnet", choices=["hgnet", "dinov2_s", "dinov2_b", "dinov2_l"])
     ap.add_argument("--dense-v3", action="store_true", help="dense branch = OpenOBB3's oriented head (OpenOBB4)")
     ap.add_argument("--geo-cls", action="store_true", help="OpenOBB5: class branch reads the predicted geometry")
@@ -50,6 +61,8 @@ def build_parser():
     ap.add_argument("--v8-off", default="", help="OpenOBB8 ablation: refiner parts switched off, comma-separated "
                                                   "(relate, geo_bias, ring, p2, jitter, refine)")
     ap.add_argument("--v9-off", default="", help="OpenOBB9 ablation: core parts switched off, comma-separated")
+    ap.add_argument("--v10-off", default="", help="OpenOBB10 ablation: parts switched off, comma-separated "
+                                                   "(slots, reach, balance)")
     ap.add_argument("--v6-off", default="", help="OpenOBB6 ablation: parts switched off, comma-separated "
                                                   "(strip, axis, attn, spd, maxpool, cls_ctx)")
     ap.add_argument("--img", type=int, default=1024)
@@ -208,8 +221,9 @@ def main(argv=None):
     torch.backends.cudnn.allow_tf32 = True
 
     classes = dataset_classes(a.data)
-    v2, v3, v4, v5 = a.arch == "v2", a.arch in ("v3", "v5", "v6", "v7", "v8", "v9"), a.arch == "v4", a.arch == "v5"
-    v6, v7, v8, v9 = a.arch == "v6", a.arch == "v7", a.arch == "v8", a.arch == "v9"
+    v2, v4, v5 = a.arch == "v2", a.arch == "v4", a.arch == "v5"
+    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10")
+    v6, v7, v8, v9, v10 = a.arch == "v6", a.arch == "v7", a.arch == "v8", a.arch == "v9", a.arch == "v10"
     dense_arch = v2 or v3                       # dense heads: no queries / decoder
     if v4:                                      # DETR decoder fed and supervised by the dense oriented branch
         a.dense = a.dense_queries = a.dense_v3 = True
@@ -220,7 +234,11 @@ def main(argv=None):
     elif v3:
         from openobb.models.openobb3 import OpenOBB3
         from openobb.models.openobb3_loss import OpenOBB3Loss
-        if v9:
+        if v10:
+            from openobb.models.openobb10 import OpenOBB10
+            model = OpenOBB10(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
+                              off=a.v10_off or None, off8=a.v8_off or None, off7=a.v7_off or None, rel_k=a.rel_k)
+        elif v9:
             from openobb.models.openobb9 import OpenOBB9
             model = OpenOBB9(a.size, num_classes=len(classes), img_size=a.img, max_det=a.num_top,
                              off=a.v9_off or None, off8=a.v8_off or None, rel_k=a.rel_k)
@@ -258,6 +276,8 @@ def main(argv=None):
         load_dfine_coco(model, a.weights, log=lambda m: log(m, console=True), class_map=cmap)
         log(f"[init] fine-tuning from {a.weights} ({len(cmap)}/{len(classes)} classes carried over)")
         init_desc = f"fine-tune from {a.weights} ({len(cmap)}/{len(classes)} classes carried over)"
+        if v10 and getattr(model, "slots", 1) > 1 and not _has_keys(a.weights, "head.reg_slot."):
+            model.head.copy_primary_box()       # single-slot checkpoint: extra slots start from slot 0's boxes
     elif not last.exists() and not a.no_pretrained and not v2 and not v6 and not v9:
         load_dfine_coco(model, a.size, class_names=classes, log=lambda m: log(m, console=True), init=a.init)
         init_desc = "D-FINE COCO weights (Apache-2.0)"
@@ -274,7 +294,10 @@ def main(argv=None):
     if v2:
         crit = OpenOBB2Loss(img_size=a.img)
     elif v3:
-        if v8 or v9:
+        if v10:
+            from openobb.models.openobb10_loss import OpenOBB10Loss
+            crit = OpenOBB10Loss(img_size=a.img, off=a.v10_off or None)
+        elif v8 or v9:
             from openobb.models.openobb8_loss import OpenOBB8Loss
             crit = OpenOBB8Loss(img_size=a.img)
         else:
@@ -407,6 +430,11 @@ def main(argv=None):
             if not a.weights:
                 say("WARNING  OpenOBB9 starts from random weights: run `openobb pretrain model=openobb9x ...` first "
                     "and pass weights=<that file> (docs/OPENOBB9.md)")
+        elif v10:
+            off = ", ".join(f"off: {v}" for v in (a.v7_off, a.v8_off, a.v10_off) if v)
+            say(f"model   OpenOBB10-{a.size} (pretrained HGNetv2 + LSK + hybrid encoder; dense oriented head P3-P5 "
+                f"with {model.slots} slots per point + oriented relational refiner of {a.rel_k} candidates"
+                f"{'; ' + off if off else ''}), {n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")
         elif v7 or v8:
             off = ", ".join(f"off: {v}" for v in (a.v7_off, a.v8_off if v8 else "") if v)
             say(f"model   OpenOBB{8 if v8 else 7}-{a.size} (pretrained HGNetv2 + LSK + hybrid encoder, repaired; dense "

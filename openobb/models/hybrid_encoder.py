@@ -392,6 +392,21 @@ class HybridEncoder(nn.Module):
 
         return torch.concat([out_w.sin(), out_w.cos(), out_h.sin(), out_h.cos()], dim=1)[None, :, :]
 
+    def grid_pos_embed(self, h, w, device):
+        """Sincos embedding of an (h, w) map in row-major order, cached per (h, w, device).
+        Built as (h, w), not (w, h): the builder's meshgrid is 'ij' over (first, second), so flat index y * w + x
+        gets first = y, second = x. A square grid gives the same tensor either way (what the weights were trained
+        with), and a top-left-anchored rectangular grid then equals the square one on the shared cells; (w, h) would
+        scramble the positions when h != w."""
+        key = (int(h), int(w), str(device))
+        cache = self.__dict__.setdefault('_pos_cache', {})
+        if key not in cache:
+            if len(cache) > 16:
+                cache.clear()
+            cache[key] = self.build_2d_sincos_position_embedding(
+                h, w, self.hidden_dim, self.pe_temperature).to(device)
+        return cache[key]
+
     def forward(self, feats, ctx_fn=None):
         """ctx_fn (OpenOBB H6): optional callable(p5, pos_embed) -> p5 applied right after the AIFI layer."""
         assert len(feats) == len(self.in_channels)
@@ -403,11 +418,14 @@ class HybridEncoder(nn.Module):
                 h, w = proj_feats[enc_ind].shape[2:]
                 # flatten [B, C, H, W] to [B, HxW, C]
                 src_flatten = proj_feats[enc_ind].flatten(2).permute(0, 2, 1)
-                if self.training or self.eval_spatial_size is None:
+                pos_embed = getattr(self, f'pos_embed{enc_ind}', None)
+                if self.training:               # square training batches: built per call (compile-friendly)
                     pos_embed = self.build_2d_sincos_position_embedding(
-                        w, h, self.hidden_dim, self.pe_temperature).to(src_flatten.device)
+                        h, w, self.hidden_dim, self.pe_temperature).to(src_flatten.device)
+                elif pos_embed is None or h != w or pos_embed.shape[1] != h * w:
+                    pos_embed = self.grid_pos_embed(h, w, src_flatten.device)     # any other grid, e.g. rect
                 else:
-                    pos_embed = getattr(self, f'pos_embed{enc_ind}', None).to(src_flatten.device)
+                    pos_embed = pos_embed.to(src_flatten.device)
 
                 memory :torch.Tensor = self.encoder[i](src_flatten, pos_embed=pos_embed)
                 proj_feats[enc_ind] = memory.permute(0, 2, 1).reshape(-1, self.hidden_dim, h, w).contiguous()

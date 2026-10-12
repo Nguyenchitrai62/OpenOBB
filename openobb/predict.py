@@ -15,6 +15,7 @@ python -m openobb.predict --ckpt runs/myjob/last.pt --src pages/ --out preds/ [-
 """
 import argparse
 import json
+import math
 from pathlib import Path
 
 import cv2
@@ -59,10 +60,14 @@ def load_model(ckpt_path, device, queries=None, classes=None):
                      off8=a.get("v8_off") or None, rel_k=a.get("rel_k", 600))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval().fuse(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
-    if a.get("arch") in ("v7", "v8"):
+    if a.get("arch") in ("v7", "v8", "v10"):
         common = dict(num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
                       max_det=max(int(a.get("num_top", 1000)), int(queries or 0)))
-        if a["arch"] == "v8":
+        if a["arch"] == "v10":
+            from openobb.models.openobb10 import OpenOBB10
+            m = OpenOBB10(a.get("size", "x"), off=a.get("v10_off") or None, off8=a.get("v8_off") or None,
+                          off7=a.get("v7_off") or None, rel_k=a.get("rel_k", 600), **common)
+        elif a["arch"] == "v8":
             from openobb.models.openobb8 import OpenOBB8
             m = OpenOBB8(a.get("size", "x"), off=a.get("v8_off") or None, off7=a.get("v7_off") or None,
                          rel_k=a.get("rel_k", 600), **common)
@@ -109,26 +114,40 @@ def load_model(ckpt_path, device, queries=None, classes=None):
     return m.to(device).eval(), list(names), a
 
 
+def rect_shape(h, w, size, stride=32):
+    """Network input (H, W) for a whole image of h x w <= size (YOLO letterbox auto / rect): each side padded up to
+    a multiple of `stride` (capped at `size`), instead of the full size x size square."""
+    return min(math.ceil(h / stride) * stride, size), min(math.ceil(w / stride) * stride, size)
+
+
 @torch.no_grad()
-def predict_image(model, img, size, gap, batch, device, num_top, vec=None, amp=True, union=True, scale=1.0):
+def predict_image(model, img, size, gap, batch, device, num_top, vec=None, amp=True, union=True, scale=1.0,
+                  rect=True, info=None):
     """-> list of (patch_name, cls, score, poly8 in tile pixels) with patch names carrying the tile offsets.
     Hybrid models (dense head present): decoder + dense outputs are pooled ("union", the measured best rule) and
-    de-duplicated by the class-wise NMS of the tile merge."""
+    de-duplicated by the class-wise NMS of the tile merge.
+    rect: an image that fits in one tile (whole-image resize) is padded only to multiples of 32 (rect_shape), top-left
+    anchored like the square tile; larger images keep square size x size tiles. info (dict): gets "shape", the
+    network input shape (B, 3, H, W) of the last batch."""
     if scale != 1.0:
         h0, w0 = img.shape[:2]
         img = cv2.resize(img, (max(1, round(w0 * scale)), max(1, round(h0 * scale))),
                          interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR)
     H, W = img.shape[:2]
     tiles = [(x, y) for y in windows(H, size, gap) for x in windows(W, size, gap)]
+    # vector tokens are cut / normalised per square tile: keep the square input for those models
+    th, tw = rect_shape(H, W, size) if rect and vec is None and len(tiles) == 1 else (size, size)
     dets = []
     for i in range(0, len(tiles), batch):
         chunk = tiles[i:i + batch]
-        x = np.empty((len(chunk), size, size, 3), np.uint8)
+        x = np.empty((len(chunk), th, tw, 3), np.uint8)
         x[:] = PAD_BGR
         for j, (x0, y0) in enumerate(chunk):
-            t = img[y0:y0 + size, x0:x0 + size]
+            t = img[y0:y0 + th, x0:x0 + tw]
             x[j, :t.shape[0], :t.shape[1]] = t
         xt = torch.from_numpy(x[..., ::-1].copy()).permute(0, 3, 1, 2).to(device).float().div_(255.0)
+        if info is not None:
+            info["shape"] = tuple(xt.shape)
         side = None
         if vec is not None:
             toks = [torch.from_numpy(cut_tile(vec, x0, y0, size)) for x0, y0 in chunk]
