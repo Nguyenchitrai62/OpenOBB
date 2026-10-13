@@ -13,6 +13,9 @@ __version__ = "0.12.1"   # bumped by tools/push_all.py when the package changes
 
 
 def __getattr__(name):              # lazy: `python -m openobb.cli` must not import openobb.cli twice
+    if name in ("Detector", "OpenOBB"):
+        from openobb.torch_setup import ensure_torch   # CUDA PyTorch when an NVIDIA GPU is present (OPENOBB_AUTO_TORCH=0: off)
+        ensure_torch()
     if name == "Detector":
         from openobb.cli import Detector
         return Detector

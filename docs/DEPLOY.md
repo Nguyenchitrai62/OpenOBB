@@ -13,6 +13,12 @@ pip install "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"
 - Nếu repo chuyển sang private: `pip install "openobb @ git+https://<token>@github.com/Nguyenchitrai62/OpenOBB.git"`.
 - Chỉ cần file `best.pt`. Mọi thông tin kiến trúc (v1–v5), class và imgsz đều nằm trong checkpoint.
 
+**GPU tự động:** khi suy luận, model chạy trên GPU nếu có, không thì CPU. Lần dùng đầu tiên (`from openobb import OpenOBB`, lệnh `openobb`, app Streamlit), package kiểm tra PyTorch:
+- máy có GPU NVIDIA nhưng PyTorch là bản CPU (mặc định của `pip install torch` trên Windows) → tự cài bản CUDA hợp với driver, rồi báo cần chạy lại;
+- máy không có GPU và chưa có PyTorch → cài bản CPU.
+
+Tắt bằng biến môi trường `OPENOBB_AUTO_TORCH=0`.
+
 ## File model giao cho khách (từ 0.8.1)
 
 `best.pt` sau khi train còn chứa thông tin của lần train: đường dẫn data / cache, thư mục run, khoảng 100 tham số train, điểm val.

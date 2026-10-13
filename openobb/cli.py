@@ -754,6 +754,8 @@ def main(argv=None):
         print(__doc__)
         return 0 if (not argv or argv[0] in ("-h", "--help", "help")) else 2
     mode, kv = argv[0], parse_kv(argv[1:])
+    from openobb.torch_setup import ensure_torch        # CUDA PyTorch when an NVIDIA GPU is present
+    ensure_torch()
     if mode == "predict":
         return _predict_cli(kv)
     if mode == "strip":

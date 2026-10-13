@@ -21,6 +21,12 @@ pip install "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanythi
 pip install "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git@vX.Y.Z"    # đúng một phiên bản
 ```
 
+**GPU tự động:** khi suy luận, model chạy trên GPU nếu có, không thì CPU. Lần dùng đầu tiên (`from openobb import OpenOBB`, lệnh `openobb`, app Streamlit), package kiểm tra PyTorch:
+- máy có GPU NVIDIA nhưng PyTorch là bản CPU (mặc định của `pip install torch` trên Windows) → tự cài bản CUDA hợp với driver, rồi báo cần chạy lại;
+- máy không có GPU và chưa có PyTorch → cài bản CPU.
+
+Tắt bằng biến môi trường `OPENOBB_AUTO_TORCH=0`.
+
 Phiên bản: `openobb.__version__`; mỗi phiên bản có tag `vX.Y.Z`. Model `.pt` nên giao bản đã làm gọn: `openobb strip`
 (xem `docs/DEPLOY.md`).
 

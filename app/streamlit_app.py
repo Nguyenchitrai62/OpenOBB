@@ -16,10 +16,13 @@ import cv2
 import numpy as np
 import pandas as pd
 import streamlit as st
-import torch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from openobb.torch_setup import ensure_torch  # noqa: E402
+
+TORCH_SETUP = ensure_torch()     # before torch is imported: CUDA PyTorch on a machine with an NVIDIA GPU, else CPU
+import torch  # noqa: E402
 from openobb.predict import (apply_head, apply_nms, conf_thresholds, load_model, merge_dets, parse_nms,  # noqa: E402
                              predict_image, to_label_lines)
 
@@ -63,6 +66,10 @@ def main():
     st.set_page_config(page_title="OpenOBB OBB test", page_icon="📐", layout="wide")
 
     with st.sidebar:
+        if TORCH_SETUP == "restart":
+            st.warning("Đã cài PyTorch bản GPU. Tắt và mở lại app để chạy bằng GPU (lần này vẫn chạy CPU).")
+        elif TORCH_SETUP == "failed":
+            st.warning("Không cài được PyTorch bản GPU tự động: xem log trong terminal.")
         st.header("Model")
         local = sorted((ROOT / "models").glob("*.pt"), key=lambda f: f.stat().st_mtime, reverse=True)
         default = MODEL_PATH if (ROOT / MODEL_PATH).exists() or not local else str(local[0].relative_to(ROOT))
