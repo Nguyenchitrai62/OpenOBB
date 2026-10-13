@@ -62,3 +62,17 @@ def test_check_arch_unknown_and_newer(tmp_path, capsys):
     assert "trained with version 99.0.0" in capsys.readouterr().out
     check_arch({"args": {"arch": "v3"}, "version": __version__}, "m.pt")
     assert "WARNING" not in capsys.readouterr().out
+
+
+def test_cpu_inference_flushes_denormals(tmp_path):
+    import torch
+
+    from openobb.models.openobb12 import OpenOBB12
+    from openobb.predict import load_model
+    p = tmp_path / "m.pt"
+    torch.save({"model": OpenOBB12("s", num_classes=2, img_size=128).state_dict(), "classes": ["a", "b"],
+                "args": {"arch": "v12", "size": "s", "img": 128}}, p)
+    torch.set_flush_denormal(False)
+    load_model(str(p), torch.device("cpu"))
+    assert torch.tensor([1e-40], dtype=torch.float32).item() == 0.0      # denormal flushed to zero
+    torch.set_flush_denormal(False)

@@ -919,6 +919,17 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
       lần gọi đầu (nạp model) 9.4 s. cProfile: 89% là conv của lõi; NMS và ghép box gần 0.
     - → Trên CPU, v12 ngang YOLO26x. Chưa có số GPU cùng phiên (`colab/speed_gpu.py`).
 
+- **F57. Suy luận chậm trên CPU / GPU của user (10-13): hai lỗi triển khai, không phải kiến trúc.**
+  - **GPU (RTX 3050, 3 s / ảnh):** máy cài torch bản CPU (`pip install torch` trên Windows mặc định là bản CPU). User sửa xong thì chạy nhanh.
+    → 0.12.2 `openobb/torch_setup.py`: tự cài torch bản CUDA khi có GPU NVIDIA, bản CPU khi không có (`OPENOBB_AUTO_TORCH=0` để tắt).
+  - **CPU (app Streamlit 25 s / ảnh):** số denormal làm conv chạy theo đường chậm của x86.
+    - Cùng tiến trình, 8 luồng, trang 1683 × 2381: 19.2 s → **9.0 s** khi bật `torch.set_flush_denormal(True)`.
+    - Đầu ra giống hệt: 378 / 378 box, cùng class và điểm, lệch góc box 0.000 px.
+    - F47 kết luận "không phải denormal" chỉ dựa trên đầu ra của backbone; denormal nằm ở activation bên trong.
+    → 0.12.3: `load_model` bật flush khi chạy CPU.
+  - Thời gian CPU giữa các tiến trình dao động 3.7–19 s cho cùng ảnh. Máy có 10 nhân / 16 luồng, 2.5 GHz, có thể là kiểu lai nhân P + E.
+    App giờ dùng số luồng bằng số nhân vật lý (8 luồng nhanh gấp 2 lần 4 luồng).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

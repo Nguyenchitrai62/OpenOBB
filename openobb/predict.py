@@ -119,6 +119,9 @@ def merge_iou_for(v, fit):
 
 
 def load_model(ckpt_path, device, queries=None, classes=None):
+    if torch.device(device).type == "cpu":
+        # denormal floats take the slow x86 path: 2.1x slower on CPU with identical detections when flushed (F57)
+        torch.set_flush_denormal(True)
     m, names, a = _load_model(ckpt_path, device, queries, classes)
     if a.get("infer_k") and getattr(m, "refiner", None) is not None:   # calibrated at training
         m.refiner.k = int(a["infer_k"])
