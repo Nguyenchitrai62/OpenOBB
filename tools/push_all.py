@@ -32,7 +32,7 @@ GITLAB_PIP = "git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git"
 CHECKOUT = ROOT / ".gitlab_export"                     # persistent working clone of GitLab (gitignored)
 ALLOW = ["openobb", "tests", "docs/DEPLOY.md", "docs/FINETUNE.md", "docs/OPENOBB2.md", "docs/OPENOBB3.md",
          "docs/OPENOBB4.md", "docs/OPENOBB5.md", "docs/OPENOBB6.md", "docs/OPENOBB7.md",
-         "docs/OPENOBB8.md", "docs/OPENOBB9.md", "docs/OPENOBB10.md", "docs/OPENOBB11.md", "docs/OPENOBB12.md", "docs/PRETRAIN.md", "docs/OPENOBB1.md", "app/streamlit_app.py",
+         "docs/OPENOBB8.md", "docs/OPENOBB9.md", "docs/OPENOBB10.md", "docs/OPENOBB11.md", "docs/OPENOBB12.md", "docs/OPENOBB13.md", "docs/PRETRAIN.md", "docs/OPENOBB1.md", "app/streamlit_app.py",
          "run_app.bat",
          "LICENSE", "LICENSES", "THIRD_PARTY_NOTICES.md", "pyproject.toml", "requirements.txt"]
 # files from older layouts removed from GitLab when present (renamed in the research repo)

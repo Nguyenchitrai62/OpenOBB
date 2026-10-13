@@ -179,7 +179,7 @@ def pretrain(model="openobb9x", data=None, val_data=None, teachers=None, epochs=
     if data is None:
         raise SystemExit("openobb pretrain needs data=<folder(s) of images, comma-separated>")
     arch, size = MODELS.get(str(model).lower(), (None, None))
-    if arch not in ("v6", "v9", "v13"):
+    if arch not in ("v6", "v9"):
         raise SystemExit("openobb pretrain is for the new cores: model=openobb9s/m/l/x or openobb6n/s/m/l/x")
     random.seed(seed)
     torch.manual_seed(seed)

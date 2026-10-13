@@ -795,6 +795,27 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     - Kỳ vọng ghi trước: wall_300 mAP50 ≥ 0.72 (v10 .649), ô wall_300 → junction < 20%, tổng ≥ 0.71.
       Bác bỏ nếu wall_300 tăng < 0.03 so với v12 khởi tạo COCO.
 
+- **F52. wall_300 tranh điểm lưới với junction (đo trên nhãn, 10-13) → OpenOBB13 mới: luồng độ phân giải gốc + lưới P2.** [docs/OPENOBB13.md](../docs/OPENOBB13.md).
+  - Script: `research/analysis/wall300_inspect.py`, `wall300_colour_scale.py`, `wall300_grid.py`. Crop mẫu: `wall300_crops.png`.
+  - Ảnh Wall_Color gốc 2000–3000 px. wall_300: 19 × 11 px ở ảnh gốc, chỉ còn 10 × 6 px ở 1280. Nó là đoạn tường ngắn cạnh cửa, nằm sát junction (khoảng cách trung vị 0.4 lần chiều dài).
+  - **Màu không phải nguyên nhân:** tỉ lệ pixel hồng 0.063 (gốc) so với 0.057 (1280); 42% junction cũng có hồng.
+  - **wall_300 chung ô lưới tâm với junction: 53% ở P3 (stride 8, 1280).** Ở lưới stride 4 còn 20%; stride 4 trên ảnh 2560 còn 6%.
+    Khớp với ô nhầm 27–32% và với việc slot (cùng vector đặc trưng) không gỡ được.
+  - User (10-13): v13 cũ (lõi nhanh v9) chỉ nhắm tốc độ, nên bỏ và thay bằng bản nhắm độ chính xác.
+  - **OpenOBB13 (0.11.0)** = v12 với 3 thay đổi; mọi mảnh mới khởi tạo sao cho P3–P5 lúc đầu = v12:
+    - lõi chạy ở `imgsz / 2`;
+    - thêm luồng CNN nhẹ trên ảnh đầy đủ, dẫn vào lưới P2 có head kép riêng, và vào P3 (khởi tạo 0);
+    - bật `reach`.
+
+    Bản x: 70.1M tham số (+2.1M), 853 GFLOPs ở 2560 × 1920 so với v12 699 ở 1280 × 960.
+  - Kỳ vọng ghi trước (100 epoch, COCO, `imgsz=2560`):
+    - tổng 0.73–0.77 / 0.48–0.51;
+    - wall_300 ≥ 0.75;
+    - ô wall_300 → junction < 15%;
+    - mAP50-95 của wall và junction tăng ≥ 0.02.
+
+    Bác bỏ nếu wall_300 tăng < 0.05 so với v12, ô nhầm ≥ 15%, hoặc junction / door giảm quá 0.02.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

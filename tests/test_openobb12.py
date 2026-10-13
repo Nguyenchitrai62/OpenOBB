@@ -79,14 +79,45 @@ def test_v12_loads_single_head_weights_and_copies_the_head():
         assert n1 == n2 and torch.equal(p1, p2)
 
 
-def test_v13_builds_and_trains():
+def test_v13_trains_with_p2_level_and_reach():
     torch.manual_seed(0)
     m = OpenOBB13("s", num_classes=NC, img_size=IMG).train()
-    assert m.arch == "v13" and getattr(m, "refiner", None) is None
     out = m(torch.rand(1, 3, IMG, IMG), _targets())
-    total = sum(OpenOBB12Loss(img_size=IMG)(out, _targets()).values())
+    n3 = sum((IMG // s) ** 2 for s in (16, 32, 64))
+    assert out["cls"].shape[1] == n3 + (IMG // 8) ** 2 == out["o2o_cls"].shape[1]
+    assert sorted(out["strides"].unique().tolist()) == [8.0, 16.0, 32.0, 64.0]
+    crit = OpenOBB12Loss(img_size=IMG, off="slots")
+    assert crit.reach and crit.o2o.reach
+    total = sum(crit(out, _targets()).values())
     assert math.isfinite(float(total.detach()))
     total.backward()
+    assert m.hires.net[0].conv.weight.grad is not None and m.p2_head.cls[0][-1].weight.grad is not None
+
+
+def test_v13_core_levels_start_as_v12_at_half_resolution():
+    """New modules start as no-ops on P3-P5: v13 on a 2x input == v12 on the input halved (same core weights)."""
+    torch.manual_seed(0)
+    v12 = OpenOBB12("s", num_classes=NC, img_size=128).eval()
+    m = OpenOBB13("s", num_classes=NC, img_size=256).eval()
+    missing, unexpected = m.load_state_dict(v12.state_dict(), strict=False)
+    assert not unexpected and all(k.split(".")[0] in ("hires", "to_p3", "p2_lat", "p2_down", "p2_fuse", "p2_head",
+                                                      "p2_head_o2o") for k in missing)
+    x = torch.rand(1, 3, 256, 256)
+    with torch.no_grad():
+        f13 = m.features(x)
+        f12 = v12.encode(torch.nn.functional.avg_pool2d(x, 2))[1]
+    for a, b in zip(f13[:3], f12):
+        assert torch.allclose(a, b, atol=1e-5)
+
+
+def test_v13_inference_any_size_and_fused():
+    torch.manual_seed(0)
+    m = OpenOBB13("s", num_classes=NC, img_size=256, max_det=40).eval()
+    with torch.no_grad():
+        r = m(torch.rand(1, 3, 200, 136))                    # not a multiple of 64: padded inside
+        m.fuse()
+        r2 = m(torch.rand(1, 3, 200, 136))
+    assert r["pred_logits"].shape == (1, 40, NC) and r2["pred_boxes"].shape == (1, 40, 5)
 
 
 def test_trained_detector_as_pretrain_teacher(tmp_path):

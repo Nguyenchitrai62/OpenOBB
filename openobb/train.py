@@ -231,7 +231,7 @@ def main(argv=None):
     v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13")
     v6, v7, v8, v10 = a.arch == "v6", a.arch == "v7", a.arch == "v8", a.arch == "v10"
     v11, v12, v13 = a.arch == "v11", a.arch == "v12", a.arch == "v13"
-    v9 = a.arch in ("v9", "v13")                # OpenOBB13 = OpenOBB9 core: same init / freeze / compile rules
+    v9 = a.arch == "v9"
     dense_arch = v2 or v3                       # dense heads: no queries / decoder
     if v4:                                      # DETR decoder fed and supervised by the dense oriented branch
         a.dense = a.dense_queries = a.dense_v3 = True
@@ -244,12 +244,8 @@ def main(argv=None):
         from openobb.models.openobb3_loss import OpenOBB3Loss
         if v12 or v13:
             from openobb.models.openobb12 import OpenOBB12, OpenOBB13
-            if v13:
-                model = OpenOBB13(a.size, num_classes=len(classes), img_size=a.img, max_det=a.num_top,
-                                  off=a.v9_off or None)
-            else:
-                model = OpenOBB12(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
-                                  off=a.v7_off or None)
+            model = (OpenOBB13 if v13 else OpenOBB12)(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk,
+                                                      max_det=a.num_top, off=a.v7_off or None)
         elif v11:
             from openobb.models.openobb11 import OpenOBB11
             model = OpenOBB11(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
@@ -320,7 +316,7 @@ def main(argv=None):
     elif v3:
         if v12 or v13:
             from openobb.models.openobb12_loss import OpenOBB12Loss
-            crit = OpenOBB12Loss(img_size=a.img)
+            crit = OpenOBB12Loss(img_size=a.img, off="slots" if v13 else "slots,reach")   # v13: P2 reach is short
         elif v11:
             from openobb.models.openobb11_loss import OpenOBB11Loss
             crit = OpenOBB11Loss(img_size=a.img)
@@ -455,14 +451,17 @@ def main(argv=None):
                 f"+ dense oriented branch, output {a.primary}), {n_par:.2f}M params, {a.queries} queries | "
                 f"init: {init_desc}")
         elif v12 or v13:
-            core = (f"OpenOBB9 re-parameterised core{', off: ' + a.v9_off if a.v9_off else ''}" if v13 else
-                    f"pretrained HGNetv2 + LSK + hybrid encoder{', off: ' + a.v7_off if a.v7_off else ''}")
-            say(f"model   OpenOBB{13 if v13 else 12}-{a.size} ({core}; dual dense oriented head P3-P5: one-to-many "
-                f"for learning + one-to-one for inference, NMS-free), {n_par:.2f}M params, max {a.num_top} "
-                f"detections | init: {init_desc}")
-            if v13 and not a.weights:
-                say("WARNING  OpenOBB13 starts from random weights: use pretrain=coco pretrain_teacher=<trained "
-                    "OpenOBB .pt> (docs/OPENOBB12.md)")
+            core = f"pretrained HGNetv2 + LSK + hybrid encoder{', off: ' + a.v7_off if a.v7_off else ''}"
+            if v13:
+                core = (f"{core} at {a.img // 2} px + full-resolution {a.img} px detail stream; dual dense oriented "
+                        f"head P2-P5")
+            else:
+                core += "; dual dense oriented head P3-P5"
+            say(f"model   OpenOBB{13 if v13 else 12}-{a.size} ({core}: one-to-many for learning + one-to-one for "
+                f"inference, NMS-free), {n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")
+            if v13 and a.img < 1536:
+                say(f"WARNING  OpenOBB13 runs its core at imgsz / 2 = {a.img // 2} px: use imgsz = 2x the usual "
+                    f"size (e.g. 2560 for drawings trained at 1280)")
         elif v9:
             head9 = (f"OpenOBB8 head + relational refiner of {a.rel_k} candidates" if model.refiner is not None
                      else "OpenOBB7 dense head, no relational refiner")

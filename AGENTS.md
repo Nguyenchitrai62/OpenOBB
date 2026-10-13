@@ -293,6 +293,12 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-13 (8): **OpenOBB13 thay bằng bản nhắm độ chính xác** (0.11.0, F52, [docs/OPENOBB13.md](docs/OPENOBB13.md)).
+  - User bỏ v13 cũ (lõi nhanh v9) vì chỉ nhắm tốc độ.
+  - Đo trên nhãn: 53% wall_300 chung ô P3 với junction. v13 = v12 + luồng độ phân giải gốc (`hires`) + lưới P2 (`p2_head`, `p2_head_o2o`) + `to_p3`.
+  - `imgsz` của v13 là độ phân giải đầy đủ (Wall_Color: 2560), lõi chạy ở một nửa. Model tự đệm đầu vào lên bội 64.
+  - Checkpoint v13 của 0.10.0 không nạp được nữa.
+
 - 2026-10-13 (7): **OpenOBB12 / OpenOBB13: head dense kép, không NMS** (F51, [docs/OPENOBB12.md](docs/OPENOBB12.md)).
   - `openobb/models/openobb12.py` (`DualHeadMixin`, `OpenOBB12` lõi v7, `OpenOBB13` lõi v9) + `openobb12_loss.py` (loss dense v10 cho cả hai head, head một-một gán k = 1).
   - `pretrain_teacher=` nhận detector OpenOBB đã train (`pretrain.TRAINED_CORES`): thầy là `encode()` của nó. `pretrain=` dùng được cho v13.
