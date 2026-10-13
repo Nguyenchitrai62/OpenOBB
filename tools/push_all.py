@@ -36,7 +36,7 @@ ALLOW = ["openobb", "tests", "docs/DEPLOY.md", "docs/FINETUNE.md", "docs/OPENOBB
          "run_app.bat",
          "LICENSE", "LICENSES", "THIRD_PARTY_NOTICES.md", "pyproject.toml", "requirements.txt"]
 # files from older layouts removed from GitLab when present (renamed in the research repo)
-RETIRED = ["docs/ARCHITECTURE_CARD.md", "docs/VRDET2.md", "docs/VRDET3.md", "docs/VRDET4.md", "docs/VRDET5.md",
+RETIRED = ["hicas_detection_obb", "docs/ARCHITECTURE_CARD.md", "docs/VRDET2.md", "docs/VRDET3.md", "docs/VRDET4.md", "docs/VRDET5.md",
            "tests/test_vrdet2.py", "tests/test_vrdet3.py", "tests/test_vrdet4.py", "tests/test_vrdet5.py"]
 README_SRC = "tools/gitlab_README.md"                 # GitLab README (product wording), copied as README.md
 EXCLUDE = {"tests/test_context.py", "tests/test_import.py", "tests/test_layers.py", "tests/test_pdf_vectors.py"}
@@ -75,11 +75,11 @@ TRANSFORMS = [
 
 
 # GitLab branding (user, 2026-10-13): the product copy is renamed, GitHub keeps "openobb".
-#   package openobb -> hicas_detection_obb, class OpenOBB* -> HicasOBB*, models / modules openobbN -> hicasobbN,
+#   package openobb -> hicasobb, class OpenOBB* -> HicasOBB*, models / modules openobbN -> hicasobbN,
 #   CLI command / run and cache file names openobb -> hicasobb. Repo URLs are kept.
 # Checkpoints hold only tensors / dicts / strings (torch.load(weights_only=True) works; the model is rebuilt from
 # args["arch"]), so .pt files trained with either name load in both.
-PKG_NEW, CLI_NEW, CLASS_NEW = "hicas_detection_obb", "hicasobb", "HicasOBB"
+PKG_NEW, CLI_NEW, CLASS_NEW = "hicasobb", "hicasobb", "HicasOBB"
 KEEP = (GITLAB_PIP,)
 TEXT_EXT = {".py", ".md", ".toml", ".txt", ".bat", ".cfg", ".ini", ".json", ".yaml", ".yml"}
 TEXT_NAMES = {"LICENSE", "NOTICE", "COPYING"}                      # text files without a suffix

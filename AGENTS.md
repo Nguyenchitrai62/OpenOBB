@@ -315,10 +315,10 @@ Câu hỏi còn mở:
     (bỏ đường dẫn `/root/.cache/openobb/...`, tham số train, điểm số), tự kiểm tra không còn tên nội bộ.
 
 - 2026-10-13 (2): **0.8.0: bản GitLab đổi thương hiệu thành HicasOBB** (theo user; GitHub giữ `openobb`).
-  - `tools/push_all.py` tự đổi khi đồng bộ: package `openobb` → `hicas_detection_obb`, class `OpenOBB*` → `HicasOBB*`,
+  - `tools/push_all.py` tự đổi khi đồng bộ: package `openobb` → `hicasobb` (từ 0.8.3; 0.8.0–0.8.2 là `hicas_detection_obb`), class `OpenOBB*` → `HicasOBB*`,
     model / module `openobbN` → `hicasobbN` (`model=hicasobb8x`), lệnh CLI `openobb` → `hicasobb`, `OPENOBB*` → `HICASOBB*`.
     URL repo giữ nguyên. Test chạy trên bản đã đổi tên trước khi đẩy.
-  - Quy trình user: train trên Colab bằng GitHub (`openobb`), suy luận bằng GitLab (`hicas_detection_obb`).
+  - Quy trình user: train trên Colab bằng GitHub (`openobb`), suy luận bằng GitLab (`hicasobb`).
     Đã kiểm: checkpoint chỉ chứa dữ liệu (`torch.load(weights_only=True)` được), `openobb10x.pt` nạp bằng bản GitLab cho
     đầu ra giống hệt bản GitHub. Cần dùng cùng số phiên bản ở hai bên.
 
