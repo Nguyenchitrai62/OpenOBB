@@ -54,6 +54,7 @@ r = OpenOBB("openobb3x").train(data="path/data.yaml", epochs=100, imgsz=1280)   
 
 | `model=` | Kiến trúc | Tham số | Ghi chú |
 |---|---|---|---|
+| `openobb11s/m/l/x` | **mới, chưa train:** OpenOBB8 + tầng quan hệ train một-một: mỗi object đúng một box, không NMS (bỏ box trùng / mảnh vụn của tường dài). Đi tiếp được từ `best.pt` của v8 / v10 (`weights=`) | x: 66.6M | [OPENOBB11.md](OPENOBB11.md) |
 | `openobb10s/m/l/x` | **mới, chưa train:** OpenOBB8 + head 3 slot mỗi điểm (vật nhỏ chồng nhau không còn tranh điểm: 72% wall_300 không có điểm riêng ở v8), gán nhãn theo tầm với DFL (note không còn học box cụt), cân bằng class hiếm. Đi tiếp được từ `best.pt` của v8 (`weights=`) | x: 66.7M | [OPENOBB10.md](OPENOBB10.md) |
 | `openobb9s/m/l/x` | **mới, chưa train:** lõi tự thiết kế (conv 3×3 dày tái tham số hoá, nhắm nhanh gấp khoảng 1.8 lần v8) + head của v8; cần `openobb pretrain` (chưng cất từ D-FINE COCO + DINOv2) trước | x: 29.5M | [OPENOBB9.md](OPENOBB9.md), [PRETRAIN.md](PRETRAIN.md) |
 | `openobb8s/m/l/x` | **bản tốt nhất hiện tại:** lõi pretrained của v3 đã sửa các lỗi đo được (chặn nổ số P5, LSK có chặn, chi tiết stride 4, head class có ngữ cảnh) + tầng suy luận quan hệ theo hướng. Bắt đầu y hệt v3 | x: 66.6M | [OPENOBB8.md](OPENOBB8.md) |

@@ -42,7 +42,7 @@ def build_parser():
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10"],
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11"],
                     help="v1: OpenOBB (DETR-style decoder); v2: OpenOBB2 (dense segment-aware, NMS-free); "
                          "v3: OpenOBB3 (pretrained encoder + dense anisotropic oriented head); "
                          "v4: OpenOBB4 (DINOv2 backbone + DETR decoder + dense oriented branch); "
@@ -51,7 +51,8 @@ def build_parser():
                          "v8: OpenOBB8 (OpenOBB7 + oriented relational refiner, docs/OPENOBB8.md); "
                          "v9: OpenOBB9 (new re-parameterised core + OpenOBB8's head, docs/OPENOBB9.md); "
                          "v10: OpenOBB10 (OpenOBB8 + multi-slot head, reach-aware assignment, class balance, "
-                         "docs/OPENOBB10.md)")
+                         "docs/OPENOBB10.md); "
+                         "v11: OpenOBB11 (dense proposals + one-to-one relational set decoder, NMS-free, docs/OPENOBB11.md)")
     ap.add_argument("--backbone", default="hgnet", choices=["hgnet", "dinov2_s", "dinov2_b", "dinov2_l"])
     ap.add_argument("--dense-v3", action="store_true", help="dense branch = OpenOBB3's oriented head (OpenOBB4)")
     ap.add_argument("--geo-cls", action="store_true", help="OpenOBB5: class branch reads the predicted geometry")
@@ -223,8 +224,9 @@ def main(argv=None):
 
     classes = dataset_classes(a.data)
     v2, v4, v5 = a.arch == "v2", a.arch == "v4", a.arch == "v5"
-    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10")
+    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11")
     v6, v7, v8, v9, v10 = a.arch == "v6", a.arch == "v7", a.arch == "v8", a.arch == "v9", a.arch == "v10"
+    v11 = a.arch == "v11"
     dense_arch = v2 or v3                       # dense heads: no queries / decoder
     if v4:                                      # DETR decoder fed and supervised by the dense oriented branch
         a.dense = a.dense_queries = a.dense_v3 = True
@@ -235,7 +237,11 @@ def main(argv=None):
     elif v3:
         from openobb.models.openobb3 import OpenOBB3
         from openobb.models.openobb3_loss import OpenOBB3Loss
-        if v10:
+        if v11:
+            from openobb.models.openobb11 import OpenOBB11
+            model = OpenOBB11(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
+                              off=a.v8_off or None, off7=a.v7_off or None, rel_k=a.rel_k)
+        elif v10:
             from openobb.models.openobb10 import OpenOBB10
             model = OpenOBB10(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
                               off=a.v10_off or None, off8=a.v8_off or None, off7=a.v7_off or None, rel_k=a.rel_k)
@@ -295,7 +301,10 @@ def main(argv=None):
     if v2:
         crit = OpenOBB2Loss(img_size=a.img)
     elif v3:
-        if v10:
+        if v11:
+            from openobb.models.openobb11_loss import OpenOBB11Loss
+            crit = OpenOBB11Loss(img_size=a.img)
+        elif v10:
             from openobb.models.openobb10_loss import OpenOBB10Loss
             crit = OpenOBB10Loss(img_size=a.img, off=a.v10_off or None)
         elif v8 or v9:
@@ -431,6 +440,10 @@ def main(argv=None):
             if not a.weights:
                 say("WARNING  OpenOBB9 starts from random weights: run `openobb pretrain model=openobb9x ...` first "
                     "and pass weights=<that file> (docs/OPENOBB9.md)")
+        elif v11:
+            say(f"model   OpenOBB11-{a.size} (pretrained HGNetv2 + LSK + hybrid encoder; dense oriented proposals "
+                f"+ one-to-one relational set decoder over {a.rel_k} candidates, NMS-free), {n_par:.2f}M params | "
+                f"init: {init_desc}")
         elif v10:
             off = ", ".join(f"off: {v}" for v in (a.v7_off, a.v8_off, a.v10_off) if v)
             say(f"model   OpenOBB10-{a.size} (pretrained HGNetv2 + LSK + hybrid encoder; dense oriented head P3-P5 "

@@ -315,19 +315,22 @@ class OpenOBB8(OpenOBB7):
         boxes[..., 4] = torch.remainder(boxes[..., 4] + math.pi / 2, math.pi) - math.pi / 2
         return {"pred_logits": logits, "pred_boxes": boxes}
 
-    def _with_jitter(self, cand, base, cls, feats, targets):
+    def _with_jitter(self, cand, base, cls, feats, targets, return_idx=False):
         """Append jittered labelled boxes (at most K / 2 per image, random subset) as extra candidates (base logits
         read at the nearest P3 anchor).
         Attention mask so the relation layer sees at training what it sees at inference: no candidate attends to a
         jittered key (other than itself), and a jittered query does not attend to a dense candidate it overlaps
-        with ProbIoU > 0.7 (inference candidates are distinct at that threshold). Padding rows are invalid."""
+        with ProbIoU > 0.7 (inference candidates are distinct at that threshold). Padding rows are invalid.
+        return_idx: also return (B, n) the labelled object of every jittered row (-1 on padding)."""
         jit = jitter_targets(targets, self.img_size)
         cap = max(self.refiner.k // 2, 1)              # at most K / 2 jittered boxes per image (memory)
-        jit = [j[torch.randperm(len(j), device=j.device)[:cap]] if len(j) > cap else j for j in jit]
+        sel = [torch.randperm(len(j), device=j.device)[:cap] if len(j) > cap else
+               torch.arange(len(j), device=j.device) for j in jit]
+        jit = [j[s] for j, s in zip(jit, sel)]
         n = max(len(j) for j in jit)
         B, K, C = base.shape
         if n == 0:
-            return cand, base, None, None
+            return (cand, base, None, None, None) if return_idx else (cand, base, None, None)
         h3, w3 = feats[0].shape[-2:]
         jc = cand.new_zeros((B, n, 5))
         jc[..., 2:4] = 1.0
@@ -350,4 +353,9 @@ class OpenOBB8(OpenOBB7):
             dup = probiou(cand[:, :, None, :].float(), cand[:, None, :, :].float()) > 0.7
         block = (is_jit[:, None, :] | ~valid[:, None, :]) & ~eye
         block = block | (is_jit[:, :, None] & dup & ~is_jit[:, None, :] & ~eye)
+        if return_idx:
+            jit_gt = torch.full((B, n), -1, dtype=torch.long, device=cand.device)
+            for i, s in enumerate(sel):
+                jit_gt[i, :len(s)] = s
+            return cand, base, block, valid, jit_gt
         return cand, base, block, valid

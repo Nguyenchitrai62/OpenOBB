@@ -293,6 +293,16 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-13 (5): **OpenOBB11 + wheel sản phẩm** (F49, [docs/OPENOBB11.md](docs/OPENOBB11.md)).
+  - User giao toàn quyền làm v11. Phân tích box trùng của v10 (53 ảnh val): gốc ở kiến trúc → tầng quan hệ train một-một, suy luận không NMS.
+  - `openobb8_loss.ref_assign` (tách ra, hành vi v8 không đổi); `OpenOBB8._with_jitter(return_idx=True)`.
+  - `push_all.py` build wheel `hicasobb-X.Y.Z-py3-none-any.whl` (khoảng 200 KB) mỗi lần phát hành:
+    - kiểm tra rò rỉ bên trong wheel;
+    - đẩy vào `wheels/` của GitLab (chỉ giữ bản mới nhất);
+    - lưu một bản ở `dist_hicasobb/` local (gitignored).
+
+    Khách cài bằng `pip install <wheel>`, không cần quyền repo.
+
 - 2026-10-13 (4): **0.8.2: kiểm tra kiến trúc khi nạp model.**
   - Quy trình user chốt: mọi thay đổi lên cả hai repo cùng phiên bản. GitHub `openobb` dùng cho nghiên cứu và train trên Colab;
     GitLab `hicasobb` (project `.../openanything/hicasobb`, lịch sử sạch, đã force-push một lần theo lời user) chỉ dùng để nạp model và suy luận.

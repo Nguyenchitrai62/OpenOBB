@@ -26,6 +26,13 @@ class OpenOBB8Loss(OpenOBB3Loss):
         """Losses of the dense head (OpenOBB3's); OpenOBB10Loss overrides this."""
         return super().forward(outputs, targets)
 
+    def ref_assign(self, b, lg, rb, cand, g, labels, outputs):
+        """Refiner targets of image b -> (positive mask (N,), object index (N,)). OpenOBB8: one-to-many, every
+        candidate whose ProbIoU (before refinement) with an object is >= ref_thr is a positive of that object.
+        OpenOBB11Loss overrides this (one-to-one)."""
+        best, gi = probiou(cand[b][:, None, :], g[None, :, :]).clamp(0, 1).max(1)
+        return best >= self.ref_thr, gi
+
     def forward(self, outputs, targets):
         losses = self.dense_losses(outputs, targets)
         if "ref_logits" not in outputs:
@@ -40,9 +47,7 @@ class OpenOBB8Loss(OpenOBB3Loss):
             g = t["boxes"].float().clone().to(lg.device)
             g[:, :4] *= self.img_size
             with torch.no_grad():
-                iou = probiou(cand[b][:, None, :], g[None, :, :]).clamp(0, 1)
-                best, gi = iou.max(1)
-                pos = best >= self.ref_thr
+                pos, gi = self.ref_assign(b, lg, rb, cand, g, t["labels"].to(lg.device), outputs)
                 if valid is not None:
                     pos &= valid[b]
             if not pos.any():

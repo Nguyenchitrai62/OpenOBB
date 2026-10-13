@@ -44,7 +44,7 @@ def windows(length, size, gap):
 
 # architecture labels this package can rebuild (args["arch"] written at training; identical in every build of the
 # package whatever its name, so a model trained with one build loads in another of the same or a newer version)
-KNOWN_ARCHS = ("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10")
+KNOWN_ARCHS = ("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11")
 
 
 def _ver(v):
@@ -89,10 +89,14 @@ def load_model(ckpt_path, device, queries=None, classes=None):
                      off8=a.get("v8_off") or None, rel_k=a.get("rel_k", 600))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval().fuse(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
-    if a.get("arch") in ("v7", "v8", "v10"):
+    if a.get("arch") in ("v7", "v8", "v10", "v11"):
         common = dict(num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
                       max_det=max(int(a.get("num_top", 1000)), int(queries or 0)))
-        if a["arch"] == "v10":
+        if a["arch"] == "v11":
+            from openobb.models.openobb11 import OpenOBB11
+            m = OpenOBB11(a.get("size", "x"), off=a.get("v8_off") or None, off7=a.get("v7_off") or None,
+                          rel_k=a.get("rel_k", 600), **common)
+        elif a["arch"] == "v10":
             from openobb.models.openobb10 import OpenOBB10
             m = OpenOBB10(a.get("size", "x"), off=a.get("v10_off") or None, off8=a.get("v8_off") or None,
                           off7=a.get("v7_off") or None, rel_k=a.get("rel_k", 600), **common)

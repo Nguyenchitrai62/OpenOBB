@@ -719,6 +719,26 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Agent đã dựng `openobb11` = lõi v9 + head dense + cân bằng class, không tầng quan hệ. **User bác bỏ ngay (10-13), đã gỡ, không commit.**
     Không gói lại các mảnh cũ thành version mới; làm tiếp trên v9 theo hướng dẫn pretrain.
 
+- **F49. Box trùng của v10 trên 53 ảnh val, và OpenOBB11 (10-13).** Script `research/analysis/dup_analysis.py`, kết quả `dup_analysis_openobb10x.json`.
+  - Box thô trước NMS của `openobb10x.pt`, thước YOLO trong pipeline phân tích (mốc 0.675 / 0.438; khác số val chính thức vì max_det 300 / conf 0.05):
+    | Lọc | mAP50 | mAP50-95 | Box trùng |
+    |---|---|---|---|
+    | NMS 0.7 | 0.675 | 0.438 | 1191 / 7355 |
+    | NMS 0.6 / 0.5 / 0.4 / 0.3 | 0.689 / 0.693 / 0.692 / 0.694 | 0.442 / 0.444 / 0.444 / 0.446 | 354 / 115 / 85 / 66 |
+    | NMS 0.7 + sàn độ dày 12 px | 0.682 | 0.440 | 600 |
+    | NMS 0.7 + bỏ box nằm ≥ 80% trong box khác | 0.672 | 0.437 | 1063 |
+  - Cặp cùng class còn chồng nhau sau NMS 0.7: 2587 chồng lệch, 738 box ngắn trong box dài, 510 gần trùng khít.
+  - Phép "trần khử trùng hoàn hảo" (khớp IoU đa giác ≥ 0.5) không phản ánh được box trùng theo ProbIoU của bộ chấm → không dùng.
+  - Kết luận:
+    - Phần lớn box trùng là bản sao lệch đầu / lệch ngang của vật mảnh, IoU 0.5–0.7.
+    - NMS 0.5 bỏ 90% và tăng nhẹ mAP (+0.018); khuyến nghị dùng ngay `iou=0.5` khi predict v10.
+    - Nguyên nhân gốc ở kiến trúc: head dense một-nhiều (tới 48 dương / object); NMS IoU mù với vật mảnh; tầng quan hệ của v8 / v10 train một-nhiều (bản sao là dương).
+  - **OpenOBB11** ([docs/OPENOBB11.md](../docs/OPENOBB11.md)):
+    - tầng quan hệ train một-một (Hungarian, chi phí −p · ProbIoU⁶), mọi bản sao là âm; bản rung box nhãn là nhóm khử nhiễu riêng;
+    - suy luận không NMS, không lan delta;
+    - head dense như v10 nhưng chỉ giữ cân bằng class.
+    - Dự đoán ghi trước: từ v10 best → 0.70–0.73 / 0.46–0.49, box trùng < 5%. Bác bỏ nếu trùng ≥ 5% hoặc mAP50 < 0.673.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

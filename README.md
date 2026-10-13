@@ -49,6 +49,7 @@ Test model bằng giao diện kéo-thả: `run_app.bat` (Streamlit).
 
 | `model=` | Mô tả | Tài liệu |
 |---|---|---|
+| `openobb11s/m/l/x` | mới: đề xuất dense + tầng quan hệ train một-một (khử trùng tự học, không NMS); nạp được checkpoint v8 / v10 | [docs/OPENOBB11.md](docs/OPENOBB11.md) |
 | `openobb10s/m/l/x` | mới, chưa train: v8 + head 3 slot / điểm (vật nhỏ chồng nhau như wall_300 cạnh junction), gán nhãn theo tầm với (box lớn), cân bằng class hiếm; nạp được checkpoint v8 | [docs/OPENOBB10.md](docs/OPENOBB10.md) |
 | `openobb9s/m/l/x` | mới, chưa train: lõi tự thiết kế (conv 3×3 dày tái tham số hoá) + head v8; pretrain bằng chưng cất 2 thầy | [docs/OPENOBB9.md](docs/OPENOBB9.md) |
 | `openobb8s/m/l/x` | bản tốt nhất: v3 sửa lỗi + tầng suy luận quan hệ theo hướng (bắt đầu y hệt v3) | [docs/OPENOBB8.md](docs/OPENOBB8.md) |

@@ -48,7 +48,8 @@ MODELS = {**{f"openobb1{s}": ("v1", s) for s in SIZES},
           **{f"openobb6{s}": ("v6", s) for s in ("n", "s", "m", "l", "x")},
           **{f"openobb8{s}": ("v8", s) for s in SIZES},      # OpenOBB7 = the core of OpenOBB8 (v8_off=refine)
           **{f"openobb9{s}": ("v9", s) for s in SIZES},
-          **{f"openobb10{s}": ("v10", s) for s in SIZES}}    # OpenOBB8 + multi-slot head (docs/OPENOBB10.md)
+          **{f"openobb10{s}": ("v10", s) for s in SIZES},    # OpenOBB8 + multi-slot head (docs/OPENOBB10.md)
+          **{f"openobb11{s}": ("v11", s) for s in SIZES}}    # NMS-free one-to-one set decoder (docs/OPENOBB11.md)
 
 # Best architecture recipe measured on FloorPlanCAD / DOTA (research/LEDGER.md, c6): selective large-kernel
 # adapters (LSK), repeat-factor sampling, one-to-many query group, adaptive query denoising, square-aware angle loss,
@@ -102,6 +103,7 @@ RECIPE6 = {"rfs": 0.1, "channels_last": True, "clip": 10.0, "num_top": 1000}
 # OpenOBB7 / OpenOBB8: OpenOBB3's pretrained core (COCO init, lower backbone LR) repaired (+ relational refiner)
 RECIPE7 = dict(RECIPE3)
 RECIPE8 = dict(RECIPE3, rel_k=600)
+RECIPE11 = dict(RECIPE8)                         # OpenOBB11: OpenOBB8 recipe, NMS-free set decoder
 RECIPE10 = dict(RECIPE8)                         # OpenOBB10: OpenOBB8 + slots / reach / balance
 # OpenOBB9: new core pretrained by distillation (openobb pretrain), OpenOBB8's head; no COCO weights for the core
 SIZE_DEFAULTS9 = {s: dict(lr=5e-4, backbone_mult=0.2, wd=1e-4, batch=b, gb=g)
@@ -468,7 +470,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         raise SystemExit(f"model must be one of {', '.join(MODELS)} or an existing OpenOBB .pt checkpoint, "
                          f"got '{model}'")
     arch = inherited.get("arch", "v1")
-    v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5", "v6", "v7", "v8", "v9", "v10")
+    v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11")
     imgsz = int(imgsz or extra.pop("img", None) or 1024)
     if imgsz % 32:
         imgsz = int(math.ceil(imgsz / 32) * 32)
@@ -489,7 +491,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
 
     sd = {"v2": SIZE_DEFAULTS2, "v3": SIZE_DEFAULTS3, "v4": SIZE_DEFAULTS4,
           "v5": SIZE_DEFAULTS5, "v6": SIZE_DEFAULTS6, "v7": SIZE_DEFAULTS3,
-          "v8": SIZE_DEFAULTS3, "v9": SIZE_DEFAULTS9, "v10": SIZE_DEFAULTS3}.get(arch, SIZE_DEFAULTS)[size]
+          "v8": SIZE_DEFAULTS3, "v9": SIZE_DEFAULTS9, "v10": SIZE_DEFAULTS3, "v11": SIZE_DEFAULTS3}.get(arch, SIZE_DEFAULTS)[size]
     if str(optimizer).lower() not in ("auto", "adamw"):
         raise SystemExit("optimizer must be 'auto' or 'AdamW'")   # lr0 given -> used; otherwise the measured LR
     prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, seed, fit=fit)
@@ -529,7 +531,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         opts["workers"] = int(workers)
     if recipe:
         opts.update({"v2": RECIPE2, "v3": RECIPE3, "v4": RECIPE4, "v5": RECIPE5, "v6": RECIPE6, "v7": RECIPE7,
-                     "v8": RECIPE8, "v9": RECIPE9, "v10": RECIPE10}.get(arch, RECIPE))
+                     "v8": RECIPE8, "v9": RECIPE9, "v10": RECIPE10, "v11": RECIPE11}.get(arch, RECIPE))
     if arch in ("v4", "v5") and "backbone" not in inherited:
         opts["backbone"] = BACKBONE4[size]
     if aug["mosaic"]:

@@ -22,3 +22,6 @@ research/jobs/.bundle-*.tar.gz
 .venv/
 
 .gitlab_export/
+
+# product wheels built by tools/push_all.py
+/dist_hicasobb/

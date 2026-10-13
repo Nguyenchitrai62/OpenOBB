@@ -1,17 +1,28 @@
 # OpenOBB
 
-Thư viện phát hiện đối tượng xoay (OBB) cho ảnh bản vẽ CAD và ảnh chụp từ trên cao. Các kiến trúc **OpenOBB** (v1–v5) là tài sản
+Thư viện phát hiện đối tượng xoay (OBB) cho ảnh bản vẽ CAD và ảnh chụp từ trên cao. Các kiến trúc **OpenOBB** là tài sản
 riêng, dùng thương mại được: chỉ dùng thành phần Apache-2.0 / BSD / MIT, không phụ thuộc Ultralytics (AGPL).
-Giao diện train / predict / kết quả giống YOLO-OBB.
+Giao diện predict / kết quả giống YOLO-OBB.
 
 ## Cài đặt
 
+**Từ file wheel (bàn giao cho khách, không cần quyền truy cập repo):**
+
 ```bash
-pip install "openobb @ git+http://git.anybim.vn/CxDP/service/hicasai/openanything/openobb.git"           # mới nhất
-pip install "openobb @ git+http://git.anybim.vn/CxDP/service/hicasai/openanything/openobb.git@v0.2.0"    # đúng một phiên bản
+pip install openobb-X.Y.Z-py3-none-any.whl      # các thư viện phụ thuộc (torch, opencv, ...) tự cài từ PyPI
 ```
 
-Phiên bản: `openobb.__version__`; mỗi phiên bản có tag `vX.Y.Z`.
+Wheel của phiên bản mới nhất nằm trong thư mục `wheels/` của repo (khoảng 200 KB, mỗi lần phát hành tự tạo lại).
+
+**Từ repo (cần tài khoản GitLab):**
+
+```bash
+pip install "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git"           # mới nhất
+pip install "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git@vX.Y.Z"    # đúng một phiên bản
+```
+
+Phiên bản: `openobb.__version__`; mỗi phiên bản có tag `vX.Y.Z`. Model `.pt` nên giao bản đã làm gọn: `openobb strip`
+(xem `docs/DEPLOY.md`).
 
 ## Suy luận (thay YOLO)
 
@@ -39,6 +50,7 @@ DOTA và các lỗi nhầm class thường gặp. Hướng dẫn: [docs/FINETUNE
 
 | `model=` | Mô tả | Tài liệu |
 |---|---|---|
+| `openobb11s/m/l/x` | mới: đề xuất dense + tầng quan hệ train một-một (khử trùng tự học, không NMS); nạp được checkpoint v8 / v10 | [docs/OPENOBB11.md](docs/OPENOBB11.md) |
 | `openobb10s/m/l/x` | mới, chưa train: v8 + head 3 slot / điểm (vật nhỏ chồng nhau như wall_300 cạnh junction), gán nhãn theo tầm với (box lớn), cân bằng class hiếm; nạp được checkpoint v8 | [docs/OPENOBB10.md](docs/OPENOBB10.md) |
 | `openobb9s/m/l/x` | mới, chưa train: lõi tự thiết kế (conv 3×3 dày tái tham số hoá) + head v8; pretrain bằng chưng cất 2 thầy | [docs/OPENOBB9.md](docs/OPENOBB9.md) |
 | `openobb8s/m/l/x` | bản tốt nhất: v3 sửa lỗi + tầng suy luận quan hệ theo hướng (bắt đầu y hệt v3) | [docs/OPENOBB8.md](docs/OPENOBB8.md) |

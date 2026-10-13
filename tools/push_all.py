@@ -32,7 +32,7 @@ GITLAB_PIP = "git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git"
 CHECKOUT = ROOT / ".gitlab_export"                     # persistent working clone of GitLab (gitignored)
 ALLOW = ["openobb", "tests", "docs/DEPLOY.md", "docs/FINETUNE.md", "docs/OPENOBB2.md", "docs/OPENOBB3.md",
          "docs/OPENOBB4.md", "docs/OPENOBB5.md", "docs/OPENOBB6.md", "docs/OPENOBB7.md",
-         "docs/OPENOBB8.md", "docs/OPENOBB9.md", "docs/OPENOBB10.md", "docs/PRETRAIN.md", "docs/OPENOBB1.md", "app/streamlit_app.py",
+         "docs/OPENOBB8.md", "docs/OPENOBB9.md", "docs/OPENOBB10.md", "docs/OPENOBB11.md", "docs/PRETRAIN.md", "docs/OPENOBB1.md", "app/streamlit_app.py",
          "run_app.bat",
          "LICENSE", "LICENSES", "THIRD_PARTY_NOTICES.md", "pyproject.toml", "requirements.txt"]
 # files from older layouts removed from GitLab when present (renamed in the research repo)
@@ -133,6 +133,32 @@ def leaks(dst):
             if m:
                 out.append((f.relative_to(dst).as_posix(), m.group(0)))
     return out
+
+
+LOCAL_WHEELS = ROOT / "dist_hicasobb"                 # every released product wheel, kept locally (gitignored)
+
+
+def build_wheel(src):
+    """Product wheel (pure Python, ~200 KB) of the exported tree -> src/wheels/<wheel> (only the latest is kept
+    there; git history has the older ones) + a copy in LOCAL_WHEELS. Customers install it with
+    `pip install hicasobb-X.Y.Z-py3-none-any.whl` (dependencies from PyPI), no access to the repo needed."""
+    import zipfile
+    with tempfile.TemporaryDirectory() as tmp:
+        run([sys.executable, "-m", "pip", "wheel", str(src), "--no-deps", "--no-build-isolation", "-q", "-w", tmp])
+        run(["git", "clean", "-qfdX"], cwd=src)            # build/, *.egg-info left by the build
+        whl = next(Path(tmp).glob("*.whl"))
+        with zipfile.ZipFile(whl) as z:
+            bad = [n for n in z.namelist() if LEAK.search(n + z.read(n).decode("utf-8", "ignore"))]
+        if bad:
+            sys.exit(f"refusing to ship: research names inside the wheel: {bad[:5]}")
+        dst = src / "wheels"
+        dst.mkdir(exist_ok=True)
+        for old in dst.glob("*.whl"):
+            old.unlink()
+        shutil.copy(whl, dst / whl.name)
+        LOCAL_WHEELS.mkdir(exist_ok=True)
+        shutil.copy(whl, LOCAL_WHEELS / whl.name)
+    return dst / whl.name
 
 
 def rebrand(dst):
@@ -303,6 +329,9 @@ def main():
         if r.returncode:
             sys.exit("tests failed on the GitLab copy: nothing pushed to GitLab (GitHub already pushed)")
         run(["git", "clean", "-qfdX"], cwd=CHECKOUT)       # __pycache__ etc. created by the test run
+    whl = build_wheel(CHECKOUT)
+    run(["git", "add", "-A", "wheels"], cwd=CHECKOUT)
+    print(f"   wheel {whl.name} ({whl.stat().st_size / 1024:.0f} KB): GitLab wheels/ and {LOCAL_WHEELS}")
     msg = f"Release {tag}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n"    # no repo / package names
     subprocess.run(["git", "commit", "-q", "-F", "-"], cwd=CHECKOUT, input=msg, text=True, check=True)
     run(["git", "push", "-q", "origin", "HEAD:main"], cwd=CHECKOUT)
