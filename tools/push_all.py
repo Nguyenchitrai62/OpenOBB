@@ -65,9 +65,59 @@ TRANSFORMS = [
     ("docs/OPENOBB9.md", r"\[research/LEDGER\.md\]\(\.\./research/LEDGER\.md\)",
      "sổ cái của repo nghiên cứu", True),
     ("docs/OPENOBB10.md", "; script trong `research/analysis/`", "", False),
+    ("docs/PRETRAIN.md", r"git\+https://github\.com/Nguyenchitrai62/OpenOBB\.git", f"git+https://{GITLAB_PIP}", True),
     ("docs/OPENOBB6.md", r"\[research/ARCH_ANALYSIS\.md\]\(\.\./research/ARCH_ANALYSIS\.md\)",
      "báo cáo phân tích của repo nghiên cứu (không nằm trong repo này)", True),
 ]
+
+
+# GitLab branding (user, 2026-10-13): the product copy is renamed, GitHub keeps "openobb".
+#   package openobb -> hicas_detection_obb, class OpenOBB* -> HicasOBB*, models / modules openobbN -> hicasobbN,
+#   CLI command / run and cache file names openobb -> hicasobb. Repo URLs are kept.
+# Checkpoints hold only tensors / dicts / strings (torch.load(weights_only=True) works; the model is rebuilt from
+# args["arch"]), so .pt files trained with either name load in both.
+PKG_NEW, CLI_NEW, CLASS_NEW = "hicas_detection_obb", "hicasobb", "HicasOBB"
+KEEP = (GITLAB_PIP, "github.com/Nguyenchitrai62/OpenOBB")
+TEXT_EXT = {".py", ".md", ".toml", ".txt", ".bat", ".cfg", ".ini", ".json", ".yaml", ".yml"}
+
+
+def rebrand_text(s):
+    masks = {}
+    for i, k in enumerate(KEEP):
+        tok = f"\0KEEP{i}\0"
+        s = s.replace(k, tok)
+        masks[tok] = k
+    s = s.replace("OpenOBB", CLASS_NEW).replace("OPENOBB", CLASS_NEW.upper())
+    s = re.sub(r"openobb(?=\d)", CLI_NEW, s)                               # openobb8x, openobb8.py, .openobb8
+    s = re.sub(r"(?<=\bimport )openobb\b|(?<=\bfrom )openobb\b", PKG_NEW, s)
+    s = re.sub(r"(?<![\w-])openobb(?=[./\*])|(?<=[\"'])openobb(?=[\"'])", PKG_NEW, s)   # openobb.x, openobb/, "openobb"
+    s = s.replace("openobb", CLI_NEW)                                       # command, openobb_args.json, ...
+    for tok, k in masks.items():
+        s = s.replace(tok, k)
+    return s
+
+
+def rebrand_path(rel):
+    """Posix path relative to the repo -> its GitLab name."""
+    parts = rel.split("/")
+    head = [PKG_NEW] if parts[0] == "openobb" else [rebrand_text(parts[0])]
+    return "/".join(head + [rebrand_text(x) for x in parts[1:]])
+
+
+def rebrand(dst):
+    """Rename files / folders and rewrite text files of the exported tree in place."""
+    files = [f for f in dst.rglob("*") if f.is_file()]
+    for f in files:
+        rel = f.relative_to(dst).as_posix()
+        if f.suffix.lower() in TEXT_EXT:
+            f.write_text(rebrand_text(f.read_text(encoding="utf-8")), encoding="utf-8")
+        new = dst / rebrand_path(rel)
+        if new != f:
+            new.parent.mkdir(parents=True, exist_ok=True)
+            f.replace(new)
+    for d in sorted((d for d in dst.rglob("*") if d.is_dir()), key=lambda d: -len(d.parts)):
+        if not any(d.iterdir()):
+            d.rmdir()
 
 
 def run(cmd, cwd=ROOT, check=True, capture=False):
@@ -99,6 +149,7 @@ def build_tree(dst):
     bad = [str(p.relative_to(dst)) for p in (dst / "openobb").rglob("*.py") if FORBIDDEN.search(p.read_text(encoding="utf-8"))]
     if bad:
         sys.exit(f"refusing to sync: forbidden imports in {bad}")
+    rebrand(dst)
 
 
 VERSION_FILE = ROOT / "openobb" / "__init__.py"
@@ -174,7 +225,8 @@ def main():
         new = Path(tmp) / "tree"
         new.mkdir()
         build_tree(new)
-        for rel in ALLOW + RETIRED + ["README.md"]:       # replace the managed paths, keep .gitignore
+        managed = ALLOW + RETIRED + ["README.md"]
+        for rel in managed + [rebrand_path(r) for r in managed]:     # replace the managed paths, keep .gitignore
             p = CHECKOUT / rel
             if p.is_dir():
                 shutil.rmtree(p)
@@ -182,8 +234,8 @@ def main():
                 p.unlink()
         shutil.copytree(new, CHECKOUT, dirs_exist_ok=True)
     run(["git", "add", "-A"], cwd=CHECKOUT)
-    committed = set(run(["git", "ls-files", "openobb"], capture=True).stdout.split())
-    tracked = set(run(["git", "ls-files", "openobb"], cwd=CHECKOUT, capture=True).stdout.split())
+    committed = {rebrand_path(f) for f in run(["git", "ls-files", "openobb"], capture=True).stdout.split()}
+    tracked = set(run(["git", "ls-files", PKG_NEW], cwd=CHECKOUT, capture=True).stdout.split())
     missing = sorted(committed - tracked)
     if missing:
         sys.exit(f"refusing to push: package files not tracked on GitLab (ignore rule?): {missing[:5]}")

@@ -293,6 +293,14 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-13 (2): **0.8.0: bản GitLab đổi thương hiệu thành HicasOBB** (theo user; GitHub giữ `openobb`).
+  - `tools/push_all.py` tự đổi khi đồng bộ: package `openobb` → `hicas_detection_obb`, class `OpenOBB*` → `HicasOBB*`,
+    model / module `openobbN` → `hicasobbN` (`model=hicasobb8x`), lệnh CLI `openobb` → `hicasobb`, `OPENOBB*` → `HICASOBB*`.
+    URL repo giữ nguyên. Test chạy trên bản đã đổi tên trước khi đẩy.
+  - Quy trình user: train trên Colab bằng GitHub (`openobb`), suy luận bằng GitLab (`hicas_detection_obb`).
+    Đã kiểm: checkpoint chỉ chứa dữ liệu (`torch.load(weights_only=True)` được), `openobb10x.pt` nạp bằng bản GitLab cho
+    đầu ra giống hệt bản GitHub. Cần dùng cùng số phiên bản ở hai bên.
+
 - 2026-10-13: **`openobb train ... pretrain=coco|dota|<thư mục>`** (theo user: pretrain v9 bằng một lệnh, khung tự lo data).
   - `openobb/auto_pretrain.py` + `openobb/data/download.py`:
     - tự tải COCO val2017 / DOTA-v1.0 (cắt 1024);
