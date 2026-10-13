@@ -68,6 +68,18 @@ Sau đó chạy đầy đủ (ví dụ 10 epoch):
 
 Kết quả ở `runs/pretrain/train/`: `weights/last.pt` (lưu mỗi epoch) và `pretrain_log.json`.
 
+**Thầy đã train trên DOTA (khuyến nghị cho vật xoay tí hon, từ 0.7.2).** `teacher_dfine=` nhận một checkpoint OpenOBB (`.pt`)
+thay cho lõi D-FINE COCO. `openobb_dota_core_x.pt` là lõi HGNetv2 + encoder đã train COCO rồi DOTA 24 epoch (run nghiên cứu
+`e6-vrdet-x-dota-24e`): vừa có tiên nghiệm COCO vừa có tiên nghiệm vật xoay nhỏ, và nhánh P5 còn sống (LEDGER F48).
+Chỉ dùng cho nghiên cứu (DOTA là data học thuật).
+
+```bash
+!openobb pretrain model=openobb9x \
+    data=/content/pre/coco/val2017,/content/datasets/dota1_1024/images/train,/content/drawings/pretrain \
+    val_data=/content/drawings/heldout teachers=dfine,dinov2 \
+    teacher_dfine=/content/openobb_dota_core_x.pt epochs=10 imgsz=1024 batch=16 workers=8
+```
+
 ### 2.4 Train detection từ lõi đã pretrain
 
 ```bash

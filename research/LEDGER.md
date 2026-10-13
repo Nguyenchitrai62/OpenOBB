@@ -706,6 +706,17 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     - Kết luận "v10 chậm gấp 10 lần YOLO" (68.7 s so với 7.0 s, các model chạy nối tiếp) **không có cơ sở**.
       Từ nay so tốc độ chỉ trên GPU (Colab, cùng GPU, cùng ảnh); script đưa user ở hội thoại 10-12.
 
+- **F48. Kế hoạch v11 theo cổng (user chọn, 10-13) + lõi DOTA dùng làm thầy chưng cất.**
+  - User xác nhận: **v9 (0.541) chưa từng được pretrain** → kết quả đó là bài học L1 (thiếu tiên nghiệm), không phải lõi nhanh hỏng.
+  - Lõi DOTA `runs/e6-vrdet-x-dota-24e/openobb_dota_core_x.pt` (HGNetv2-X + encoder, COCO → DOTA 24 epoch) là thầy khoẻ:
+    trang thật 640 px, backbone mean|x| 0.58 / 0.85 / 1.21 (không nổ); đặt P5 backbone = 0 đổi P3 62%, P4 78%, P5 96% → **P5 sống**,
+    khác hẳn v3 đã fine-tune (P5 chết).
+  - `openobb pretrain ... teacher_dfine=<checkpoint .pt>` (0.7.2): thầy `dfine` là lõi của checkpoint đó thay cho D-FINE COCO.
+  - Cổng: T1 tốc độ GPU (v9-x không tầng quan hệ so với v8-x và YOLO26x, khoảng 0.2 CU) → H-DOTA (v8-x khởi tạo từ lõi DOTA,
+    100 epoch, so F43 v8 vòng 1 từ COCO 0.671 / 0.444, wall_300 .571; khoảng 5 CU) → chưng cất v9 / v11 từ thầy DOTA + DINOv2 → fine-tune.
+  - User hỏi pretrain v9 ngay: hướng dẫn = chưng cất (thầy DOTA + DINOv2) rồi fine-tune với `v8_off=refine` (bỏ tầng quan hệ:
+    chưa chứng minh lợi ích, tốn 35% thời gian).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

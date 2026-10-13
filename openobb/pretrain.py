@@ -167,6 +167,8 @@ def pretrain(model="openobb9x", data=None, val_data=None, teachers=None, epochs=
     teacher       DINOv2 size: dinov2_s (default for OpenOBB9), dinov2_b (default for OpenOBB6), dinov2_l
     teacher_imgsz DINOv2 input size (multiple of 14; default ~0.7 x imgsz)
     teacher_dfine D-FINE COCO core size used as teacher: x (default; OpenOBB3-x / OpenOBB8-x core), l, m, s
+                  or an OpenOBB checkpoint (.pt) whose HGNetv2 + encoder core is the teacher, e.g. a core
+                  trained on DOTA (tiny oriented objects): teacher_dfine=/content/openobb_dota_core_x.pt
     dino_layers   "last" (default) or "mid,last": DINOv2 layers used as targets for P4 and P5
     w_dfine       loss weights of the dfine targets at P3, P4, P5 (one number = all)
     w_dino        loss weights of the DINOv2 targets at P4, P5 (one number = both)
@@ -209,8 +211,9 @@ def pretrain(model="openobb9x", data=None, val_data=None, teachers=None, epochs=
     bad = [t for t in names if t not in TEACHERS]
     if bad or not names:
         raise SystemExit(f"teachers must be a subset of {','.join(TEACHERS)}, got {teachers}")
+    td = str(teacher_dfine) if str(teacher_dfine).endswith(".pt") else str(teacher_dfine).lower()   # keep path case
     return _pretrain_v9(size, model_name=str(model).lower(), val_files=val_files, teachers=names,
-                        teacher=teacher or "dinov2_s", teacher_dfine=str(teacher_dfine).lower(),
+                        teacher=teacher or "dinov2_s", teacher_dfine=td,
                         dino_layers=_names(dino_layers), w_dfine=_floats(w_dfine, 3, "w_dfine"),
                         w_dino=_floats(w_dino, 2, "w_dino"), t2_min=float(t2_min),
                         channels_last=bool(channels_last), v9_off=v9_off, **common)
@@ -334,11 +337,18 @@ class _Teachers(nn.Module):
         if "dfine" in names:
             from openobb.models import openobb1
             from openobb.models.openobb3 import OpenOBB3
-            core = OpenOBB3(dfine_size, num_classes=1, img_size=imgsz, lsk=False)
-            skipped = openobb1.load_dfine_coco(core, dfine_size, log=log)
+            src, size = dfine_size, dfine_size
+            if str(dfine_size).endswith(".pt"):          # an OpenOBB checkpoint, e.g. a core trained on DOTA
+                if not Path(dfine_size).exists():
+                    raise SystemExit(f"teacher_dfine checkpoint not found: {dfine_size}")
+                ck = torch.load(dfine_size, map_location="cpu", weights_only=False, mmap=True)
+                size = str((ck.get("args") or {}).get("size", "x")) if isinstance(ck, dict) else "x"
+                del ck
+            core = OpenOBB3(size, num_classes=1, img_size=imgsz, lsk=False)
+            skipped = openobb1.load_dfine_coco(core, src, log=log)
             missing = [k for k in (skipped or []) if k.startswith(("backbone.", "encoder."))]
             if missing:                              # never distil from a partly random teacher
-                raise RuntimeError(f"D-FINE-{dfine_size} COCO weights do not cover the teacher core: {missing[:5]}")
+                raise RuntimeError(f"teacher {src} does not cover the HGNetv2 + encoder core: {missing[:5]}")
             self.dfine = nn.ModuleDict({"backbone": core.backbone, "encoder": core.encoder})
             self.channels["dfine"] = int(core.encoder.hidden_dim)        # 384 for x, 256 for s / m / l
         if "dinov2" in names:

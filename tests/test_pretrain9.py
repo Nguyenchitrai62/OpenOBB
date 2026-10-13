@@ -98,3 +98,24 @@ def test_pretrain_rejects_bad_options(tmp_path, no_downloads):
         pretrain("openobb6n", teachers="dfine,dinov2", **kw)
     with pytest.raises(SystemExit):
         pretrain("openobb3x", **kw)
+
+
+def test_teacher_from_checkpoint_path(tmp_path):
+    """teacher_dfine=<OpenOBB .pt> (e.g. a core trained on DOTA): the teacher core is that checkpoint, size read
+    from its args, path case kept."""
+    from openobb.models.openobb3 import OpenOBB3
+    from openobb.pretrain import _Teachers
+    torch.manual_seed(0)
+    src = OpenOBB3("s", num_classes=3, img_size=64, lsk=False)
+    p = tmp_path / "Dota_Core_S.pt"
+    torch.save({"model": src.state_dict(), "args": {"size": "s"}, "classes": ["a", "b", "c"]}, p)
+    tch = _Teachers(["dfine"], 64, str(p), "dinov2_s", ["last"], 42, log=lambda *_: None)
+    assert tch.channels["dfine"] == 256
+    src.eval()                                       # teacher = the saved weights, eval statistics
+    x = torch.rand(1, 3, 64, 64)
+    with torch.no_grad():
+        want = src.encoder(src.backbone(x))
+    got = tch(x)["dfine"]
+    assert len(got) == 3 and all(torch.allclose(a, b, atol=1e-5) for a, b in zip(want, got))
+    with pytest.raises(SystemExit):
+        _Teachers(["dfine"], 64, str(tmp_path / "missing.pt"), "dinov2_s", ["last"], 42)
