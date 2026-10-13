@@ -34,9 +34,16 @@ PALETTE = [(230, 25, 75), (60, 180, 75), (0, 130, 200), (245, 130, 48), (145, 30
 def get_model(path, queries):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if device.type == "cpu":
-        torch.set_num_threads(max(1, min(4, os.cpu_count() or 1)))
+        torch.set_num_threads(max(1, (os.cpu_count() or 2) // 2))   # physical cores: 2x faster than 4 threads on 8 cores
     model, names, targs = load_model(path, device, queries)
     return model, list(names), targs, device
+
+
+def preview(img, max_side=1600):
+    """Downscaled copy for display only (detections stay at full resolution): a 3300 x 2300 page re-encoded on every
+    Streamlit rerun made the app slow."""
+    s = max_side / max(img.shape[:2])
+    return img if s >= 1 else cv2.resize(img, (round(img.shape[1] * s), round(img.shape[0] * s)), interpolation=cv2.INTER_AREA)
 
 
 def draw(img_rgb, dets, names, thickness, show_text):
@@ -122,7 +129,7 @@ def main():
         st.session_state.update(raw=raw, key=key, ms=(time.time() - t) * 1000)
 
     left, right = st.columns(2)
-    left.image(rgb, caption=f"{up.name} ({img.shape[1]}×{img.shape[0]})")
+    left.image(preview(rgb), caption=f"{up.name} ({img.shape[1]}×{img.shape[0]})")
     if st.session_state.get("key") != key:
         right.info("Bấm **Detect**.")
         return
@@ -130,7 +137,7 @@ def main():
     thr = conf_thresholds(names, targs, "auto" if auto else conf)
     raw = [d for d in st.session_state["raw"] if d[2] >= thr[d[1]]]
     dets = [d for d in merge_dets(raw, names, 0.0, iou) if d["class_id"] in selected]
-    right.image(draw(rgb, dets, names, thickness, show_text), caption=f"{len(dets)} objects · "
+    right.image(preview(draw(rgb, dets, names, thickness, show_text)), caption=f"{len(dets)} objects · "
                 f"{st.session_state['ms']:.0f} ms ({device})")
 
     counts = pd.Series([d["class"] for d in dets], dtype=str).value_counts()
