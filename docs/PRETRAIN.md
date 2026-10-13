@@ -2,6 +2,41 @@
 
 Tài liệu này hướng dẫn chạy `openobb pretrain` cho OpenOBB9. Lập luận thiết kế nằm ở [OPENOBB9.md](OPENOBB9.md).
 
+## 0. Cách nhanh nhất: một lệnh (từ 0.7.3)
+
+Với lõi tự thiết kế (`openobb9*`, `openobb6*`), thêm `pretrain=` vào lệnh train. Khung tự tải data, tự sắp xếp, tự pretrain,
+lưu cache, rồi train tiếp trên data của bạn:
+
+```bash
+!pip install -q --force-reinstall --no-deps git+https://github.com/Nguyenchitrai62/OpenOBB.git
+
+# COCO: chưng cất lõi trên 5k ảnh COCO val2017 + ảnh train của bạn (không cần nhãn), rồi train
+!openobb train model=openobb9x data=/content/Wall_Color/data.yaml imgsz=1280 epochs=150 pretrain=coco v8_off=refine
+
+# DOTA: chưng cất trên ảnh DOTA + ảnh của bạn, rồi train có nhãn trên DOTA (vật xoay tí hon), rồi train trên data của bạn
+!openobb train model=openobb9x data=/content/Wall_Color/data.yaml imgsz=1280 epochs=150 pretrain=dota v8_off=refine
+```
+
+| Tham số | Mặc định | Ý nghĩa |
+|---|---|---|
+| `pretrain=` | không | `coco`, `dota`, `coco,dota`, hoặc thư mục ảnh của bạn (phân cách bằng dấu phẩy). Chỉ cho `openobb6*` / `openobb9*` (các model khác đã có weights COCO sẵn) |
+| `pretrain_epochs=` | 20 (coco, thư mục), 10 (dota) | số epoch chưng cất |
+| `pretrain_det_epochs=` | 12 | số epoch train có nhãn trên DOTA (chỉ với `dota`; `0` = bỏ bước này) |
+| `pretrain_dir=` | `~/.cache/openobb/pretrain` | nơi lưu data + weights pretrain. **Trên Colab nên để trên Drive** (`/content/drive/MyDrive/openobb_pretrain`) để lần sau dùng lại, không tốn CU |
+| `pretrain_teacher=` | lõi D-FINE-X COCO (tự tải) | thầy chưng cất khác: một checkpoint OpenOBB `.pt`, ví dụ `openobb_dota_core_x.pt` |
+
+- Các bước chạy:
+  1. Tải data: COCO val2017 khoảng 1 GB; DOTA-v1.0 train + val, cắt patch 1024 px, khoảng 6 phút.
+  2. Chưng cất lõi từ thầy D-FINE COCO + DINOv2. Ảnh val của bạn dùng cho cổng T2.
+  3. (chỉ với `dota`) train cả detector có nhãn trên DOTA.
+  4. Train trên data của bạn từ weights vừa tạo.
+- Mỗi bước được cache theo (model, nguồn, số epoch, cỡ ảnh). Chạy lại cùng cài đặt thì nhảy thẳng tới bước 4.
+- Chi phí **ước tính**, chưa đo; log chưng cất in số ảnh/giây ở mỗi epoch:
+  - `coco`: khoảng 3–6 CU;
+  - `dota`: khoảng 25–40 CU, phần lớn ở bước train có nhãn trên DOTA.
+- Bản quyền: COCO / DOTA chỉ dùng nghiên cứu, nên weights pretrain trên chúng cũng chỉ là weights nghiên cứu.
+  Bản thương mại: fine-tune trên data tự gán nhãn của bạn.
+
 ## 1. Pretrain làm gì
 
 - Lõi của OpenOBB9 (backbone + neck) là kiến trúc mới. Không có weights COCO hay ImageNet cho nó.

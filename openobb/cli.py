@@ -109,6 +109,7 @@ RECIPE9 = {"rfs": 0.1, "channels_last": True, "clip": 10.0, "num_top": 1000, "re
 ARCH_KEYS = ("arch", "size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_queries", "denoising",
              "no_rotate_sampling", "context", "backbone", "dense_v3", "primary", "geo_cls", "relate", "rel_k",
              "v6_off", "v7_off", "v8_off", "v9_off", "v10_off")
+PRETRAIN_KEYS = ("pretrain", "pretrain_epochs", "pretrain_det_epochs", "pretrain_dir", "pretrain_teacher")
 MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / per epoch on small datasets
 ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every", "lrf": "min_lr_ratio"}
 IGNORED = ("save_period", "plots", "momentum", "degrees", "shear", "perspective", "mixup", "cutmix",
@@ -395,7 +396,11 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
           exist_ok=False, resume=False, tile=False, tile_scale=None, gap=200, val_frac=0.15, cache="auto", cache_dir=None, workers=None,
           device=None, recipe=True, warmup_epochs=3, patience=100, lrf=0.01, cos_lr=True, seed=0, optimizer="auto",
           **extra):
-    """Train (or fine-tune when `model` is a .pt path). Returns SimpleNamespace(save_dir, best, last, metrics)."""
+    """Train (or fine-tune when `model` is a .pt path). Returns SimpleNamespace(save_dir, best, last, metrics).
+    pretrain=coco|dota|<image folders> (new cores openobb6* / openobb9*): download, pretrain and cache the starting
+    weights first (openobb/auto_pretrain.py); pretrain_epochs=, pretrain_det_epochs= (DOTA stage), pretrain_dir=,
+    pretrain_teacher= (an OpenOBB .pt core as distillation teacher) tune it."""
+    pre = {k: extra.pop(k) for k in PRETRAIN_KEYS if k in extra}
     check_keys(extra)
     _set_device(device)
     for k in list(extra):
@@ -486,6 +491,19 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
     if str(optimizer).lower() not in ("auto", "adamw"):
         raise SystemExit("optimizer must be 'auto' or 'AdamW'")   # lr0 given -> used; otherwise the measured LR
     prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, seed, fit=fit)
+    if pre.get("pretrain"):
+        if arch not in ("v6", "v9"):
+            raise SystemExit(f"pretrain= is for the new cores without public weights (openobb6*, openobb9*); "
+                             f"{model} already starts from pretrained COCO weights")
+        if weights or extra.get("weights"):
+            raise SystemExit("pretrain= builds the starting weights itself: use either pretrain= or weights=")
+        from openobb.auto_pretrain import ARCH_SWITCHES, auto_pretrain
+        extra["weights"] = auto_pretrain(
+            f"openobb{arch[1:]}{size}", pre["pretrain"], Path(prepared) / "images" / "train",
+            Path(prepared) / "images" / "val", imgsz=imgsz, epochs=pre.get("pretrain_epochs"),
+            det_epochs=pre.get("pretrain_det_epochs"), root=pre.get("pretrain_dir"), teacher=pre.get("pretrain_teacher"),
+            device=device, workers=int(workers) if workers is not None else 8,
+            switches={k: extra.get(k) for k in ARCH_SWITCHES})
     n_train = _n_lines(Path(prepared) / "meta" / "train.jsonl")
     if cache == "auto":                              # decoded uint8 images in RAM when they take < 25% of it
         cache = n_train * imgsz * imgsz * 3 < 0.25 * _ram_bytes()

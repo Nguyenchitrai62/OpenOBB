@@ -293,6 +293,16 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-13: **`openobb train ... pretrain=coco|dota|<thư mục>`** (theo user: pretrain v9 bằng một lệnh, khung tự lo data).
+  - `openobb/auto_pretrain.py` + `openobb/data/download.py`:
+    - tự tải COCO val2017 / DOTA-v1.0 (cắt 1024);
+    - chưng cất lõi (thầy D-FINE COCO hoặc `pretrain_teacher=<.pt>` + DINOv2);
+    - với `dota` thì train có nhãn trên DOTA;
+    - cache theo cài đặt (`pretrain_dir=`).
+  - `openobb pretrain teacher_dfine=<.pt>` nhận lõi DOTA làm thầy (0.7.2; F48).
+  - User bác bỏ `openobb11` dạng gộp v9 + cân bằng class + bỏ tầng quan hệ (đã gỡ, không commit).
+    Luật: version mới phải là cải tiến đột phá, không gói tinh chỉnh nhỏ.
+
 - 2026-10-12 (5): **OpenOBB10 + suy luận ảnh chữ nhật** (F45, [docs/OPENOBB10.md](docs/OPENOBB10.md)).
   - Đo tốc độ trên trang thật (CPU 1 luồng): v3-x 1.32×, v8-x 1.77× YOLO26x cùng đầu vào. Trên trang A, OpenOBB còn đệm vuông
     (thêm 38% điểm ảnh) → suy luận chữ nhật (bội số 32) thành mặc định cho mọi model, không cần train lại.
