@@ -244,7 +244,11 @@ def main():
         url = run(["git", "remote", "get-url", "origin"], cwd=CHECKOUT, capture=True).stdout.strip()
         if url != GITLAB:                                  # product repo moved: start from a fresh clone
             print(f"   GitLab project changed ({url} -> {GITLAB}): re-cloning")
-            shutil.rmtree(CHECKOUT, onerror=lambda f, p, e: (os.chmod(p, 0o700), f(p)))
+            for child in CHECKOUT.iterdir():               # keep the folder itself (Windows: may be held open)
+                if child.is_dir():
+                    shutil.rmtree(child, onerror=lambda f, p, e: (os.chmod(p, 0o700), f(p)))
+                else:
+                    child.unlink()
     if (CHECKOUT / ".git").exists():
         run(["git", "fetch", "-q", "--tags", "origin"], cwd=CHECKOUT)
         if run(["git", "rev-parse", "--verify", "-q", "origin/main"], cwd=CHECKOUT, check=False,
