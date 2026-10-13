@@ -894,6 +894,13 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Bác bỏ nếu một trong hai điều sau xảy ra:
     - mAP50-95 không hơn v12 ít nhất 0.01;
     - sai số độ dày của wall không xuống dưới 0.8 px.
+  - **Kết quả sơ bộ (user, 10-13): fine-tune 30 epoch từ `openobb12x.pt` với `box=direct`, KHÔNG phải điều kiện ghi trước.**
+    - ep30: 0.703 / 0.436, vẫn đang tăng chậm.
+    - Mốc cùng cách đo: `openobb12x.pt` với head một-nhiều + NMS 0.7 = 0.740 / 0.479 (`openobb calibrate` trên máy).
+    - Lớp ra của box nạp lệch nghĩa: `24 partial`, 3 / 5 kênh nhận logit bin DFL. box_loss ep1 = 1.96, mAP ep1 = 0.25.
+    - Chỉ 450 bước, so với 1500 bước của v12.
+    - Nghiêng về bác bỏ nhưng chưa kết luận. Cần `best.pt` để đo độ khít box (`box_quality.py`):
+      nếu sai số độ dày wall < 0.7 px → chạy đúng điều kiện (COCO, 100 epoch); nếu không → bác bỏ, không tốn thêm CU.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
