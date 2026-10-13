@@ -785,6 +785,15 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     |---|---|---|---|
     | v12 | 0.68–0.71 / 0.45–0.47 | < 3% | mAP50 < 0.673, hoặc trùng ≥ 3% |
     | v13 | 0.64–0.68 / 0.41–0.45; T2 ≥ 0.8; ≤ 6 ms | < 3% | T2 không đạt, hoặc mAP50 < 0.62 |
+  - **User 10-13: ưu tiên độ chính xác, v13 (bản tốc độ) tạm hoãn.**
+    Chẩn đoán lại: khoảng 95% khoảng cách mAP50 với YOLO26x nằm ở wall_300 (bị nhầm sang junction 27–32%).
+    Ô nhầm này đứng yên qua mọi thay đổi head / ngữ cảnh / slot (v3 → v10).
+    Khác biệt lớn chưa từng thử: YOLO26x-obb khởi tạo từ weights DOTA, còn OpenOBB từ COCO.
+    → Thí nghiệm kế tiếp là **H-DOTA trên v12**: `weights=openobb_dota_core_x.pt`.
+    - Lõi DOTA khớp 100% backbone (650 / 650) và encoder (546 / 546) của v12-x; LSK và head khởi tạo mới.
+    - Không tốn CU pretrain. So với v12 khởi tạo COCO, cùng 100 epoch.
+    - Kỳ vọng ghi trước: wall_300 mAP50 ≥ 0.72 (v10 .649), ô wall_300 → junction < 20%, tổng ≥ 0.71.
+      Bác bỏ nếu wall_300 tăng < 0.03 so với v12 khởi tạo COCO.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
