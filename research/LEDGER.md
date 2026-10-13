@@ -816,6 +816,18 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 
     Bác bỏ nếu wall_300 tăng < 0.05 so với v12, ô nhầm ≥ 15%, hoặc junction / door giảm quá 0.02.
 
+- **F53. v13 cũ (lõi v9 + head kép, 0.10.0), log của user (10-13): 0.560 / 0.321, đã bỏ.**
+  - Điều kiện: fine-tune 50 epoch từ `best.pt` của một run v13 trước. **lr 0.005**, gấp 10 lần mặc định 5e-4 của lõi v9 (do user đặt `lr0`).
+    mAP sập ở epoch 2–3 (0.368 → 0.044) rồi mới hồi lại: LR quá cao phá điểm khởi đầu. Kết quả bị nhiễu bởi LR, không chỉ do kiến trúc.
+  - Theo class: wall .706, slide_door .086, double_door .232, wall_300 .609. Ô wall_300 → junction 17%.
+  - **Tín hiệu về head kép (cần v12 xác nhận):**
+    - không NMS: 8.4% box trùng (junction 260, wall 112);
+    - hiệu chỉnh chọn NMS 0.7 (fitness 0.345 so với "không NMS" 0.319).
+
+    Head một-một chưa đủ để bỏ NMS ở run này.
+  - Tốc độ: 8.4 ms / ảnh (batch 16, bf16, G4), so với v11 13.6 ms.
+  - Bài học cho v13 mới: dùng LR mặc định (không đặt `lr0`); `imgsz=2560`; khởi tạo COCO.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
