@@ -27,8 +27,8 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-GITLAB = "https://git.anybim.vn/CxDP/service/hicasai/openanything/openobb.git"
-GITLAB_PIP = "git.anybim.vn/CxDP/service/hicasai/openanything/openobb.git"
+GITLAB = "https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git"     # product repo (since 0.8.1)
+GITLAB_PIP = "git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git"
 CHECKOUT = ROOT / ".gitlab_export"                     # persistent working clone of GitLab (gitignored)
 ALLOW = ["openobb", "tests", "docs/DEPLOY.md", "docs/FINETUNE.md", "docs/OPENOBB2.md", "docs/OPENOBB3.md",
          "docs/OPENOBB4.md", "docs/OPENOBB5.md", "docs/OPENOBB6.md", "docs/OPENOBB7.md",
@@ -48,12 +48,12 @@ TRANSFORMS = [
     ("THIRD_PARTY_NOTICES.md",
      r"- \*\*Ultralytics \(AGPL-3\.0\)\*\* is only used by `colab/baselines/yolo_obb\.py`.*?is not distributed\.",
      "- **Ultralytics (AGPL-3.0)** is not used or distributed by this repository. `tests/test_license_guard.py` "
-     "fails if\n  `openobb/` imports it (or mmcv / mmdet / mmrotate / ai4rs). YOLO models were only trained, in a "
-     "separate research\n  repository, as accuracy baselines.", True),
+     "fails if\n  `openobb/` imports it (or mmcv / mmdet / mmrotate / ai4rs). YOLO models were only trained "
+     "separately,\n  as accuracy baselines.", True),
     ("docs/OPENOBB1.md", "- Lịch sử thí nghiệm: [research/LEDGER.md](../research/LEDGER.md).",
-     "- Lịch sử thí nghiệm: sổ cái của repo nghiên cứu (không nằm trong repo này).", False),
+     "- Lịch sử thí nghiệm: tài liệu nội bộ (không nằm trong repo này).", False),
     ("docs/FINETUNE.md", r"- \[`colab/OpenOBB_wall_color\.ipynb`\].*\n- \[`colab/OpenOBB_train\.ipynb`\].*",
-     "- Notebook Colab nằm ở repo nghiên cứu. Trong repo này dùng thẳng CLI: `pip install` rồi `openobb train ...` "
+     "- Repo này không kèm notebook Colab. Dùng thẳng CLI: `pip install` rồi `openobb train ...` "
      "(mục 2).", True),
     ("requirements.txt", r"(?m)^.*(pdf_vectors|pymupdf).*\n", "", True),
     ("docs/DEPLOY.md", r"https://<token>@github\.com/Nguyenchitrai62/OpenOBB\.git",
@@ -63,11 +63,14 @@ TRANSFORMS = [
     ("docs/FINETUNE.md", r"https://github\.com/Nguyenchitrai62/OpenOBB\.git", f"https://{GITLAB_PIP}", True),
     ("docs/OPENOBB7.md", r", \[research/ARCH_ANALYSIS\.md\]\(\.\./research/ARCH_ANALYSIS\.md\)", "", True),
     ("docs/OPENOBB9.md", r"\[research/LEDGER\.md\]\(\.\./research/LEDGER\.md\)",
-     "sổ cái của repo nghiên cứu", True),
+     "tài liệu nội bộ", True),
     ("docs/OPENOBB10.md", "; script trong `research/analysis/`", "", False),
     ("docs/PRETRAIN.md", r"git\+https://github\.com/Nguyenchitrai62/OpenOBB\.git", f"git+https://{GITLAB_PIP}", True),
+    ("docs/PRETRAIN.md", r"(?m)^!git clone -q https://github\.com/Nguyenchitrai62/OpenOBB\.git.*\n", "", True),
+    ("docs/PRETRAIN.md", "!python /content/OpenOBB/colab/data/get_dota.py --root /content/datasets --splits train",
+     "!python -c \"from openobb.data.download import dota; dota('/content/datasets', splits=('train',))\"", False),
     ("docs/OPENOBB6.md", r"\[research/ARCH_ANALYSIS\.md\]\(\.\./research/ARCH_ANALYSIS\.md\)",
-     "báo cáo phân tích của repo nghiên cứu (không nằm trong repo này)", True),
+     "báo cáo phân tích nội bộ (không nằm trong repo này)", True),
 ]
 
 
@@ -77,8 +80,13 @@ TRANSFORMS = [
 # Checkpoints hold only tensors / dicts / strings (torch.load(weights_only=True) works; the model is rebuilt from
 # args["arch"]), so .pt files trained with either name load in both.
 PKG_NEW, CLI_NEW, CLASS_NEW = "hicas_detection_obb", "hicasobb", "HicasOBB"
-KEEP = (GITLAB_PIP, "github.com/Nguyenchitrai62/OpenOBB")
+KEEP = (GITLAB_PIP,)
 TEXT_EXT = {".py", ".md", ".toml", ".txt", ".bat", ".cfg", ".ini", ".json", ".yaml", ".yml"}
+# the product repo never names the research repo / package (customer-facing): checked before every push
+LEAK = re.compile(r"openobb|vrdet|nguyenchitrai|github\.com/nguyen|(?<!\w)research/|repo nghiên cứu|research repo", re.I)
+SCRUB = (("research/LEDGER.md", "internal benchmark notes"), ("research/ARCH_ANALYSIS.md", "internal analysis"),
+         ("research/LESSONS_BY_LAYER.md", "internal notes"), ("repo nghiên cứu", "nhóm phát triển"),
+         ("research repository", "internal repository"), ("research repo", "internal repository"))
 
 
 def rebrand_text(s):
@@ -92,6 +100,11 @@ def rebrand_text(s):
     s = re.sub(r"(?<=\bimport )openobb\b|(?<=\bfrom )openobb\b", PKG_NEW, s)
     s = re.sub(r"(?<![\w-])openobb(?=[./\*])|(?<=[\"'])openobb(?=[\"'])", PKG_NEW, s)   # openobb.x, openobb/, "openobb"
     s = s.replace("openobb", CLI_NEW)                                       # command, openobb_args.json, ...
+    s = s.replace("VRDet", CLASS_NEW).replace("VRDET", CLASS_NEW.upper()).replace("vrdet", CLI_NEW)
+    s = re.sub(r"\[([^\]]*)\]\((?:\.\./)*research/[^)]*\)", r"\1", s)          # [text](../research/x) -> text
+    for old, new in SCRUB:
+        s = s.replace(old, new)
+    s = re.sub(r"(?<!\w)research/[\w./-]*", "internal notes", s)              # not github.com/facebookresearch/
     for tok, k in masks.items():
         s = s.replace(tok, k)
     return s
@@ -102,6 +115,17 @@ def rebrand_path(rel):
     parts = rel.split("/")
     head = [PKG_NEW] if parts[0] == "openobb" else [rebrand_text(parts[0])]
     return "/".join(head + [rebrand_text(x) for x in parts[1:]])
+
+
+def leaks(dst):
+    """Text files of the exported tree that still name the research repo / package -> [(file, match)]."""
+    out = []
+    for f in dst.rglob("*"):
+        if f.is_file() and f.suffix.lower() in TEXT_EXT:
+            m = LEAK.search(f.read_text(encoding="utf-8"))
+            if m:
+                out.append((f.relative_to(dst).as_posix(), m.group(0)))
+    return out
 
 
 def rebrand(dst):
@@ -150,6 +174,9 @@ def build_tree(dst):
     if bad:
         sys.exit(f"refusing to sync: forbidden imports in {bad}")
     rebrand(dst)
+    left = leaks(dst)
+    if left:
+        sys.exit(f"refusing to sync: research names left in the product copy: {left[:8]}")
 
 
 VERSION_FILE = ROOT / "openobb" / "__init__.py"
@@ -206,8 +233,6 @@ def main():
         print("note: uncommitted changes are NOT synced:\n" + dirty)
     version, _ = next_version("minor" if a.minor else "patch", a.dry_run)
     tag = "v" + ".".join(map(str, version))
-    head = run(["git", "rev-parse", "--short", "HEAD"], capture=True).stdout.strip()
-    subject = run(["git", "log", "-1", "--format=%s"], capture=True).stdout.strip()
 
     if not a.dry_run:
         print(f"== GitHub: git push ({tag})")
@@ -216,11 +241,21 @@ def main():
 
     print("== GitLab: update the working clone")
     if (CHECKOUT / ".git").exists():
+        url = run(["git", "remote", "get-url", "origin"], cwd=CHECKOUT, capture=True).stdout.strip()
+        if url != GITLAB:                                  # product repo moved: start from a fresh clone
+            print(f"   GitLab project changed ({url} -> {GITLAB}): re-cloning")
+            shutil.rmtree(CHECKOUT, onerror=lambda f, p, e: (os.chmod(p, 0o700), f(p)))
+    if (CHECKOUT / ".git").exists():
         run(["git", "fetch", "-q", "--tags", "origin"], cwd=CHECKOUT)
-        run(["git", "reset", "-q", "--hard", "origin/main"], cwd=CHECKOUT)
+        if run(["git", "rev-parse", "--verify", "-q", "origin/main"], cwd=CHECKOUT, check=False,
+               capture=True).returncode == 0:
+            run(["git", "reset", "-q", "--hard", "origin/main"], cwd=CHECKOUT)
         run(["git", "clean", "-qfdx"], cwd=CHECKOUT)
     else:
         run(["git", "clone", "-q", GITLAB, str(CHECKOUT)])
+    if not (CHECKOUT / ".gitignore").exists():            # new project: anchored rules only (lesson 10-09)
+        (CHECKOUT / ".gitignore").write_text("__pycache__/\n*.pyc\n.pytest_cache/\n/runs/\n/build/\n/dist/\n"
+                                             "*.egg-info/\n", encoding="utf-8")
     with tempfile.TemporaryDirectory() as tmp:
         new = Path(tmp) / "tree"
         new.mkdir()
@@ -257,9 +292,7 @@ def main():
         if r.returncode:
             sys.exit("tests failed on the GitLab copy: nothing pushed to GitLab (GitHub already pushed)")
         run(["git", "clean", "-qfdX"], cwd=CHECKOUT)       # __pycache__ etc. created by the test run
-    msg = (f"Sync from GitHub {head} ({tag}): {subject}\n\n"
-           "Product subset of github.com/Nguyenchitrai62/OpenOBB (tools/push_all.py).\n\n"
-           "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n")
+    msg = f"Release {tag}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n"    # no repo / package names
     subprocess.run(["git", "commit", "-q", "-F", "-"], cwd=CHECKOUT, input=msg, text=True, check=True)
     run(["git", "push", "-q", "origin", "HEAD:main"], cwd=CHECKOUT)
     ensure_tag(tag, CHECKOUT)

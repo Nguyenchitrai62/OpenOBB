@@ -13,6 +13,19 @@ pip install "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"
 - Nếu repo chuyển sang private: `pip install "openobb @ git+https://<token>@github.com/Nguyenchitrai62/OpenOBB.git"`.
 - Chỉ cần file `best.pt`. Mọi thông tin kiến trúc (v1–v5), class và imgsz đều nằm trong checkpoint.
 
+## File model giao cho khách (từ 0.8.1)
+
+`best.pt` sau khi train còn chứa thông tin của lần train: đường dẫn data / cache, thư mục run, khoảng 100 tham số train, điểm val.
+Trước khi giao, tạo bản triển khai chỉ gồm weights, kiến trúc, class và ngưỡng conf:
+
+```bash
+openobb strip model=runs/obb/train/weights/best.pt out=wall_detector.pt     # half=True: weights float16, file nhỏ một nửa
+```
+
+- Tên file tuỳ ý. Kiến trúc được đọc từ nội dung file (`args.arch`, `args.size`), không từ tên.
+- Lệnh tự kiểm tra file kết quả không còn đường dẫn hay tên nội bộ, nếu còn thì báo lỗi.
+- Nạp như mọi checkpoint: `OpenOBB("wall_detector.pt")`.
+
 ## Đổi code
 
 ```python

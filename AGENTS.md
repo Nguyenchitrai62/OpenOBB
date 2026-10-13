@@ -293,6 +293,17 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-13 (3): **Repo sản phẩm chuyển sang GitLab `.../openanything/hicasobb`, lịch sử mới; `openobb strip`** (0.8.1).
+  - User chọn project mới để bỏ lịch sử cũ (project `openobb` cũ chứa package `openobb` và link repo GitHub; user tự archive).
+  - `push_all.py`:
+    - đổi URL;
+    - tự clone lại khi remote đổi, hỗ trợ project trống;
+    - commit message trung tính `Release vX.Y.Z`;
+    - xoá mọi nhắc tới repo nghiên cứu, `research/`, `vrdet` trong bản sản phẩm;
+    - **chặn đẩy** nếu còn `openobb|vrdet|nguyenchitrai|research/|repo nghiên cứu`.
+  - `openobb strip model=best.pt`: file giao khách chỉ còn weights + kiến trúc + class + ngưỡng conf
+    (bỏ đường dẫn `/root/.cache/openobb/...`, tham số train, điểm số), tự kiểm tra không còn tên nội bộ.
+
 - 2026-10-13 (2): **0.8.0: bản GitLab đổi thương hiệu thành HicasOBB** (theo user; GitHub giữ `openobb`).
   - `tools/push_all.py` tự đổi khi đồng bộ: package `openobb` → `hicas_detection_obb`, class `OpenOBB*` → `HicasOBB*`,
     model / module `openobbN` → `hicasobbN` (`model=hicasobb8x`), lệnh CLI `openobb` → `hicasobb`, `OPENOBB*` → `HICASOBB*`.
