@@ -20,7 +20,8 @@ import torch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from openobb.predict import conf_thresholds, load_model, merge_dets, predict_image, to_label_lines  # noqa: E402
+from openobb.predict import (apply_head, apply_nms, conf_thresholds, load_model, merge_dets, parse_nms,  # noqa: E402
+                             predict_image, to_label_lines)
 
 MODEL_PATH = r"F:\Source_code\NEW_architecture\models\best_v1.pt"       # đường dẫn model: tuyệt đối, hoặc tương đối so với thư mục repo
 
@@ -75,10 +76,19 @@ def main():
         auto = st.checkbox("Ngưỡng tự động theo class (F2 tốt nhất trên val)", value=False,
                            disabled=not targs.get("conf_thr"))
         conf = c1.slider("Confidence", 0.05, 1.0, 0.3, 0.05, disabled=auto)
-        iou = c2.slider("NMS IoU", 0.0, 1.0, 0.7 if targs.get("fit", False) else 0.1, 0.05,
-                        help="gộp box trùng; 0.7 khi cả ảnh là 1 tile, 0.1 khi ghép nhiều tile")
+        cal = parse_nms(targs.get("nms_iou"))           # calibrated on val at the end of training
+        nms0 = 1.0 if cal == "none" else (cal if isinstance(cal, float) else 0.7)
+        iou = c2.slider("NMS IoU", 0.0, 1.0, nms0 if targs.get("fit", False) else 0.1, 0.05,
+                        help="lọc box trùng (mặc định = giá trị hiệu chỉnh lúc train; 1.0 = không NMS). Cả ảnh là 1 "
+                             "tile: áp cho NMS của model và lúc ghép; nhiều tile: 0.1 khi ghép")
+        head = None
+        if hasattr(model, "infer_head"):                 # OpenOBB12 / 13: one-to-many (+ NMS) or one-to-one head
+            heads = ["o2m", "o2o"]
+            head = st.radio("Head", heads, index=heads.index(targs.get("infer_head") or "o2m"), horizontal=True,
+                            help="o2m: head một-nhiều + NMS; o2o: head một-một (ít trùng, không cần NMS). "
+                                 "Mặc định = lựa chọn hiệu chỉnh lúc train")
         with st.expander("Kích thước ảnh"):
-            size = st.number_input("imgsz", 256, 2048, int(targs.get("img", 1024)), 32,
+            size = st.number_input("imgsz", 256, 4096, int(targs.get("img", 1024)), 32,
                                    help="cạnh dài ảnh đưa vào model (mặc định = lúc train)")
             tile = st.checkbox("Cắt tile ở độ phân giải gốc", value=not targs.get("fit", False),
                                help="cho trang rất lớn có object rất nhỏ; mặc định resize cả ảnh như lúc train")
@@ -101,8 +111,11 @@ def main():
     rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     run_scale = float(scale) if tile else int(size) / max(img.shape[:2])     # whole image: long side = imgsz
-    key = (up.name, len(data), str(p), queries, int(size), run_scale, int(gap))
+    fit = not tile
+    key = (up.name, len(data), str(p), queries, int(size), run_scale, int(gap), head, iou if fit else None)
     if detect:
+        apply_head(model, head)
+        apply_nms(model, ("none" if iou >= 1.0 else iou) if fit else targs.get("nms_iou"))
         t = time.time()
         with st.spinner("Detecting..."):
             raw = predict_image(model, img, int(size), int(gap), 8, device, queries, scale=run_scale)
