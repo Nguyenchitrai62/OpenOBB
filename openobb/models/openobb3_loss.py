@@ -20,7 +20,19 @@ import torch.nn.functional as F
 from openobb.ops.obb_torch import probiou
 
 from .openobb2_loss import assign
-from .openobb3 import ALONG_BINS, THICK_BINS, decode
+from .openobb3 import ALONG_BINS, DIRECT_CH, THICK_BINS, decode, direct_dists
+
+
+def dist_loss(r, s, lt, rt, thick):
+    """Along-axis distances + thickness: DFL on the distributions, or (box=direct, YOLO26-style) L1 in stride /
+    half-stride units on the regressed values."""
+    if r.shape[-1] == DIRECT_CH:
+        left, right, t = direct_dists(r, s)
+        return (((left - lt).abs() + (right - rt).abs()) / s + (t - thick).abs() / (s / 2)) / 3
+    hi_a, hi_t = ALONG_BINS - 1 - 1e-3, THICK_BINS - 1 - 1e-3
+    return (_dfl(r[:, 2:2 + ALONG_BINS], (lt / s).clamp(0, hi_a))
+            + _dfl(r[:, 2 + ALONG_BINS:2 + 2 * ALONG_BINS], (rt / s).clamp(0, hi_a))
+            + _dfl(r[:, 2 + 2 * ALONG_BINS:], (thick / (s / 2)).clamp(0, hi_t))) / 3
 
 
 def _dfl(logits, t):
@@ -87,10 +99,7 @@ class OpenOBB3Loss(nn.Module):
         lt, rt, at, length, thick, th_t = frame_targets(p_pts, r[:, 0].detach(), tgt[fg])
         tbox = torch.stack([tgt[fg][:, 0], tgt[fg][:, 1], length, thick, th_t], -1)
         out["box"] = ((1 - probiou(boxes[fg], tbox)) * w).sum() / norm
-        hi_a, hi_t = ALONG_BINS - 1 - 1e-3, THICK_BINS - 1 - 1e-3
-        dfl = (_dfl(r[:, 2:2 + ALONG_BINS], (lt / s).clamp(0, hi_a))
-               + _dfl(r[:, 2 + ALONG_BINS:2 + 2 * ALONG_BINS], (rt / s).clamp(0, hi_a))
-               + _dfl(r[:, 2 + 2 * ALONG_BINS:], (thick / (s / 2)).clamp(0, hi_t))) / 3
+        dfl = dist_loss(r, s, lt, rt, thick)
         out["dfl"] = (dfl * w).sum() / norm
         out["across"] = (torch.log1p((r[:, 1] * s - at).abs() / thick.clamp(min=2.0)) * w).sum() / norm
         out["angle"] = ((1 - torch.cos(2 * (r[:, 0] - th_t))) * w).sum() / norm

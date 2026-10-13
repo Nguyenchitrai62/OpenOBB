@@ -86,8 +86,8 @@ class ContextOrientedHead(OrientedHead):
     """OpenOBB3's head (same parameter names) + a residual large-kernel unit in each class tower, after its first two
     layers (depthwise 3x3, 1x1 to cc channels). The unit's residual branch starts at zero."""
 
-    def __init__(self, ch, nc, prior=0.01, k=11):
-        super().__init__(ch, nc, prior)
+    def __init__(self, ch, nc, prior=0.01, k=11, reg_ch=None):
+        super().__init__(ch, nc, prior, **({"reg_ch": reg_ch} if reg_ch else {}))
         cc = self.cls[0][1].conv.out_channels
         self.ctx = nn.ModuleList(StripMix(cc, k) for _ in ch)
 

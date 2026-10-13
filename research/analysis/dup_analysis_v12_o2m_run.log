@@ -1,0 +1,65 @@
+1/53 wall_val_0000: 887 raw boxes (6s)
+2/53 wall_val_0001: 436 raw boxes (11s)
+3/53 wall_val_0002: 630 raw boxes (18s)
+4/53 wall_val_0003: 695 raw boxes (40s)
+5/53 wall_val_0005: 366 raw boxes (46s)
+6/53 wall_val_0006: 1564 raw boxes (53s)
+7/53 wall_val_0007: 2103 raw boxes (61s)
+8/53 wall_val_0008: 1463 raw boxes (69s)
+9/53 wall_val_0009: 1132 raw boxes (78s)
+10/53 wall_val_0010: 944 raw boxes (88s)
+11/53 wall_val_0011: 1059 raw boxes (98s)
+12/53 wall_val_0013: 1160 raw boxes (107s)
+13/53 wall_val_0014: 954 raw boxes (117s)
+14/53 wall_val_0015: 2625 raw boxes (126s)
+15/53 wall_val_0016: 948 raw boxes (135s)
+16/53 wall_val_0017: 2062 raw boxes (145s)
+17/53 wall_val_0020: 688 raw boxes (152s)
+18/53 wall_val_0021: 783 raw boxes (158s)
+19/53 wall_val_0022: 2893 raw boxes (163s)
+20/53 wall_val_0023: 720 raw boxes (169s)
+21/53 wall_val_0024: 1822 raw boxes (176s)
+22/53 wall_val_0025: 849 raw boxes (182s)
+23/53 wall_val_0026: 748 raw boxes (187s)
+24/53 wall_val_0028: 546 raw boxes (193s)
+25/53 wall_val_0029: 558 raw boxes (198s)
+26/53 wall_val_0030: 534 raw boxes (204s)
+27/53 wall_val_0031: 1829 raw boxes (210s)
+28/53 wall_val_0032: 455 raw boxes (216s)
+29/53 wall_val_0033: 477 raw boxes (221s)
+30/53 wall_val_0034: 405 raw boxes (227s)
+31/53 wall_val_0035: 257 raw boxes (233s)
+32/53 wall_val_0036: 1120 raw boxes (238s)
+33/53 wall_val_0037: 1730 raw boxes (244s)
+34/53 wall_val_0038: 632 raw boxes (250s)
+35/53 wall_val_0039: 1255 raw boxes (255s)
+36/53 wall_val_0041: 943 raw boxes (261s)
+37/53 wall_val_0042: 497 raw boxes (267s)
+38/53 wall_val_0043: 1214 raw boxes (273s)
+39/53 wall_val_0045: 916 raw boxes (278s)
+40/53 wall_val_0046: 225 raw boxes (284s)
+41/53 wall_val_0047: 1939 raw boxes (289s)
+42/53 wall_val_0048: 1050 raw boxes (295s)
+43/53 wall_val_0049: 215 raw boxes (300s)
+44/53 wall_val_0050: 1191 raw boxes (306s)
+45/53 wall_val_0051: 1052 raw boxes (311s)
+46/53 作図依頼内容 (10)_p001: 1030 raw boxes (317s)
+47/53 作図依頼内容 (14): 767 raw boxes (322s)
+48/53 作図依頼内容 (4)_p001: 1590 raw boxes (328s)
+49/53 作図資料_KISCO_p001: 1251 raw boxes (334s)
+50/53 作図資料_SERVCORP天神: 705 raw boxes (339s)
+51/53 依頼内容 ソシオネクスト 240305_p001: 1535 raw boxes (345s)
+52/53 依頼内容 ソシオネクスト 240305_p002: 650 raw boxes (350s)
+53/53 新規レイアウト_内容変更_p002: 2315 raw boxes (356s)
+model default (ProbIoU NMS 0.7)            mAP50 0.7347 mAP50-95 0.4811 | dups 354 of 4730 | {'wall': 139, 'note': 14, 'door': 7, 'slide_door': 9, 'double_door': 1, 'wall_300': 17, 'junction': 167}
+NMS 0.6                                    mAP50 0.7385 mAP50-95 0.4807 | dups 141 of 4425 | {'wall': 42, 'note': 8, 'door': 6, 'slide_door': 7, 'double_door': 1, 'wall_300': 12, 'junction': 65}
+NMS 0.5                                    mAP50 0.7411 mAP50-95 0.4810 | dups 73 of 4270 | {'wall': 16, 'note': 3, 'door': 6, 'slide_door': 7, 'double_door': 1, 'wall_300': 8, 'junction': 32}
+NMS 0.4                                    mAP50 0.7396 mAP50-95 0.4812 | dups 52 of 4151 | {'wall': 12, 'note': 1, 'door': 5, 'slide_door': 5, 'double_door': 1, 'wall_300': 7, 'junction': 21}
+NMS 0.3                                    mAP50 0.7332 mAP50-95 0.4795 | dups 40 of 4048 | {'wall': 9, 'note': 0, 'door': 5, 'slide_door': 5, 'double_door': 1, 'wall_300': 7, 'junction': 13}
+NMS 0.5 + containment 0.8                  mAP50 0.7378 mAP50-95 0.4794 | dups 70 of 4238 | {'wall': 15, 'note': 2, 'door': 6, 'slide_door': 6, 'double_door': 1, 'wall_300': 8, 'junction': 32}
+NMS 0.7 + floor 12 px                      mAP50 0.7365 mAP50-95 0.4812 | dups 192 of 4523 | {'wall': 58, 'note': 14, 'door': 8, 'slide_door': 7, 'double_door': 1, 'wall_300': 15, 'junction': 89}
+NMS 0.7 + containment 0.8                  mAP50 0.7320 mAP50-95 0.4783 | dups 304 of 4636 | {'wall': 99, 'note': 9, 'door': 7, 'slide_door': 8, 'double_door': 1, 'wall_300': 17, 'junction': 163}
+ORACLE: model NMS + perfect duplicate removal mAP50 0.7349 mAP50-95 0.4812 | dups 352 of 4727 | {'wall': 137, 'note': 14, 'door': 7, 'slide_door': 9, 'double_door': 1, 'wall_300': 17, 'junction': 167}
+NMS 0.7 + floor 12 + containment 0.8       mAP50 0.7339 mAP50-95 0.4785 | dups 170 of 4458 | {'wall': 42, 'note': 9, 'door': 8, 'slide_door': 6, 'double_door': 1, 'wall_300': 15, 'junction': 89}
+same-class overlapping pairs after the model's NMS: {'contained (short inside long)': 126, 'near-identical (IoU >= 0.5)': 180, 'partial overlap': 640}
+saved F:\Source_code\NEW_architecture\research\analysis\dup_analysis_openobb12x_o2m.json

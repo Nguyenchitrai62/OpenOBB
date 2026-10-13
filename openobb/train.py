@@ -67,6 +67,8 @@ def build_parser():
     ap.add_argument("--nms-iou", default="auto",
                     help="duplicate suppression: auto (calibrated on val at the end and saved in best.pt as the "
                          "inference default), none (no NMS; OpenOBB11), or a ProbIoU threshold")
+    ap.add_argument("--box", default="dfl", choices=["dfl", "direct"],
+                    help="OpenOBB12 / 13 box regression: dfl (distributions) or direct (values, YOLO26-style, F54)")
     ap.add_argument("--v10-off", default="", help="OpenOBB10 ablation: parts switched off, comma-separated "
                                                    "(slots, reach, balance)")
     ap.add_argument("--v6-off", default="", help="OpenOBB6 ablation: parts switched off, comma-separated "
@@ -245,7 +247,7 @@ def main(argv=None):
         if v12 or v13:
             from openobb.models.openobb12 import OpenOBB12, OpenOBB13
             model = (OpenOBB13 if v13 else OpenOBB12)(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk,
-                                                      max_det=a.num_top, off=a.v7_off or None)
+                                                      max_det=a.num_top, off=a.v7_off or None, box=a.box)
         elif v11:
             from openobb.models.openobb11 import OpenOBB11
             model = OpenOBB11(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
@@ -306,7 +308,7 @@ def main(argv=None):
     else:
         init_desc = "resume" if last.exists() else "random (trained from scratch)"
     sanitize_batchnorm(model, log=lambda m: log(m, console=True))
-    from openobb.predict import apply_nms, merge_iou_for, parse_nms
+    from openobb.predict import apply_head, apply_nms, merge_iou_for, parse_nms, postprocess_options
     apply_nms(model, a.nms_iou)                 # fixed value: used for every val; auto: architecture default
     model.to(device)
     if a.channels_last:
@@ -457,11 +459,13 @@ def main(argv=None):
                         f"head P2-P5")
             else:
                 core += "; dual dense oriented head P3-P5"
+            if a.box == "direct":
+                core += ", direct box regression (no DFL)"
             say(f"model   OpenOBB{13 if v13 else 12}-{a.size} ({core}: one-to-many for learning + one-to-one for "
                 f"inference, NMS-free), {n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")
             if v13 and a.img < 1536:
-                say(f"WARNING  OpenOBB13 runs its core at imgsz / 2 = {a.img // 2} px: use imgsz = 2x the usual "
-                    f"size (e.g. 2560 for drawings trained at 1280)")
+                say(f"WARNING  OpenOBB13's core runs at {a.img // 2} px: drawings need the core at >= 1024 "
+                    f"(openobb train imgsz=1280 -> input {2 * 1280})")
         elif v9:
             head9 = (f"OpenOBB8 head + relational refiner of {a.rel_k} candidates" if model.refiner is not None
                      else "OpenOBB7 dense head, no relational refiner")
@@ -730,16 +734,19 @@ def main(argv=None):
     if parse_nms(a.nms_iou) is None and hasattr(vm, "nms_iou"):
         # NMS is a parameter of the trained model, not a constant: try the settings on val, keep the best fitness
         # (0.1 mAP50 + 0.9 mAP50-95, as YOLO's best.pt) and save it as the inference default (args["nms_iou"])
-        cands = ["none", 0.7, 0.5] if hasattr(vm, "final_nms") else [0.7, 0.6, 0.5]
+        # dual-head models also choose the inference head (one-to-one / one-to-many + NMS), saved as args["infer_head"]
         tried = []
-        for c in cands:
+        for h, c in postprocess_options(vm):
+            apply_head(vm, h)
             r, d = final_eval(c)
             u = r.get("ultra") or r
-            tried.append((0.1 * u["mAP50"] + 0.9 * u["mAP50_95"], c, r, d))
-        fit_best, a.nms_iou, res, dets = max(tried, key=lambda t: t[0])
+            tried.append((0.1 * u["mAP50"] + 0.9 * u["mAP50_95"], (h, c), r, d))
+        fit_best, (a.infer_head, a.nms_iou), res, dets = max(tried, key=lambda t: t[0])
+        apply_head(vm, a.infer_head)
         apply_nms(vm, a.nms_iou)
+        lab = lambda hc: f"{hc[0]} {hc[1]}" if hc[0] else f"{hc[1]}"  # noqa: E731
         say("NMS calibrated on val (saved in best.pt, the inference default): "
-            + " | ".join(f"{c}: fitness {f:.4f}" for f, c, _, _ in tried) + f" -> {a.nms_iou}")
+            + " | ".join(f"{lab(c)}: fitness {f:.4f}" for f, c, _, _ in tried) + f" -> {lab((a.infer_head, a.nms_iou))}")
     else:
         res, dets = final_eval(a.nms_iou)
         u = res.get("ultra") or res
@@ -802,6 +809,8 @@ def main(argv=None):
         ck = torch.load(wdir / "best.pt", map_location="cpu", weights_only=False)
         ck["conf_thr"] = {c: round(final["classes"][c].get("conf_f2", 0.25), 3) for c in classes}
         ck["args"]["nms_iou"] = a.nms_iou
+        if getattr(a, "infer_head", None):
+            ck["args"]["infer_head"] = a.infer_head
         if a.infer_k:
             ck["args"]["infer_k"] = a.infer_k
         ck["conf_f1"] = final.get("conf_f1")
@@ -827,7 +836,9 @@ def main(argv=None):
     if not a.eval_only and last.exists():   # finished: drop the optimiser state from last.pt (like best.pt)
         ck = torch.load(last, map_location="cpu", weights_only=False)
         if "opt" in ck:
-            torch.save({"model": ck["ema"]["module"], "epoch": ck["epoch"], "args": dict(ck["args"], nms_iou=a.nms_iou),
+            torch.save({"model": ck["ema"]["module"], "epoch": ck["epoch"], "args": dict(ck["args"], nms_iou=a.nms_iou,
+                                                                       **({"infer_head": a.infer_head}
+                                                                          if getattr(a, "infer_head", None) else {})),
                         "classes": ck["classes"], "best_score": ck.get("best_score"),
                         "version": ck.get("version", __version__)}, wdir / "last.tmp")
             os.replace(wdir / "last.tmp", last)

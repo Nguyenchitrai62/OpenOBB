@@ -278,7 +278,8 @@ class OpenOBB:
         names = [self._names[i] for i in range(len(self._names))]
         if isinstance(imgsz, (list, tuple)):
             imgsz = max(int(v) for v in imgsz)
-        size = int(imgsz or a.get("img", 1024))
+        from openobb.predict import input_size
+        size = input_size(a, imgsz)
         fit = a.get("fit", False) if tile is None else not tile
         from openobb.predict import apply_nms, merge_iou_for
         if iou is None:                                  # the value calibrated on val at training (args["nms_iou"])

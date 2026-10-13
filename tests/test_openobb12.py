@@ -159,3 +159,57 @@ def test_results_csv_has_o2o_loss_and_keeps_old_header(tmp_path):
     append_results(old, dict(rec, epoch=2))
     last = (old / "results.csv").read_text().splitlines()[-1].split(",")
     assert len(last) == 2 and last[1] == "1.0"                       # same columns as the old header
+
+
+def test_v13_imgsz_means_the_core_size():
+    from openobb.predict import input_size
+    assert input_size({"arch": "v13", "img": 2560}) == 2560          # trained size kept
+    assert input_size({"arch": "v13", "img": 2560}, 1280) == 2560    # user imgsz = core size -> 2x input
+    assert input_size({"arch": "v12", "img": 1280}, 1024) == 1024
+
+
+def test_inference_head_is_a_calibrated_setting(tmp_path):
+    from openobb.predict import apply_head, load_model, postprocess_options
+    torch.manual_seed(0)
+    m = OpenOBB12("s", num_classes=NC, img_size=128, max_det=30).eval()
+    assert m.infer_head == "o2o" and ("o2m", 0.5) in postprocess_options(m)
+    x = torch.rand(1, 3, 128, 128)
+    with torch.no_grad():
+        r1 = m(x)
+        apply_head(m, "o2m")
+        r2 = m(x)                                           # one-to-many head, always through NMS
+    assert m.infer_head == "o2m" and not torch.equal(r1["pred_logits"], r2["pred_logits"])
+    path = tmp_path / "v12.pt"
+    torch.save({"model": m.state_dict(), "classes": ["a", "b", "c"],
+                "args": {"arch": "v12", "size": "s", "img": 128, "nms_iou": 0.5, "infer_head": "o2m"}}, path)
+    net, _, _ = load_model(str(path), torch.device("cpu"))
+    assert net.infer_head == "o2m" and net.final_nms == 0.5
+
+
+def test_direct_box_regression_trains_and_decodes():
+    from openobb.models.openobb3 import DIRECT_CH
+    torch.manual_seed(0)
+    for C in (OpenOBB12, OpenOBB13):
+        m = C("s", num_classes=NC, img_size=IMG, box="direct").train()
+        assert m.head.reg[0][-1].out_channels == DIRECT_CH == m.head_o2o.reg[0][-1].out_channels
+        out = m(torch.rand(1, 3, IMG, IMG), _targets())
+        assert out["reg"].shape[-1] == DIRECT_CH
+        losses = OpenOBB12Loss(img_size=IMG)(out, _targets())
+        assert {"loss_dfl", "loss_o2o_dfl"} <= set(losses)       # L1 on the regressed values, same report column
+        total = sum(losses.values())
+        assert math.isfinite(float(total.detach()))
+        total.backward()
+        m.eval()
+        with torch.no_grad():
+            r = m(torch.rand(1, 3, IMG, IMG))
+        assert (r["pred_boxes"][..., 2:4] > 0).all()
+
+
+def test_direct_box_checkpoint_loads(tmp_path):
+    from openobb.predict import load_model
+    m = OpenOBB12("s", num_classes=NC, img_size=128, box="direct")
+    path = tmp_path / "v12d.pt"
+    torch.save({"model": m.state_dict(), "classes": ["a", "b", "c"],
+                "args": {"arch": "v12", "size": "s", "img": 128, "box": "direct"}}, path)
+    net, _, _ = load_model(str(path), torch.device("cpu"))
+    assert net.box == "direct"

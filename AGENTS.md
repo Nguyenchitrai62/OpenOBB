@@ -293,6 +293,13 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-13 (9): **0.12.0: head suy luận hiệu chỉnh, `box=direct`, `openobb calibrate`, sửa `imgsz` của v13** (F54, F55).
+  - v12 (user): 0.722 / 0.468. Cùng checkpoint, head một-nhiều + NMS 0.5 cho 0.741 / 0.481.
+    → `args["infer_head"]` được hiệu chỉnh cuối train (`predict.postprocess_options`, `apply_head`); lệnh `openobb calibrate`.
+  - Đo độ khít box so với YOLO26x (`research/analysis/box_quality.py`): box dày hơn thật, đầu box và góc kém.
+    → `box=direct` (kiểu YOLO26, `openobb3.DIRECT_CH`, `openobb3_loss.dist_loss`).
+  - v13: `imgsz` giờ là cỡ của lõi (`predict.input_size`). Run v13 đầu tiên của user không hợp lệ (lõi 640).
+
 - 2026-10-13 (8): **OpenOBB13 thay bằng bản nhắm độ chính xác** (0.11.0, F52, [docs/OPENOBB13.md](docs/OPENOBB13.md)).
   - User bỏ v13 cũ (lõi nhanh v9) vì chỉ nhắm tốc độ.
   - Đo trên nhãn: 53% wall_300 chung ô P3 với junction. v13 = v12 + luồng độ phân giải gốc (`hires`) + lưới P2 (`p2_head`, `p2_head_o2o`) + `to_p3`.

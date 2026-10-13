@@ -1,7 +1,9 @@
 # OpenOBB13: luồng chi tiết độ phân giải gốc + lưới P2 cho vật tí hon (2026-10-13)
 
 `model=openobb13s | m | l | x`. Nền là OpenOBB12 (lõi OpenOBB7 pretrained COCO + head dense kép, không NMS).
-**`imgsz` là độ phân giải đầy đủ** (ví dụ 2560). Lõi pretrained chạy ở `imgsz / 2`, tức đúng như v12 ở 1280.
+**Từ 0.12.0, `imgsz` mang đúng nghĩa như mọi model khác: cỡ ảnh của lõi** (ví dụ 1280). Khung tự chuẩn bị ảnh ở 2 × imgsz
+(2560) cho luồng chi tiết; lõi pretrained thấy đúng ảnh như v12 ở 1280.
+(Ở 0.11.0, `imgsz` là độ phân giải đầy đủ. Run v13 đầu tiên của user đặt 1280 nên lõi chỉ chạy ở 640: run đó không hợp lệ, F54.)
 
 Bản này thay cho v13 cũ của 0.10.0 (lõi nhanh v9 + head kép). Bản cũ chỉ nhắm tốc độ, nên user bỏ.
 Checkpoint v13 cũ không nạp được bằng 0.11.0.
@@ -57,8 +59,8 @@ Chi phí: 853 GFLOPs ở 2560 × 1920 (đường suy luận), so với v12-x 699
 ## 4. Chỉ số kỳ vọng (ghi TRƯỚC khi train)
 
 Điều kiện: Wall_Color, val 53 ảnh, thước YOLO, 100 epoch, khởi tạo COCO.
-- v13: `imgsz=2560`.
-- v12: `imgsz=1280` (cùng tỉ lệ đối với lõi).
+- v13: `imgsz=1280` (lõi 1280, luồng chi tiết 2560).
+- v12: `imgsz=1280`.
 
 | | v10 | v12 (kỳ vọng) | **v13 kỳ vọng** | YOLO26x |
 |---|---|---|---|---|
@@ -77,10 +79,11 @@ Chi phí: 853 GFLOPs ở 2560 × 1920 (đường suy luận), so với v12-x 699
 ## 5. Train (Colab)
 
 ```bash
-openobb train model=openobb13x data=/content/data.yaml imgsz=2560 epochs=100
+openobb train model=openobb13x data=/content/data.yaml imgsz=1280 epochs=100
 ```
 
-- Ảnh Wall_Color gốc 2000–3000 px, nên `imgsz=2560` gần đúng độ phân giải gốc. **Không dùng 1280**: lõi sẽ chỉ còn thấy 640.
+- Ảnh Wall_Color gốc 2000–3000 px; với `imgsz=1280`, luồng chi tiết đọc ảnh 2560, gần đúng độ phân giải gốc.
+  Log in dòng `OpenOBB13: imgsz 1280 is the core's size; images are prepared at 2560 px`.
 - Batch tự chọn theo VRAM, tự giảm nếu thiếu bộ nhớ.
 - Đi tiếp từ checkpoint v12 / v7 / v8 (`weights=`): lõi và head P3–P5 nạp thẳng. Luồng gốc và P2 khởi tạo mới; head một-một chép từ head một-nhiều.
 - Khi gửi log, nhờ kèm: bảng theo class, confusion matrix (ô wall_300 → junction), dòng `Duplicate boxes`, dòng `NMS calibrated`, tốc độ val.

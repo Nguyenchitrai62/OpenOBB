@@ -828,6 +828,73 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Tốc độ: 8.4 ms / ảnh (batch 16, bf16, G4), so với v11 13.6 ms.
   - Bài học cho v13 mới: dùng LR mặc định (không đặt `lr0`); `imgsz=2560`; khởi tạo COCO.
 
+- **F54. OpenOBB12-x Wall_Color (user, 10-13): 0.722 / 0.468, bản tốt nhất tới nay; head một-nhiều của chính nó còn tốt hơn: 0.741 / 0.481.**
+  - Điều kiện: COCO, 100 epoch, 1280, lr 1e-3, batch 16. Best ep96. Hiệu chỉnh chọn head một-một + NMS 0.7
+    (fitness: không NMS .4727, NMS 0.7 .4937, NMS 0.5 .4912).
+  - Theo class (YOLO26x trong ngoặc):
+    | Class | v12 (YOLO26x) |
+    |---|---|
+    | wall | .835 / .502 (.919 / .624) |
+    | note | .697 / .433 |
+    | door | .965 / .797 |
+    | slide_door | .324 / .171 |
+    | double_door | .622 / .518 (.494 / .392) |
+    | wall_300 | .708 / .327 (.824 / .441) |
+    | junction | .903 / .531 (.910 / .584) |
+  - Ô wall_300 → junction còn 11% (v10 27%).
+  - **Đối chiếu kỳ vọng F51:**
+    - mAP50 ≥ 0.673: đạt (vượt dải 0.68–0.71).
+    - Bỏ NMS: **không đạt**. Box trùng 7.1% (có NMS 0.7), hiệu chỉnh vẫn chọn NMS.
+    - Nhanh hơn v11 30%: **không đạt**. 15.3 ms so với 13.6 ms, nhưng hai số đo ở hai phiên khác nhau.
+  - **Cùng checkpoint, đo trên máy** (`research/analysis/dup_analysis.py`, `DUP_HEAD=o2m`; thước YOLO, 53 ảnh val):
+    | Head, hậu xử lý | mAP50 / 50-95 | Box trùng (conf 0.25) |
+    |---|---|---|
+    | một-một, NMS 0.7 | 0.718 / 0.470 | 263 / 4466 |
+    | một-một, NMS 0.4 | 0.726 / 0.471 | 38 |
+    | một-nhiều, NMS 0.7 | 0.735 / 0.481 | 354 / 4730 |
+    | **một-nhiều, NMS 0.5** | **0.741 / 0.481** | 73 |
+    - Phần tăng của v12 so với v10 (0.693) đến từ việc **train kèm head một-một**: gradient một-một làm lõi chung tốt hơn.
+      Khi suy luận, head một-nhiều + NMS vẫn tốt hơn head một-một (cách YOLOv10 / YOLO26 bỏ NMS chưa đạt ở 250 ảnh).
+    - → 0.12.0: head dùng khi suy luận (`args["infer_head"]`) được hiệu chỉnh trên val cuối train, cùng với NMS.
+      Lệnh `openobb calibrate` hiệu chỉnh lại checkpoint đã train.
+  - **Độ khít box so với YOLO26x** (`research/analysis/box_quality.py`; px ở thang 1280; trung vị trên các object được khớp; head một-một NMS 0.7):
+    | Class | R@.75 v12 / YOLO | Sai số đầu box | Lệch độ dày (bias) | Lệch ngang | Góc (°) |
+    |---|---|---|---|---|---|
+    | wall | .31 / .56 | 2.42 / 1.30 | **+0.66 / −0.04** | 0.41 / 0.28 | 0.48 / 0.01 |
+    | wall_300 | .09 / .24 | 1.42 / 1.05 | +0.93 / +0.28 | 0.40 / 0.33 | 0.81 / 0.04 |
+    | junction | .33 / .47 | 0.90 / 0.63 | +0.26 / −0.34 | 0.55 / 0.38 | **2.21 / 0.06** |
+    | door | .81 / .84 | 0.94 / 0.85 | +0.47 / +0.28 | 0.59 / 0.50 | 1.26 / 0.17 |
+    - Recall ở IoU 0.5 gần bằng YOLO. **Khoảng cách mAP50-95 nằm ở độ khít**:
+      - box dày hơn thật một cách hệ thống: +0.66 px trên tường 5.6 px, tức +12% → IoU khoảng −0.1;
+      - đầu box sai gần gấp đôi YOLO;
+      - góc lệch 0.5–2° (YOLO gần 0).
+    - YOLO26 hồi quy trực tiếp, không DFL. OpenOBB đọc độ dày bằng **trung bình** của phân phối DFL, bin = stride / 2:
+      - tường 5.6 px ở P4 chỉ là 0.7 bin, nằm sát biên 0 của phân phối;
+      - phân phối trải rộng thì trung bình bị kéo lên.
+
+      Giả thuyết đang kiểm tra bằng cách giải mã quanh đỉnh phân phối (`DUP_DECODE=peak`).
+  - **v13 mới (log user, 10-13): run không hợp lệ.** Đặt `imgsz=1280`, theo định nghĩa của 0.11.0 thì lõi chỉ chạy ở 640.
+    - Kết quả 0.524 / 0.319 (ep87) không kiểm tra được giả thuyết F52.
+    - Lỗi giao diện là do agent: `imgsz` của v13 khác nghĩa với mọi model khác.
+    - 0.12.0 sửa: `imgsz` luôn là cỡ của lõi; v13 tự chuẩn bị ảnh ở 2 × imgsz (`predict.input_size`).
+  - **Giải mã DFL quanh đỉnh** (`DUP_DECODE=peak`, cùng checkpoint, không train lại):
+    - lệch độ dày của wall hết (+0.66 → +0.01 px), nhưng sai số tuyệt đối vẫn 1.00 px (YOLO 0.54);
+    - recall wall ở IoU 0.5 tụt (.78 → .66), tổng còn 0.678 / 0.443.
+
+    → Nguyên nhân là độ chính xác của hồi quy bằng phân phối theo bin thô, không phải cách đọc. Sửa sau mạng không đủ.
+
+- **F55. `box=direct` (0.12.0): hồi quy box kiểu YOLO26, không DFL. Kỳ vọng ghi trước, chưa train.**
+  - Cơ chế: hai khoảng cách tới hai đầu và độ dày là giá trị liên tục (softplus × stride, × stride / 2), loss L1 theo đơn vị stride + ProbIoU.
+    Góc, lệch ngang, gán nhãn, head kép giữ nguyên. Một yếu tố duy nhất so với v12 (F54).
+  - Điều kiện: v12-x, COCO, 100 epoch, 1280; so với v12 (`box=dfl`) cùng bước hiệu chỉnh head / NMS.
+  - Kỳ vọng:
+    - wall: sai số độ dày ≤ 0.7 px (v12 1.00, YOLO 0.54); |lệch| ≤ 0.2 px; sai số đầu box ≤ 1.8 px (v12 2.42);
+    - R@.75 của wall ≥ 0.40 (v12 .31, YOLO .56);
+    - mAP50-95 ≥ 0.49 (v12 cùng cách hiệu chỉnh 0.481).
+  - Bác bỏ nếu một trong hai điều sau xảy ra:
+    - mAP50-95 không hơn v12 ít nhất 0.01;
+    - sai số độ dày của wall không xuống dưới 0.8 px.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

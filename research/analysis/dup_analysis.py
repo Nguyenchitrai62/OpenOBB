@@ -2,9 +2,10 @@
 Val images of Wall_Color, the model's raw boxes before NMS (model NMS disabled), then several suppression rules,
 each scored with the Ultralytics-style mAP and the duplicate count (conf 0.25). CPU inference only.
 
-usage: python dup_analysis.py <checkpoint.pt> [n_images]
+usage: python dup_analysis.py <checkpoint.pt> [n_images]   (DUP_HEAD=o2m: dual-head models use the one-to-many head)
 """
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -28,11 +29,30 @@ ck, n_img = sys.argv[1], int(sys.argv[2]) if len(sys.argv) > 2 else 10**9
 m = OpenOBB(ck)
 net, names = m.model, [m.names[i] for i in range(len(m.names))]
 net.nms_iou, net.nms_conf, net.max_det = 1.01, 0.05, 3000          # model returns its raw candidates (no class NMS)
+if hasattr(net, "final_nms"):                 # OpenOBB12 / 13: one-to-one head output, no fallback NMS
+    net.final_nms = None
+    if os.environ.get("DUP_HEAD") == "o2m":        # same checkpoint, one-to-many head (what v10 used) instead
+        net.head_o2o = net.head
+        if hasattr(net, "p2_head_o2o"):
+            net.p2_head_o2o = net.p2_head
 
+if os.environ.get("DUP_DECODE") == "peak":       # DFL read around the distribution's peak, not its full mean
+    from openobb.models import openobb3 as _m3
+
+    def _peak(logits, width):
+        p = logits.softmax(-1)
+        n = p.shape[-1]
+        raw_i = p.argmax(-1, keepdim=True) + torch.arange(-1, 2, device=p.device)   # bins peak-1, peak, peak+1
+        valid = (raw_i >= 0) & (raw_i < n)
+        idx = raw_i.clamp(0, n - 1)
+        w = p.gather(-1, idx) * valid
+        return (w * idx.to(p.dtype)).sum(-1) / w.sum(-1).clamp(min=1e-9) * width
+
+    _m3._expect = _peak                                             # decode() looks _expect up at call time
 raw, gts = {}, {}
 imgs = sorted((ROOT / "images" / "val").iterdir())[:n_img]
 t0 = time.time()
-CACHE = Path(__file__).with_name(f"dup_raw_{Path(ck).stem}_{len(imgs)}.npz")
+CACHE = Path(__file__).with_name(f"dup_raw_{Path(ck).stem}{'_' + os.environ['DUP_HEAD'] if os.environ.get('DUP_HEAD') else ''}{'_' + os.environ['DUP_DECODE'] if os.environ.get('DUP_DECODE') else ''}_{len(imgs)}.npz")
 cached = dict(np.load(CACHE, allow_pickle=True)) if CACHE.exists() else {}
 for k, p in enumerate(imgs):
     if p.stem in cached:
@@ -173,6 +193,6 @@ for stem, (sc, cl, b) in raw.items():
             pairs["near-identical (IoU >= 0.5)" if iou >= 0.5 else
                   "contained (short inside long)" if inter / small >= 0.8 else "partial overlap"] += 1
 print("same-class overlapping pairs after the model's NMS:", pairs, flush=True)
-out = Path(__file__).with_name(f"dup_analysis_{Path(ck).stem}.json")
+out = Path(__file__).with_name(f"dup_analysis_{Path(ck).stem}{'_' + os.environ['DUP_HEAD'] if os.environ.get('DUP_HEAD') else ''}{'_' + os.environ['DUP_DECODE'] if os.environ.get('DUP_DECODE') else ''}.json")
 out.write_text(json.dumps({"rules": res, "pairs": pairs, "images": len(raw)}, indent=1))
 print("saved", out)

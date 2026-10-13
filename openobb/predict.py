@@ -93,6 +93,22 @@ def apply_nms(model, v):
     return model
 
 
+def apply_head(model, h):
+    """Dual-head models (OpenOBB12 / 13): the head used at inference ("o2o" / "o2m"), calibrated at training."""
+    if h in ("o2o", "o2m") and hasattr(model, "infer_head"):
+        model.infer_head = h
+    return model
+
+
+def postprocess_options(model):
+    """(inference head, NMS) settings the end-of-training calibration tries for this model."""
+    if hasattr(model, "infer_head"):
+        return [("o2o", "none"), ("o2o", 0.7), ("o2o", 0.5), ("o2m", 0.7), ("o2m", 0.5)]
+    if hasattr(model, "final_nms"):
+        return [(None, "none"), (None, 0.7), (None, 0.5)]
+    return [(None, 0.7), (None, 0.6), (None, 0.5)]
+
+
 def merge_iou_for(v, fit):
     """Polygon NMS after the network (tile merge): whole-image models follow the model's NMS setting; tiled
     inference keeps 0.1 (overlapping tiles repeat the same object)."""
@@ -106,7 +122,7 @@ def load_model(ckpt_path, device, queries=None, classes=None):
     m, names, a = _load_model(ckpt_path, device, queries, classes)
     if a.get("infer_k") and getattr(m, "refiner", None) is not None:   # calibrated at training
         m.refiner.k = int(a["infer_k"])
-    return apply_nms(m, a.get("nms_iou")), names, a
+    return apply_head(apply_nms(m, a.get("nms_iou")), a.get("infer_head")), names, a
 
 
 def _load_model(ckpt_path, device, queries=None, classes=None):
@@ -134,7 +150,7 @@ def _load_model(ckpt_path, device, queries=None, classes=None):
         if a["arch"] in ("v12", "v13"):
             from openobb.models.openobb12 import OpenOBB12, OpenOBB13
             m = (OpenOBB13 if a["arch"] == "v13" else OpenOBB12)(a.get("size", "x"), off=a.get("v7_off") or None,
-                                                               **common)
+                                                               box=a.get("box") or "dfl", **common)
         elif a["arch"] == "v11":
             from openobb.models.openobb11 import OpenOBB11
             m = OpenOBB11(a.get("size", "x"), off=a.get("v8_off") or None, off7=a.get("v7_off") or None,
@@ -188,6 +204,14 @@ def _load_model(ckpt_path, device, queries=None, classes=None):
         m.decoder.num_queries = queries
     a = dict(a, conf_thr=ck.get("conf_thr"))
     return m.to(device).eval(), list(names), a
+
+
+def input_size(args, imgsz=None):
+    """Network input size for a checkpoint's args: imgsz given by the user means the core's size for every model,
+    so OpenOBB13 (core at half of its input, full-resolution detail stream) gets 2x; no imgsz -> the trained size."""
+    if not imgsz:
+        return int(args.get("img", 1024))
+    return int(imgsz) * (2 if args.get("arch") == "v13" else 1)
 
 
 def rect_shape(h, w, size, stride=32):
@@ -296,7 +320,7 @@ def run(ckpt, source, out=None, conf=0.25, names=None, size=None, gap=200, queri
         keep = {int(c) if str(c).strip().isdigit() else names.index(str(c).strip()) for c in cl}
     thr = conf_thresholds(names, targs, conf)
     model.nms_conf = max(0.001, min(thr))            # pre-NMS score filter (does not change the kept boxes)
-    size = size or targs.get("img", 1024)
+    size = input_size(targs, size)
     scale = scale or targs.get("scale", 1.0)
     fit = targs.get("fit", False) if tile is None else not tile
     src = Path(source)

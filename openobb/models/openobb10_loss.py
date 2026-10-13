@@ -25,7 +25,7 @@ import torch.nn.functional as F
 from openobb.ops.obb_torch import probiou
 
 from .openobb3 import ALONG_BINS, THICK_BINS, decode
-from .openobb3_loss import _dfl, frame_targets
+from .openobb3_loss import dist_loss, frame_targets
 from .openobb8_loss import OpenOBB8Loss
 from .openobb10 import parse_off10
 
@@ -184,10 +184,7 @@ class OpenOBB10Loss(OpenOBB8Loss):
         lt, rt, at, length, thick, th_t = frame_targets(p_pts, r[:, 0].detach(), tgt[fg])
         tbox = torch.stack([tgt[fg][:, 0], tgt[fg][:, 1], length, thick, th_t], -1)
         out["box"] = ((1 - probiou(boxes[fg], tbox)) * w).sum() / norm
-        hi_a, hi_t = ALONG_BINS - 1 - 1e-3, THICK_BINS - 1 - 1e-3
-        dfl = (_dfl(r[:, 2:2 + ALONG_BINS], (lt / s).clamp(0, hi_a))
-               + _dfl(r[:, 2 + ALONG_BINS:2 + 2 * ALONG_BINS], (rt / s).clamp(0, hi_a))
-               + _dfl(r[:, 2 + 2 * ALONG_BINS:], (thick / (s / 2)).clamp(0, hi_t))) / 3
+        dfl = dist_loss(r, s, lt, rt, thick)
         out["dfl"] = (dfl * w).sum() / norm
         out["across"] = (torch.log1p((r[:, 1] * s - at).abs() / thick.clamp(min=2.0)) * w).sum() / norm
         out["angle"] = ((1 - torch.cos(2 * (r[:, 0] - th_t))) * w).sum() / norm

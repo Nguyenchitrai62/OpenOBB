@@ -22,6 +22,7 @@ import math
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from openobb.ops.obb_torch import probiou
 
@@ -33,6 +34,12 @@ from .openobb2 import Conv
 ALONG_BINS = 32          # distance from the point to each end of the object, bin = 1 stride
 THICK_BINS = 32          # thickness (short side), bin = stride / 2
 REG_CH = 2 + 2 * ALONG_BINS + THICK_BINS     # angle, across offset, left, right, thickness
+DIRECT_CH = 5            # box=direct (YOLO26-style, no DFL): angle, across offset, left, right, thickness as values
+
+
+def direct_dists(reg, s):
+    """Direct head: along-axis distances (stride units) and thickness (half-stride units) through softplus -> px."""
+    return F.softplus(reg[..., 2]) * s, F.softplus(reg[..., 3]) * s, F.softplus(reg[..., 4]) * (s / 2)
 
 
 def _expect(logits, width):
@@ -45,9 +52,12 @@ def decode(reg, pts, strides):
     s = strides[None, :]
     th = reg[..., 0]
     a = reg[..., 1] * s
-    left = _expect(reg[..., 2:2 + ALONG_BINS], 1.0) * s
-    right = _expect(reg[..., 2 + ALONG_BINS:2 + 2 * ALONG_BINS], 1.0) * s
-    thick = _expect(reg[..., 2 + 2 * ALONG_BINS:], 1.0) * (s / 2)
+    if reg.shape[-1] == DIRECT_CH:
+        left, right, thick = direct_dists(reg, s)
+    else:
+        left = _expect(reg[..., 2:2 + ALONG_BINS], 1.0) * s
+        right = _expect(reg[..., 2 + ALONG_BINS:2 + 2 * ALONG_BINS], 1.0) * s
+        thick = _expect(reg[..., 2 + 2 * ALONG_BINS:], 1.0) * (s / 2)
     c, sn = th.cos(), th.sin()
     du = (right - left) / 2
     cx = pts[None, :, 0] + du * c - a * sn
@@ -59,11 +69,11 @@ class OrientedHead(nn.Module):
     """Per level: class logits (light depthwise tower) + oriented regression (angle, across offset, two along-axis
     distance distributions, thickness distribution)."""
 
-    def __init__(self, ch, nc, prior=0.01):
+    def __init__(self, ch, nc, prior=0.01, reg_ch=REG_CH):
         super().__init__()
         cr = max(128, ch[0] // 3)
         cc = max(ch[0] // 2, min(nc * 2, 128))
-        self.reg = nn.ModuleList(nn.Sequential(Conv(c, cr, 3), Conv(cr, cr, 3), nn.Conv2d(cr, REG_CH, 1)) for c in ch)
+        self.reg = nn.ModuleList(nn.Sequential(Conv(c, cr, 3), Conv(cr, cr, 3), nn.Conv2d(cr, reg_ch, 1)) for c in ch)
         self.cls = nn.ModuleList(nn.Sequential(Conv(c, c, 3, g=c), Conv(c, cc, 1), Conv(cc, cc, 3, g=cc),
                                                Conv(cc, cc, 1), nn.Conv2d(cc, nc, 1)) for c in ch)
         for m in self.cls:

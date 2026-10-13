@@ -69,3 +69,25 @@ openobb train model=openobb12x data=/content/data.yaml imgsz=1280 epochs=100
 
 - Khi val, xem dòng `Duplicate boxes`, cột `o2o_loss` trong `results.csv`, và dòng hiệu chỉnh NMS cuối train.
 - Có thể đi tiếp từ checkpoint một head: `weights=<best.pt của v7 / v8 / v12>`; head một-một được chép từ head một-nhiều.
+
+## 6. Cập nhật 0.12.0 (sau run đầu, F54)
+
+Run v12 đầu tiên của user đạt 0.722 / 0.468, cao nhất tới nay. Hai phát hiện từ phân tích checkpoint đó:
+
+1. **Head dùng khi suy luận là một tham số hiệu chỉnh.**
+   - Trên cùng checkpoint, head một-nhiều + NMS 0.5 cho 0.741 / 0.481, còn head một-một cho 0.718 / 0.470.
+   - Train kèm head một-một làm lõi tốt hơn; nhưng ở 250 ảnh, head một-nhiều + NMS vẫn tốt hơn khi suy luận.
+   - Cuối train, bước hiệu chỉnh thử `{một-một: không NMS / 0.7 / 0.5; một-nhiều: 0.7 / 0.5}` trên val, lưu `args["infer_head"]` và `args["nms_iou"]` vào `best.pt`.
+   - Checkpoint đã train: `openobb calibrate model=best.pt data=data.yaml [out=calibrated.pt]`.
+2. **`box=direct`: hồi quy box kiểu YOLO26.**
+   - So với YOLO26x, box của v12:
+     - dày hơn thật một cách hệ thống (+0.66 px trên tường 5.6 px);
+     - sai số độ dày gấp đôi (1.00 so với 0.54 px);
+     - đầu box sai gần gấp đôi (2.4 so với 1.3 px).
+   - Nguyên nhân: độ dày và độ dài đọc từ phân phối DFL theo bin thô (stride / 2, stride). Sửa cách giải mã chỉ hết lệch, không giảm sai số (F54).
+   - `box=direct` thay ba phân phối (hai đầu, độ dày) bằng ba giá trị liên tục (softplus × stride). Loss là L1 theo đơn vị stride + ProbIoU; góc và lệch ngang giữ nguyên.
+   - Kỳ vọng ghi trước ở LEDGER F55.
+
+```bash
+openobb train model=openobb12x data=/content/data.yaml imgsz=1280 epochs=100 box=direct
+```

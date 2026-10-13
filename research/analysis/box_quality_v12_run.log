@@ -1,0 +1,64 @@
+yolo 1/53
+yolo 2/53
+yolo 3/53
+yolo 4/53
+yolo 5/53
+yolo 6/53
+yolo 7/53
+yolo 8/53
+yolo 9/53
+yolo 10/53
+yolo 11/53
+yolo 12/53
+yolo 13/53
+yolo 14/53
+yolo 15/53
+yolo 16/53
+yolo 17/53
+yolo 18/53
+yolo 19/53
+yolo 20/53
+yolo 21/53
+yolo 22/53
+yolo 23/53
+yolo 24/53
+yolo 25/53
+yolo 26/53
+yolo 27/53
+yolo 28/53
+yolo 29/53
+yolo 30/53
+yolo 31/53
+yolo 32/53
+yolo 33/53
+yolo 34/53
+yolo 35/53
+yolo 36/53
+yolo 37/53
+yolo 38/53
+yolo 39/53
+yolo 40/53
+yolo 41/53
+yolo 42/53
+yolo 43/53
+yolo 44/53
+yolo 45/53
+yolo 46/53
+yolo 47/53
+yolo 48/53
+yolo 49/53
+yolo 50/53
+yolo 51/53
+yolo 52/53
+yolo 53/53
+
+OpenOBB (left) vs YOLO26x (right); px at 1280 scale; medians over matched objects
+class            n |        R@.5 |       R@.75 |     IoU med |     ends px |    long end |  |thick| px |  thick bias |   across px |   angle deg
+wall          1044 |  0.78  0.87 |  0.31  0.56 |  0.72  0.80 |  2.42  1.30 |  3.41  1.85 |  1.00  0.54 |  0.66 -0.04 |  0.41  0.28 |  0.48  0.01
+note            60 |  0.78  0.73 |  0.43  0.57 |  0.78  0.83 | 14.56  6.58 | 20.66  9.77 |  7.36  7.19 |  3.64 -2.25 |  5.55  2.74 |  1.01  0.02
+door           391 |  0.97  0.96 |  0.81  0.84 |  0.84  0.85 |  0.94  0.85 |  1.36  1.19 |  1.14  1.01 |  0.47  0.28 |  0.59  0.50 |  1.26  0.17
+slide_door      31 |  0.48  0.16 |  0.16  0.06 |  0.67  0.74 |  6.08 13.76 |  9.38 25.83 |  1.71  1.08 |  1.00 -0.50 |  0.83  0.61 |  0.67  0.04
+double_door     25 |  0.72  0.40 |  0.56  0.32 |  0.84  0.83 |  1.31  1.47 |  1.53  2.54 |  1.99  1.45 |  0.16 -0.45 |  1.04  0.60 |  1.23  0.04
+wall_300       141 |  0.59  0.74 |  0.09  0.24 |  0.66  0.69 |  1.42  1.05 |  2.01  1.42 |  1.22  0.77 |  0.93  0.28 |  0.40  0.33 |  0.81  0.04
+junction      1773 |  0.78  0.83 |  0.33  0.47 |  0.73  0.78 |  0.90  0.63 |  1.29  0.87 |  0.96  0.71 |  0.26 -0.34 |  0.55  0.38 |  2.21  0.06
+saved F:\Source_code\NEW_architecture\research\analysis\box_quality_dup_raw_openobb12x_53.json

@@ -1,0 +1,450 @@
+{
+ "rules": {
+  "model default (ProbIoU NMS 0.7)": {
+   "mAP50": 0.718,
+   "mAP50_95": 0.4696,
+   "dups": {
+    "wall": 83,
+    "note": 16,
+    "door": 7,
+    "slide_door": 8,
+    "double_door": 3,
+    "wall_300": 14,
+    "junction": 132
+   },
+   "detections": 4466,
+   "classes": {
+    "wall": [
+     0.838,
+     0.51
+    ],
+    "note": [
+     0.699,
+     0.437
+    ],
+    "door": [
+     0.96,
+     0.798
+    ],
+    "slide_door": [
+     0.321,
+     0.175
+    ],
+    "double_door": [
+     0.594,
+     0.491
+    ],
+    "wall_300": [
+     0.714,
+     0.347
+    ],
+    "junction": [
+     0.901,
+     0.528
+    ]
+   }
+  },
+  "NMS 0.6": {
+   "mAP50": 0.7218,
+   "mAP50_95": 0.4679,
+   "dups": {
+    "wall": 35,
+    "note": 8,
+    "door": 7,
+    "slide_door": 6,
+    "double_door": 2,
+    "wall_300": 8,
+    "junction": 53
+   },
+   "detections": 4249,
+   "classes": {
+    "wall": [
+     0.842,
+     0.509
+    ],
+    "note": [
+     0.704,
+     0.429
+    ],
+    "door": [
+     0.96,
+     0.797
+    ],
+    "slide_door": [
+     0.33,
+     0.178
+    ],
+    "double_door": [
+     0.593,
+     0.486
+    ],
+    "wall_300": [
+     0.719,
+     0.349
+    ],
+    "junction": [
+     0.904,
+     0.527
+    ]
+   }
+  },
+  "NMS 0.5": {
+   "mAP50": 0.7245,
+   "mAP50_95": 0.4689,
+   "dups": {
+    "wall": 10,
+    "note": 2,
+    "door": 7,
+    "slide_door": 6,
+    "double_door": 2,
+    "wall_300": 8,
+    "junction": 28
+   },
+   "detections": 4125,
+   "classes": {
+    "wall": [
+     0.845,
+     0.51
+    ],
+    "note": [
+     0.703,
+     0.43
+    ],
+    "door": [
+     0.96,
+     0.796
+    ],
+    "slide_door": [
+     0.338,
+     0.182
+    ],
+    "double_door": [
+     0.601,
+     0.49
+    ],
+    "wall_300": [
+     0.723,
+     0.348
+    ],
+    "junction": [
+     0.901,
+     0.526
+    ]
+   }
+  },
+  "NMS 0.4": {
+   "mAP50": 0.7255,
+   "mAP50_95": 0.4705,
+   "dups": {
+    "wall": 5,
+    "note": 0,
+    "door": 3,
+    "slide_door": 5,
+    "double_door": 2,
+    "wall_300": 5,
+    "junction": 18
+   },
+   "detections": 4027,
+   "classes": {
+    "wall": [
+     0.847,
+     0.513
+    ],
+    "note": [
+     0.708,
+     0.435
+    ],
+    "door": [
+     0.961,
+     0.797
+    ],
+    "slide_door": [
+     0.332,
+     0.18
+    ],
+    "double_door": [
+     0.603,
+     0.491
+    ],
+    "wall_300": [
+     0.731,
+     0.352
+    ],
+    "junction": [
+     0.897,
+     0.525
+    ]
+   }
+  },
+  "NMS 0.3": {
+   "mAP50": 0.7192,
+   "mAP50_95": 0.4687,
+   "dups": {
+    "wall": 2,
+    "note": 0,
+    "door": 3,
+    "slide_door": 5,
+    "double_door": 2,
+    "wall_300": 4,
+    "junction": 14
+   },
+   "detections": 3952,
+   "classes": {
+    "wall": [
+     0.842,
+     0.515
+    ],
+    "note": [
+     0.665,
+     0.416
+    ],
+    "door": [
+     0.961,
+     0.797
+    ],
+    "slide_door": [
+     0.335,
+     0.183
+    ],
+    "double_door": [
+     0.603,
+     0.491
+    ],
+    "wall_300": [
+     0.735,
+     0.354
+    ],
+    "junction": [
+     0.894,
+     0.525
+    ]
+   }
+  },
+  "NMS 0.5 + containment 0.8": {
+   "mAP50": 0.719,
+   "mAP50_95": 0.4654,
+   "dups": {
+    "wall": 10,
+    "note": 2,
+    "door": 7,
+    "slide_door": 6,
+    "double_door": 2,
+    "wall_300": 8,
+    "junction": 28
+   },
+   "detections": 4092,
+   "classes": {
+    "wall": [
+     0.845,
+     0.512
+    ],
+    "note": [
+     0.661,
+     0.401
+    ],
+    "door": [
+     0.96,
+     0.796
+    ],
+    "slide_door": [
+     0.342,
+     0.184
+    ],
+    "double_door": [
+     0.601,
+     0.49
+    ],
+    "wall_300": [
+     0.723,
+     0.348
+    ],
+    "junction": [
+     0.901,
+     0.525
+    ]
+   }
+  },
+  "NMS 0.7 + floor 12 px": {
+   "mAP50": 0.7199,
+   "mAP50_95": 0.4692,
+   "dups": {
+    "wall": 45,
+    "note": 16,
+    "door": 9,
+    "slide_door": 6,
+    "double_door": 3,
+    "wall_300": 9,
+    "junction": 64
+   },
+   "detections": 4293,
+   "classes": {
+    "wall": [
+     0.842,
+     0.511
+    ],
+    "note": [
+     0.698,
+     0.437
+    ],
+    "door": [
+     0.96,
+     0.797
+    ],
+    "slide_door": [
+     0.324,
+     0.176
+    ],
+    "double_door": [
+     0.593,
+     0.49
+    ],
+    "wall_300": [
+     0.719,
+     0.347
+    ],
+    "junction": [
+     0.903,
+     0.527
+    ]
+   }
+  },
+  "NMS 0.7 + containment 0.8": {
+   "mAP50": 0.7127,
+   "mAP50_95": 0.4654,
+   "dups": {
+    "wall": 70,
+    "note": 11,
+    "door": 6,
+    "slide_door": 8,
+    "double_door": 2,
+    "wall_300": 14,
+    "junction": 128
+   },
+   "detections": 4396,
+   "classes": {
+    "wall": [
+     0.839,
+     0.512
+    ],
+    "note": [
+     0.656,
+     0.408
+    ],
+    "door": [
+     0.96,
+     0.798
+    ],
+    "slide_door": [
+     0.326,
+     0.178
+    ],
+    "double_door": [
+     0.594,
+     0.486
+    ],
+    "wall_300": [
+     0.713,
+     0.347
+    ],
+    "junction": [
+     0.901,
+     0.528
+    ]
+   }
+  },
+  "ORACLE: model NMS + perfect duplicate removal": {
+   "mAP50": 0.718,
+   "mAP50_95": 0.4692,
+   "dups": {
+    "wall": 82,
+    "note": 15,
+    "door": 7,
+    "slide_door": 8,
+    "double_door": 3,
+    "wall_300": 14,
+    "junction": 132
+   },
+   "detections": 4464,
+   "classes": {
+    "wall": [
+     0.838,
+     0.51
+    ],
+    "note": [
+     0.699,
+     0.435
+    ],
+    "door": [
+     0.96,
+     0.798
+    ],
+    "slide_door": [
+     0.321,
+     0.175
+    ],
+    "double_door": [
+     0.594,
+     0.491
+    ],
+    "wall_300": [
+     0.714,
+     0.347
+    ],
+    "junction": [
+     0.901,
+     0.528
+    ]
+   }
+  },
+  "NMS 0.7 + floor 12 + containment 0.8": {
+   "mAP50": 0.7147,
+   "mAP50_95": 0.465,
+   "dups": {
+    "wall": 36,
+    "note": 11,
+    "door": 8,
+    "slide_door": 6,
+    "double_door": 2,
+    "wall_300": 9,
+    "junction": 64
+   },
+   "detections": 4231,
+   "classes": {
+    "wall": [
+     0.843,
+     0.514
+    ],
+    "note": [
+     0.655,
+     0.407
+    ],
+    "door": [
+     0.96,
+     0.797
+    ],
+    "slide_door": [
+     0.33,
+     0.178
+    ],
+    "double_door": [
+     0.593,
+     0.486
+    ],
+    "wall_300": [
+     0.719,
+     0.347
+    ],
+    "junction": [
+     0.903,
+     0.526
+    ]
+   }
+  }
+ },
+ "pairs": {
+  "contained (short inside long)": 94,
+  "near-identical (IoU >= 0.5)": 150,
+  "partial overlap": 462
+ },
+ "images": 53
+}

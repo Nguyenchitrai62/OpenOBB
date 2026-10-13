@@ -25,7 +25,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .openobb3 import decode, fast_nms
+from .openobb3 import DIRECT_CH, OrientedHead, decode, fast_nms
 from .openobb6 import ConvBN
 from .openobb7 import ContextOrientedHead, OpenOBB7, space_to_depth
 
@@ -36,6 +36,9 @@ class DualHeadMixin:
     def _add_o2o(self, final_nms):
         self.head_o2o = copy.deepcopy(self.head)
         self.final_nms = final_nms            # None: the one-to-one head's output as it is (NMS-free)
+        # head used at inference, calibrated on val at the end of training (args["infer_head"]): "o2o" (NMS-free) or
+        # "o2m" (the one-to-many head + NMS). F54: on Wall_Color the jointly trained o2m head + NMS 0.5 scored higher.
+        self.infer_head = "o2o"
 
     @torch.no_grad()
     def copy_head_to_o2o(self):
@@ -55,11 +58,13 @@ class DualHeadMixin:
             cls, reg = self.run_head(feats, False)
             c1, r1 = self.run_head(feats, True)
             return {"cls": cls, "reg": reg, "points": pts, "strides": st, "o2o_cls": c1, "o2o_reg": r1}
-        cls, reg = self.run_head(feats, True)  # inference: the one-to-one head only
+        o2o = self.infer_head != "o2m"
+        cls, reg = self.run_head(feats, o2o)
         boxes = decode(reg, pts, st)
         conf = getattr(self, "nms_conf", 0.001)
-        if self.final_nms is not None:
-            logits, boxes = fast_nms(cls, boxes, self.max_det, conf=conf, iou=float(self.final_nms))
+        nms = self.final_nms if o2o or self.final_nms is not None else self.nms_iou   # one-to-many: always NMS
+        if nms is not None:
+            logits, boxes = fast_nms(cls, boxes, self.max_det, conf=conf, iou=float(nms))
         else:
             k = min(self.max_det, cls.shape[1])
             order = cls.amax(-1).topk(k, dim=1).indices
@@ -72,12 +77,27 @@ class DualHeadMixin:
         return {"pred_logits": logits, "pred_boxes": boxes}
 
 
+BOX_MODES = ("dfl", "direct")
+
+
+def make_head(ch, nc, ctx, box):
+    """Dense oriented head: OpenOBB7's (context unit in the class tower unless cls_ctx is off); box="direct" regresses
+    the distances and thickness as values (YOLO26-style, F54) instead of DFL distributions."""
+    kw = {"reg_ch": DIRECT_CH} if box == "direct" else {}
+    return ContextOrientedHead(ch, nc, **kw) if ctx else OrientedHead(ch, nc, **kw)
+
+
 class OpenOBB12(DualHeadMixin, OpenOBB7):
     arch = "v12"
 
     def __init__(self, size="x", num_classes=15, img_size=1024, lsk=True, max_det=1000, nms_iou=0.7, off=None,
-                 final_nms=None, **_):
+                 final_nms=None, box="dfl", **_):
         super().__init__(size, num_classes, img_size, lsk=lsk, max_det=max_det, nms_iou=nms_iou, off=off)
+        if box not in BOX_MODES:
+            raise ValueError(f"box must be one of {BOX_MODES}, got {box!r}")
+        self.box = box
+        if box != "dfl":
+            self.head = make_head([self.encoder.hidden_dim] * 3, num_classes, "cls_ctx" not in self.off, box)
         self._add_o2o(final_nms)
 
 
@@ -118,9 +138,9 @@ class OpenOBB13(OpenOBB12):
     PAD = 64                                   # the core halves the input, then needs multiples of 32
 
     def __init__(self, size="x", num_classes=15, img_size=2048, lsk=True, max_det=1000, nms_iou=0.7, off=None,
-                 final_nms=None, **_):
+                 final_nms=None, box="dfl", **_):
         super().__init__(size, num_classes, img_size, lsk=lsk, max_det=max_det, nms_iou=nms_iou, off=off,
-                         final_nms=final_nms)
+                         final_nms=final_nms, box=box)
         hid, cin = self.encoder.hidden_dim, self.encoder.in_channels
         c2 = max(64, hid // 2)
         self.hires = HiResStream(c2)
@@ -128,7 +148,7 @@ class OpenOBB13(OpenOBB12):
         self.p2_lat = ConvBN(c2, c2, 1, act=False)
         self.p2_down = ConvBN(hid, c2, 1, act=False)
         self.p2_fuse = DWRes(c2)
-        self.p2_head = ContextOrientedHead([c2], num_classes)
+        self.p2_head = make_head([c2], num_classes, True, box)
         self.p2_head_o2o = copy.deepcopy(self.p2_head)
         self.strides = (16, 32, 64, 8)
 

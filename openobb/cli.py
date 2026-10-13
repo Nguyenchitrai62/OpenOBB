@@ -10,6 +10,7 @@
     openobb prepare data=data.yaml out=datasets/mydata imgsz=1024
     openobb pretrain model=openobb9x data=<image folders> val_data=<held-out drawings> epochs=20 imgsz=640
                     # OpenOBB9 core by two-teacher distillation, no labels (docs/PRETRAIN.md)
+    openobb calibrate model=best.pt data=data.yaml [out=calibrated.pt]   # re-choose the inference head / NMS on val
     openobb strip   model=runs/obb/train/weights/best.pt [out=model.pt half=True]   # deploy checkpoint:
                     # weights + architecture + classes only (no paths, training args or scores)
 
@@ -38,7 +39,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-MODES = ("train", "val", "predict", "prepare", "pretrain", "strip")
+MODES = ("train", "val", "predict", "prepare", "pretrain", "strip", "calibrate")
 SIZES = ("s", "m", "l", "x")
 # model names: openobb1{s,m,l,x} (= s/m/l/x, DETR-style OpenOBB), openobb2{n,s,m,l,x} (dense segment-aware OpenOBB2),
 # openobb3{s,m,l,x} (pretrained encoder + dense anisotropic oriented head), openobb4x (DINOv2 + hybrid DETR)
@@ -118,7 +119,7 @@ RECIPE9 = {"rfs": 0.1, "channels_last": True, "clip": 10.0, "num_top": 1000, "re
 # architecture flags a fine-tune inherits from its source checkpoint (weights only load into the same shape)
 ARCH_KEYS = ("arch", "size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_queries", "denoising",
              "no_rotate_sampling", "context", "backbone", "dense_v3", "primary", "geo_cls", "relate", "rel_k",
-             "v6_off", "v7_off", "v8_off", "v9_off", "v10_off")
+             "v6_off", "v7_off", "v8_off", "v9_off", "v10_off", "box")
 PRETRAIN_KEYS = ("pretrain", "pretrain_epochs", "pretrain_det_epochs", "pretrain_dir", "pretrain_teacher")
 MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / per epoch on small datasets
 ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every", "lrf": "min_lr_ratio",
@@ -478,10 +479,17 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
                          f"got '{model}'")
     arch = inherited.get("arch", "v1")
     v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13")
-    imgsz = int(imgsz or extra.pop("img", None) or 1024)
+    src_img = extra.pop("img", None)                 # a checkpoint's own input size (already the full size for v13)
+    core_size = imgsz is not None or src_img is None
+    imgsz = int(imgsz or src_img or 1024)
     if imgsz % 32:
         imgsz = int(math.ceil(imgsz / 32) * 32)
         print(f"[openobb] imgsz must be a multiple of 32: using {imgsz}")
+    if arch == "v13" and core_size:
+        from openobb.predict import input_size
+        imgsz = input_size({"arch": "v13"}, imgsz)
+        print(f"[openobb] OpenOBB13: imgsz {imgsz // 2} is the core's size; images are prepared at {imgsz} px for "
+              f"the full-resolution detail stream")
 
     fit = not tile and tile_scale is None
     if fit:
@@ -591,7 +599,8 @@ def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, b
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net, names, targs = load_model(model, dev, queries)
     net.nms_min_side = float(nms_min_side)             # thickness floor for the NMS overlap test (fast_nms)
-    imgsz = int(imgsz or targs.get("img", 1024))
+    from openobb.predict import input_size
+    imgsz = input_size(targs, imgsz)
     fit = bool(targs.get("fit", False)) and tile_scale is None
     scale = float(tile_scale if tile_scale is not None else targs.get("scale", 1.0))
     if data is None:
@@ -623,6 +632,52 @@ def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, b
         print(f"Ultralytics-style metric (ProbIoU matching, 101-point AP): mAP50 {u['mAP50']:.3f}  "
               f"mAP50-95 {u['mAP50_95']:.3f}")
     return res
+
+
+def calibrate(model, data=None, out=None, imgsz=None, batch=8, workers=8, cache_dir=None, device=None, seed=0,
+              val_frac=0.15, gap=200):
+    """Re-run the end-of-training calibration on val for a trained checkpoint: the inference head of dual-head models
+    (one-to-one / one-to-many + NMS) and the NMS threshold, by fitness 0.1 mAP50 + 0.9 mAP50-95. Writes the choice
+    into the checkpoint's args (in place, or to `out`); everything else is unchanged."""
+    _set_device(device)
+    import torch
+
+    from openobb.data.dota import dataset_classes
+    from openobb.engine import eval_dota
+    from openobb.predict import apply_head, apply_nms, input_size, load_model, merge_iou_for, postprocess_options
+    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    net, names, targs = load_model(model, dev)
+    imgsz = input_size(targs, imgsz)
+    fit = bool(targs.get("fit", False))
+    if data is None:
+        if not _is_prepared(targs.get("data", "")):
+            raise SystemExit("calibrate needs data=<data.yaml> (the checkpoint's prepared data is not on this machine)")
+        prepared = Path(targs["data"])
+    else:
+        prepared = prepare_data(data, imgsz, gap, val_frac, float(targs.get("scale", 1.0)), cache_dir, workers,
+                                targs.get("seed", seed), fit=fit)
+    if list(dataset_classes(prepared)) != list(names):
+        raise SystemExit(f"dataset classes {list(dataset_classes(prepared))} do not match the model's {list(names)}")
+    tried = []
+    for h, c in postprocess_options(net):
+        apply_head(net, h)
+        apply_nms(net, c)
+        res, _ = eval_dota(net, prepared, dev, None, batch=batch, workers=workers, img_size=imgsz,
+                           num_top=int(targs.get("num_top", 1000)),
+                           merge_iou=merge_iou_for(c, fit), ultra=True, metric="yolo")
+        u = res.get("ultra") or res
+        f = 0.1 * u["mAP50"] + 0.9 * u["mAP50_95"]
+        tried.append((f, h, c))
+        print(f"[calibrate] {(h + ' ') if h else ''}nms {c}: mAP50 {u['mAP50']:.4f}  mAP50-95 {u['mAP50_95']:.4f}  "
+              f"fitness {f:.4f}", flush=True)
+    f, h, c = max(tried, key=lambda t: t[0])
+    ck = torch.load(model, map_location="cpu", weights_only=False)
+    ck["args"] = dict(ck.get("args", {}), nms_iou=c, **({"infer_head": h} if h else {}))
+    dst = Path(out or model)
+    torch.save(ck, dst.with_suffix(".tmp"))
+    os.replace(dst.with_suffix(".tmp"), dst)
+    print(f"[calibrate] -> {(h + ' ') if h else ''}nms {c} (fitness {f:.4f}) saved in {dst}")
+    return SimpleNamespace(infer_head=h, nms_iou=c, fitness=f, path=str(dst))
 
 
 def predict(model, source, conf=0.25, save_dir=None, vis=True, imgsz=None, tile=None, tile_scale=None,
@@ -707,6 +762,13 @@ def main(argv=None):
         if bad or "model" not in kv:
             raise SystemExit("usage: openobb strip model=<best.pt> [out=<deploy.pt>] [half=True]")
         strip(**kv)
+        return 0
+    if mode == "calibrate":
+        import inspect
+        bad = [k for k in kv if k not in inspect.signature(calibrate).parameters]
+        if bad or "model" not in kv:
+            raise SystemExit("usage: openobb calibrate model=<best.pt> data=<data.yaml> [out=<file.pt>]")
+        calibrate(**kv)
         return 0
     if mode == "pretrain":
         import inspect
