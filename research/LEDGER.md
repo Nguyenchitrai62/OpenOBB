@@ -716,6 +716,8 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     100 epoch, so F43 v8 vòng 1 từ COCO 0.671 / 0.444, wall_300 .571; khoảng 5 CU) → chưng cất v9 / v11 từ thầy DOTA + DINOv2 → fine-tune.
   - User hỏi pretrain v9 ngay: hướng dẫn = chưng cất (thầy DOTA + DINOv2) rồi fine-tune với `v8_off=refine` (bỏ tầng quan hệ:
     chưa chứng minh lợi ích, tốn 35% thời gian).
+  - Agent đã dựng `openobb11` = lõi v9 + head dense + cân bằng class, không tầng quan hệ. **User bác bỏ ngay (10-13), đã gỡ, không commit.**
+    Không gói lại các mảnh cũ thành version mới; làm tiếp trên v9 theo hướng dẫn pretrain.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
