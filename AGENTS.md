@@ -293,6 +293,16 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-13 (4): **0.8.2: kiểm tra kiến trúc khi nạp model.**
+  - Quy trình user chốt: mọi thay đổi lên cả hai repo cùng phiên bản. GitHub `openobb` dùng cho nghiên cứu và train trên Colab;
+    GitLab `hicasobb` (project `.../openanything/hicasobb`, lịch sử sạch, đã force-push một lần theo lời user) chỉ dùng để nạp model và suy luận.
+    Project GitLab `openobb` cũ bị bỏ, user tự xoá.
+  - Checkpoint ghi `version` (bản lúc train).
+  - `predict.check_arch`:
+    - nhãn `arch` không có trong `KNOWN_ARCHS` → báo lỗi rõ, kèm yêu cầu cập nhật (trước đây rơi xuống dựng v1 và lỗi lệch tensor);
+    - model train ở bản mới hơn → cảnh báo.
+  - **Khi thêm kiến trúc mới phải thêm nhãn vào `KNOWN_ARCHS`** (test `test_check_arch_unknown_and_newer` bắt lỗi nếu quên).
+
 - 2026-10-13 (3): **Repo sản phẩm chuyển sang GitLab `.../openanything/hicasobb`, lịch sử mới; `openobb strip`** (0.8.1).
   - User chọn project mới để bỏ lịch sử cũ (project `openobb` cũ chứa package `openobb` và link repo GitHub; user tự archive).
   - `push_all.py`:

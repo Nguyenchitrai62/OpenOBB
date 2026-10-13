@@ -37,6 +37,8 @@ def strip(model, out=None, half=False):
     dep = {"model": sd, "args": args, "classes": list(ck.get("classes") or [])}
     if ck.get("conf_thr") is not None:
         dep["conf_thr"] = ck["conf_thr"]
+    if ck.get("version"):
+        dep["version"] = ck["version"]                         # load_model warns on a newer one
     text = json.dumps({"args": args, "classes": dep["classes"]}, default=str).lower()
     found = [w for w in LEAKS if w in text]
     if found:

@@ -42,8 +42,37 @@ def windows(length, size, gap):
     return s
 
 
+# architecture labels this package can rebuild (args["arch"] written at training; identical in every build of the
+# package whatever its name, so a model trained with one build loads in another of the same or a newer version)
+KNOWN_ARCHS = ("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10")
+
+
+def _ver(v):
+    try:
+        return tuple(int(x) for x in str(v).split(".")[:3])
+    except ValueError:
+        return (0,)
+
+
+def check_arch(ck, path=""):
+    """Architecture of a checkpoint dict -> its label; clear error when this package version cannot build it."""
+    from openobb import __version__
+    a = ck.get("args") or {}
+    arch = a.get("arch") or "v1"
+    trained = ck.get("version")
+    if arch not in KNOWN_ARCHS:
+        need = f" (trained with version {trained})" if trained else ""
+        raise SystemExit(f"{path}: architecture '{arch}'{need} is not in this package (version {__version__}, "
+                         f"architectures {', '.join(KNOWN_ARCHS)}): update the package")
+    if trained and _ver(trained) > _ver(__version__):
+        print(f"WARNING {path}: trained with version {trained}, this package is {__version__}; update it if the "
+              f"model does not load or predicts differently")
+    return arch
+
+
 def load_model(ckpt_path, device, queries=None, classes=None):
     ck = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    check_arch(ck, ckpt_path)
     a = ck.get("args", {})
     names = ck.get("classes") or classes
     if not names:

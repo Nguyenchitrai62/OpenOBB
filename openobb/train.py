@@ -17,6 +17,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
+from openobb import __version__
 from openobb.data.dota import DotaPatches, collate, dataset_classes
 from openobb.engine import (ModelEMA, batchnorm_finite, eval_dota, lr_factor, param_groups, sanitize_batchnorm,
                           to_device)
@@ -478,7 +479,7 @@ def main(argv=None):
     def save_best(score, epoch):
         # compact deployable checkpoint: EMA weights + args + classes (no optimiser state)
         torch.save({"model": ema.module.state_dict(), "epoch": epoch, "args": vars(a), "classes": list(classes),
-                    "val_mAP50_95": score}, wdir / "best.tmp")
+                    "val_mAP50_95": score, "version": __version__}, wdir / "best.tmp")
         os.replace(wdir / "best.tmp", wdir / "best.pt")
         log(f"best.pt <- epoch {epoch} (val mAP50:95 {score:.4f})")
 
@@ -633,7 +634,8 @@ def main(argv=None):
                 save_best(best_score, epoch)
         torch.save({"model": model.state_dict(), "ema": ema.state_dict(), "opt": opt.state_dict(), "epoch": epoch,
                     "iter": it, "args": vars(a), "classes": list(classes), "best_score": best_score,
-                    "best_epoch": best_epoch, "recoveries": recoveries, "lr_scale": lr_scale}, wdir / "last.tmp")
+                    "best_epoch": best_epoch, "recoveries": recoveries, "lr_scale": lr_scale,
+                    "version": __version__}, wdir / "last.tmp")
         os.replace(wdir / "last.tmp", last)
         jlog(rec)
         append_results(out, rec, res)
@@ -737,7 +739,8 @@ def main(argv=None):
         ck = torch.load(last, map_location="cpu", weights_only=False)
         if "opt" in ck:
             torch.save({"model": ck["ema"]["module"], "epoch": ck["epoch"], "args": ck["args"],
-                        "classes": ck["classes"], "best_score": ck.get("best_score")}, wdir / "last.tmp")
+                        "classes": ck["classes"], "best_score": ck.get("best_score"),
+                        "version": ck.get("version", __version__)}, wdir / "last.tmp")
             os.replace(wdir / "last.tmp", last)
     (out / "train_done").write_text("ok")
 

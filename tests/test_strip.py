@@ -48,3 +48,17 @@ def test_strip_half_and_refuses_foreign_files(tmp_path):
     torch.save({"model": {}}, tmp_path / "x.pt")
     with pytest.raises(SystemExit):
         strip(str(tmp_path / "x.pt"))
+
+
+def test_check_arch_unknown_and_newer(tmp_path, capsys):
+    from openobb import __version__
+    from openobb.cli import MODELS
+    from openobb.predict import KNOWN_ARCHS, check_arch
+    assert {arch for arch, _ in MODELS.values()} <= set(KNOWN_ARCHS)     # every CLI model can be loaded back
+    assert check_arch({"args": {"arch": "v8"}}) == "v8" and check_arch({"args": {}}) == "v1"
+    with pytest.raises(SystemExit, match="'v99'.*trained with version 9.9.9.*update"):
+        check_arch({"args": {"arch": "v99"}, "version": "9.9.9"}, "m.pt")
+    check_arch({"args": {"arch": "v3"}, "version": "99.0.0"}, "m.pt")
+    assert "trained with version 99.0.0" in capsys.readouterr().out
+    check_arch({"args": {"arch": "v3"}, "version": __version__}, "m.pt")
+    assert "WARNING" not in capsys.readouterr().out
