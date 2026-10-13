@@ -440,8 +440,10 @@ def main(argv=None):
                 f"+ dense oriented branch, output {a.primary}), {n_par:.2f}M params, {a.queries} queries | "
                 f"init: {init_desc}")
         elif v9:
-            say(f"model   OpenOBB9-{a.size} (new re-parameterised core + OpenOBB8 head + relational refiner of "
-                f"{a.rel_k} candidates), {n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")
+            head9 = (f"OpenOBB8 head + relational refiner of {a.rel_k} candidates" if model.refiner is not None
+                     else "OpenOBB7 dense head, no relational refiner")
+            say(f"model   OpenOBB9-{a.size} (new re-parameterised core + {head9}), {n_par:.2f}M params, "
+                f"max {a.num_top} detections | init: {init_desc}")
             if not a.weights:
                 say("WARNING  OpenOBB9 starts from random weights: run `openobb pretrain model=openobb9x ...` first "
                     "and pass weights=<that file> (docs/OPENOBB9.md)")

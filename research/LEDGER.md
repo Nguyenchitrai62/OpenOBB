@@ -743,6 +743,35 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     - cùng cách đó với `infer_k`: K nhỏ nhất của tầng quan hệ mà fitness không giảm quá 0.002 (tốc độ).
     Áp dụng cho mọi model (v3–v11), giá trị đã lưu là mặc định khi predict / val.
 
+- **F50. OpenOBB11 và OpenOBB9 + `pretrain=coco` (user, 10-13): cả hai không đạt; lõi nhanh v9 rất nhanh nhưng thiếu tiên nghiệm.**
+  - Cùng G4, val 53 ảnh, thước YOLO, NMS / K tự hiệu chỉnh khi train xong (0.9.1):
+    | | v9 + pretrain coco, `v8_off=refine`, 100 ep | v11 từ COCO, 100 ep |
+    |---|---|---|
+    | mAP50 / 50-95 | 0.539 / 0.311 | 0.641 / 0.413 |
+    | Box trùng (conf 0.25) | 3.8% | 1.3% |
+    | NMS chọn | 0.6 (0.7: .3333, 0.6: .3338, 0.5: .3311) | 0.5 (không NMS: .355, 0.7: .427, 0.5: .429) |
+    | K chọn | — | 150 (fitness .435; K=300 .438; K=600 .429) |
+    | Suy luận (batch 16, bf16) | **5.4 ms** + 3.0 ms hậu xử lý | 13.6 ms + 0 |
+    | s / epoch | 7.8 | 17.4 |
+    Mốc cùng ngân sách từ COCO: v8 0.671 / 0.444 (F43); v10 0.693 / 0.456 (F47). v9 không pretrain: 0.541 / 0.331 (F44).
+  - **v11 bị bác bỏ theo tiêu chí ghi trước** (mAP50 < 0.673).
+    - Box trùng thấp nhưng bước hiệu chỉnh vẫn chọn NMS 0.5: tầng quan hệ một-một chưa học khử trùng đủ để bỏ NMS.
+    - Bỏ sót tăng: wall → background 21% (v10 14%), note 38%, wall mAP50 .769 so với .875.
+      Một dương mỗi object học chậm trên 250 ảnh (bài học DETR v1 / v4 lặp lại).
+    - (Chưa thử khởi tạo từ v10 như khuyến nghị; khoảng cách −0.03 với v8 cùng ngân sách cho thấy khó đảo ngược.)
+    - K = 150 tốt hơn K = 600: bớt ứng viên thì bớt box sai.
+  - **Pretrain chưng cất từ COCO không giúp v9** (0.539 so với 0.541).
+    - T2 không đạt: cosine giữ lại P3 0.813, P4 0.787 (ngưỡng 0.8), cosine tăng chậm sau epoch 10.
+    - 5.25k ảnh (COCO val + 250 bản vẽ), 20 epoch, 1024 px, 41.5 ảnh/s, khoảng 45 phút G4.
+  - **Tốc độ**: lõi v9 không tầng quan hệ 5.4 ms, so với v11 13.6 ms (khoảng 2.5 lần).
+    Tầng quan hệ (v8 / v10 / v11) chưa lần nào tăng độ chính xác (F43, F44, F47, F50) nhưng chiếm phần lớn thời gian suy luận.
+  - Kết luận:
+    - cấu hình chính xác nhất vẫn là head dense + NMS (v10 0.693; NMS hiệu chỉnh +0.018, F49);
+    - lõi nhanh v9 cần tiên nghiệm đúng miền.
+  - Hướng đề xuất: chưng cất lõi v9 từ chính model v10 đã train trên bản vẽ (thầy cùng miền), thay cho thầy COCO.
+    Rẻ, không cần nhãn; T2 sẽ cho biết học trò bắt chước được không. `pretrain=dota` (25–40 CU) để sau.
+  - Lỗi log: v9 với `v8_off=refine` vẫn in "relational refiner" (đã sửa).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
