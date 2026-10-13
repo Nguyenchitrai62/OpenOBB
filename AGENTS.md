@@ -293,6 +293,11 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-13 (7): **OpenOBB12 / OpenOBB13: head dense kép, không NMS** (F51, [docs/OPENOBB12.md](docs/OPENOBB12.md)).
+  - `openobb/models/openobb12.py` (`DualHeadMixin`, `OpenOBB12` lõi v7, `OpenOBB13` lõi v9) + `openobb12_loss.py` (loss dense v10 cho cả hai head, head một-một gán k = 1).
+  - `pretrain_teacher=` nhận detector OpenOBB đã train (`pretrain.TRAINED_CORES`): thầy là `encode()` của nó. `pretrain=` dùng được cho v13.
+  - Cột `o2o_loss` trong báo cáo. Test: `tests/test_openobb12.py`.
+
 - 2026-10-13 (6): **Tham số suy luận do train quyết định** (theo user: "NMS phải là tham số training, không hardcode").
   - `--nms-iou` (CLI `iou=` / `nms_iou=`, mặc định `auto`): train xong thử các ngưỡng trên val, lưu tốt nhất vào `best.pt`.
   - `infer_k`: số ứng viên nhỏ nhất của tầng quan hệ giữ nguyên fitness.

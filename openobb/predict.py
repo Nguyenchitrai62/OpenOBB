@@ -44,7 +44,7 @@ def windows(length, size, gap):
 
 # architecture labels this package can rebuild (args["arch"] written at training; identical in every build of the
 # package whatever its name, so a model trained with one build loads in another of the same or a newer version)
-KNOWN_ARCHS = ("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11")
+KNOWN_ARCHS = ("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13")
 
 
 def _ver(v):
@@ -121,6 +121,12 @@ def _load_model(ckpt_path, device, queries=None, classes=None):
         m = OpenOBB2(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
+    if a.get("arch") == "v13":
+        from openobb.models.openobb12 import OpenOBB13
+        m = OpenOBB13(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024),
+                      max_det=max(int(a.get("num_top", 1000)), int(queries or 0)), off=a.get("v9_off") or None)
+        m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
+        return m.to(device).eval().fuse(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
     if a.get("arch") == "v9":
         from openobb.models.openobb9 import OpenOBB9
         m = OpenOBB9(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024),
@@ -128,10 +134,13 @@ def _load_model(ckpt_path, device, queries=None, classes=None):
                      off8=a.get("v8_off") or None, rel_k=a.get("rel_k", 600))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval().fuse(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
-    if a.get("arch") in ("v7", "v8", "v10", "v11"):
+    if a.get("arch") in ("v7", "v8", "v10", "v11", "v12"):
         common = dict(num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
                       max_det=max(int(a.get("num_top", 1000)), int(queries or 0)))
-        if a["arch"] == "v11":
+        if a["arch"] == "v12":
+            from openobb.models.openobb12 import OpenOBB12
+            m = OpenOBB12(a.get("size", "x"), off=a.get("v7_off") or None, **common)
+        elif a["arch"] == "v11":
             from openobb.models.openobb11 import OpenOBB11
             m = OpenOBB11(a.get("size", "x"), off=a.get("v8_off") or None, off7=a.get("v7_off") or None,
                           rel_k=a.get("rel_k", 600), **common)

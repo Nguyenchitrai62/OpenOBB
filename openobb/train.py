@@ -42,7 +42,7 @@ def build_parser():
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11"],
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13"],
                     help="v1: OpenOBB (DETR-style decoder); v2: OpenOBB2 (dense segment-aware, NMS-free); "
                          "v3: OpenOBB3 (pretrained encoder + dense anisotropic oriented head); "
                          "v4: OpenOBB4 (DINOv2 backbone + DETR decoder + dense oriented branch); "
@@ -52,7 +52,8 @@ def build_parser():
                          "v9: OpenOBB9 (new re-parameterised core + OpenOBB8's head, docs/OPENOBB9.md); "
                          "v10: OpenOBB10 (OpenOBB8 + multi-slot head, reach-aware assignment, class balance, "
                          "docs/OPENOBB10.md); "
-                         "v11: OpenOBB11 (dense proposals + one-to-one relational set decoder, NMS-free, docs/OPENOBB11.md)")
+                         "v11: OpenOBB11 (dense proposals + one-to-one relational set decoder, NMS-free, docs/OPENOBB11.md); "
+                         "v12 / v13: OpenOBB7 / OpenOBB9 core + dual dense head, NMS-free (docs/OPENOBB12.md)")
     ap.add_argument("--backbone", default="hgnet", choices=["hgnet", "dinov2_s", "dinov2_b", "dinov2_l"])
     ap.add_argument("--dense-v3", action="store_true", help="dense branch = OpenOBB3's oriented head (OpenOBB4)")
     ap.add_argument("--geo-cls", action="store_true", help="OpenOBB5: class branch reads the predicted geometry")
@@ -227,9 +228,10 @@ def main(argv=None):
 
     classes = dataset_classes(a.data)
     v2, v4, v5 = a.arch == "v2", a.arch == "v4", a.arch == "v5"
-    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11")
-    v6, v7, v8, v9, v10 = a.arch == "v6", a.arch == "v7", a.arch == "v8", a.arch == "v9", a.arch == "v10"
-    v11 = a.arch == "v11"
+    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13")
+    v6, v7, v8, v10 = a.arch == "v6", a.arch == "v7", a.arch == "v8", a.arch == "v10"
+    v11, v12, v13 = a.arch == "v11", a.arch == "v12", a.arch == "v13"
+    v9 = a.arch in ("v9", "v13")                # OpenOBB13 = OpenOBB9 core: same init / freeze / compile rules
     dense_arch = v2 or v3                       # dense heads: no queries / decoder
     if v4:                                      # DETR decoder fed and supervised by the dense oriented branch
         a.dense = a.dense_queries = a.dense_v3 = True
@@ -240,7 +242,15 @@ def main(argv=None):
     elif v3:
         from openobb.models.openobb3 import OpenOBB3
         from openobb.models.openobb3_loss import OpenOBB3Loss
-        if v11:
+        if v12 or v13:
+            from openobb.models.openobb12 import OpenOBB12, OpenOBB13
+            if v13:
+                model = OpenOBB13(a.size, num_classes=len(classes), img_size=a.img, max_det=a.num_top,
+                                  off=a.v9_off or None)
+            else:
+                model = OpenOBB12(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
+                                  off=a.v7_off or None)
+        elif v11:
             from openobb.models.openobb11 import OpenOBB11
             model = OpenOBB11(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
                               off=a.v8_off or None, off7=a.v7_off or None, rel_k=a.rel_k)
@@ -288,6 +298,8 @@ def main(argv=None):
         init_desc = f"fine-tune from {a.weights} ({len(cmap)}/{len(classes)} classes carried over)"
         if v10 and getattr(model, "slots", 1) > 1 and not _has_keys(a.weights, "head.reg_slot."):
             model.head.copy_primary_box()       # single-slot checkpoint: extra slots start from slot 0's boxes
+        if (v12 or v13) and not _has_keys(a.weights, "head_o2o."):
+            model.copy_head_to_o2o()            # single-head checkpoint: the one-to-one head starts as its copy
     elif not last.exists() and not a.no_pretrained and not v2 and not v6 and not v9:
         load_dfine_coco(model, a.size, class_names=classes, log=lambda m: log(m, console=True), init=a.init)
         init_desc = "D-FINE COCO weights (Apache-2.0)"
@@ -306,7 +318,10 @@ def main(argv=None):
     if v2:
         crit = OpenOBB2Loss(img_size=a.img)
     elif v3:
-        if v11:
+        if v12 or v13:
+            from openobb.models.openobb12_loss import OpenOBB12Loss
+            crit = OpenOBB12Loss(img_size=a.img)
+        elif v11:
             from openobb.models.openobb11_loss import OpenOBB11Loss
             crit = OpenOBB11Loss(img_size=a.img)
         elif v10:
@@ -439,6 +454,15 @@ def main(argv=None):
             say(f"model   OpenOBB4-{a.size} ({a.backbone} + {'LSK + ' if a.lsk else ''}hybrid encoder + DETR decoder "
                 f"+ dense oriented branch, output {a.primary}), {n_par:.2f}M params, {a.queries} queries | "
                 f"init: {init_desc}")
+        elif v12 or v13:
+            core = (f"OpenOBB9 re-parameterised core{', off: ' + a.v9_off if a.v9_off else ''}" if v13 else
+                    f"pretrained HGNetv2 + LSK + hybrid encoder{', off: ' + a.v7_off if a.v7_off else ''}")
+            say(f"model   OpenOBB{13 if v13 else 12}-{a.size} ({core}; dual dense oriented head P3-P5: one-to-many "
+                f"for learning + one-to-one for inference, NMS-free), {n_par:.2f}M params, max {a.num_top} "
+                f"detections | init: {init_desc}")
+            if v13 and not a.weights:
+                say("WARNING  OpenOBB13 starts from random weights: use pretrain=coco pretrain_teacher=<trained "
+                    "OpenOBB .pt> (docs/OPENOBB12.md)")
         elif v9:
             head9 = (f"OpenOBB8 head + relational refiner of {a.rel_k} candidates" if model.refiner is not None
                      else "OpenOBB7 dense head, no relational refiner")

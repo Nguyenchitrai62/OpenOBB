@@ -179,7 +179,7 @@ def pretrain(model="openobb9x", data=None, val_data=None, teachers=None, epochs=
     if data is None:
         raise SystemExit("openobb pretrain needs data=<folder(s) of images, comma-separated>")
     arch, size = MODELS.get(str(model).lower(), (None, None))
-    if arch not in ("v6", "v9"):
+    if arch not in ("v6", "v9", "v13"):
         raise SystemExit("openobb pretrain is for the new cores: model=openobb9s/m/l/x or openobb6n/s/m/l/x")
     random.seed(seed)
     torch.manual_seed(seed)
@@ -327,14 +327,32 @@ def _check_core(net, imgsz, dev):
                            f"{[tuple(f.shape) for f in feats]}")
 
 
+# trained OpenOBB detectors whose full core (encode) can be a distillation teacher (pretrain_teacher=<best.pt>)
+TRAINED_CORES = ("v3", "v5", "v7", "v8", "v10", "v11", "v12")
+
+
 class _Teachers(nn.Module):
     """Frozen teachers. __call__(x in [0, 1]) -> {"dfine": [P3, P4, P5], "dinov2": [one map per DINOv2 layer]}."""
 
     def __init__(self, names, imgsz, dfine_size, dino_name, dino_layers, t_size, log=print):
         super().__init__()
-        self.dfine = self.vit = None
+        self.dfine = self.vit = self.dfine_full = None
         self.channels = {}
-        if "dfine" in names:
+        full = None
+        if "dfine" in names and str(dfine_size).endswith(".pt") and Path(dfine_size).exists():
+            ck = torch.load(dfine_size, map_location="cpu", weights_only=False, mmap=True)
+            if isinstance(ck, dict) and (ck.get("args") or {}).get("arch") in TRAINED_CORES:
+                full = dfine_size
+            del ck
+        if full is not None:                             # a trained OpenOBB detector: its whole core is the teacher
+            from openobb.predict import _load_model     # (LSK, scale guard, stride-4 detail: what it really computes)
+            net, _, _ = _load_model(full, torch.device("cpu"))
+            if not hasattr(net, "encode"):
+                raise SystemExit(f"teacher {full}: this architecture has no encode()")
+            self.dfine_full = net
+            self.channels["dfine"] = int(net.encoder.hidden_dim)
+            log(f"[pretrain] teacher = trained detector {Path(full).name} (arch {net.arch}): its core's P3 / P4 / P5")
+        elif "dfine" in names:
             from openobb.models import openobb1
             from openobb.models.openobb3 import OpenOBB3
             src, size = dfine_size, dfine_size
@@ -377,6 +395,8 @@ class _Teachers(nn.Module):
         out = {}
         if self.dfine is not None:                   # same input as OpenOBB3 inference: RGB in [0, 1], no mean / std
             out["dfine"] = self.dfine["encoder"](self.dfine["backbone"](x))
+        elif self.dfine_full is not None:
+            out["dfine"] = list(self.dfine_full.encode(x)[1])
         if self.vit is not None:
             xt = F.interpolate((x - self.mean) / self.std, size=(self.t_size, self.t_size), mode="bilinear",
                                align_corners=False)
@@ -387,7 +407,7 @@ class _Teachers(nn.Module):
 def _pairs(teachers, tch, w_dfine, w_dino):
     """(display name, student level 0..2, teacher, teacher map index, weight) for every distillation target."""
     pairs = []
-    if tch.dfine is not None:
+    if tch.dfine is not None or tch.dfine_full is not None:
         pairs += [(f"dfine/{LEVELS[l]}", l, "dfine", l, w_dfine[l]) for l in range(3)]
     if tch.vit is not None:
         for j, n in enumerate(tch.dino_names):

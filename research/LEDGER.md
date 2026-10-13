@@ -772,6 +772,20 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     Rẻ, không cần nhãn; T2 sẽ cho biết học trò bắt chước được không. `pretrain=dota` (25–40 CU) để sau.
   - Lỗi log: v9 với `v8_off=refine` vẫn in "relational refiner" (đã sửa).
 
+- **F51. OpenOBB12 / OpenOBB13: head dense kép, không NMS, không tầng quan hệ (10-13, chưa train).** [docs/OPENOBB12.md](../docs/OPENOBB12.md).
+  - Lập luận từ F43–F50:
+    - độ chính xác đến từ lõi pretrained + head dense một-nhiều;
+    - tầng quan hệ không tăng độ chính xác nhưng tốn thời gian;
+    - một-một kiểu Hungarian (v11) học chậm.
+  - Cơ chế: head thứ hai cùng thiết kế với head dense, gán top-1 mỗi object theo cùng thước đo (điểm × ProbIoU^6), kiểu gán kép của YOLOv10 / YOLO26.
+    Suy luận chỉ dùng head một-một, không NMS; NMS là dự phòng do hiệu chỉnh cuối train chọn.
+  - v12 = lõi OpenOBB7 (68.0M). v13 = lõi OpenOBB9 (30.9M), chưng cất với thầy là OpenOBB10 đã train (`pretrain_teacher=`, mới: `_Teachers` nhận cả detector đã train).
+  - Kỳ vọng ghi trước (100 epoch, Wall_Color):
+    | | mAP50 / 50-95 | Box trùng, không NMS | Bác bỏ nếu |
+    |---|---|---|---|
+    | v12 | 0.68–0.71 / 0.45–0.47 | < 3% | mAP50 < 0.673, hoặc trùng ≥ 3% |
+    | v13 | 0.64–0.68 / 0.41–0.45; T2 ≥ 0.8; ≤ 6 ms | < 3% | T2 không đạt, hoặc mAP50 < 0.62 |
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
