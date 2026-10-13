@@ -738,6 +738,10 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     - suy luận không NMS, không lan delta;
     - head dense như v10 nhưng chỉ giữ cân bằng class.
     - Dự đoán ghi trước: từ v10 best → 0.70–0.73 / 0.46–0.49, box trùng < 5%. Bác bỏ nếu trùng ≥ 5% hoặc mAP50 < 0.673.
+  - User (10-13): NMS không được cố định trong code, phải là tham số của lần train → `nms_iou=auto`:
+    - train xong thử trên val (v11: không NMS / 0.7 / 0.5; model khác: 0.7 / 0.6 / 0.5), lưu ngưỡng fitness cao nhất vào `best.pt`;
+    - cùng cách đó với `infer_k`: K nhỏ nhất của tầng quan hệ mà fitness không giảm quá 0.002 (tốc độ).
+    Áp dụng cho mọi model (v3–v11), giá trị đã lưu là mặc định khi predict / val.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 

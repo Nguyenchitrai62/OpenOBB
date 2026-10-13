@@ -58,6 +58,31 @@ OpenOBB11 giữ **lõi pretrained và head dense của OpenOBB8**. Thay đổi n
 - Ở đây nó chỉ áp lên tầng quan hệ; head dense vẫn một-nhiều, và tầng quan hệ bắt đầu từ điểm dense, nên rủi ro thấp hơn.
 - K = 600 ứng viên: object thứ 601 trở đi (theo điểm) không ra được. Ảnh rất đông vật cần `rel_k` lớn hơn.
 
+### Tham số suy luận do train quyết định (không chỉnh tay)
+
+Hai tham số trước đây cố định trong code nay được **hiệu chỉnh trên val khi train xong**, rồi ghi vào `best.pt`
+(`args.nms_iou`, `args.infer_k`). `predict` / `val` dùng chúng làm mặc định; truyền `iou=` khi predict thì ghi đè.
+
+| Tham số | Thử | Chọn | Tác dụng |
+|---|---|---|---|
+| `nms_iou` (lọc trùng) | v11: không NMS, 0.7, 0.5. Model khác: 0.7, 0.6, 0.5 | fitness cao nhất (0.1·mAP50 + 0.9·mAP50-95, như YOLO); hoà thì ưu tiên không NMS | độ chính xác, không phải đoán ngưỡng theo dataset |
+| `infer_k` (số ứng viên của tầng quan hệ) | K train (600), K/2, K/4 (≥ 64) | K nhỏ nhất mà fitness không giảm quá 0.002 | tốc độ: chi phí tầng quan hệ tỉ lệ với K (lớp quan hệ tỉ lệ K²) |
+
+- Khi train: `nms_iou=auto` (mặc định), hoặc `iou=0.5` / `nms_iou=none` để cố định.
+- Áp dụng cho mọi model có NMS (v3–v11). `infer_k` áp dụng cho các model có tầng quan hệ (v8, v10, v11).
+- Ngưỡng conf theo class (F2) vốn đã được hiệu chỉnh theo cách này từ trước (`conf="auto"` khi predict).
+
+### Các tối ưu khác của v11
+
+| Tối ưu | Tốc độ | Độ chính xác |
+|---|---|---|
+| Không NMS, không lan delta sang 4000 anchor | bỏ ma trận ProbIoU 4000 × 600 và NMS 4000 ứng viên | — |
+| Không ghép đa giác sau mạng khi `nms_iou` = không NMS | bỏ NMS đa giác trên CPU | — |
+| Head dense 1 slot (bỏ slot của v10) | ít hơn 3 lần số anchor qua decode / chọn ứng viên | bớt bản sao (slot làm tăng trùng, F47) |
+| `infer_k` hiệu chỉnh | tầng quan hệ nhỏ lại khi ảnh ít vật | giữ nguyên (ràng buộc 0.002) |
+| Cân bằng class trong loss dense | — | class hiếm (F47: slide_door +.12) |
+| Ghép một-một chọn box khít nhất (β = 6) | — | mAP50-95 của vật dài |
+
 ## 3. Chỉ số kỳ vọng (ghi TRƯỚC khi train)
 
 Điều kiện: đi tiếp 50 epoch từ best của v10 (0.693 / 0.456; thước YOLO, val 53 ảnh).

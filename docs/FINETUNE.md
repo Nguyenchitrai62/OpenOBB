@@ -79,6 +79,7 @@ Có thể khởi tạo `openobb3x` từ một checkpoint `openobb1` bằng `weig
 | `translate` | 0.1 | dịch ngẫu nhiên ±10% |
 | `hsv_h`, `hsv_s`, `hsv_v` | 0.015, 0.5, 0.3 | đổi màu |
 | `warmup_epochs` | 3 | khởi động learning rate |
+| `iou` / `nms_iou` | `auto` | lọc trùng: `auto` = train xong tự thử trên val và lưu ngưỡng tốt nhất (v11 thử cả không NMS) vào `best.pt`, làm mặc định khi predict; hoặc một số cố định / `none` |
 | `pretrain` | không | chỉ `openobb9*` / `openobb6*`: `coco`, `dota` hoặc thư mục ảnh. Tự tải data, pretrain lõi (và train trên DOTA với `dota`), lưu cache rồi mới train. Xem [PRETRAIN.md](PRETRAIN.md) mục 0 |
 | `lrf` | 0.01 | learning rate giảm theo **cosine** (mặc định từ 0.7.1) từ `lr0` về `lr0 × lrf` ở cuối run (`cos_lr=False`: giảm tuyến tính như mặc định của YOLO) |
 | `cache` | auto | giải mã ảnh train một lần vào RAM nếu chiếm dưới 25% RAM (`cache=False` để tắt) |

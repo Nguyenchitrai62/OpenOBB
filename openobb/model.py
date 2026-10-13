@@ -280,8 +280,13 @@ class OpenOBB:
             imgsz = max(int(v) for v in imgsz)
         size = int(imgsz or a.get("img", 1024))
         fit = a.get("fit", False) if tile is None else not tile
-        if iou is None:
-            iou = 0.7 if fit else 0.1
+        from openobb.predict import apply_nms, merge_iou_for
+        if iou is None:                                  # the value calibrated on val at training (args["nms_iou"])
+            apply_nms(self.model, a.get("nms_iou"))
+            iou = merge_iou_for(a.get("nms_iou"), fit)
+        else:                                            # explicit iou=: network NMS and tile merge both use it
+            apply_nms(self.model, iou)
+            iou = merge_iou_for(iou, fit)
         thr = conf_thresholds(names, a, conf)
         # boxes below every class threshold are dropped before the in-model NMS (same result: a lower-scored box
         # never suppresses a higher-scored one), so NMS works on hundreds of boxes, not 4000
@@ -315,7 +320,7 @@ class OpenOBB:
             dets = merge_dets(raw, names, 0.0, iou=iou)
             if agnostic_nms and dets:
                 polys = np.array([d["poly"] for d in dets], np.float64)
-                keep = nms_poly(polys, np.array([d["score"] for d in dets]), iou)
+                keep = nms_poly(polys, np.array([d["score"] for d in dets]), 0.7 if iou is None else iou)
                 dets = [dets[i] for i in keep]
             dets = sorted(dets, key=lambda d: -d["score"])[:max_det]
             if dets:

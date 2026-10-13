@@ -63,6 +63,9 @@ def build_parser():
     ap.add_argument("--v8-off", default="", help="OpenOBB8 ablation: refiner parts switched off, comma-separated "
                                                   "(relate, geo_bias, ring, p2, jitter, refine)")
     ap.add_argument("--v9-off", default="", help="OpenOBB9 ablation: core parts switched off, comma-separated")
+    ap.add_argument("--nms-iou", default="auto",
+                    help="duplicate suppression: auto (calibrated on val at the end and saved in best.pt as the "
+                         "inference default), none (no NMS; OpenOBB11), or a ProbIoU threshold")
     ap.add_argument("--v10-off", default="", help="OpenOBB10 ablation: parts switched off, comma-separated "
                                                    "(slots, reach, balance)")
     ap.add_argument("--v6-off", default="", help="OpenOBB6 ablation: parts switched off, comma-separated "
@@ -295,6 +298,8 @@ def main(argv=None):
     else:
         init_desc = "resume" if last.exists() else "random (trained from scratch)"
     sanitize_batchnorm(model, log=lambda m: log(m, console=True))
+    from openobb.predict import apply_nms, merge_iou_for, parse_nms
+    apply_nms(model, a.nms_iou)                 # fixed value: used for every val; auto: architecture default
     model.to(device)
     if a.channels_last:
         model.to(memory_format=torch.channels_last)
@@ -687,11 +692,54 @@ def main(argv=None):
     else:
         from openobb.models.openobb7 import fuse_model
         fuse_model(vm)
-    res, dets = eval_dota(vm, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.num_top,
-                          img_size=a.img, log=log, fusion=a.dense or a.vec_ground > 0, variants=["dec", "dense", "union", "snap", "snapg"],
-                          save_preds_to=(out / "val_preds.npz") if a.dense else None, context=a.context,
-                          vectors=a.vectors, post=a.post, merge_iou=a.merge_iou, primary=a.primary, ultra=True,
-                          metric=a.metric)
+    def final_eval(nms):
+        apply_nms(vm, nms)
+        merge = merge_iou_for(nms, True) if a.fit else a.merge_iou
+        return eval_dota(vm, a.data, device, None, batch=a.batch, workers=a.workers, num_top=a.num_top,
+                         img_size=a.img, log=log, fusion=a.dense or a.vec_ground > 0,
+                         variants=["dec", "dense", "union", "snap", "snapg"],
+                         save_preds_to=(out / "val_preds.npz") if a.dense else None, context=a.context,
+                         vectors=a.vectors, post=a.post, merge_iou=merge, primary=a.primary, ultra=True,
+                         metric=a.metric)
+
+    if parse_nms(a.nms_iou) is None and hasattr(vm, "nms_iou"):
+        # NMS is a parameter of the trained model, not a constant: try the settings on val, keep the best fitness
+        # (0.1 mAP50 + 0.9 mAP50-95, as YOLO's best.pt) and save it as the inference default (args["nms_iou"])
+        cands = ["none", 0.7, 0.5] if hasattr(vm, "final_nms") else [0.7, 0.6, 0.5]
+        tried = []
+        for c in cands:
+            r, d = final_eval(c)
+            u = r.get("ultra") or r
+            tried.append((0.1 * u["mAP50"] + 0.9 * u["mAP50_95"], c, r, d))
+        fit_best, a.nms_iou, res, dets = max(tried, key=lambda t: t[0])
+        apply_nms(vm, a.nms_iou)
+        say("NMS calibrated on val (saved in best.pt, the inference default): "
+            + " | ".join(f"{c}: fitness {f:.4f}" for f, c, _, _ in tried) + f" -> {a.nms_iou}")
+    else:
+        res, dets = final_eval(a.nms_iou)
+        u = res.get("ultra") or res
+        fit_best = 0.1 * u["mAP50"] + 0.9 * u["mAP50_95"]
+    a.infer_k = None
+    ref = getattr(vm, "refiner", None)
+    if ref is not None and not a.eval_only:
+        # candidate budget of the relational stage at inference (its cost grows with K): the smallest K whose val
+        # fitness stays within 0.002 of the trained K is saved in best.pt (args["infer_k"]) and used by predict / val
+        k0, best = ref.k, (ref.k, res, dets)
+        for k in (k0 // 2, k0 // 4):
+            if k < 64:
+                break
+            ref.k = k
+            r, d = final_eval(a.nms_iou)
+            u = r.get("ultra") or r
+            f = 0.1 * u["mAP50"] + 0.9 * u["mAP50_95"]
+            say(f"inference candidates K={k}: fitness {f:.4f} (K={k0}: {fit_best:.4f})")
+            if f < fit_best - 0.002:
+                break
+            best = (k, r, d)
+        ref.k, res, dets = best
+        a.infer_k = ref.k if ref.k != k0 else None
+        if a.infer_k:
+            say(f"relational stage: {ref.k} candidates at inference instead of {k0} (saved in best.pt)")
     if not a.eval_only and not full_val:
         save_best(res["mAP50_95"], a.epochs - 1)
     table = summary_table(res, classes)
@@ -728,6 +776,9 @@ def main(argv=None):
     if not a.eval_only and (wdir / "best.pt").exists():  # per-class confidence (best F2) for predict conf=auto
         ck = torch.load(wdir / "best.pt", map_location="cpu", weights_only=False)
         ck["conf_thr"] = {c: round(final["classes"][c].get("conf_f2", 0.25), 3) for c in classes}
+        ck["args"]["nms_iou"] = a.nms_iou
+        if a.infer_k:
+            ck["args"]["infer_k"] = a.infer_k
         ck["conf_f1"] = final.get("conf_f1")
         torch.save(ck, wdir / "best.tmp")
         os.replace(wdir / "best.tmp", wdir / "best.pt")
@@ -751,7 +802,7 @@ def main(argv=None):
     if not a.eval_only and last.exists():   # finished: drop the optimiser state from last.pt (like best.pt)
         ck = torch.load(last, map_location="cpu", weights_only=False)
         if "opt" in ck:
-            torch.save({"model": ck["ema"]["module"], "epoch": ck["epoch"], "args": ck["args"],
+            torch.save({"model": ck["ema"]["module"], "epoch": ck["epoch"], "args": dict(ck["args"], nms_iou=a.nms_iou),
                         "classes": ck["classes"], "best_score": ck.get("best_score"),
                         "version": ck.get("version", __version__)}, wdir / "last.tmp")
             os.replace(wdir / "last.tmp", last)

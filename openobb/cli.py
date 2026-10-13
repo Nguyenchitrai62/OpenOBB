@@ -115,7 +115,8 @@ ARCH_KEYS = ("arch", "size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "de
              "v6_off", "v7_off", "v8_off", "v9_off", "v10_off")
 PRETRAIN_KEYS = ("pretrain", "pretrain_epochs", "pretrain_det_epochs", "pretrain_dir", "pretrain_teacher")
 MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / per epoch on small datasets
-ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every", "lrf": "min_lr_ratio"}
+ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every", "lrf": "min_lr_ratio",
+           "iou": "nms_iou"}      # train: iou= (YOLO's val NMS IoU) = nms_iou, auto by default
 IGNORED = ("save_period", "plots", "momentum", "degrees", "shear", "perspective", "mixup", "cutmix",
            "copy_paste", "rect", "multi_scale", "warmup_bias_lr", "warmup_momentum", "nbs", "dropout", "cls_pw")
 
@@ -597,8 +598,9 @@ def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, b
     classes = list(dataset_classes(prepared))
     if classes != list(names):                       # class ids are positional: a different order means wrong mAP
         raise SystemExit(f"dataset classes {classes} do not match the model's {list(names)} (same names, same order)")
+    from openobb.predict import merge_iou_for
     res, _ = eval_dota(net, prepared, dev, None, batch=batch, workers=workers, num_top=queries, img_size=imgsz,
-                       merge_iou=0.7 if fit else 0.1,
+                       merge_iou=merge_iou_for(targs.get("nms_iou"), fit),
                        post=targs.get("post", "flat"), primary=targs.get("primary", "dec"),
                        fusion=targs.get("primary", "dec") != "dec", ultra=True, metric=metric)
     print(summary_table(res, classes))

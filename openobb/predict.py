@@ -70,7 +70,46 @@ def check_arch(ck, path=""):
     return arch
 
 
+def parse_nms(v):
+    """NMS setting -> None (architecture default: "auto" / missing), "none" (no NMS) or a ProbIoU threshold."""
+    if v is None or str(v).lower() in ("auto", ""):
+        return None
+    if str(v).lower() in ("none", "off", "false"):
+        return "none"
+    return float(v)
+
+
+def apply_nms(model, v):
+    """Set a model's duplicate suppression: a threshold -> class-wise NMS at it (OpenOBB11: on its set output),
+    "none" -> no NMS, None -> the architecture default. The value is calibrated on val at the end of training
+    (args["nms_iou"]) and is the default at inference."""
+    v = parse_nms(v)
+    if v is None or not hasattr(model, "nms_iou"):
+        return model
+    if hasattr(model, "final_nms"):
+        model.final_nms = None if v == "none" else v
+    else:
+        model.nms_iou = 1.01 if v == "none" else v
+    return model
+
+
+def merge_iou_for(v, fit):
+    """Polygon NMS after the network (tile merge): whole-image models follow the model's NMS setting; tiled
+    inference keeps 0.1 (overlapping tiles repeat the same object)."""
+    v = parse_nms(v)
+    if not fit:
+        return 0.1
+    return 0.7 if v is None else (None if v == "none" else v)
+
+
 def load_model(ckpt_path, device, queries=None, classes=None):
+    m, names, a = _load_model(ckpt_path, device, queries, classes)
+    if a.get("infer_k") and getattr(m, "refiner", None) is not None:   # calibrated at training
+        m.refiner.k = int(a["infer_k"])
+    return apply_nms(m, a.get("nms_iou")), names, a
+
+
+def _load_model(ckpt_path, device, queries=None, classes=None):
     ck = torch.load(ckpt_path, map_location="cpu", weights_only=False)
     check_arch(ck, ckpt_path)
     a = ck.get("args", {})

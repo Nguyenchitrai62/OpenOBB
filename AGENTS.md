@@ -293,6 +293,11 @@ Câu hỏi còn mở:
 
 ## 9. Nhật ký
 
+- 2026-10-13 (6): **Tham số suy luận do train quyết định** (theo user: "NMS phải là tham số training, không hardcode").
+  - `--nms-iou` (CLI `iou=` / `nms_iou=`, mặc định `auto`): train xong thử các ngưỡng trên val, lưu tốt nhất vào `best.pt`.
+  - `infer_k`: số ứng viên nhỏ nhất của tầng quan hệ giữ nguyên fitness.
+  - `predict.apply_nms` / `merge_iou_for` / `load_model` áp các giá trị này; `strip` giữ lại.
+
 - 2026-10-13 (5): **OpenOBB11 + wheel sản phẩm** (F49, [docs/OPENOBB11.md](docs/OPENOBB11.md)).
   - User giao toàn quyền làm v11. Phân tích box trùng của v10 (53 ảnh val): gốc ở kiến trúc → tầng quan hệ train một-một, suy luận không NMS.
   - `openobb8_loss.ref_assign` (tách ra, hành vi v8 không đổi); `OpenOBB8._with_jitter(return_idx=True)`.
