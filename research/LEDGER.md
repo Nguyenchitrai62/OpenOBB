@@ -902,6 +902,23 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     - Nghiêng về bác bỏ nhưng chưa kết luận. Cần `best.pt` để đo độ khít box (`box_quality.py`):
       nếu sai số độ dày wall < 0.7 px → chạy đúng điều kiện (COCO, 100 epoch); nếu không → bác bỏ, không tốn thêm CU.
 
+- **F56. Hiệu chỉnh `openobb12x.pt` trên máy (val chuẩn) + tốc độ CPU (10-13).**
+  - `openobb calibrate` chọn head một-nhiều + NMS 0.7. File mới: `F:\Downloads\openobb12x_calibrated.pt`.
+    | Head / NMS | mAP50 / 50-95 | fitness |
+    |---|---|---|
+    | một-một, không NMS | .675 / .450 | .4724 |
+    | một-một, 0.7 | .720 / .468 | .4934 |
+    | một-một, 0.5 | .724 / .464 | .4903 |
+    | **một-nhiều, 0.7** | **.740 / .479** | **.5053** |
+    | một-nhiều, 0.5 | .745 / .476 | .5026 |
+    YOLO26x: .746 / .499.
+  - **Tốc độ CPU** (`research/analysis/speed_cpu_v12.py`, 4 luồng, 928 × 1280, xen kẽ trong một tiến trình):
+    - với đầu vào nhiễu ngẫu nhiên: YOLO26x 5.4 s; v12 head một-một 5.0 s; v12 head một-nhiều + NMS 17.4 s; v10 18.1 s.
+    - Phần chênh 12 s là NMS trên hàng nghìn box rác do nhiễu sinh ra. **Đầu vào nhiễu không dùng được để đo model có NMS.**
+    - Trên trang thật (3307 × 2338 → 1280): `predict` của v12 hết **5.7 s với 4 luồng, 15.0 s với 1 luồng**;
+      lần gọi đầu (nạp model) 9.4 s. cProfile: 89% là conv của lõi; NMS và ghép box gần 0.
+    - → Trên CPU, v12 ngang YOLO26x. Chưa có số GPU cùng phiên (`colab/speed_gpu.py`).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

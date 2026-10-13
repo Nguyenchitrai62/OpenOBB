@@ -1,0 +1,25 @@
+[data] train: 250 images, 13588 objects, 0 backgrounds, 0 missing labels, 0 corrupt lines, 0 unreadable images
+[split] train: 250 images -> 250 tiles, 13588 objects
+[data] val: 53 images, 3465 objects, 0 backgrounds, 0 missing labels, 0 corrupt lines, 0 unreadable images
+[split] val: 53 images -> 53 tiles, 3465 objects
+C:\Users\HP\AppData\Local\Programs\Python\Python312\Lib\site-packages\torch\utils\data\dataloader.py:759: UserWarning: 'pin_memory' argument is set as true but no accelerator is found, then device pinned memory won't be used.
+  super().__init__(loader)
+[eval] 53 patches / 53 images: predict 309s, merge+eval 10s, dec mAP50 67.53
+[calibrate] o2o nms none: mAP50 0.6753  mAP50-95 0.4499  fitness 0.4724
+C:\Users\HP\AppData\Local\Programs\Python\Python312\Lib\site-packages\torch\utils\data\dataloader.py:759: UserWarning: 'pin_memory' argument is set as true but no accelerator is found, then device pinned memory won't be used.
+  super().__init__(loader)
+[eval] 53 patches / 53 images: predict 430s, merge+eval 11s, dec mAP50 71.96
+[calibrate] o2o nms 0.7: mAP50 0.7196  mAP50-95 0.4682  fitness 0.4934
+C:\Users\HP\AppData\Local\Programs\Python\Python312\Lib\site-packages\torch\utils\data\dataloader.py:759: UserWarning: 'pin_memory' argument is set as true but no accelerator is found, then device pinned memory won't be used.
+  super().__init__(loader)
+[eval] 53 patches / 53 images: predict 477s, merge+eval 13s, dec mAP50 72.37
+[calibrate] o2o nms 0.5: mAP50 0.7237  mAP50-95 0.4644  fitness 0.4903
+C:\Users\HP\AppData\Local\Programs\Python\Python312\Lib\site-packages\torch\utils\data\dataloader.py:759: UserWarning: 'pin_memory' argument is set as true but no accelerator is found, then device pinned memory won't be used.
+  super().__init__(loader)
+[eval] 53 patches / 53 images: predict 981s, merge+eval 11s, dec mAP50 74.01
+[calibrate] o2m nms 0.7: mAP50 0.7401  mAP50-95 0.4792  fitness 0.5053
+C:\Users\HP\AppData\Local\Programs\Python\Python312\Lib\site-packages\torch\utils\data\dataloader.py:759: UserWarning: 'pin_memory' argument is set as true but no accelerator is found, then device pinned memory won't be used.
+  super().__init__(loader)
+[eval] 53 patches / 53 images: predict 668s, merge+eval 10s, dec mAP50 74.49
+[calibrate] o2m nms 0.5: mAP50 0.7449  mAP50-95 0.4757  fitness 0.5026
+[calibrate] -> o2m nms 0.7 (fitness 0.5053) saved in F:\Downloads\openobb12x_calibrated.pt
