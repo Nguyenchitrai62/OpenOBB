@@ -1,0 +1,50 @@
+"""`openobb strip`: deploy checkpoint with weights + architecture + classes only."""
+import json
+
+import pytest
+import torch
+
+from openobb.models.openobb3 import OpenOBB3
+from openobb.predict import load_model
+from openobb.strip import strip
+
+torch.set_num_threads(1)
+
+
+def _ckpt(tmp_path):
+    torch.manual_seed(0)
+    m = OpenOBB3("s", num_classes=2, img_size=128, lsk=True)
+    args = {"arch": "v3", "size": "s", "img": 128, "lsk": True, "num_top": 300, "fit": True,
+            "data": "/root/.cache/openobb/datasets/x_1280", "out": "runs/obb/train3", "lr": 1e-3, "seed": 0,
+            "weights": "/content/drive/MyDrive/openobb8x.pt"}
+    p = tmp_path / "best.pt"
+    torch.save({"model": m.state_dict(), "epoch": 12, "args": args, "classes": ["wall", "door"],
+                "val_mAP50_95": 0.4, "conf_thr": [0.3, 0.2], "conf_f1": [0.5, 0.6]}, p)
+    return p, m
+
+
+def test_strip_keeps_only_inference_fields_and_loads(tmp_path):
+    p, m = _ckpt(tmp_path)
+    out = strip(str(p), out=str(tmp_path / "anything.pt"))
+    ck = torch.load(out, map_location="cpu", weights_only=True)
+    assert set(ck) == {"model", "args", "classes", "conf_thr"}
+    assert ck["args"] == {"arch": "v3", "size": "s", "img": 128, "fit": True, "num_top": 300, "lsk": True}
+    text = json.dumps({"a": ck["args"], "c": ck["classes"]}).lower()
+    assert "openobb" not in text and "/root" not in text and "runs/" not in text
+    net, names, _ = load_model(out, torch.device("cpu"))
+    assert names == ["wall", "door"]
+    a = dict(m.eval().state_dict())
+    b = torch.load(out, map_location="cpu", weights_only=True)["model"]
+    assert a.keys() == b.keys() and all(torch.equal(a[k], b[k]) for k in a)
+
+
+def test_strip_half_and_refuses_foreign_files(tmp_path):
+    p, _ = _ckpt(tmp_path)
+    out = strip(str(p), half=True)
+    assert out.endswith("best_deploy.pt")
+    ck = torch.load(out, map_location="cpu", weights_only=True)
+    assert all(v.dtype == torch.float16 for v in ck["model"].values() if v.is_floating_point())
+    load_model(out, torch.device("cpu"))                        # float16 weights load into the float32 model
+    torch.save({"model": {}}, tmp_path / "x.pt")
+    with pytest.raises(SystemExit):
+        strip(str(tmp_path / "x.pt"))

@@ -10,6 +10,8 @@
     openobb prepare data=data.yaml out=datasets/mydata imgsz=1024
     openobb pretrain model=openobb9x data=<image folders> val_data=<held-out drawings> epochs=20 imgsz=640
                     # OpenOBB9 core by two-teacher distillation, no labels (docs/PRETRAIN.md)
+    openobb strip   model=runs/obb/train/weights/best.pt [out=model.pt half=True]   # deploy checkpoint:
+                    # weights + architecture + classes only (no paths, training args or scores)
 
     from openobb import OpenOBB
     model = OpenOBB("openobb3x")                # or OpenOBB("runs/obb/train/weights/best.pt")
@@ -36,7 +38,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-MODES = ("train", "val", "predict", "prepare", "pretrain")
+MODES = ("train", "val", "predict", "prepare", "pretrain", "strip")
 SIZES = ("s", "m", "l", "x")
 # model names: openobb1{s,m,l,x} (= s/m/l/x, DETR-style OpenOBB), openobb2{n,s,m,l,x} (dense segment-aware OpenOBB2),
 # openobb3{s,m,l,x} (pretrained encoder + dense anisotropic oriented head), openobb4x (DINOv2 + hybrid DETR)
@@ -689,6 +691,13 @@ def main(argv=None):
     mode, kv = argv[0], parse_kv(argv[1:])
     if mode == "predict":
         return _predict_cli(kv)
+    if mode == "strip":
+        from openobb.strip import strip
+        bad = [k for k in kv if k not in ("model", "out", "half")]
+        if bad or "model" not in kv:
+            raise SystemExit("usage: openobb strip model=<best.pt> [out=<deploy.pt>] [half=True]")
+        strip(**kv)
+        return 0
     if mode == "pretrain":
         import inspect
 
