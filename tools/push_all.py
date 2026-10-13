@@ -82,6 +82,13 @@ TRANSFORMS = [
 PKG_NEW, CLI_NEW, CLASS_NEW = "hicas_detection_obb", "hicasobb", "HicasOBB"
 KEEP = (GITLAB_PIP,)
 TEXT_EXT = {".py", ".md", ".toml", ".txt", ".bat", ".cfg", ".ini", ".json", ".yaml", ".yml"}
+TEXT_NAMES = {"LICENSE", "NOTICE", "COPYING"}                      # text files without a suffix
+
+
+def is_text(f):
+    return f.suffix.lower() in TEXT_EXT or f.name in TEXT_NAMES
+
+
 # the product repo never names the research repo / package (customer-facing): checked before every push
 LEAK = re.compile(r"openobb|vrdet|nguyenchitrai|github\.com/nguyen|(?<!\w)research/|repo nghiên cứu|research repo", re.I)
 SCRUB = (("research/LEDGER.md", "internal benchmark notes"), ("research/ARCH_ANALYSIS.md", "internal analysis"),
@@ -121,7 +128,7 @@ def leaks(dst):
     """Text files of the exported tree that still name the research repo / package -> [(file, match)]."""
     out = []
     for f in dst.rglob("*"):
-        if f.is_file() and f.suffix.lower() in TEXT_EXT:
+        if f.is_file() and is_text(f):
             m = LEAK.search(f.read_text(encoding="utf-8"))
             if m:
                 out.append((f.relative_to(dst).as_posix(), m.group(0)))
@@ -133,7 +140,7 @@ def rebrand(dst):
     files = [f for f in dst.rglob("*") if f.is_file()]
     for f in files:
         rel = f.relative_to(dst).as_posix()
-        if f.suffix.lower() in TEXT_EXT:
+        if is_text(f):
             f.write_text(rebrand_text(f.read_text(encoding="utf-8")), encoding="utf-8")
         new = dst / rebrand_path(rel)
         if new != f:
