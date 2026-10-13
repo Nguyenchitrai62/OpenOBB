@@ -56,6 +56,7 @@ def test_one_to_one_assignment_gives_one_positive_per_object():
 def test_inference_is_one_to_one_head_without_nms():
     torch.manual_seed(0)
     m = OpenOBB12("s", num_classes=NC, img_size=128, max_det=50).eval()
+    m.infer_head = "o2o"
     with torch.no_grad():
         r = m(torch.rand(2, 3, 128, 128))
     assert r["pred_logits"].shape == (2, 50, NC) and r["pred_boxes"].shape == (2, 50, 5)
@@ -172,13 +173,13 @@ def test_inference_head_is_a_calibrated_setting(tmp_path):
     from openobb.predict import apply_head, load_model, postprocess_options
     torch.manual_seed(0)
     m = OpenOBB12("s", num_classes=NC, img_size=128, max_det=30).eval()
-    assert m.infer_head == "o2o" and ("o2m", 0.5) in postprocess_options(m)
+    assert m.infer_head == "o2m" and ("o2o", "none") in postprocess_options(m)
     x = torch.rand(1, 3, 128, 128)
     with torch.no_grad():
-        r1 = m(x)
-        apply_head(m, "o2m")
-        r2 = m(x)                                           # one-to-many head, always through NMS
-    assert m.infer_head == "o2m" and not torch.equal(r1["pred_logits"], r2["pred_logits"])
+        r1 = m(x)                                           # one-to-many head, always through NMS
+        apply_head(m, "o2o")
+        r2 = m(x)
+    assert m.infer_head == "o2o" and not torch.equal(r1["pred_logits"], r2["pred_logits"])
     path = tmp_path / "v12.pt"
     torch.save({"model": m.state_dict(), "classes": ["a", "b", "c"],
                 "args": {"arch": "v12", "size": "s", "img": 128, "nms_iou": 0.5, "infer_head": "o2m"}}, path)

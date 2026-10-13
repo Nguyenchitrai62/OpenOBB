@@ -79,6 +79,7 @@ Run v12 đầu tiên của user đạt 0.722 / 0.468, cao nhất tới nay. Hai 
    - Train kèm head một-một làm lõi tốt hơn; nhưng ở 250 ảnh, head một-nhiều + NMS vẫn tốt hơn khi suy luận.
    - Cuối train, bước hiệu chỉnh thử `{một-một: không NMS / 0.7 / 0.5; một-nhiều: 0.7 / 0.5}` trên val, lưu `args["infer_head"]` và `args["nms_iou"]` vào `best.pt`.
    - Checkpoint đã train: `openobb calibrate model=best.pt data=data.yaml [out=calibrated.pt]`.
+   - Từ 0.12.1, checkpoint chưa có `infer_head` (train trước 0.12.0) và val mỗi epoch dùng head một-nhiều + NMS theo mặc định.
 2. **`box=direct`: hồi quy box kiểu YOLO26.**
    - So với YOLO26x, box của v12:
      - dày hơn thật một cách hệ thống (+0.66 px trên tường 5.6 px);

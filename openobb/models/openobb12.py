@@ -37,8 +37,9 @@ class DualHeadMixin:
         self.head_o2o = copy.deepcopy(self.head)
         self.final_nms = final_nms            # None: the one-to-one head's output as it is (NMS-free)
         # head used at inference, calibrated on val at the end of training (args["infer_head"]): "o2o" (NMS-free) or
-        # "o2m" (the one-to-many head + NMS). F54: on Wall_Color the jointly trained o2m head + NMS 0.5 scored higher.
-        self.infer_head = "o2o"
+        # "o2m" (the one-to-many head + NMS). Default "o2m" (F54: same v12 checkpoint, o2m + NMS 0.718 -> 0.735 mAP50,
+        # 0.470 -> 0.481 mAP50-95): per-epoch val and checkpoints trained before 0.12.0 use it.
+        self.infer_head = "o2m"
 
     @torch.no_grad()
     def copy_head_to_o2o(self):
