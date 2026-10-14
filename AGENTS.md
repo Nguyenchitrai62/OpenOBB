@@ -3,6 +3,7 @@
 > File bàn giao cho mọi coding agent (Claude Code, Codex, Cursor, Antigravity...).
 >
 > **Tiếp tục nghiên cứu:** gọi skill **`vrdet-research`**. Claude Code: `/vrdet-research`. Codex: `$vrdet-research`. Agent khác: "đọc và làm theo `.agents/skills/vrdet-research/SKILL.md`". Skill tự đọc trạng thái, tự quyết thí nghiệm tiếp theo, tự chạy trên Colab và tự ghi lại kết quả.
+> **Quy trình nghiên cứu chuẩn (bắt buộc cho mọi agent, mọi session): mục 8b.**
 > **Sổ cái nghiên cứu: [research/LEDGER.md](research/LEDGER.md).** Đọc trước khi chọn thí nghiệm. Mọi kết quả, phát hiện và lỗi
 > đều phải ghi vào đó (luật của user, 2026-10-08).
 >
@@ -301,6 +302,85 @@ Câu hỏi còn mở:
 **GPU mặc định: G4** (RTX PRO 6000 Blackwell 94 GB, ~8.9 CU/h; 500 CU ≈ 55 giờ G4).
 
 **Cần user:** điền tên chủ sở hữu pháp lý (cá nhân hoặc công ty) vào `LICENSE` (hiện để "the repository owner").
+
+## 8b. Quy trình nghiên cứu (handoff, chuẩn từ 2026-10-14)
+
+Agent (Claude Code, Codex, Cursor...) ở session khác làm theo đúng thứ tự này. Không có GPU local; user train trên Colab và gửi log.
+
+### B1. Đọc trước khi làm gì
+1. File này: mục 7 (quyết định của user), mục 8 (trạng thái), mục 8b, 3–5 mục cuối của Nhật ký (mục 9).
+2. [research/LEDGER.md](research/LEDGER.md): các F mới nhất (hiện F58–F62). Mọi số liệu đều ở đó, không hỏi lại user số đã ghi.
+3. Thẻ kiến trúc của 2–3 version mới nhất: `docs/OPENOBB14.md`, `OPENOBB15.md`, `OPENOBB16.md` (mỗi thẻ có bảng lập luận và bảng kỳ vọng ghi trước).
+4. Bài học tổng hợp: [research/LESSONS_BY_LAYER.md](research/LESSONS_BY_LAYER.md), [research/ARCH_ANALYSIS.md](research/ARCH_ANALYSIS.md).
+
+### B2. Luật thiết kế (của user, không thương lượng)
+- **Mốc so sánh:** YOLO26x-obb trên Wall_Color **0.746 / 0.499** (F59) và bản OpenOBB tốt nhất hiện tại **v12-x head một-nhiều + NMS 0.7:
+  0.743 / 0.472, 15.3 ms / ảnh (G4, batch 16)**. So cùng thước YOLO (`metric=yolo`, in trong log), cùng data, cùng cách hiệu chỉnh head / NMS.
+- **Mục tiêu:** chính xác hơn YOLO (nhất là mAP50-95); chậm hơn YOLO được nhưng không quá (khoảng ≤ 1.3× v12 là trần tạm). Kiến trúc và weights
+  phải **thương mại được, thuộc sở hữu user**: chỉ thành phần Apache-2.0 / MIT, không code / weights Ultralytics (`tests/test_license_guard.py`
+  chặn import). Bản mới na ná kiến trúc cấm thương mại thì vô nghĩa.
+- **Version mới = đột phá có lập luận.** Mỗi `openobbN` phải có thẻ `docs/OPENOBBN.md` gồm: bằng chứng (số F), bảng *bài học → cơ chế → kỳ vọng →
+  điều chứng minh sai*, chi tiết từng phần + tỉ lệ tận dụng phần có sẵn, **bảng chỉ số kỳ vọng ghi TRƯỚC khi train** và tiêu chí bác bỏ.
+  Tinh chỉnh nhỏ thì thành công tắc (`v14_off=`, `box=`, `neck=`...), không thành version.
+- **Mỗi phần mới khởi tạo đồng nhất** (zero-init) trên bản trước, có test "bắt đầu đúng bằng bản trước" (ví dụ `test_v16_starts_as_v15`).
+- **Mỗi vòng giao user HAI hạt giống** khác nhau đúng một yếu tố, kèm lệnh `openobb train ...` chính xác; user train song song và gửi log.
+- **Đào sâu bên trong mọi backbone SOTA bằng số đo**, không lắp thêm mù: trước khi thiết kế, chạy các script ở B3 và trích số vào thẻ.
+- Giữ thân HGNetv2 pretrained cho tới khi có ngân sách pretrain thân riêng (3 lần train lõi từ đầu đều thất bại: F25, F40, F50). Lộ trình sở hữu
+  trọn: thân conv dày tái tham số hoá, chưng cất từ chính model đã train trên bản vẽ + DOTA.
+
+### B3. Công cụ đo (chạy local, CPU, không cần GPU)
+| Việc | Lệnh |
+|---|---|
+| Mổ cơ chế bên trong thân trên checkpoint đã train | `OMP_NUM_THREADS=2 py -3.12 research/analysis/dissect_hgnet.py F:/Downloads/openobb12x.pt --images 3` |
+| FLOPs / byte / roofline G4 từng mảnh (model của mình và YOLO) | `OMP_NUM_THREADS=1 py -3.12 research/analysis/roofline.py openobb16x:neck=dfine openobb12x yolo26x-obb --hw 960x1280` (biến thể: `openobb15x:neck=dfine,off=stage4,widehead`) |
+| 16 backbone SOTA cùng thước | `py -3.12 research/analysis/roofline_backbones.py` (cần `timm`, chỉ để đo) |
+| Độ khít box so với YOLO trên checkpoint | `research/analysis/box_quality.py`, `dup_analysis.py` (xem đầu file) |
+| Test | `OMP_NUM_THREADS=1 py -3.12 -m pytest -q tests/` (khoảng 4 phút; torch CPU trên máy này phải 1 luồng) |
+
+Checkpoint đã train: `F:\Downloads\openobb12x.pt`, `openobb10x.pt`; lõi DOTA: `runs/e6-vrdet-x-dota-24e/openobb_dota_core_x.pt`.
+Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
+
+### B4. Thêm một version N (danh sách kiểm, làm đủ)
+1. `openobb/models/openobbN.py` (+ `openobbN_loss.py` nếu cần). Kế thừa bản trước; mọi phần mới zero-init; `fuse()` gộp BN / RepConv.
+2. Đăng ký: `openobb/cli.py` (`MODELS`, `RECIPEN`, `SIZE_DEFAULTSN`, tuple `dense_arch`, map `sd` / recipe, `ARCH_KEYS` nếu có cờ mới, nhánh
+   `imgsz` 2× nếu ảnh vào gấp đôi như v13 / v15 / v16); `openobb/predict.py` (`KNOWN_ARCHS`, nhánh nạp, `input_size`); `openobb/train.py`
+   (choices `--arch`, nhóm `v3`, dựng model, loss, dòng log `model`, copy head một-một khi `weights=`).
+3. `tests/test_openobbN.py`: train step + loss hữu hạn + gradient mọi phần mới; đồng nhất lúc đầu so với bản trước; fuse giữ đầu ra; nạp weights
+   pretrained / checkpoint cũ; suy luận mọi cỡ; registry. Chạy cả `tests/test_strip.py` (mọi model trong `MODELS` phải có trong `KNOWN_ARCHS`).
+4. `docs/OPENOBBN.md` (theo B2) + thêm dòng vào bảng model của `README.md`, `docs/FINETUNE.md`, `tools/gitlab_README.md`.
+5. Sổ cái: mục F mới (thiết kế + kỳ vọng ghi trước). Mục 8 + Nhật ký của file này.
+6. Commit chỉ file của mình (`git add <file>...`; `app/streamlit_app.py`, `docs/DEPLOY.md` và một phần `tools/gitlab_README.md` đang có sửa dở
+   của user, không commit). Thông điệp commit kết bằng dòng `Co-Authored-By` theo quy định của session.
+7. Phát hành: `python tools/push_all.py` (`--minor` khi có kiến trúc mới): tự tăng version, push GitHub, đồng bộ bản sạch sang GitLab (đổi tên
+   `hicasobb`), chạy test trên bản đó, build wheel, gắn tag. Colab của user cài từ GitHub, nên **phải push trước khi bảo user train**.
+8. Trả lời user bằng tiếng Việt: hai hạt giống + lệnh + điều cần gửi lại (bảng theo class, confusion matrix, `Duplicate boxes`, `NMS calibrated`,
+   `Speed`, và `openobb val model=best.pt data=... ref_k=0` với họ v14+).
+
+### B5. Khi user gửi log
+1. Ghi mục F mới: điều kiện (init, epoch, lr, batch, imgsz, GPU), bảng theo class so với mốc (F59) và bản trước, dòng hiệu chỉnh, box trùng, tốc độ.
+2. Đối chiếu từng dòng của bảng kỳ vọng trong thẻ; ghi **đạt / không đạt / bác bỏ** vào thẻ (mục "Kết quả thật") và sổ cái. Không nới tiêu chí sau khi có số.
+3. Chẩn đoán theo class (class nào mất, class nào tăng) → nguyên nhân có bằng chứng → phép thử tách một yếu tố cho vòng sau (công tắc có sẵn
+   trước, version mới sau).
+4. Cập nhật mục 8 của file này và memory của agent nếu user ra luật mới.
+
+### B6. Trạng thái vòng hiện tại (2026-10-14 tối)
+- Đang train (user): `openobb15x neck=dfine` (v15, ảnh vào 2560). Có thể cả `openobb14x neck=dfine`.
+- Sẵn sàng train: `openobb16x neck=dfine` (v16, 0.15.0). Bản nhanh nếu quá chậm: thêm `v14_off=stage4,widehead`.
+- Cây quyết định khi có log:
+  - v15 ≥ 0.76 / 0.51 và wall_300 ≥ .78 → cơ chế độ phân giải gốc được xác nhận; chạy v16 từ `best.pt` của v15 (`weights=`), so cùng xuất phát.
+  - v15 tốt ở 50-95 nhưng chậm quá → `openobb15x neck=dfine v14_off=stage4,widehead` (đo trước bằng roofline).
+  - v15 không hơn v14 `neck=dfine` → luồng gốc / P2 không có tác dụng ở 250 ảnh; quay về câu hỏi tiên nghiệm (H-DOTA: `weights=` lõi DOTA,
+    hoặc `pretrain=dota`), và kiểm tra lại nhãn wall_300.
+  - v14 `neck=dfine` ≥ v12 ở 50-95 mà v14 neck tự thiết kế không → neck mất tiên nghiệm là nguyên nhân F60; lộ trình sở hữu trọn phải qua
+    chưng cất neck / thân.
+- Chưa làm: pretrain thân riêng (cần CU), FloorPlanCAD cho v14–v16 (lệnh ở `docs/OPENOBB14.md` mục 4c).
+
+### B7. Lỗi môi trường hay gặp
+- Bash tool trên Windows: heredoc chứa nhiều dấu nháy đơn làm shell báo "unexpected EOF"; khi đó **ghi script Python ra file trong scratchpad
+  (Write tool) rồi chạy**, không nhúng vào heredoc.
+- torch CPU trên máy này: luôn `OMP_NUM_THREADS=1` (hoặc 2) để không crash heap; tốc độ CPU local không dùng để so model (F47), chỉ GPU cùng phiên.
+- `timm` và `ultralytics` có trong Python 3.12 local chỉ để đo (research), không bao giờ import trong `openobb/`.
+- `push_all.py` chỉ đồng bộ file đã commit; nó in danh sách file chưa commit, đọc để không bỏ sót.
 
 ## 9. Nhật ký
 
