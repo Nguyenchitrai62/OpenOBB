@@ -122,7 +122,7 @@ RECIPE9 = {"rfs": 0.1, "channels_last": True, "clip": 10.0, "num_top": 1000, "re
 # architecture flags a fine-tune inherits from its source checkpoint (weights only load into the same shape)
 ARCH_KEYS = ("arch", "size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_queries", "denoising",
              "no_rotate_sampling", "context", "backbone", "dense_v3", "primary", "geo_cls", "relate", "rel_k",
-             "v6_off", "v7_off", "v8_off", "v9_off", "v10_off", "box", "v14_off", "ref_k")
+             "v6_off", "v7_off", "v8_off", "v9_off", "v10_off", "box", "v14_off", "ref_k", "neck")
 PRETRAIN_KEYS = ("pretrain", "pretrain_epochs", "pretrain_det_epochs", "pretrain_dir", "pretrain_teacher")
 MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / per epoch on small datasets
 ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every", "lrf": "min_lr_ratio",
@@ -591,7 +591,7 @@ def _summary(save_dir):
 
 
 def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, batch=8, workers=8, queries=900,
-        cache_dir=None, device=None, seed=0, metric="yolo", nms_min_side=0.0):
+        cache_dir=None, device=None, seed=0, metric="yolo", nms_min_side=0.0, ref_k=None):
     """DOTA-protocol mAP of a checkpoint on the val split of `data` (same hold-out and resizing as training).
     Without `data`, the checkpoint's own prepared data is used when it is available."""
     _set_device(device)
@@ -604,6 +604,8 @@ def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, b
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net, names, targs = load_model(model, dev, queries)
     net.nms_min_side = float(nms_min_side)             # thickness floor for the NMS overlap test (fast_nms)
+    if ref_k is not None and hasattr(net, "ref_k"):    # OpenOBB14: edge refiner budget at val (0 = off), no retrain
+        net.ref_k = int(ref_k)
     from openobb.predict import input_size
     imgsz = input_size(targs, imgsz)
     fit = bool(targs.get("fit", False)) and tile_scale is None

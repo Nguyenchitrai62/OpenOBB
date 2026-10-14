@@ -124,6 +124,24 @@ Công tắc ablation `v14_off=`: `attn`, `spd`, `edge`, `dilate`, `maxpool`, `gu
 
 Điều v14 **không** nhắm và nói trước: phân loại wall_300 (mAP50 .721 so với .824, 14% nhầm sang junction). Nếu v14 đạt mAP50-95 mà wall_300 vẫn .72, bước kế tiếp là H-DOTA (khởi tạo thân từ lõi DOTA) hoặc luồng độ phân giải gốc của v13, không phải sửa v14.
 
+## 4b. Kết quả thật (F60, user 10-14) và bước kế tiếp
+
+| | v12-x (F59) | **v14-x (F60)** | kỳ vọng |
+|---|---|---|---|
+| mAP50 / 50-95 | 0.743 / 0.472 | **0.713 / 0.469** | 0.73–0.77 / 0.50–0.53 → **không đạt** |
+| tốc độ G4, batch 16 | 15.3 ms | **10.9 ms (−29%)** | ≤ 13 ms → **đạt** |
+| wall 50-95 | .520 | **.565** | +0.03 → đạt |
+| note / slide_door / wall_300 mAP50 | .741 / .410 / .721 | .657 / .276 / .677 | không giảm → **không đạt** |
+| box trùng | 8.2% | 3.5% | |
+
+Cơ chế box làm đúng việc (tường +.045 mAP50-95, box trùng giảm một nửa, nhanh hơn 29%); phần mất nằm ở class cần ngữ nghĩa và class hiếm,
+khớp với rủi ro đã nêu: neck mới mất tiên nghiệm COCO của encoder. Phép thử tách một yếu tố: `neck=dfine`.
+
+```bash
+openobb train model=openobb14x data=/content/data.yaml imgsz=1280 epochs=100 neck=dfine
+openobb val model=runs/obb/train6/weights/best.pt data=/content/data.yaml ref_k=0    # đóng góp của bộ tinh chỉnh, không train lại
+```
+
 ## 5. Train và đối chứng (Colab)
 
 ```bash

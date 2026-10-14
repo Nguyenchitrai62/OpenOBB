@@ -279,7 +279,9 @@ Câu hỏi còn mở:
 - **Mốc chính thức 2026-10-14 (F59, log user): YOLO26x 0.746 / 0.499 (150 ep, A100); OpenOBB12-x head một-nhiều + NMS 0.7: 0.743 / 0.472, 15.3 ms / ảnh (G4, batch 16).**
   Khoảng cách nằm ở mAP50-95 của wall / wall_300 / junction / note (độ khít box) và mAP50 của wall_300 (phân loại); class hiếm v12 thắng.
 - [x] **OpenOBB14 (2026-10-14, F58):** thân HGNetv2 pretrained giữ nguyên + neck / head / bộ tinh chỉnh box tự thiết kế.
-  Chi tiết và kỳ vọng ghi trước: [docs/OPENOBB14.md](docs/OPENOBB14.md). Chờ user: T1 tốc độ rồi train 100 epoch.
+  Chi tiết và kỳ vọng ghi trước: [docs/OPENOBB14.md](docs/OPENOBB14.md).
+  **Kết quả (F60):** 0.713 / 0.469, 10.9 ms (v12: 0.743 / 0.472, 15.3 ms). Tốc độ đạt, wall +.045 mAP50-95, nhưng note / slide_door /
+  wall_300 tụt → mất tiên nghiệm encoder. Đang chờ phép thử `neck=dfine` (0.13.1) để tách nguyên nhân.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.

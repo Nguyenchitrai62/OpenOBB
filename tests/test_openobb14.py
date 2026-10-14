@@ -126,6 +126,24 @@ def test_off_switches_and_dfl_box():
     assert math.isfinite(float(total.detach()))
 
 
+def test_neck_dfine_control_loads_the_pretrained_encoder(tmp_path):
+    torch.manual_seed(0)
+    src = OpenOBB3("s", num_classes=NC, img_size=IMG)
+    p = tmp_path / "src.pt"
+    torch.save({"model": src.state_dict()}, p)
+    m = OpenOBB14("s", num_classes=NC, img_size=IMG, neck="dfine")
+    assert m.neck is None and m.hid == src.encoder.hidden_dim
+    skipped = load_dfine_coco(m, str(p), log=lambda *_: None)
+    assert not any(k.startswith(("backbone.", "encoder.")) for k in skipped)
+    m.train()
+    out = m(torch.rand(1, 3, IMG, IMG), _targets())
+    total = sum(OpenOBB14Loss(img_size=IMG)(out, _targets()).values())
+    assert math.isfinite(float(total.detach()))
+    m.eval().fuse()
+    with torch.no_grad():
+        assert m(torch.rand(1, 3, 128, 128))["pred_boxes"].shape[1] == 1000
+
+
 def test_registry_knows_v14():
     from openobb.cli import MODELS, RECIPE14
     from openobb.predict import KNOWN_ARCHS, check_arch

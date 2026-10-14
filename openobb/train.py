@@ -68,6 +68,8 @@ def build_parser():
                                                   "(attn, spd, edge, dilate, maxpool, guard, dual)")
     ap.add_argument("--ref-k", type=int, default=1500, help="OpenOBB14: candidates refined by the edge refiner at "
                                                             "inference (0: off)")
+    ap.add_argument("--neck", default="own", choices=["own", "dfine"],
+                    help="OpenOBB14: own re-parameterised neck, or D-FINE's COCO-pretrained hybrid encoder (control)")
     ap.add_argument("--nms-iou", default="auto",
                     help="duplicate suppression: auto (calibrated on val at the end and saved in best.pt as the "
                          "inference default), none (no NMS; OpenOBB11), or a ProbIoU threshold")
@@ -251,7 +253,7 @@ def main(argv=None):
         if v14:
             from openobb.models.openobb14 import OpenOBB14
             model = OpenOBB14(a.size, num_classes=len(classes), img_size=a.img, max_det=a.num_top,
-                              off=a.v14_off or None, box=a.box, ref_k=a.ref_k)
+                              off=a.v14_off or None, box=a.box, ref_k=a.ref_k, neck=a.neck)
         elif v12 or v13:
             from openobb.models.openobb12 import OpenOBB12, OpenOBB13
             model = (OpenOBB13 if v13 else OpenOBB12)(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk,
@@ -464,7 +466,8 @@ def main(argv=None):
                 f"+ dense oriented branch, output {a.primary}), {n_par:.2f}M params, {a.queries} queries | "
                 f"init: {init_desc}")
         elif v14:
-            say(f"model   OpenOBB14-{a.size} (pretrained HGNetv2 trunk + own re-parameterised neck + heavy dual dense "
+            neck_desc = "own re-parameterised neck" if a.neck == "own" else "D-FINE COCO hybrid encoder (control)"
+            say(f"model   OpenOBB14-{a.size} (pretrained HGNetv2 trunk + {neck_desc} + heavy dual dense "
                 f"oriented head, box={a.box}, edge refiner on {a.ref_k} candidates"
                 f"{', off: ' + a.v14_off if a.v14_off else ''}), {n_par:.2f}M params, max {a.num_top} detections | "
                 f"init: {init_desc}")

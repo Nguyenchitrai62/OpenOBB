@@ -151,7 +151,7 @@ def _load_model(ckpt_path, device, queries=None, classes=None):
         from openobb.models.openobb14 import OpenOBB14
         m = OpenOBB14(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024),
                       max_det=max(int(a.get("num_top", 1000)), int(queries or 0)), off=a.get("v14_off") or None,
-                      box=a.get("box") or "direct", ref_k=int(a.get("ref_k", 1500)))
+                      box=a.get("box") or "direct", ref_k=int(a.get("ref_k", 1500)), neck=a.get("neck") or "own")
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval().fuse(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
     if a.get("arch") in ("v7", "v8", "v10", "v11", "v12", "v13"):

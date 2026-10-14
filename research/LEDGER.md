@@ -1027,6 +1027,37 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     14% nhầm sang junction) → không phải vấn đề box, v14 không nhắm vào đó.
   - Dùng hai mốc này cho OpenOBB14 (thay số F56 trên máy); kỳ vọng v14 ở [docs/OPENOBB14.md](../docs/OPENOBB14.md) mục 4 đã cập nhật theo.
 
+- **F60. OpenOBB14-x trên Wall_Color (user, 10-14, nhiều vòng): tốc độ ĐẠT (10.9 ms so với 15.3 ms của v12, −29%), độ chính xác KHÔNG ĐẠT (0.713 / 0.469 so với 0.743 / 0.472).**
+  - Log cuối: fine-tune 20 epoch (300 bước) từ `train5/best.pt` (một vòng v14 trước), lr 1e-4 cos, batch 16, 1280, G4. Best ở epoch 2; cả 20 epoch
+    dao động 0.700–0.712 / 0.456–0.469 → đã chững, fine-tune thêm không đổi. Hiệu chỉnh: o2o none .4327 | o2o 0.7 .4693 | o2m 0.7 .4934 | **o2m 0.5 .4938**.
+    Log các vòng trước (từ COCO) user không gửi; chỉ biết là không vòng nào hơn v12.
+  - Theo class, v14 so với v12 (F59), mAP50 / mAP50-95:
+    | Class | v14 | v12 | Δ50 | Δ50-95 |
+    |---|---|---|---|---|
+    | wall | .878 / **.565** | .877 / .520 | 0 | **+.045** |
+    | junction | .899 / .542 | .900 / .531 | 0 | +.011 |
+    | door | .970 / .813 | .976 / .808 | −.006 | +.005 |
+    | double_door | .634 / .510 | .572 / .462 | +.062 | +.048 |
+    | note | .657 / .450 | .741 / .459 | **−.084** | −.009 |
+    | slide_door | .276 / .116 | .410 / .217 | **−.134** | **−.101** |
+    | wall_300 | .677 / .291 | .721 / .310 | **−.044** | −.019 |
+    Box trùng 3.5% (v12 8.2%). Lỗi mới: door → double_door 15 (4%).
+  - **Đối chiếu kỳ vọng ghi trước (OPENOBB14 mục 4):**
+    - T1 tốc độ ≤ 13 ms cùng điều kiện: **đạt** (10.9 ms; roofline dự đoán −16%, thực tế −29%: phần mượn sau thân nghẽn bộ nhớ hơn ước lượng).
+    - mAP50-95 ≥ 0.482: **không đạt** (0.469) → theo tiêu chí, v14 bị bác bỏ ở vai trò "bản chính xác hơn".
+    - wall mAP50-95 +0.03: **đạt** (+.045). Cơ chế hồi quy trực tiếp + tinh chỉnh theo cạnh làm đúng việc trên class nó nhắm tới (tường dài, mảnh).
+    - junction / door không giảm quá 0.02: đạt.
+  - **Chẩn đoán:** phần mất nằm trọn ở note (−.084), slide_door (−.134), wall_300 (−.044): class cần ngữ nghĩa / ngữ cảnh và class hiếm (31, 60, 141 mẫu).
+    Đây đúng là điều đã nêu trước là chưa đo: neck tự thiết kế khởi tạo ngẫu nhiên **mất tiên nghiệm COCO của encoder D-FINE** (20.7M tham số), và
+    250 ảnh không đủ để học lại ngữ nghĩa cho class hiếm. Tường / nút (nhiều mẫu, hình học thuần) không cần tiên nghiệm đó nên tăng.
+    Giả thuyết thay thế (chưa loại): head nặng gấp 3 overfit class hiếm; `box=direct` kém DFL ở vật nhỏ.
+  - **Phép thử tách một yếu tố (đã code, 0.13.1): `neck=dfine`** = cùng thân, cùng head kép, cùng bộ tinh chỉnh, nhưng neck là encoder lai pretrained
+    của D-FINE (weights COCO nạp thẳng) thay cho Neck14. Nếu note / slide_door / wall_300 quay về mức v12 mà wall giữ +.045 → nguyên nhân là tiên nghiệm
+    neck, và hướng đúng là **giữ encoder pretrained + head v14**, hoặc chưng cất Neck14 từ encoder (thầy cùng kiến trúc thân, dễ hơn F50).
+    Nếu không → nguyên nhân ở head / box=direct; thử tiếp `box=dfl` và `v14_off=edge`.
+    Kỳ vọng ghi trước cho `neck=dfine` (COCO, 100 epoch): mAP50 ≥ 0.74, mAP50-95 ≥ 0.49, wall 50-95 ≥ .55, note ≥ .72, slide_door ≥ .38; tốc độ khoảng 13–14 ms.
+  - Ngoài ra `openobb val model=best.pt ref_k=0` (0.13.1) đo đóng góp của bộ tinh chỉnh trên checkpoint đã có, không cần train lại.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

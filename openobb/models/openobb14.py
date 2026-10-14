@@ -38,6 +38,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .hgnetv2 import HGNetv2
+from .hybrid_encoder import HybridEncoder
 from .openobb1 import CONFIGS
 from .openobb3 import DIRECT_CH, REG_CH, OpenOBB3, decode, fast_nms
 from .openobb6 import ConvBN, GlobalAttention
@@ -54,6 +55,7 @@ N_ALONG = 6              # samples along each long edge / the centre line
 N_END = 3                # samples across each end
 REF_K_TRAIN = 256        # dense candidates refined per image in training (plus as many jittered labelled boxes)
 BOX_MODES = ("direct", "dfl")
+NECKS = ("own", "dfine")   # own: Neck14 (random init); dfine: the COCO-pretrained hybrid encoder of D-FINE (F60 control)
 
 
 def parse_off14(off):
@@ -181,10 +183,13 @@ class OpenOBB14(nn.Module):
     anchors = OpenOBB3.anchors
 
     def __init__(self, size="x", num_classes=15, img_size=1024, max_det=1000, nms_iou=0.7, off=None, box="direct",
-                 ref_k=1500, final_nms=None, **_):
+                 ref_k=1500, final_nms=None, neck="own", **_):
         super().__init__()
         if box not in BOX_MODES:
             raise ValueError(f"box must be one of {BOX_MODES}, got {box!r}")
+        if neck not in NECKS:
+            raise ValueError(f"neck must be one of {NECKS}, got {neck!r}")
+        self.neck_kind = neck
         cfg = copy.deepcopy(CONFIGS[size])
         self.size, self.nc, self.img_size, self.box = size, num_classes, img_size, box
         self.max_det, self.nms_iou = max_det, nms_iou
@@ -196,8 +201,15 @@ class OpenOBB14(nn.Module):
         cin = cfg["encoder"]["in_channels"]
         c4 = self.backbone._out_channels[0]
         sc = SCALES14[size]
-        self.hid = sc["hid"]
-        self.neck = Neck14(cin, c4, self.hid, sc["depth"], self.off)
+        if neck == "dfine":
+            # F60 control: the same trunk, head and refiner on D-FINE's COCO-pretrained hybrid encoder ("encoder.*"
+            # parameter names, so its weights load as they are) instead of the randomly initialised Neck14
+            self.hid = cfg["encoder"]["hidden_dim"]
+            self.neck = None
+            self.encoder = HybridEncoder(**cfg["encoder"], eval_spatial_size=[img_size, img_size])
+        else:
+            self.hid = sc["hid"]
+            self.neck = Neck14(cin, c4, self.hid, sc["depth"], self.off)
         reg_ch = DIRECT_CH if box == "direct" else REG_CH
         self.head = Head14([self.hid] * 3, num_classes, sc["head"], reg_ch)
         self.head_o2o = None if "dual" in self.off else copy.deepcopy(self.head)
@@ -224,6 +236,8 @@ class OpenOBB14(nn.Module):
             h = stage(h)
             outs.append(h if self.guard is None else self.guard(h))
         f4, c3, c4, c5 = outs
+        if self.neck is None:
+            return f4, list(self.encoder([c3, c4, c5]))
         return f4, self.neck(f4, c3, c4, c5)
 
     def features(self, x):
