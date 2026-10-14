@@ -142,6 +142,36 @@ openobb train model=openobb14x data=/content/data.yaml imgsz=1280 epochs=100 nec
 openobb val model=runs/obb/train6/weights/best.pt data=/content/data.yaml ref_k=0    # đóng góp của bộ tinh chỉnh, không train lại
 ```
 
+## 4c. Vòng hai hạt giống (10-14): A và B train song song
+
+Wall_Color đã gần trần của 250 ảnh: ba model rất khác nhau (YOLO26x, v12, v14) đều rơi trong 0.03 mAP50; slide_door / double_door chỉ có
+31 / 25 object val nên lệch 0.1 là nhiễu. Vì vậy vòng này chạy trên **cả FloorPlanCAD** (810 ảnh val, 30 class; mốc YOLO26x 80.16 / 74.96,
+OpenOBB tốt nhất 78.16 / 68.81, khoảng cách chính là độ khít box, F18), nơi cơ chế box của v14 phải lộ ra nếu nó có thật.
+
+| Hạt giống | Khác nhau đúng một yếu tố | Câu hỏi | Kỳ vọng ghi trước |
+|---|---|---|---|
+| **A** `openobb14x neck=dfine` | neck = encoder pretrained COCO của D-FINE (giữ tiên nghiệm), head + bộ tinh chỉnh v14 | tiên nghiệm neck có phải thứ v14 mất không | Wall_Color: ≥ 0.74 / ≥ 0.49, wall 50-95 ≥ .55, note ≥ .72. FPC: mAP50-95 ≥ 70 (c6 68.8) |
+| **B** `openobb14x` (neck tự thiết kế) | như A nhưng neck Neck14 khởi tạo ngẫu nhiên | khi đủ data (15k ảnh FPC) neck tự thiết kế có bắt kịp không | FPC: trong 1.5 điểm của A và nhanh hơn ≥ 20%; Wall_Color đã biết (F60) |
+
+Kết luận có thể rút ra từ hai log: A > B rõ trên cả hai data → tiên nghiệm neck quyết định, bản sản phẩm là A, và lộ trình sở hữu trọn phải qua
+chưng cất Neck14 từ encoder. A ≈ B trên FPC → neck tự thiết kế đủ tốt khi có data, chỉ thiếu pretrain; đi tiếp pretrain neck/thân trên DOTA + bản vẽ.
+
+```bash
+# Wall_Color (cả hai, 100 epoch từ COCO)
+openobb train model=openobb14x data=/content/data.yaml imgsz=1280 epochs=100 neck=dfine
+openobb train model=openobb14x data=/content/data.yaml imgsz=1280 epochs=100
+
+# FloorPlanCAD (dữ liệu tự tải và chuyển đổi, khoảng 15 phút; thư mục ra là data đã chuẩn bị, dùng thẳng)
+pip install -q -U gdown shapely
+python colab/data/floorplancad.py --root /content/datasets
+openobb train model=openobb14x data=/content/datasets/floorplancad_1024 imgsz=1024 epochs=24 batch=16 neck=dfine
+openobb train model=openobb14x data=/content/datasets/floorplancad_1024 imgsz=1024 epochs=24 batch=16
+```
+
+Mốc FPC đọc theo thước DOTA in kèm trong log (số của c6 và YOLO26x ở sổ cái là thước DOTA / thước YOLO tương ứng; so cùng thước).
+Tuỳ chọn thứ ba, không cần code: `weights=runs/e6-vrdet-x-dota-24e/openobb_dota_core_x.pt` (217 MB, trên máy local) với `neck=dfine`
+= khởi tạo thân + encoder từ lõi DOTA thay vì COCO (H-DOTA, F51), nhắm wall_300.
+
 ## 5. Train và đối chứng (Colab)
 
 ```bash

@@ -1057,6 +1057,9 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     Nếu không → nguyên nhân ở head / box=direct; thử tiếp `box=dfl` và `v14_off=edge`.
     Kỳ vọng ghi trước cho `neck=dfine` (COCO, 100 epoch): mAP50 ≥ 0.74, mAP50-95 ≥ 0.49, wall 50-95 ≥ .55, note ≥ .72, slide_door ≥ .38; tốc độ khoảng 13–14 ms.
   - Ngoài ra `openobb val model=best.pt ref_k=0` (0.13.1) đo đóng góp của bộ tinh chỉnh trên checkpoint đã có, không cần train lại.
+  - **Vòng hai hạt giống (user đề nghị train song song, 10-14):** A = `openobb14x neck=dfine`, B = `openobb14x`, mỗi bản trên Wall_Color (100 ep)
+    và FloorPlanCAD (24 ep, `colab/data/floorplancad.py`). Lý do thêm FPC: Wall_Color gần trần 250 ảnh (ba model khác nhau trong 0.03 mAP50;
+    class hiếm 25–31 object val là nhiễu). Kỳ vọng ghi trước: OPENOBB14 mục 4c.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
