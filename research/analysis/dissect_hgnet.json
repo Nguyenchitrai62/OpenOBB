@@ -1,0 +1,139 @@
+{
+ "ckpt": "F:/Downloads/openobb12x.pt",
+ "images": [
+  "wall_val_0000.png",
+  "wall_val_0001.png",
+  "wall_val_0002.png"
+ ],
+ "conf": 0.25,
+ "ese": {},
+ "blocks_stats": {
+  "stages.0.blocks.0": {
+   "channels": 128,
+   "frac_dead": 0.0078125,
+   "frac_weak": 0.0078125,
+   "branch_over_identity_rms": null
+  },
+  "stages.1.blocks.0": {
+   "channels": 512,
+   "frac_dead": 0.005859375,
+   "frac_weak": 0.009765625,
+   "branch_over_identity_rms": null
+  },
+  "stages.1.blocks.1": {
+   "channels": 512,
+   "frac_dead": 0.0,
+   "frac_weak": 0.0,
+   "branch_over_identity_rms": 1.3287473917007446
+  },
+  "stages.2.blocks.0": {
+   "channels": 1024,
+   "frac_dead": 0.0283203125,
+   "frac_weak": 0.0419921875,
+   "branch_over_identity_rms": null
+  },
+  "stages.2.blocks.1": {
+   "channels": 1024,
+   "frac_dead": 0.0009765625,
+   "frac_weak": 0.005859375,
+   "branch_over_identity_rms": 0.8223915298779806
+  },
+  "stages.2.blocks.2": {
+   "channels": 1024,
+   "frac_dead": 0.0,
+   "frac_weak": 0.0,
+   "branch_over_identity_rms": 0.48717915018399555
+  },
+  "stages.2.blocks.3": {
+   "channels": 1024,
+   "frac_dead": 0.0,
+   "frac_weak": 0.0,
+   "branch_over_identity_rms": 0.52451491355896
+  },
+  "stages.2.blocks.4": {
+   "channels": 1024,
+   "frac_dead": 0.0,
+   "frac_weak": 0.0,
+   "branch_over_identity_rms": 0.5556506911913554
+  },
+  "stages.3.blocks.0": {
+   "channels": 2048,
+   "frac_dead": 0.23046875,
+   "frac_weak": 0.24853515625,
+   "branch_over_identity_rms": null
+  },
+  "stages.3.blocks.1": {
+   "channels": 2048,
+   "frac_dead": 0.14892578125,
+   "frac_weak": 0.2734375,
+   "branch_over_identity_rms": 15.952689488728842
+  }
+ },
+ "variants": {
+  "ese_folded_all": {
+   "kept": 1.0,
+   "boxes_base": 142,
+   "boxes": 142
+  },
+  "ese_removed_all": {
+   "kept": 1.0,
+   "boxes_base": 142,
+   "boxes": 142
+  },
+  "zero_stages.1.blocks.1": {
+   "kept": 0.8675213654836019,
+   "boxes_base": 142,
+   "boxes": 133
+  },
+  "zero_stages.2.blocks.1": {
+   "kept": 0.9221056699752808,
+   "boxes_base": 142,
+   "boxes": 139
+  },
+  "zero_stages.2.blocks.2": {
+   "kept": 0.9743589758872986,
+   "boxes_base": 142,
+   "boxes": 149
+  },
+  "zero_stages.2.blocks.3": {
+   "kept": 0.9679487148920695,
+   "boxes_base": 142,
+   "boxes": 150
+  },
+  "zero_stages.2.blocks.4": {
+   "kept": 0.9207459092140198,
+   "boxes_base": 142,
+   "boxes": 146
+  },
+  "zero_stages.3.blocks.1": {
+   "kept": 1.0,
+   "boxes_base": 142,
+   "boxes": 152
+  },
+  "dw_stage2_3x3": {
+   "kept": 0.6172300080458323,
+   "boxes_base": 142,
+   "boxes": 105
+  },
+  "dw_stage2_1x1": {
+   "kept": 0.8610139687856039,
+   "boxes_base": 142,
+   "boxes": 216
+  },
+  "dw_stage3_3x3": {
+   "kept": 0.9898989995320638,
+   "boxes_base": 142,
+   "boxes": 155
+  },
+  "dw_stage3_1x1": {
+   "kept": 0.9784382184346517,
+   "boxes_base": 142,
+   "boxes": 149
+  },
+  "stage4_zero": {
+   "kept": 0.9628982146581014,
+   "boxes_base": 142,
+   "boxes": 138
+  }
+ }
+}

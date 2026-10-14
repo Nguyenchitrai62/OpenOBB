@@ -223,7 +223,8 @@ def load_dfine_coco(model, ckpt_or_size, class_names=None, log=print, init="coco
             s = src[k]
             is_cls = (("score_head" in k) or ("denoising_class_embed" in k) or (".cls." in k and ".4." in k)  # v2 cls out
                       or "head.cls_out." in k                                                               # v6 cls out
-                      or "head.cls_slot." in k or k.startswith("refiner.cls_out."))      # v10 slots, v8 refiner
+                      or "head.cls_slot." in k or k.startswith("refiner.cls_out.")       # v10 slots, v8 refiner
+                      or (".cls." in k and ".out." in k))                                  # v14 towers
             if s.shape == v.shape and not (is_cls and class_map is not None):
                 v.copy_(s)
                 full += 1

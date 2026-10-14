@@ -22,6 +22,7 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
 | e5-yolo26x-dota-24e | DOTA | **78.42 / 53.10** | 12.8 ms | như trên, batch 16 |
 | e4-fpc-yolo26s-24e | FloorPlanCAD | 78.51 / 70.54 | 7.8 ms | như trên (chỉ còn là lịch sử) |
 | e8-fpc-yolo26x-24e | FloorPlanCAD | **80.16 / 74.96** | 11.6 ms | **mốc CAD**, batch 16 |
+| yolo26x-wall-color (user, 10-14) | Wall_Color (thước YOLO) | **0.746 / 0.499** | A100, không cùng phiên | 150 ep, init từ checkpoint Wall_Color trước; F59 |
 
 ## 2. Thí nghiệm VRDet
 
@@ -936,6 +937,95 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
       - Mốc từ user: `OpenOBB.predict` (test.py, CPU máy user) = **2.9 s** / ảnh 928 × 1280.
   - Thời gian CPU giữa các tiến trình dao động 3.7–19 s cho cùng ảnh. Máy có 10 nhân / 16 luồng, 2.5 GHz, có thể là kiểu lai nhân P + E.
     App giờ dùng số luồng bằng số nhân vật lý (8 luồng nhanh gấp 2 lần 4 luồng).
+
+- **F58. Mổ bên trong các backbone (HGNetv2 đã train, 16 backbone SOTA) → OpenOBB14 (10-14, chưa train).** [docs/OPENOBB14.md](../docs/OPENOBB14.md).
+  - User (10-14): phải đào sâu vào bên trong MỌI backbone SOTA, không chỉ lắp thêm lên HGNetv2; mốc so sánh là YOLO26x và
+    v12 tốt nhất = head một-nhiều + NMS hiệu chỉnh (0.741 / 0.481, F56), **không phải `box=direct`**.
+  - **(a) Can thiệp từng cơ chế trong thân HGNetv2-B5 của `openobb12x.pt`** (`research/analysis/dissect_hgnet.py`, 3 trang val,
+    conf 0.25, số = phần detection gốc còn giữ được, cùng class, ProbIoU ≥ 0.5; kết quả `dissect_hgnet.json`):
+    | Can thiệp | Giữ |
+    |---|---|
+    | nhánh dư `stages.1.blocks.1` (/8) = 0 | 86.8% |
+    | nhánh dư từng block /16 (4 block) = 0 | 92.2 / 97.4 / 96.8 / 92.1% |
+    | nhánh dư `stages.3.blocks.1` (/32) = 0 | 100% (+10 box); nhánh có RMS gấp 16 lần identity (nổ, guard chặn) |
+    | stage 4 = 0 | 96.3% |
+    | **depthwise 5×5 LightConv stage 3 cắt còn 3×3 / 1×1** | **61.7% / 86.1%** (1×1: box 142 → 216) |
+    | depthwise 5×5 stage 4 cắt còn 3×3 / 1×1 | 99.0 / 97.8% |
+    | kênh chết (std < 10⁻³ mức trung bình) | stage 1–3 ≤ 3%; **stage 4: 23% chết, 25% yếu** |
+    | ESE | **B4 / B5 không có ESE** (`agg='se'`); chỉ B0–B2 có → nhận xét ESE ở ARCH_ANALYSIS chỉ đúng cỡ s / m |
+    Kết luận: thân pretrained gần như toàn bộ sống trên bản vẽ; vùng nhìn 5×5 ở stride 16 thiết yếu; chỗ cắt được (stage 4) chỉ 7% FLOPs.
+    → **Không đụng thân.** Đột phá phải nằm ở phần sau thân (45% FLOPs của v12) và ở cơ chế định vị.
+  - **(b) Roofline từng mảnh** (`research/analysis/roofline.py`, 960×1280, bf16, G4 195 TFLOPS / 1.7 TB/s; byte = vào + ra + tham số của
+    từng module lá, chưa tính cat / cộng / nội suy nên là cận dưới):
+    | | v12-x | v14-x | YOLO26x |
+    |---|---|---|---|
+    | thân | 320 G / 2.40 ms | 320 / 2.40 | 332 / 2.73 |
+    | LSK | 48 / 0.31 | — | — |
+    | encoder / neck | 260 / 1.61 (FPN P3 189 G) | **133 / 0.80** | 206 / 1.07 |
+    | head (một head) | 44 / 0.39 | **129 / 0.76** | 67 / 0.41 |
+    | bộ tinh chỉnh | — | 4 / 0.04 | — |
+    | **tổng** | **682 G / 4.84 ms** | **586 / 4.08** | **605 / 4.34** |
+    | FLOP / byte; % thời gian ở 1×1 / depthwise | 156; 39 / 6 | 168; 36 / 4 | 159; 29 / 1 |
+    Thân HGNetv2-B5 và thân YOLO26x ngang nhau theo roofline; khoảng cách tốc độ v12 – YOLO nằm hoàn toàn sau thân.
+  - **(c) 16 backbone SOTA cùng thước** (`research/analysis/roofline_backbones.py`, kiến trúc không weights, timm + Ultralytics chỉ để đo;
+    960×1280; `roofline_backbones.json`):
+    | Backbone | M | GFLOPs | GB | F/B | roof ms | % thời gian dày / 1×1 / dw / attn-linear / act |
+    |---|---|---|---|---|---|---|
+    | HGNetv2-B5 | 33.3 | 320 | 2.38 | 135 | 2.41 | 28 / 43 / 6 / 0 / 22 |
+    | HGNetv2-B4 | 13.5 | 134 | 1.43 | 94 | 1.20 | 23 / 41 / 7 / 0 / 27 |
+    | YOLO26x / YOLO11x (thân) | 28.8 | 332 | 2.14 | 155 | 2.39 | 50 / 26 / 0 / 0 / 24 |
+    | YOLOv8x (thân) | 30.9 | 401 | 1.67 | 241 | 2.53 | 70 / 12 / 0 / 0 / 17 |
+    | CSPDarknet53 | 26.6 | 245 | 2.58 | 95 | 2.27 | 46 / 21 / 0 / 0 / 33 |
+    | ResNet-50 / 101 | 23.5 / 42.5 | 200 / 382 | 3.19 / 4.74 | 63 / 81 | 2.38 / 3.91 | 21 / 28 / 0 / 0 / 23 |
+    | RegNetY-3.2 | 17.9 | 155 | 2.20 | 70 | 1.59 | 15 / 47 / 0 / 0 / 39 |
+    | EfficientNet-B5 | 27.3 | **113** | 4.39 | **26** | **2.72** | 1 / 32 / 23 / 0 / 44 |
+    | RepVGG-B2 | 86.5 | 1000 | 2.07 | **483** | 5.62 | 83 / 11 / 0 / 0 / 7 |
+    | ConvNeXt-B / V2-B (MLP dạng Linear) | 87.6 | 752 | 5.39 / 7.22 | 140 / 104 | 5.53 / 6.60 | 2 / 0 / 5 / 68 / 0 |
+    | Swin-B | 86.7 | 766 | 5.74 | 134 | 5.75 | 0 / 0 / 0 / 69 / 12 |
+    | DINOv2 ViT-B/14 | 86.6 | 1057 | 3.84 | 275 | 6.49 | 0 / 0 / 0 / 83 / 8 (không có bản đồ /4, /8) |
+    | YOLO12x | — | không đo được (khối A2C2f nhận list) | | | | |
+    Rút ra: (1) EfficientNet-B5 ít FLOPs nhất (113 G) mà roofline chậm hơn HGNet-B5 (320 G): depthwise + activation nghẽn băng thông,
+    cùng bài học F39. (2) RepVGG (conv dày thuần) có cường độ 483 FLOP/byte, gấp 3.5 HGNet: hướng cho một thân tự thiết kế sau này,
+    nhưng cần pretrain (F50). (3) Thân YOLO26 và HGNet-B5 ngang nhau; phân bổ FLOPs theo stride cũng gần nhau (/4 26 so với 13%, /8 33 so
+    với 36%, /16 30 so với 36%). (4) ViT / Swin / ConvNeXt cỡ B: 750–1050 G và 5.5–6.5 ms, gấp 2.3–2.7 lần, không có /4–/8 → không dùng khi suy luận.
+  - **OpenOBB14** (`openobb/models/openobb14.py`, `openobb14_loss.py`; `model=openobb14s|m|l|x`): thân HGNetv2 giữ nguyên (weights COCO nạp
+    thẳng) + neck RepCSP conv dày (giãn 1,2,1,3 ở P3 / P4, spd stride 4 → P3, Down có max-pool, 1 attention zero-init ở /32) thay LSK +
+    encoder lai + head kép nặng (1×1 + hai conv dày 3×3 mỗi tháp, class giãn 2), `box=direct` mặc định + **bộ tinh chỉnh box theo cạnh**:
+    lấy mẫu bản đồ stride 4 (64 kênh) tại 24 điểm trên cạnh / đầu / tim box + P3 6 điểm → MLP → residual (`openobb8.refine_boxes`),
+    zero-init, train trên top-256 ứng viên + box nhãn rung, suy luận top-1500 trước NMS. 62.7M (thân 33.2M = 53%; tự viết 47%).
+    Test `tests/test_openobb14.py` (train, identity lúc đầu, fuse giữ đầu ra, nạp thân COCO, ánh xạ class theo tên, suy luận).
+  - **Kỳ vọng ghi trước** (Wall_Color, 100 epoch, COCO, 1280, cùng hiệu chỉnh head / NMS): mAP50 / 50-95 **0.73–0.77 / 0.50–0.53**
+    (v12 0.741 / 0.481; YOLO26x 0.746 / 0.499); wall R@.75 ≥ .45, sai số dày ≤ 0.7 px, đầu ≤ 1.8 px; junction / door không giảm quá 0.02;
+    T1 (G4, cùng phiên) ≤ 0.85× v12 và ≤ 1.1× YOLO26x. **Bác bỏ** nếu mAP50-95 không hơn v12 ≥ 0.01, hoặc sai số dày ≥ 0.8 px, hoặc T1 không đạt.
+  - Điều chưa biết (v14 là phép đo): encoder pretrained của D-FINE đáng giá bao nhiêu so với neck mới ngẫu nhiên.
+    Đối chứng rẻ đề xuất: v12 với encoder khởi tạo lại. Tách tác dụng sau khi có số: `v14_off=edge`, `box=dfl`.
+
+- **F59. Mốc chính thức trên Wall_Color (log user, 10-14): YOLO26x-obb 0.746 / 0.499 so với OpenOBB12-x (head một-nhiều + NMS 0.7) 0.743 / 0.472.**
+  - **YOLO26x-obb** (Ultralytics 8.4.153, A100 80 GB): 150 epoch (patience 30), batch 16 (OOM ở 32), imgsz 1280, `optimizer=auto` → AdamW lr 9.09e-4,
+    mosaic 1.0 tắt 10 epoch cuối, scale 0.5, translate 0.1, fliplr 0.5, max_det tự nâng lên 397. **Khởi tạo từ `wall_300kaggle.pt`** (một checkpoint đã train
+    trước trên cùng data, không phải weights DOTA gốc): epoch 1 đã 0.662 / 0.426. Best quanh ep 125–129 (0.750 / 0.497); best.pt val lại **0.746 / 0.499**,
+    P 0.722 R 0.792. 57.6M tham số (fused), 202 GFLOPs ở 640. Speed log: 96.9 ms inference + 18.6 ms postprocess / ảnh (A100, không cùng phiên với OpenOBB).
+    0.653 giờ train.
+  - **OpenOBB12-x** (0.12.1, G4 95 GB): fine-tune 30 epoch (450 bước) từ `openobb12x.pt` (bản F54), lr 1e-3 cos, batch 16, 1280, mosaic 1 tắt 10 cuối.
+    Hiệu chỉnh cuối train: o2o none .4684 | o2o 0.7 .4867 | o2o 0.5 .4839 | **o2m 0.7 .4994** | o2m 0.5 .4948 → **head một-nhiều + NMS 0.7: 0.743 / 0.472**,
+    P 0.712 R 0.720, F2 0.669. Box trùng 8.2% (junction 195, wall 139, wall_300 48). **Tốc độ 15.3 ms / ảnh** (batch 16, bf16, fused, ảnh trung bình 976×1280, G4).
+    Cả hai mốc đều là vòng train thứ hai trên cùng data (YOLO từ checkpoint Wall_Color, v12 từ checkpoint Wall_Color).
+  - **Theo class (v12 so với YOLO26x), mAP50 / mAP50-95:**
+    | Class | v12 | YOLO26x | Δ50 | Δ50-95 |
+    |---|---|---|---|---|
+    | wall (1044) | .877 / .520 | .919 / .624 | −.042 | **−.104** |
+    | note (60) | .741 / .459 | .764 / .517 | −.023 | −.058 |
+    | door (391) | .976 / .808 | .965 / .811 | +.011 | −.003 |
+    | slide_door (31) | .410 / .217 | .345 / .123 | **+.065** | **+.094** |
+    | double_door (25) | .572 / .462 | .494 / .392 | **+.078** | **+.070** |
+    | wall_300 (141) | .721 / .310 | .824 / .441 | **−.103** | **−.131** |
+    | junction (1773) | .900 / .531 | .910 / .584 | −.010 | −.053 |
+  - Lỗi v12 thường gặp (conf 0.25): junction → nền 101 (6%), wall → nền 82 (8%), wall_300 → junction 20 (14%), wall_300 → nền 15 (11%).
+  - **Phân rã khoảng cách:** mAP50 tổng chỉ −0.003 (class hiếm v12 thắng bù cho wall_300). mAP50-95 −0.027 nằm ở **độ khít box của vật mảnh /
+    dày đặc**: wall −.104, wall_300 −.131, junction −.053, note −.058 (cả bốn class đều là tường / nút / khối chữ nhật), trong khi recall và mAP50 của
+    wall / junction gần ngang. Đây đúng là lỗi F54 đã đo bằng `box_quality.py` (dày thừa, đầu box, góc). Phần còn lại là **phân loại wall_300** (mAP50 −.103,
+    14% nhầm sang junction) → không phải vấn đề box, v14 không nhắm vào đó.
+  - Dùng hai mốc này cho OpenOBB14 (thay số F56 trên máy); kỳ vọng v14 ở [docs/OPENOBB14.md](../docs/OPENOBB14.md) mục 4 đã cập nhật theo.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 

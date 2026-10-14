@@ -276,6 +276,10 @@ Câu hỏi còn mở:
   - Dùng: `model=vrdet5x`. Chi tiết: [docs/OPENOBB5.md](docs/OPENOBB5.md).
   - Val in thêm confusion matrix (lỗi nhầm class thường gặp).
 - Kết quả cùng thước YOLO (Wall_Color): YOLO26x 0.746 / 0.499; v3 0.712 / 0.467; v4 0.663 / 0.457 (1 run). Xem LEDGER F32–F33.
+- **Mốc chính thức 2026-10-14 (F59, log user): YOLO26x 0.746 / 0.499 (150 ep, A100); OpenOBB12-x head một-nhiều + NMS 0.7: 0.743 / 0.472, 15.3 ms / ảnh (G4, batch 16).**
+  Khoảng cách nằm ở mAP50-95 của wall / wall_300 / junction / note (độ khít box) và mAP50 của wall_300 (phân loại); class hiếm v12 thắng.
+- [x] **OpenOBB14 (2026-10-14, F58):** thân HGNetv2 pretrained giữ nguyên + neck / head / bộ tinh chỉnh box tự thiết kế.
+  Chi tiết và kỳ vọng ghi trước: [docs/OPENOBB14.md](docs/OPENOBB14.md). Chờ user: T1 tốc độ rồi train 100 epoch.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.
@@ -292,6 +296,20 @@ Câu hỏi còn mở:
 **Cần user:** điền tên chủ sở hữu pháp lý (cá nhân hoặc công ty) vào `LICENSE` (hiện để "the repository owner").
 
 ## 9. Nhật ký
+
+- 2026-10-14: **OpenOBB14 + mổ bên trong backbone** (F58, [docs/OPENOBB14.md](docs/OPENOBB14.md); chưa train).
+  - User: phải đào sâu vào bên trong MỌI backbone SOTA (không chỉ lắp thêm lên HGNetv2) mới có đột phá; mốc so sánh là
+    YOLO26x và v12 tốt nhất = head một-nhiều + NMS hiệu chỉnh (0.741 / 0.481, F56), không phải `box=direct`.
+  - Đo mới (CPU, không cần GPU):
+    - `research/analysis/dissect_hgnet.py`: can thiệp từng cơ chế trong thân HGNetv2 của `openobb12x.pt` đã train.
+      Thân gần như toàn bộ sống trên bản vẽ; depthwise 5×5 ở stage 3 thiết yếu (cắt còn 3×3 mất 38% detection);
+      stage 4 chỉ góp 4%, 23% kênh chết; B4 / B5 không có ESE.
+    - `research/analysis/roofline.py`: FLOPs + byte + ước lượng roofline G4 theo từng mảnh (v12-x, v14-x, YOLO26x).
+    - `research/analysis/roofline_backbones.py`: cùng thước cho 16 backbone SOTA (timm + Ultralytics, chỉ để đo).
+  - v14 = thân HGNetv2 giữ nguyên + neck RepCSP tự thiết kế (thay LSK + encoder lai) + head kép nặng hồi quy trực tiếp
+    + bộ tinh chỉnh box đọc nét stride 4 trên cạnh box. 62.7M (47% tự viết), 586 GFLOPs so với v12 682 / YOLO26x 605.
+  - `model=openobb14s|m|l|x`, `v14_off=`, `box=direct|dfl`, `ref_k=`. Test `tests/test_openobb14.py`.
+  - Cổng trước khi tốn CU: T1 tốc độ G4 (`colab/speed_gpu.py`) ≤ 0.85× v12.
 
 - 2026-10-13 (9): **0.12.0: head suy luận hiệu chỉnh, `box=direct`, `openobb calibrate`, sửa `imgsz` của v13** (F54, F55).
   - v12 (user): 0.722 / 0.468. Cùng checkpoint, head một-nhiều + NMS 0.5 cho 0.741 / 0.481.

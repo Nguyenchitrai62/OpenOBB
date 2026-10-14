@@ -52,7 +52,8 @@ MODELS = {**{f"openobb1{s}": ("v1", s) for s in SIZES},
           **{f"openobb10{s}": ("v10", s) for s in SIZES},    # OpenOBB8 + multi-slot head (docs/OPENOBB10.md)
           **{f"openobb11{s}": ("v11", s) for s in SIZES},    # NMS-free one-to-one set decoder (docs/OPENOBB11.md)
           **{f"openobb12{s}": ("v12", s) for s in SIZES},    # dual dense head, NMS-free (docs/OPENOBB12.md)
-          **{f"openobb13{s}": ("v13", s) for s in SIZES}}    # + full-res stream + P2 grid (docs/OPENOBB13.md)
+          **{f"openobb13{s}": ("v13", s) for s in SIZES},    # + full-res stream + P2 grid (docs/OPENOBB13.md)
+          **{f"openobb14{s}": ("v14", s) for s in SIZES}}    # pretrained trunk + own rep-conv neck + edge refiner (docs/OPENOBB14.md)
 
 # Best architecture recipe measured on FloorPlanCAD / DOTA (research/LEDGER.md, c6): selective large-kernel
 # adapters (LSK), repeat-factor sampling, one-to-many query group, adaptive query denoising, square-aware angle loss,
@@ -108,6 +109,8 @@ RECIPE7 = dict(RECIPE3)
 RECIPE8 = dict(RECIPE3, rel_k=600)
 RECIPE12 = dict(RECIPE3)                         # OpenOBB12: OpenOBB7 core, dual head
 RECIPE13 = dict(RECIPE3)                         # OpenOBB13: OpenOBB12 + full-resolution stream + P2
+# OpenOBB14: HGNetv2 trunk (COCO) + own re-parameterised neck + heavy dual head, direct box regression, edge refiner
+RECIPE14 = {"rfs": 0.1, "channels_last": True, "clip": 10.0, "num_top": 1000, "box": "direct", "ref_k": 1500}
 # OpenOBB13: imgsz is the full resolution, the core runs at half of it -> memory per image ~0.45x by area
 SIZE_DEFAULTS13 = {s: dict(d, gb=round(d["gb"] * 0.45, 2)) for s, d in SIZE_DEFAULTS3.items()}
 RECIPE11 = dict(RECIPE8)                         # OpenOBB11: OpenOBB8 recipe, NMS-free set decoder
@@ -119,7 +122,7 @@ RECIPE9 = {"rfs": 0.1, "channels_last": True, "clip": 10.0, "num_top": 1000, "re
 # architecture flags a fine-tune inherits from its source checkpoint (weights only load into the same shape)
 ARCH_KEYS = ("arch", "size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_queries", "denoising",
              "no_rotate_sampling", "context", "backbone", "dense_v3", "primary", "geo_cls", "relate", "rel_k",
-             "v6_off", "v7_off", "v8_off", "v9_off", "v10_off", "box")
+             "v6_off", "v7_off", "v8_off", "v9_off", "v10_off", "box", "v14_off", "ref_k")
 PRETRAIN_KEYS = ("pretrain", "pretrain_epochs", "pretrain_det_epochs", "pretrain_dir", "pretrain_teacher")
 MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / per epoch on small datasets
 ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every", "lrf": "min_lr_ratio",
@@ -478,7 +481,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         raise SystemExit(f"model must be one of {', '.join(MODELS)} or an existing OpenOBB .pt checkpoint, "
                          f"got '{model}'")
     arch = inherited.get("arch", "v1")
-    v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13")
+    v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14")
     src_img = extra.pop("img", None)                 # a checkpoint's own input size (already the full size for v13)
     core_size = imgsz is not None or src_img is None
     imgsz = int(imgsz or src_img or 1024)
@@ -506,7 +509,8 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
 
     sd = {"v2": SIZE_DEFAULTS2, "v3": SIZE_DEFAULTS3, "v4": SIZE_DEFAULTS4,
           "v5": SIZE_DEFAULTS5, "v6": SIZE_DEFAULTS6, "v7": SIZE_DEFAULTS3,
-          "v8": SIZE_DEFAULTS3, "v9": SIZE_DEFAULTS9, "v10": SIZE_DEFAULTS3, "v11": SIZE_DEFAULTS3, "v12": SIZE_DEFAULTS3, "v13": SIZE_DEFAULTS13}.get(arch, SIZE_DEFAULTS)[size]
+          "v8": SIZE_DEFAULTS3, "v9": SIZE_DEFAULTS9, "v10": SIZE_DEFAULTS3, "v11": SIZE_DEFAULTS3, "v12": SIZE_DEFAULTS3, "v13": SIZE_DEFAULTS13,
+          "v14": SIZE_DEFAULTS3}.get(arch, SIZE_DEFAULTS)[size]
     if str(optimizer).lower() not in ("auto", "adamw"):
         raise SystemExit("optimizer must be 'auto' or 'AdamW'")   # lr0 given -> used; otherwise the measured LR
     prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, seed, fit=fit)
@@ -546,7 +550,8 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         opts["workers"] = int(workers)
     if recipe:
         opts.update({"v2": RECIPE2, "v3": RECIPE3, "v4": RECIPE4, "v5": RECIPE5, "v6": RECIPE6, "v7": RECIPE7,
-                     "v8": RECIPE8, "v9": RECIPE9, "v10": RECIPE10, "v11": RECIPE11, "v12": RECIPE12, "v13": RECIPE13}.get(arch, RECIPE))
+                     "v8": RECIPE8, "v9": RECIPE9, "v10": RECIPE10, "v11": RECIPE11, "v12": RECIPE12, "v13": RECIPE13,
+                     "v14": RECIPE14}.get(arch, RECIPE))
     if arch in ("v4", "v5") and "backbone" not in inherited:
         opts["backbone"] = BACKBONE4[size]
     if aug["mosaic"]:
@@ -558,7 +563,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
     if extra.get("v6_off"):                          # OpenOBB6 ablation: v6_off=strip,attn or v6_off=[strip,attn]
         from openobb.models.openobb6 import parse_off
         extra["v6_off"] = ",".join(sorted(parse_off(extra["v6_off"])))
-    for k in ("v7_off", "v8_off", "v9_off", "v10_off"):   # OpenOBB7 / 8 / 9 / 10 ablation switches, same forms
+    for k in ("v7_off", "v8_off", "v9_off", "v10_off", "v14_off"):   # OpenOBB7 / 8 / 9 / 10 / 14 ablation switches
         if extra.get(k):
             v = extra[k]
             extra[k] = ",".join(sorted({s.strip() for s in (v.split(",") if isinstance(v, str) else v) if str(s).strip()}))

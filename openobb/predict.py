@@ -44,7 +44,7 @@ def windows(length, size, gap):
 
 # architecture labels this package can rebuild (args["arch"] written at training; identical in every build of the
 # package whatever its name, so a model trained with one build loads in another of the same or a newer version)
-KNOWN_ARCHS = ("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13")
+KNOWN_ARCHS = ("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14")
 
 
 def _ver(v):
@@ -145,6 +145,13 @@ def _load_model(ckpt_path, device, queries=None, classes=None):
         m = OpenOBB9(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024),
                      max_det=max(int(a.get("num_top", 1000)), int(queries or 0)), off=a.get("v9_off") or None,
                      off8=a.get("v8_off") or None, rel_k=a.get("rel_k", 600))
+        m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
+        return m.to(device).eval().fuse(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
+    if a.get("arch") == "v14":
+        from openobb.models.openobb14 import OpenOBB14
+        m = OpenOBB14(a.get("size", "x"), num_classes=len(names), img_size=a.get("img", 1024),
+                      max_det=max(int(a.get("num_top", 1000)), int(queries or 0)), off=a.get("v14_off") or None,
+                      box=a.get("box") or "direct", ref_k=int(a.get("ref_k", 1500)))
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval().fuse(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
     if a.get("arch") in ("v7", "v8", "v10", "v11", "v12", "v13"):
