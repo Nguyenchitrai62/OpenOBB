@@ -310,6 +310,12 @@ Câu hỏi còn mở:
     + bộ tinh chỉnh box đọc nét stride 4 trên cạnh box. 62.7M (47% tự viết), 586 GFLOPs so với v12 682 / YOLO26x 605.
   - `model=openobb14s|m|l|x`, `v14_off=`, `box=direct|dfl`, `ref_k=`. Test `tests/test_openobb14.py`.
   - Cổng trước khi tốn CU: T1 tốc độ G4 (`colab/speed_gpu.py`) ≤ 0.85× v12.
+  - Đã push: GitHub v0.13.0 (081282d), GitLab hicasobb v0.13.0 + wheel. User chỉ cần đổi `model=openobb14x` trên Colab.
+  - User nhắc (10-14): mục đích là kiến trúc **thương mại được, sở hữu được**, chính xác và nhanh hơn; bản mới mà na ná
+    kiến trúc cấm thương mại (YOLO) thì vô nghĩa. Trạng thái v14: code 100% tự viết, không có code / weights Ultralytics;
+    phần mượn duy nhất là thân HGNetv2 + weights D-FINE COCO (Apache-2.0, dùng thương mại được). Lộ trình để sở hữu
+    trọn: v15 = thân conv dày tái tham số hoá (cường độ 483 FLOP/byte, F58) pretrain bằng chưng cất từ chính v14 đã train
+    trên bản vẽ + DOTA (`pretrain=dota`, khoảng 25–40 CU), thay cho thầy COCO đã thất bại ở v9 (F50).
 
 - 2026-10-13 (9): **0.12.0: head suy luận hiệu chỉnh, `box=direct`, `openobb calibrate`, sửa `imgsz` của v13** (F54, F55).
   - v12 (user): 0.722 / 0.468. Cùng checkpoint, head một-nhiều + NMS 0.5 cho 0.741 / 0.481.
