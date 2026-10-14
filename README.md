@@ -9,38 +9,21 @@ Train, predict và đọc kết quả giống YOLO-OBB. Không phụ thuộc Ult
 
 ## Cài đặt
 
-### Bước 1: cài PyTorch (chọn một)
-
-Máy có GPU NVIDIA:
+**Máy có GPU NVIDIA:**
 
 ```bash
 pip install -U torch --index-url https://download.pytorch.org/whl/cu126
-```
-
-Máy chỉ có CPU:
-
-```bash
-pip install -U torch --index-url https://download.pytorch.org/whl/cpu
-```
-
-GPU RTX 50xx: đổi `cu126` thành `cu130`.
-
-### Bước 2: cài code (chọn một)
-
-Từ repo:
-
-```bash
 pip install -U "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"
 ```
 
-Từ file wheel (không cần quyền truy cập repo; file mới nhất nằm trong thư mục `wheels/` của repo sản phẩm, hoặc là file
-được bàn giao; `X.Y.Z` là phiên bản ghi trong tên file):
+**Máy chỉ có CPU:**
 
 ```bash
-pip install -U ./openobb-X.Y.Z-py3-none-any.whl
+pip install -U torch --index-url https://download.pytorch.org/whl/cpu
+pip install -U "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"
 ```
 
-- Bước 2 giữ nguyên PyTorch đã cài ở bước 1. Cập nhật: chạy lại bước 2.
+- Luôn cài bản mới nhất; chạy lại đúng lệnh để cập nhật. GPU RTX 50xx: đổi `cu126` thành `cu130`.
 - Khi suy luận, model tự chạy trên GPU nếu có. Nếu máy có GPU NVIDIA mà PyTorch là bản CPU, lần dùng đầu tiên sẽ tự cài
   bản GPU rồi báo chạy lại (tắt bằng biến môi trường `OPENOBB_AUTO_TORCH=0`).
 - Kiểm tra phiên bản: `python -c "import openobb; print(openobb.__version__)"`.
