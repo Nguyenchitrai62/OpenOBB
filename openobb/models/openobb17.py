@@ -149,26 +149,28 @@ class OpenOBB17(OpenOBB12):
         return boxes.scatter(1, idx[..., None].expand(-1, -1, 5), self.snap(field, cand).to(boxes.dtype)), idx
 
     def forward(self, x, targets=None, ctx=None):
-        if self.field is None:
-            return super().forward(x, targets, ctx)
         f4, feats = self.encode(x)
         pts, st = self.anchors(feats)
-        field = self.field(f4, feats[0])
+        field = None if self.field is None else self.field(f4, feats[0])
         if self.training:
             cls, reg = self.run_head(feats, False)
             c1, r1 = self.run_head(feats, True)
-            out = {"cls": cls, "reg": reg, "points": pts, "strides": st, "o2o_cls": c1, "o2o_reg": r1, "field": field}
-            boxes = decode(reg.detach(), pts, st)
-            k = min(self.ref_k_train, boxes.shape[1])
-            idx = cls.detach().sigmoid().amax(-1).topk(k, dim=1).indices
-            cand = boxes.gather(1, idx[..., None].expand(-1, -1, 5))
-            cand, valid = self._with_jitter(cand, targets)
-            out.update(ref_boxes=self.snap(field, cand), ref_cand=cand, ref_valid=valid)
+            # feats / input: for losses that compare the neck with a teacher (OpenOBB18); unused otherwise
+            out = {"cls": cls, "reg": reg, "points": pts, "strides": st, "o2o_cls": c1, "o2o_reg": r1,
+                   "feats": feats, "input": x}
+            if field is not None:
+                out["field"] = field
+                boxes = decode(reg.detach(), pts, st)
+                k = min(self.ref_k_train, boxes.shape[1])
+                idx = cls.detach().sigmoid().amax(-1).topk(k, dim=1).indices
+                cand = boxes.gather(1, idx[..., None].expand(-1, -1, 5))
+                cand, valid = self._with_jitter(cand, targets)
+                out.update(ref_boxes=self.snap(field, cand), ref_cand=cand, ref_valid=valid)
             return out
         o2o = self.infer_head != "o2m"
         cls, reg = self.run_head(feats, o2o)
         boxes = decode(reg, pts, st)
-        if self.ref_k > 0:
+        if field is not None and self.ref_k > 0:
             boxes, _ = self.snap_topk(field, cls, boxes, self.ref_k)
         conf = getattr(self, "nms_conf", 0.001)
         nms = self.final_nms if o2o or self.final_nms is not None else self.nms_iou   # one-to-many: always NMS

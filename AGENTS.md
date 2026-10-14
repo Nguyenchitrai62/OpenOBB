@@ -295,6 +295,8 @@ Câu hỏi còn mở:
 - [x] **OpenOBB17 (10-15, F66, 0.16.0):** v12 + trường ranh giới stride 2 + bám ranh giới trước NMS. [docs/OPENOBB17.md](docs/OPENOBB17.md).
   Vòng hai hạt giống: fine-tune 30 ep từ `openobb12x.pt`, `openobb17x` vs `openobb12x`, cùng phiên, `nbs=0 warmup_bias_lr=0 epoch_lr=False`.
   Cùng đợt: trainer khớp YOLO (warmup theo epoch tối thiểu 100 iteration, bias LR 0.1, `lf(epoch)`, `nbs=64`).
+- [x] **OpenOBB18 (10-15, F67, 0.17.0):** v17 với neck RepConv tự viết thay encoder lai + LSK, chưng cất từ encoder v12 đã train (`teacher=`).
+  520 so với 686 GFLOPs, 50.6M tham số. [docs/OPENOBB18.md](docs/OPENOBB18.md). Luật user: mỗi vòng hai version (tinh chỉnh + đột phá) train song song.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.

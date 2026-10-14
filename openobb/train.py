@@ -42,7 +42,7 @@ def build_parser():
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17"],
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18"],
                     help="v1: OpenOBB (DETR-style decoder); v2: OpenOBB2 (dense segment-aware, NMS-free); "
                          "v3: OpenOBB3 (pretrained encoder + dense anisotropic oriented head); "
                          "v4: OpenOBB4 (DINOv2 backbone + DETR decoder + dense oriented branch); "
@@ -68,6 +68,10 @@ def build_parser():
                                                   "(attn, spd, edge, dilate, maxpool, guard, dual, stage4, widehead)")
     ap.add_argument("--ref-k", type=int, default=1500, help="OpenOBB14: candidates refined by the edge refiner at "
                                                             "inference (0: off)")
+    ap.add_argument("--teacher", default=None,
+                    help="OpenOBB18: trained OpenOBB12 / 17 checkpoint whose encoder output (P3-P5) the own neck is "
+                         "distilled from during training (not part of the saved model)")
+    ap.add_argument("--w-distill", type=float, default=2.0, help="OpenOBB18: weight of the neck distillation loss")
     ap.add_argument("--neck", default="own", choices=["own", "dfine"],
                     help="OpenOBB14: own re-parameterised neck, or D-FINE's COCO-pretrained hybrid encoder (control)")
     ap.add_argument("--nms-iou", default="auto",
@@ -246,10 +250,11 @@ def main(argv=None):
 
     classes = dataset_classes(a.data)
     v2, v4, v5 = a.arch == "v2", a.arch == "v4", a.arch == "v5"
-    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17")
+    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18")
     v6, v7, v8, v10 = a.arch == "v6", a.arch == "v7", a.arch == "v8", a.arch == "v10"
-    v11, v12, v13, v14 = a.arch == "v11", a.arch in ("v12", "v17"), a.arch == "v13", a.arch in ("v14", "v15", "v16")
-    v17 = a.arch == "v17"                       # OpenOBB12 + boundary field / snapping: every v12 path applies
+    v11, v12, v13, v14 = a.arch == "v11", a.arch in ("v12", "v17", "v18"), a.arch == "v13", a.arch in ("v14", "v15", "v16")
+    v17 = a.arch in ("v17", "v18")              # OpenOBB12 + boundary field / snapping: every v12 path applies
+    v18 = a.arch == "v18"                       # OpenOBB17 with the own neck distilled from a trained encoder
     v15, v16 = a.arch in ("v15", "v16"), a.arch == "v16"
     v9 = a.arch == "v9"
     dense_arch = v2 or v3                       # dense heads: no queries / decoder
@@ -271,7 +276,8 @@ def main(argv=None):
                           off=a.v14_off or None, box=a.box, ref_k=a.ref_k, neck=a.neck)
         elif v17:
             from openobb.models.openobb17 import OpenOBB17
-            model = OpenOBB17(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
+            from openobb.models.openobb18 import OpenOBB18
+            model = (OpenOBB18 if v18 else OpenOBB17)(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
                               off=a.v7_off or None, box=a.box, ref_k=a.ref_k)
         elif v12 or v13:
             from openobb.models.openobb12 import OpenOBB12, OpenOBB13
@@ -348,6 +354,16 @@ def main(argv=None):
         if v14:
             from openobb.models.openobb14_loss import OpenOBB14Loss
             crit = OpenOBB14Loss(img_size=a.img)
+        elif v18:
+            from openobb.models.openobb18_loss import OpenOBB18Loss
+            teacher = None
+            if a.teacher:
+                from openobb.predict import load_model
+                teacher = load_model(a.teacher, device)[0].eval()
+                for p_ in teacher.parameters():
+                    p_.requires_grad_(False)
+                log(f"[distill] neck distilled from the encoder of {a.teacher} (weight {a.w_distill:g})", console=True)
+            crit = OpenOBB18Loss(img_size=a.img, teacher=teacher, w_distill=a.w_distill)
         elif v17:
             from openobb.models.openobb17_loss import OpenOBB17Loss
             crit = OpenOBB17Loss(img_size=a.img)
@@ -393,8 +409,8 @@ def main(argv=None):
         elif f == "backbone":
             frozen = [model.backbone]
         elif f == "encoder":
-            frozen = [model.backbone, model.encoder] + [m for m in (model.lsk, getattr(model, "p2_proj", None))
-                                                        if m is not None]
+            frozen = [model.backbone] + [m for m in (getattr(model, "encoder", None), getattr(model, "neck", None),
+                                                     model.lsk, getattr(model, "p2_proj", None)) if m is not None]
         else:
             raise SystemExit(f"--freeze must be an integer, 'backbone' or 'encoder', got {a.freeze!r}")
         for m in frozen:
@@ -456,7 +472,7 @@ def main(argv=None):
     if a.compile and device.type == "cuda" and not a.eval_only:
         try:
             model.backbone.forward = torch.compile(model.backbone.forward)
-            if v2 or v6 or v9:
+            if v2 or v6 or v9 or v18:
                 model.neck.forward = torch.compile(model.neck.forward, dynamic=False)
             else:
                 model.encoder.forward = torch.compile(model.encoder.forward, dynamic=False)
@@ -502,6 +518,10 @@ def main(argv=None):
                 f"init: {init_desc}")
         elif v12 or v13:
             core = f"pretrained HGNetv2 + LSK + hybrid encoder{', off: ' + a.v7_off if a.v7_off else ''}"
+            if v18:
+                core = (f"pretrained HGNetv2 + own re-parameterised neck"
+                        f"{' distilled from ' + a.teacher if a.teacher else ' (no teacher)'}"
+                        f"{', off: ' + a.v7_off if a.v7_off else ''}")
             if v13:
                 core = (f"{core} at {a.img // 2} px + full-resolution {a.img} px detail stream; dual dense oriented "
                         f"head P2-P5")
@@ -511,7 +531,7 @@ def main(argv=None):
                 core += f"; boundary field (stride 2) + boundary snapping of {a.ref_k} candidates"
             if a.box == "direct":
                 core += ", direct box regression (no DFL)"
-            say(f"model   OpenOBB{17 if v17 else (13 if v13 else 12)}-{a.size} ({core}: one-to-many for learning + one-to-one for "
+            say(f"model   OpenOBB{18 if v18 else (17 if v17 else (13 if v13 else 12))}-{a.size} ({core}: one-to-many for learning + one-to-one for "
                 f"inference, NMS-free), {n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")
             if v13 and a.img < 1536:
                 say(f"WARNING  OpenOBB13's core runs at {a.img // 2} px: drawings need the core at >= 1024 "

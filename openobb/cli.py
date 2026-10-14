@@ -58,7 +58,8 @@ MODELS = {**{f"openobb1{s}": ("v1", s) for s in SIZES},
           **{f"openobb14{s}": ("v14", s) for s in SIZES},    # pretrained trunk + own rep-conv neck + edge refiner (docs/OPENOBB14.md)
           **{f"openobb15{s}": ("v15", s) for s in SIZES},    # v14 + full-resolution stream + P2 grid (docs/OPENOBB15.md)
           **{f"openobb16{s}": ("v16", s) for s in SIZES},    # v15 + cascade refiners + fit-aware scores (docs/OPENOBB16.md)
-          **{f"openobb17{s}": ("v17", s) for s in SIZES}}    # v12 + boundary field + boundary snapping (docs/OPENOBB17.md)
+          **{f"openobb17{s}": ("v17", s) for s in SIZES},    # v12 + boundary field + boundary snapping (docs/OPENOBB17.md)
+          **{f"openobb18{s}": ("v18", s) for s in SIZES}}    # v17 with an own fast neck distilled from a trained encoder (docs/OPENOBB18.md)
 
 # Best architecture recipe measured on FloorPlanCAD / DOTA (research/LEDGER.md, c6): selective large-kernel
 # adapters (LSK), repeat-factor sampling, one-to-many query group, adaptive query denoising, square-aware angle loss,
@@ -119,6 +120,7 @@ RECIPE14 = {"rfs": 0.1, "channels_last": True, "clip": 10.0, "num_top": 1000, "b
 RECIPE15 = dict(RECIPE14)                        # OpenOBB15: v14 + full-resolution stream + P2 (imgsz = core size, input 2x)
 RECIPE16 = dict(RECIPE15)                        # OpenOBB16: v15 + 3-stage cascade of refiners + fit-aware scores
 RECIPE17 = dict(RECIPE12)                        # OpenOBB17: v12 + boundary field + boundary snapping
+RECIPE18 = dict(RECIPE12)                        # OpenOBB18: v17 + own neck distilled from a trained encoder (teacher=)
 SIZE_DEFAULTS15 = {s: dict(d, gb=round(d["gb"] * 0.5, 2)) for s, d in SIZE_DEFAULTS3.items()}
 # OpenOBB13: imgsz is the full resolution, the core runs at half of it -> memory per image ~0.45x by area
 SIZE_DEFAULTS13 = {s: dict(d, gb=round(d["gb"] * 0.45, 2)) for s, d in SIZE_DEFAULTS3.items()}
@@ -496,7 +498,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         raise SystemExit(f"model must be one of {', '.join(MODELS)} or an existing OpenOBB .pt checkpoint, "
                          f"got '{model}'")
     arch = inherited.get("arch", "v1")
-    v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17")
+    v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18")
     src_img = extra.pop("img", None)                 # a checkpoint's own input size (already the full size for v13)
     core_size = imgsz is not None or src_img is None
     imgsz = int(imgsz or src_img or 1024)
@@ -526,7 +528,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
           "v5": SIZE_DEFAULTS5, "v6": SIZE_DEFAULTS6, "v7": SIZE_DEFAULTS3,
           "v8": SIZE_DEFAULTS3, "v9": SIZE_DEFAULTS9, "v10": SIZE_DEFAULTS3, "v11": SIZE_DEFAULTS3, "v12": SIZE_DEFAULTS3, "v13": SIZE_DEFAULTS13,
           "v14": SIZE_DEFAULTS3, "v15": SIZE_DEFAULTS15, "v16": SIZE_DEFAULTS15,
-          "v17": SIZE_DEFAULTS3}.get(arch, SIZE_DEFAULTS)[size]
+          "v17": SIZE_DEFAULTS3, "v18": SIZE_DEFAULTS3}.get(arch, SIZE_DEFAULTS)[size]
     if str(optimizer).lower() not in ("auto", "adamw"):
         raise SystemExit("optimizer must be 'auto' or 'AdamW'")   # lr0 given -> used; otherwise the measured LR
     prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, seed, fit=fit)
@@ -571,7 +573,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         opts.update({"v2": RECIPE2, "v3": RECIPE3, "v4": RECIPE4, "v5": RECIPE5, "v6": RECIPE6, "v7": RECIPE7,
                      "v8": RECIPE8, "v9": RECIPE9, "v10": RECIPE10, "v11": RECIPE11, "v12": RECIPE12, "v13": RECIPE13,
                      "v14": RECIPE14, "v15": RECIPE15, "v16": RECIPE16,
-                     "v17": RECIPE17}.get(arch, RECIPE))
+                     "v17": RECIPE17, "v18": RECIPE18}.get(arch, RECIPE))
     if arch in ("v4", "v5") and "backbone" not in inherited:
         opts["backbone"] = BACKBONE4[size]
     if aug["mosaic"]:

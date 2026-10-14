@@ -44,7 +44,7 @@ def windows(length, size, gap):
 
 # architecture labels this package can rebuild (args["arch"] written at training; identical in every build of the
 # package whatever its name, so a model trained with one build loads in another of the same or a newer version)
-KNOWN_ARCHS = ("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17")
+KNOWN_ARCHS = ("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18")
 
 
 def _ver(v):
@@ -157,12 +157,13 @@ def _load_model(ckpt_path, device, queries=None, classes=None):
                       box=a.get("box") or "direct", ref_k=int(a.get("ref_k", 1500)), neck=a.get("neck") or "own")
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval().fuse(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
-    if a.get("arch") in ("v7", "v8", "v10", "v11", "v12", "v13", "v17"):
+    if a.get("arch") in ("v7", "v8", "v10", "v11", "v12", "v13", "v17", "v18"):
         common = dict(num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
                       max_det=max(int(a.get("num_top", 1000)), int(queries or 0)))
-        if a["arch"] == "v17":
+        if a["arch"] in ("v17", "v18"):
             from openobb.models.openobb17 import OpenOBB17
-            m = OpenOBB17(a.get("size", "x"), off=a.get("v7_off") or None, box=a.get("box") or "dfl",
+            from openobb.models.openobb18 import OpenOBB18
+            m = (OpenOBB18 if a["arch"] == "v18" else OpenOBB17)(a.get("size", "x"), off=a.get("v7_off") or None, box=a.get("box") or "dfl",
                           ref_k=int(a.get("ref_k", 1500)), **common)
         elif a["arch"] in ("v12", "v13"):
             from openobb.models.openobb12 import OpenOBB12, OpenOBB13

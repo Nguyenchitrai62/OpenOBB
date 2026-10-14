@@ -1157,6 +1157,21 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     và weight decay nhân `batch × accumulate / nbs`; EMA cập nhật theo bước optimizer. `nbs=0 warmup_bias_lr=0 epoch_lr=False` = công thức cũ.
     Mọi run từ 0.16.0 trở đi không so trực tiếp được với run cũ trừ khi dùng ba tham số đó.
 
+- **F67. OpenOBB18 (10-15, chưa train): lõi CAD nhanh, bản đột phá của vòng hai version (user: mỗi vòng một bản tinh chỉnh + một bản đột phá).**
+  [docs/OPENOBB18.md](../docs/OPENOBB18.md).
+  - v18 = v17 (thân HGNetv2, head kép DFL của v12, trường ranh giới) với encoder lai + LSK thay bằng `Neck14` (RepConv, rộng 384 = encoder), neck
+    được **chưng cất từ encoder của v12 đã train** (thầy cùng miền, cùng thân; sai số bình phương tương đối P3–P5, trọng số 2) và học cùng loss
+    detection. Thân + head nạp nguyên từ `openobb12x.pt`. Thầy chỉ dùng khi train (`teacher=`), không lưu trong model.
+  - Đo (CPU, `torch.utils.flop_counter`, 960 × 1280, sau fuse): v12 686 GFLOPs (thân 320, LSK + encoder 322, head 44), v17 702, **v18 520 (−24%;
+    neck 140)**. Tham số 67.1M → 50.6M; phần mượn chỉ còn thân (33.2M, 66%).
+  - Trả lời user "vì sao lõi tự viết luôn tệ": ý tưởng SOTA đã dùng, phần thiếu là trọng số (F39: COCO gấp đôi từ đầu); v14 hỏng ở head (F65).
+    v18 không có phần nào học từ đầu.
+  - Kỳ vọng ghi trước (60 ep, công thức cũ, khởi tạo + thầy `openobb12x.pt`): ≥ 0.73 / ≥ 0.48, note ≥ .68, slide_door ≥ .33, wall 50-95 ≥ .53,
+    **≤ 11.5 ms** G4 batch 16, `loss_distill` < 0.1. Đột phá = tốc độ ≤ 0.75 × v12 và mAP50-95 ≥ v12 − 0.01. Bác bỏ: > 0.85 × v12, < 0.45, hoặc
+    note / slide_door tụt > 0.08.
+  - Ghi chú vận hành: run v17 đầu tiên của user (0.16.0) chạy công thức YOLO mới (`nbs 64`, accumulate 4: 30 epoch chỉ khoảng 112 bước cập nhật)
+    → đã đề nghị chạy lại với `nbs=0 warmup_bias_lr=0 epoch_lr=False`.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
