@@ -9,13 +9,15 @@ Giao diện predict / kết quả giống YOLO-OBB.
 **Máy có GPU NVIDIA:**
 
 ```bash
-pip install -U torch "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git" --index-url https://download.pytorch.org/whl/cu126 --extra-index-url https://pypi.org/simple
+pip install -U torch --index-url https://download.pytorch.org/whl/cu126
+pip install -U "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git"
 ```
 
 **Máy chỉ có CPU:**
 
 ```bash
-pip install -U torch "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git" --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple
+pip install -U torch --index-url https://download.pytorch.org/whl/cpu
+pip install -U "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git"
 ```
 
 **Cài từ file wheel** (không cần quyền truy cập repo; file mới nhất nằm trong thư mục `wheels/` của repo sản phẩm,

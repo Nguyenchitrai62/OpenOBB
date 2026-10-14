@@ -8,13 +8,15 @@ OpenOBB tự viết phần giao diện này; package không phụ thuộc Ultral
 **Máy có GPU NVIDIA:**
 
 ```bash
-pip install -U torch "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git" --index-url https://download.pytorch.org/whl/cu126 --extra-index-url https://pypi.org/simple
+pip install -U torch --index-url https://download.pytorch.org/whl/cu126
+pip install -U "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"
 ```
 
 **Máy chỉ có CPU:**
 
 ```bash
-pip install -U torch "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git" --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple
+pip install -U torch --index-url https://download.pytorch.org/whl/cpu
+pip install -U "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"
 ```
 
 Luôn cài bản mới nhất; chạy lại đúng lệnh đó để cập nhật. GPU RTX 50xx: đổi `cu126` thành `cu130`.
