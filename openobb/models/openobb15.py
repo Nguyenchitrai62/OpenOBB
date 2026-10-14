@@ -48,7 +48,7 @@ class OpenOBB15(OpenOBB14):
         self.p2_head = Head14([c2], num_classes, max(64, SCALES14[size]["head"] // 3 // 8 * 8), reg_ch)   # 76.8k cells at x
         self.p2_head_o2o = None if self.head_o2o is None else copy.deepcopy(self.p2_head)
         if self.edge is not None:                  # the refiner reads the full-resolution stream (stride 8 input px)
-            self.edge = EdgeRefiner(c2, hid, s4=8, s3=16)
+            self.edge = self.make_refiner(c2, hid, 8, 16)
         self.strides = (16, 32, 64, 8)
 
     @torch.no_grad()
@@ -65,15 +65,9 @@ class OpenOBB15(OpenOBB14):
             x = F.pad(x, (0, pw, 0, ph), mode="replicate")
         hr = self.hires(x)
         xc = F.avg_pool2d(x, 2)                    # the core's input: what OpenOBB14 sees at imgsz / 2
-        bb = self.backbone
-        h = bb.stem(xc)
-        outs = []
-        for stage in bb.stages:
-            h = stage(h)
-            outs.append(h if self.guard is None else self.guard(h))
-        f4, c3, c4, c5 = outs
+        f4, c3, c4, c5 = self.trunk(xc)
         c3 = c3 + self.to_p3(hr)
-        feats = list(self.encoder([c3, c4, c5])) if self.neck is None else self.neck(f4, c3, c4, c5)
+        feats = self.fuse_levels(f4, c3, c4, c5)
         p2 = self.p2_lat(hr) + F.interpolate(self.p2_down(feats[0]), size=hr.shape[-2:], mode="nearest")
         return hr, feats + [self.p2_fuse(p2)]
 

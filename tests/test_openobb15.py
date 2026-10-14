@@ -67,6 +67,23 @@ def test_v15_inference_any_size_fused_and_refiner_reads_full_res():
     assert not any(isinstance(mod, torch.nn.BatchNorm2d) for mod in m.modules())
 
 
+def test_v15_stage4_cut_and_narrow_head_on_both_necks():
+    torch.manual_seed(0)
+    for neck in ("own", "dfine"):
+        m = OpenOBB15("s", num_classes=NC, img_size=IMG, off="stage4,widehead", neck=neck).train()
+        assert isinstance(m.backbone.stages[3], torch.nn.Identity)
+        assert not any(n.startswith("backbone.stages.3.") for n, _ in m.named_parameters())
+        full = OpenOBB15("s", num_classes=NC, img_size=IMG, neck=neck)
+        assert sum(p.numel() for p in m.parameters()) < sum(p.numel() for p in full.parameters())
+        out = m(torch.rand(1, 3, IMG, IMG), _targets())
+        total = sum(OpenOBB14Loss(img_size=IMG)(out, _targets()).values())
+        assert math.isfinite(float(total.detach()))
+        total.backward()
+        m.eval().fuse()
+        with torch.no_grad():
+            assert m(torch.rand(1, 3, 192, 128))["pred_boxes"].shape[1] == 1000
+
+
 def test_v15_neck_dfine_and_registry():
     from openobb.cli import MODELS
     from openobb.predict import KNOWN_ARCHS, input_size

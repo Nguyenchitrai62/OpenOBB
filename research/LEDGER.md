@@ -1075,6 +1075,18 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     hoặc wall_300 mAP50 tăng < 0.05.
   - Vòng hai hạt giống: A = `openobb15x neck=dfine`, B = `openobb14x neck=dfine` (khác đúng một yếu tố: luồng gốc + P2 + tinh chỉnh ở độ phân giải gốc).
 
+- **F62. OpenOBB16 (10-14, chưa train): v15 + cascade 3 bước tinh chỉnh box + chấm điểm theo độ khít.** [docs/OPENOBB16.md](../docs/OPENOBB16.md).
+  - User: v15 đang train; làm v16. Yêu cầu: chính xác hơn YOLO, chậm hơn được nhưng không quá chậm.
+  - Lập luận: mAP50-95 đo độ khít **và** thứ tự xếp hạng theo độ khít. v16 thêm hai bước tinh chỉnh nữa, mỗi bước đọc lại nét trên box bước trước
+    (ngưỡng dương 0.5 → 0.6 → 0.7, Cascade R-CNN) và một head `fit` dự đoán ProbIoU của box cuối; điểm class của ứng viên = điểm × fit^0.5 trước NMS
+    (GFL / VarifocalNet, áp lên box đã sửa). Zero-init + fit bias +4 → v16 bắt đầu đúng bằng v15 (test). +8 GFLOPs, +1.2M tham số.
+  - Cơ chế nằm trong `OpenOBB14` (`CASCADE`, `QUALITY`, `run_cascade`, `fit_scores`), nên v14 / v15 không đổi (CASCADE = 1, QUALITY = False).
+  - Cùng đợt (0.15.0): công tắc `v14_off=stage4` (bỏ stage 4 của thân: 45 GFLOPs nghẽn bộ nhớ, 23% kênh chết, 4% detection; neck tự thiết kế lấy
+    P5 từ P4 bằng Down, encoder D-FINE nhận P5 = 0) và `v14_off=widehead` (head rộng 2/3), cho bản nhanh của v15 / v16 khi cần.
+    `research/analysis/roofline.py` nhận biến thể `openobb15x:neck=dfine,off=stage4`.
+  - Kỳ vọng ghi trước (Wall_Color, COCO, 100 ep, `neck=dfine`): **≥ 0.76 / ≥ 0.53**, junction 50-95 ≥ .60, wall ≥ .63, R@.75 wall ≥ .55, ≤ 21 ms.
+    Bác bỏ nếu không hơn v15 ≥ 0.01 mAP50-95, hoặc `ref_k=0` trên checkpoint v16 làm mAP50-95 giảm < 0.01.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

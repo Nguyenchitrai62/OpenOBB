@@ -285,6 +285,8 @@ Câu hỏi còn mở:
 - [x] **OpenOBB15 (2026-10-14, F61, 0.14.0):** v14 + luồng độ phân giải gốc + lưới P2 + bộ tinh chỉnh đọc luồng gốc, nhắm mAP50-95 của
   junction / tường / wall_300 trên Wall_Color. [docs/OPENOBB15.md](docs/OPENOBB15.md). Vòng hai hạt giống: `openobb15x neck=dfine` so với
   `openobb14x neck=dfine`. Chờ log user.
+- [x] **OpenOBB16 (2026-10-14, F62, 0.15.0):** v15 + cascade 3 bước tinh chỉnh box + điểm × độ khít dự đoán. [docs/OPENOBB16.md](docs/OPENOBB16.md).
+  Công tắc mới `v14_off=stage4,widehead` cho bản nhanh. Chờ log v15 / v16 của user.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.

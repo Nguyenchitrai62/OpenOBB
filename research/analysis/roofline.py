@@ -60,6 +60,7 @@ def build(name, nc, hw):
     """-> (module, forward fn(x), part_of(leaf_name) -> part label)."""
     if name.startswith("openobb"):
         from openobb.cli import MODELS
+        name, _, opts = name.partition(":")           # openobb15x:neck=dfine,off=stage4 -> constructor kwargs
         arch, size = MODELS[name]
         if arch == "v12":
             from openobb.models.openobb12 import OpenOBB12
@@ -75,19 +76,29 @@ def build(name, nc, hw):
             def fn(x):
                 feats = m.features(x)
                 return m.head(feats)
-        elif arch == "v14":
+        elif arch in ("v14", "v15", "v16"):
             from openobb.models.openobb14 import OpenOBB14
-            m = OpenOBB14(size, num_classes=nc, img_size=max(hw)).eval().fuse()
+            from openobb.models.openobb15 import OpenOBB15
+            kw = dict(kv.split("=") for kv in opts.split(",") if kv)
+            if arch == "v16":
+                from openobb.models.openobb16 import OpenOBB16
+                cls = OpenOBB16
+            else:
+                cls = OpenOBB15 if arch == "v15" else OpenOBB14
+            m = cls(size, num_classes=nc, img_size=max(hw), **kw).eval().fuse()
             parts = [("backbone.stem", "trunk stem"), ("backbone.stages.0", "trunk stage1 /4"),
                      ("backbone.stages.1", "trunk stage2 /8"), ("backbone.stages.2", "trunk stage3 /16"),
                      ("backbone.stages.3", "trunk stage4 /32"), ("neck.proj", "neck proj 1x1"), ("neck.spd", "neck spd"),
                      ("neck.attn", "neck attention /32"), ("neck.td", "neck top-down"), ("neck.lat", "neck top-down"),
                      ("neck.bu", "neck bottom-up"), ("neck.dn", "neck bottom-up"),
+                     ("neck.down5", "neck bottom-up"), ("encoder.", "neck (D-FINE encoder)"),
+                     ("hires", "hires stream"), ("to_p3", "hires stream"), ("p2_lat", "P2 level"), ("p2_down", "P2 level"),
+                     ("p2_fuse", "P2 level"), ("p2_head.", "P2 head (o2m)"),
                      ("head.cls", "head cls (o2m)"), ("head.box", "head box (o2m)"), ("edge", "edge refiner")]
 
             def fn(x):
                 f4, feats = m.encode(x)
-                cls, reg = m.head(feats)
+                cls, reg = m.run_head(feats, False)
                 pts, st = m.anchors(feats)
                 from openobb.models.openobb3 import decode
                 return m.refine(f4, feats[0], cls, decode(reg, pts, st), 1500)

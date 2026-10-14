@@ -46,7 +46,10 @@ from .openobb7 import GUARD_TAU, ScaleGuard, fuse_model, space_to_depth
 from .openobb8 import _sample, jitter_targets, refine_boxes
 from .openobb9 import Down, RepConv, RepCSP
 
-PARTS14 = ("attn", "spd", "edge", "dilate", "maxpool", "guard", "dual")
+PARTS14 = ("attn", "spd", "edge", "dilate", "maxpool", "guard", "dual", "stage4", "widehead")
+# stage4: the trunk stops after stage 3 (F58: stage 4 = 7% of the FLOPs, 23% dead channels, 4% of the detections). Own
+#         neck: P5 comes from the stride-16 map through a Down block; D-FINE encoder: its P5 input is zeros (F37 / F46:
+#         the encoder's P5 path contributed ~0-4%).  widehead: head towers at 2/3 width.
 # neck width, head tower width, RepConv per neck block
 SCALES14 = {"s": dict(hid=192, head=128, depth=1), "m": dict(hid=256, head=160, depth=2),
             "l": dict(hid=256, head=192, depth=3), "x": dict(hid=384, head=256, depth=3)}
@@ -77,7 +80,12 @@ class Neck14(nn.Module):
         super().__init__()
         dil = (1,) if "dilate" in off else DILATIONS14
         mp = "maxpool" not in off
-        self.proj = nn.ModuleList(ConvBN(c, hid, 1, act=False) for c in cin)
+        self.no_c5 = "stage4" in off
+        if self.no_c5:                              # P5 from the stride-16 trunk map (conv s2 + max-pool path)
+            self.proj = nn.ModuleList([ConvBN(cin[0], hid, 1, act=False), ConvBN(cin[1], hid, 1, act=False)])
+            self.down5 = Down(cin[1], hid, mp)
+        else:
+            self.proj = nn.ModuleList(ConvBN(c, hid, 1, act=False) for c in cin)
         self.attn = nn.Identity() if "attn" in off else GlobalAttention(hid, heads=8)
         self.spd = None if "spd" in off else ConvBN(4 * c4, hid // 2, 1)
         self.lat5 = ConvBN(hid, hid, 1)
@@ -88,7 +96,7 @@ class Neck14(nn.Module):
         self.dn4, self.bu5 = Down(hid, hid, mp), RepCSP(2 * hid, hid, n, (1,))
 
     def forward(self, f4, c3, c4, c5):
-        t5 = self.lat5(self.attn(self.proj[2](c5)))
+        t5 = self.lat5(self.attn(self.down5(c4) if self.no_c5 else self.proj[2](c5)))
         n4 = self.td4(torch.cat([self.proj[1](c4), F.interpolate(t5, size=c4.shape[-2:], mode="nearest")], 1))
         t4 = self.lat4(n4)
         parts = [self.proj[0](c3), F.interpolate(t4, size=c3.shape[-2:], mode="nearest")]
@@ -140,9 +148,15 @@ class EdgeRefiner(nn.Module):
     by openobb8.refine_boxes (ends in units of clamp(L / 10, 2, 32) px, log thickness, across offset in units of
     max(T / 2, 1) px, angle 0.2 tanh). The last layer starts at zero: the refiner is the identity at the start."""
 
-    def __init__(self, c4, c3, ce=64, hidden=256, s4=4, s3=8):
+    def __init__(self, c4, c3, ce=64, hidden=256, s4=4, s3=8, quality=False):
         super().__init__()
         self.s4, self.s3 = s4, s3                      # strides (input px) of the detail map and of P3
+        # quality: a logit of ProbIoU(refined box, object) from the same features (OpenOBB16); bias +4 -> p = 0.98 at
+        # the start, so the scores are ~unchanged until the head has learnt something
+        self.fit = nn.Linear(hidden, 1) if quality else None
+        if quality:
+            nn.init.zeros_(self.fit.weight)
+            nn.init.constant_(self.fit.bias, 4.0)
         self.p4 = ConvBN(c4, ce, 1, act=False)
         self.p3 = ConvBN(c3, ce, 1, act=False)
         u = (torch.arange(N_ALONG) + 0.5) / N_ALONG - 0.5
@@ -168,6 +182,10 @@ class EdgeRefiner(nn.Module):
 
     def forward(self, f4, p3, b):
         """f4 (B, c4, H/4, W/4), p3 (B, c3, H/8, W/8), candidate boxes b (B, K, 5) px -> refined boxes (B, K, 5)."""
+        return self.refine_with_fit(f4, p3, b)[0]
+
+    def refine_with_fit(self, f4, p3, b):
+        """-> (refined boxes (B, K, 5), fit logits (B, K) or None)."""
         b = b.detach().float()
         B, K, _ = b.shape
         pts = self.points(b)
@@ -175,13 +193,20 @@ class EdgeRefiner(nn.Module):
         s3 = _sample(self.p3(p3), pts[:, :, -N_ALONG:].reshape(B, -1, 2), self.s3).reshape(B, K, -1)
         geo = torch.stack([torch.log1p(b[..., 2]) / 7, torch.log1p(b[..., 3]) / 4, torch.sin(2 * b[..., 4]),
                            torch.cos(2 * b[..., 4])], -1)
-        d = self.mlp(torch.cat([s4, s3, geo], -1).to(self.mlp[0].weight.dtype)).float()
-        return refine_boxes(b, d)
+        h = torch.cat([s4, s3, geo], -1).to(self.mlp[0].weight.dtype)
+        for layer in list(self.mlp)[:-1]:
+            h = layer(h)
+        d = self.mlp[-1](h).float()
+        fit = None if self.fit is None else self.fit(h).float()[..., 0]
+        return refine_boxes(b, d), fit
 
 
 class OpenOBB14(nn.Module):
     arch = "v14"
     anchors = OpenOBB3.anchors
+
+    CASCADE, QUALITY, FIT_POWER = 1, False, 0.5     # OpenOBB16: 3 refiner stages, fit-aware scores (score x fit^0.5)
+    CASCADE_THR = (0.5, 0.6, 0.7)                     # positive threshold (ProbIoU to the object) of stage 1, 2, 3
 
     def __init__(self, size="x", num_classes=15, img_size=1024, max_det=1000, nms_iou=0.7, off=None, box="direct",
                  ref_k=1500, final_nms=None, neck="own", **_):
@@ -201,7 +226,12 @@ class OpenOBB14(nn.Module):
         self.guard = None if "guard" in self.off else ScaleGuard(GUARD_TAU)
         cin = cfg["encoder"]["in_channels"]
         c4 = self.backbone._out_channels[0]
-        sc = SCALES14[size]
+        sc = dict(SCALES14[size])
+        if "widehead" in self.off:
+            sc["head"] = max(64, round(sc["head"] * 2 / 3 / 8) * 8)
+        self.c5_ch = cin[2]
+        if "stage4" in self.off:
+            self.backbone.stages[3] = nn.Identity()  # no parameters: the COCO weights of stage 4 are simply not loaded
         if neck == "dfine":
             # F60 control: the same trunk, head and refiner on D-FINE's COCO-pretrained hybrid encoder ("encoder.*"
             # parameter names, so its weights load as they are) instead of the randomly initialised Neck14
@@ -214,7 +244,7 @@ class OpenOBB14(nn.Module):
         reg_ch = DIRECT_CH if box == "direct" else REG_CH
         self.head = Head14([self.hid] * 3, num_classes, sc["head"], reg_ch)
         self.head_o2o = None if "dual" in self.off else copy.deepcopy(self.head)
-        self.edge = None if "edge" in self.off else EdgeRefiner(c4, self.hid)
+        self.edge = None if "edge" in self.off else self.make_refiner(c4, self.hid, 4, 8)
         self.ref_k, self.ref_k_train = int(ref_k), REF_K_TRAIN
         self.strides = (8, 16, 32)
         self._grid = {}
@@ -222,24 +252,63 @@ class OpenOBB14(nn.Module):
         self.infer_head = "o2m"
         self.final_nms = final_nms                 # one-to-one head: None = NMS-free, else a ProbIoU threshold
 
+    def make_refiner(self, c4, c3, s4, s3):
+        """Stage 1 is `edge`; stages 2.. (cascade) are `edge_more` with the same design and their own weights."""
+        self.edge_more = nn.ModuleList(EdgeRefiner(c4, c3, s4=s4, s3=s3, quality=self.QUALITY)
+                                       for _ in range(self.CASCADE - 1))
+        return EdgeRefiner(c4, c3, s4=s4, s3=s3, quality=self.QUALITY)
+
+    def stages(self):
+        return [self.edge] + list(getattr(self, "edge_more", []))
+
+    def run_cascade(self, f4, p3, cand):
+        """-> ([(input boxes, refined boxes) per stage], fit logits of the last stage or None)."""
+        out, fit, b = [], None, cand
+        for stage in self.stages():
+            r, fit = stage.refine_with_fit(f4, p3, b)
+            out.append((b, r))
+            b = r
+        return out, fit
+
+    @staticmethod
+    def fit_scores(cls, idx, fit, power):
+        """score x fit^power on the refined candidates (logits in, logits out; untouched elsewhere)."""
+        p = cls.gather(1, idx[..., None].expand(-1, -1, cls.shape[-1])).sigmoid()
+        q = fit.sigmoid().clamp(min=1e-4)[..., None] ** power
+        new = torch.logit((p * q).clamp(1e-6, 1 - 1e-6))
+        return cls.scatter(1, idx[..., None].expand(-1, -1, cls.shape[-1]), new.to(cls.dtype))
+
     @torch.no_grad()
     def copy_head_to_o2o(self):
         """Warm start of the one-to-one head from the one-to-many head (after loading a single-head checkpoint)."""
         if self.head_o2o is not None:
             self.head_o2o.load_state_dict(self.head.state_dict())
 
-    def encode(self, x):
-        """-> (stride-4 trunk map (guarded), [P3, P4, P5] neck outputs with `hid` channels)."""
+    def trunk(self, x):
+        """-> (f4, c3, c4, c5) guarded trunk maps at stride 4 / 8 / 16 / 32 (c5 = None when stage 4 is cut)."""
         bb = self.backbone
         h = bb.stem(x)
         outs = []
         for stage in bb.stages:
+            if isinstance(stage, nn.Identity):
+                outs.append(None)
+                continue
             h = stage(h)
             outs.append(h if self.guard is None else self.guard(h))
-        f4, c3, c4, c5 = outs
+        return tuple(outs)
+
+    def fuse_levels(self, f4, c3, c4, c5):
+        """Trunk maps -> [P3, P4, P5] through the own neck or the D-FINE encoder (zeros for a cut stage 4)."""
         if self.neck is None:
-            return f4, list(self.encoder([c3, c4, c5]))
-        return f4, self.neck(f4, c3, c4, c5)
+            if c5 is None:
+                c5 = c4.new_zeros((c4.shape[0], self.c5_ch, (c4.shape[2] + 1) // 2, (c4.shape[3] + 1) // 2))
+            return list(self.encoder([c3, c4, c5]))
+        return self.neck(f4, c3, c4, c5)
+
+    def encode(self, x):
+        """-> (stride-4 trunk map (guarded), [P3, P4, P5] neck outputs with `hid` channels)."""
+        f4, c3, c4, c5 = self.trunk(x)
+        return f4, self.fuse_levels(f4, c3, c4, c5)
 
     def features(self, x):
         return self.encode(x)[1]
@@ -248,12 +317,16 @@ class OpenOBB14(nn.Module):
         return (self.head_o2o if o2o and self.head_o2o is not None else self.head)(feats)
 
     def refine(self, f4, p3, cls, boxes, k):
-        """Refine the k best-scoring candidates in place of their dense boxes -> (boxes (B, A, 5), idx (B, k))."""
+        """Refine the k best-scoring candidates in place of their dense boxes (every cascade stage) and, with the
+        fit head, rescale their class scores -> (cls (B, A, C), boxes (B, A, 5), idx (B, k))."""
         k = min(int(k), cls.shape[1])
         idx = cls.detach().sigmoid().amax(-1).topk(k, dim=1).indices
         cand = boxes.gather(1, idx[..., None].expand(-1, -1, 5))
-        ref = self.edge(f4, p3, cand)
-        return boxes.scatter(1, idx[..., None].expand(-1, -1, 5), ref.to(boxes.dtype)), idx
+        stages, fit = self.run_cascade(f4, p3, cand)
+        ref = stages[-1][1]
+        if fit is not None:
+            cls = self.fit_scores(cls, idx, fit, self.FIT_POWER)
+        return cls, boxes.scatter(1, idx[..., None].expand(-1, -1, 5), ref.to(boxes.dtype)), idx
 
     def forward(self, x, targets=None, ctx=None):
         f4, feats = self.encode(x)
@@ -269,14 +342,20 @@ class OpenOBB14(nn.Module):
                 idx = cls.detach().sigmoid().amax(-1).topk(k, dim=1).indices
                 cand = boxes.gather(1, idx[..., None].expand(-1, -1, 5))
                 cand, valid = self._with_jitter(cand, targets)
-                out.update(ref_boxes=self.edge(f4, feats[0], cand), ref_cand=cand, ref_valid=valid)
+                stages, fit = self.run_cascade(f4, feats[0], cand)
+                out.update(ref_boxes=stages[0][1], ref_cand=cand, ref_valid=valid)
+                if len(stages) > 1:
+                    out["ref_stages"] = [(c, r, self.CASCADE_THR[min(i + 1, len(self.CASCADE_THR) - 1)])
+                                         for i, (c, r) in enumerate(stages[1:])]
+                if fit is not None:
+                    out["ref_fit"], out["ref_fit_boxes"] = fit, stages[-1][1]
             return out
         o2o = self.infer_head != "o2m" and self.head_o2o is not None
         cls, reg = self.run_head(feats, o2o)
         boxes = decode(reg, pts, st)
         conf = getattr(self, "nms_conf", 0.001)
         if self.edge is not None and self.ref_k > 0:
-            boxes, _ = self.refine(f4, feats[0], cls, boxes, self.ref_k)
+            cls, boxes, _ = self.refine(f4, feats[0], cls, boxes, self.ref_k)
         nms = self.final_nms if o2o else self.nms_iou           # one-to-many: always NMS
         if nms is not None:
             logits, boxes = fast_nms(cls, boxes, self.max_det, conf=conf, iou=float(nms))

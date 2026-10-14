@@ -65,6 +65,7 @@ Test model bằng giao diện kéo-thả: `run_app.bat` (Streamlit).
 | `openobb13s/m/l/x` | mới, nhắm độ chính xác: v12 + luồng độ phân giải gốc + lưới P2 cho vật tí hon (`imgsz` = độ phân giải đầy đủ, ví dụ 2560; lõi chạy ở một nửa) | [docs/OPENOBB13.md](docs/OPENOBB13.md) |
 | `openobb14s/m/l/x` | mới, nhắm cả độ chính xác lẫn tốc độ: thân HGNetv2 pretrained + neck conv dày tái tham số hoá tự thiết kế (thay LSK + encoder lai) + head kép nặng hồi quy box trực tiếp + bộ tinh chỉnh box đọc nét ở stride 4 (`box=direct` mặc định, `ref_k`) | [docs/OPENOBB14.md](docs/OPENOBB14.md) |
 | `openobb15s/m/l/x` | mới, nhắm độ chính xác: v14 + luồng độ phân giải gốc + lưới P2, bộ tinh chỉnh box đọc nét ở độ phân giải gốc (`imgsz` = cỡ lõi, ảnh vào 2×; `neck=dfine` cho vòng này) | [docs/OPENOBB15.md](docs/OPENOBB15.md) |
+| `openobb16s/m/l/x` | mới, nhắm mAP50-95: v15 + tinh chỉnh box theo tầng (cascade 3 bước, ngưỡng 0.5 / 0.6 / 0.7) + chấm điểm theo độ khít (điểm × fit^0.5 trước NMS); +8 GFLOPs | [docs/OPENOBB16.md](docs/OPENOBB16.md) |
 | `openobb10s/m/l/x` | mới, chưa train: v8 + head 3 slot / điểm (vật nhỏ chồng nhau như wall_300 cạnh junction), gán nhãn theo tầm với (box lớn), cân bằng class hiếm; nạp được checkpoint v8 | [docs/OPENOBB10.md](docs/OPENOBB10.md) |
 | `openobb9s/m/l/x` | mới, chưa train: lõi tự thiết kế (conv 3×3 dày tái tham số hoá) + head v8; pretrain bằng chưng cất 2 thầy | [docs/OPENOBB9.md](docs/OPENOBB9.md) |
 | `openobb8s/m/l/x` | bản tốt nhất: v3 sửa lỗi + tầng suy luận quan hệ theo hướng (bắt đầu y hệt v3) | [docs/OPENOBB8.md](docs/OPENOBB8.md) |

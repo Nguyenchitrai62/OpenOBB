@@ -26,9 +26,34 @@ class OpenOBB14Loss(OpenOBB12Loss):
         losses = super().forward(outputs, targets)
         if "ref_boxes" in outputs:
             losses["loss_ref_box"] = self.w_ref * self.refine_loss(outputs, targets)
+            # cascade (OpenOBB16): stage i is trained on the boxes stage i - 1 produced, with a higher threshold
+            for i, (c, r, thr) in enumerate(outputs.get("ref_stages", []), start=2):
+                losses[f"loss_ref_box{i}"] = self.w_ref * self.refine_loss(
+                    {"ref_boxes": r, "ref_cand": c, "ref_valid": outputs.get("ref_valid")}, targets, thr)
+            if "ref_fit" in outputs:
+                losses["loss_ref_fit"] = self.fit_loss(outputs, targets)
         return losses
 
-    def refine_loss(self, outputs, targets):
+    def fit_loss(self, outputs, targets):
+        """BCE of the fit logit against ProbIoU(final refined box, matched object) (0 for unmatched candidates)."""
+        fit, rb, valid = outputs["ref_fit"].float(), outputs["ref_fit_boxes"].float().detach(), outputs.get("ref_valid")
+        tgt = torch.zeros_like(fit)
+        for b, t in enumerate(targets):
+            if not len(t["labels"]):
+                continue
+            g = t["boxes"].float().clone().to(fit.device)
+            g[:, :4] *= self.img_size
+            with torch.no_grad():
+                best = probiou(rb[b][:, None, :], g[None, :, :]).clamp(0, 1).amax(1)
+            tgt[b] = torch.where(best >= 0.5, best, torch.zeros_like(best))
+        l = torch.nn.functional.binary_cross_entropy_with_logits(fit, tgt, reduction="none")
+        if valid is not None:
+            l = l * valid
+            return l.sum() / valid.sum().clamp(min=1.0)
+        return l.mean()
+
+    def refine_loss(self, outputs, targets, thr=None):
+        thr = self.ref_thr_ if thr is None else thr
         rb, cand, valid = outputs["ref_boxes"].float(), outputs["ref_cand"].float(), outputs.get("ref_valid")
         box_l, n_pos = rb.sum() * 0, 0                      # keeps the graph when there is no positive
         for b, t in enumerate(targets):
@@ -38,7 +63,7 @@ class OpenOBB14Loss(OpenOBB12Loss):
             g[:, :4] *= self.img_size
             with torch.no_grad():
                 best, gi = probiou(cand[b][:, None, :], g[None, :, :]).clamp(0, 1).max(1)
-                pos = best >= self.ref_thr_
+                pos = best >= thr
                 if valid is not None:
                     pos &= valid[b]
             if not pos.any():
