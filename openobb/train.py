@@ -42,7 +42,7 @@ def build_parser():
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18"],
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19"],
                     help="v1: OpenOBB (DETR-style decoder); v2: OpenOBB2 (dense segment-aware, NMS-free); "
                          "v3: OpenOBB3 (pretrained encoder + dense anisotropic oriented head); "
                          "v4: OpenOBB4 (DINOv2 backbone + DETR decoder + dense oriented branch); "
@@ -72,6 +72,10 @@ def build_parser():
                     help="OpenOBB18: trained OpenOBB12 / 17 checkpoint whose encoder output (P3-P5) the own neck is "
                          "distilled from during training (not part of the saved model)")
     ap.add_argument("--w-distill", type=float, default=2.0, help="OpenOBB18: weight of the neck distillation loss")
+    ap.add_argument("--groups", default="",
+                    help="OpenOBB17 / 18 / 19: contention-aware class groups (one box per group at every point): 'auto' "
+                         "(from the training labels, OpenOBB19's default), a group id per class '0,0,1,...', or '' (one)")
+    ap.add_argument("--n-groups", type=int, default=3, help="number of class groups for --groups auto")
     ap.add_argument("--neck", default="own", choices=["own", "dfine"],
                     help="OpenOBB14: own re-parameterised neck, or D-FINE's COCO-pretrained hybrid encoder (control)")
     ap.add_argument("--nms-iou", default="auto",
@@ -250,11 +254,30 @@ def main(argv=None):
 
     classes = dataset_classes(a.data)
     v2, v4, v5 = a.arch == "v2", a.arch == "v4", a.arch == "v5"
-    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18")
+    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19")
     v6, v7, v8, v10 = a.arch == "v6", a.arch == "v7", a.arch == "v8", a.arch == "v10"
-    v11, v12, v13, v14 = a.arch == "v11", a.arch in ("v12", "v17", "v18"), a.arch == "v13", a.arch in ("v14", "v15", "v16")
-    v17 = a.arch in ("v17", "v18")              # OpenOBB12 + boundary field / snapping: every v12 path applies
-    v18 = a.arch == "v18"                       # OpenOBB17 with the own neck distilled from a trained encoder
+    v11, v12, v13, v14 = a.arch == "v11", a.arch in ("v12", "v17", "v18", "v19"), a.arch == "v13", a.arch in ("v14", "v15", "v16")
+    v17 = a.arch in ("v17", "v18", "v19")       # OpenOBB12 + boundary field / snapping: every v12 path applies
+    v18 = a.arch in ("v18", "v19")              # OpenOBB17 with the own neck distilled from a trained encoder
+    v19 = a.arch == "v19"                       # OpenOBB18 + contention-aware class groups
+    if v17:
+        from openobb.models.groups import parse_groups
+        if v19 and not a.groups:
+            a.groups = "auto"
+        if a.groups and a.groups != "auto":
+            try:
+                parse_groups(a.groups, len(classes))
+            except ValueError:                  # inherited from a checkpoint with other classes: recompute
+                a.groups = "auto"
+        if a.groups == "auto":
+            from openobb.models.groups import contention_groups
+            meta = Path(a.data) / "meta" / "train.jsonl"
+            items = [json.loads(l) for l in meta.read_text(encoding="utf-8").splitlines() if l.strip()]
+            g = contention_groups(items, len(classes), a.n_groups)
+            a.groups = ",".join(map(str, g))
+            log("[groups] contention-aware class groups (from the training labels): "
+                + " | ".join(", ".join(c for c, k in zip(classes, g) if k == j) for j in range(max(g) + 1)),
+                console=True)
     v15, v16 = a.arch in ("v15", "v16"), a.arch == "v16"
     v9 = a.arch == "v9"
     dense_arch = v2 or v3                       # dense heads: no queries / decoder
@@ -277,8 +300,10 @@ def main(argv=None):
         elif v17:
             from openobb.models.openobb17 import OpenOBB17
             from openobb.models.openobb18 import OpenOBB18
-            model = (OpenOBB18 if v18 else OpenOBB17)(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
-                              off=a.v7_off or None, box=a.box, ref_k=a.ref_k)
+            from openobb.models.openobb18 import OpenOBB19
+            model = (OpenOBB19 if v19 else OpenOBB18 if v18 else OpenOBB17)(
+                a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top, off=a.v7_off or None,
+                box=a.box, ref_k=a.ref_k, groups=a.groups or None)
         elif v12 or v13:
             from openobb.models.openobb12 import OpenOBB12, OpenOBB13
             model = (OpenOBB13 if v13 else OpenOBB12)(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk,
@@ -327,6 +352,7 @@ def main(argv=None):
         src_ck = torch.load(a.weights, map_location="cpu", weights_only=False)
         src_cls = list(src_ck.get("classes") or [])
         src_box = (src_ck.get("args") or {}).get("box") or "dfl"
+        src_groups = (src_ck.get("args") or {}).get("groups") or ""
         del src_ck
         cmap = {i: src_cls.index(c) for i, c in enumerate(classes) if c in src_cls}
         load_dfine_coco(model, a.weights, log=lambda m: log(m, console=True), class_map=cmap)
@@ -336,6 +362,8 @@ def main(argv=None):
             model.head.copy_primary_box()       # single-slot checkpoint: extra slots start from slot 0's boxes
         if (v12 or v13 or v14) and not _has_keys(a.weights, "head_o2o."):
             model.copy_head_to_o2o()            # single-head checkpoint: the one-to-one head starts as its copy
+        if v17 and getattr(model, "n_groups", 1) > 1 and not src_groups:
+            model.replicate_group_boxes()       # one-box checkpoint: every class group starts as its box predictor
         if (v12 or v13) and a.box == "direct" and src_box != "direct":
             from openobb.models.openobb12 import restart_direct_distances
             restart_direct_distances(model)     # DFL checkpoint -> direct boxes: distances restart, angle / across kept
@@ -535,11 +563,13 @@ def main(argv=None):
                         f"head P2-P5")
             else:
                 core += "; dual dense oriented head P3-P5"
+            if v17 and a.groups:
+                core += f"; {max(map(int, a.groups.split(','))) + 1} contention-aware class groups ({a.groups})"
             if v17 and "field" not in (a.v7_off or ""):
                 core += f"; boundary field (stride 2) + boundary snapping of {a.ref_k} candidates"
             if a.box == "direct":
                 core += ", direct box regression (no DFL)"
-            say(f"model   OpenOBB{18 if v18 else (17 if v17 else (13 if v13 else 12))}-{a.size} ({core}: one-to-many for learning + one-to-one for "
+            say(f"model   OpenOBB{19 if v19 else (18 if v18 else (17 if v17 else (13 if v13 else 12)))}-{a.size} ({core}: one-to-many for learning + one-to-one for "
                 f"inference, NMS-free), {n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")
             if v13 and a.img < 1536:
                 say(f"WARNING  OpenOBB13's core runs at {a.img // 2} px: drawings need the core at >= 1024 "

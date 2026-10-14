@@ -21,7 +21,7 @@ class OpenOBB12Loss(OpenOBB10Loss):
         losses = self.dense_losses(outputs, targets)
         if "o2o_cls" in outputs:
             o = {"cls": outputs["o2o_cls"], "reg": outputs["o2o_reg"], "points": outputs["points"],
-                 "strides": outputs["strides"]}
+                 "strides": outputs["strides"], "class_group": outputs.get("class_group")}
             for k, v in self.o2o.dense_losses(o, targets).items():
                 losses[k.replace("loss_", "loss_o2o_", 1)] = v * self.w_o2o
         return losses

@@ -31,9 +31,9 @@ class OpenOBB18(OpenOBB17):
     arch = "v18"
 
     def __init__(self, size="x", num_classes=15, img_size=1024, lsk=True, max_det=1000, nms_iou=0.7, off=None,
-                 final_nms=None, box="dfl", ref_k=1500, **_):
+                 final_nms=None, box="dfl", ref_k=1500, groups=None, **_):
         super().__init__(size, num_classes, img_size, lsk=lsk, max_det=max_det, nms_iou=nms_iou, off=off,
-                         final_nms=final_nms, box=box, ref_k=ref_k)
+                         final_nms=final_nms, box=box, ref_k=ref_k, groups=groups)
         hid, cin = self.encoder.hidden_dim, list(self.encoder.in_channels)
         c4 = self.backbone._out_channels[0]
         # same width as the encoder it replaces: the OpenOBB12 head (and its trained weights) reads it unchanged
@@ -68,3 +68,10 @@ def teacher_feats(teacher, x):
     """P3 / P4 / P5 of a trained OpenOBB12 / 17 (frozen, eval) on the same batch (bf16 autocast on CUDA)."""
     with torch.autocast(device_type=x.device.type, dtype=torch.bfloat16, enabled=x.device.type == "cuda"):
         return [f.detach() for f in teacher.encode(x)[1]]
+
+
+class OpenOBB19(OpenOBB18):
+    """OpenOBB18 (fast own neck distilled from a trained encoder, boundary field) + contention-aware class groups:
+    one box per class group at every grid point (models/groups.py, docs/OPENOBB19.md). groups = list of one group id
+    per class, computed from the training labels by the trainer (groups=auto)."""
+    arch = "v19"

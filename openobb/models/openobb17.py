@@ -20,16 +20,19 @@ Why (research/LEDGER.md F64, measured on Wall_Color with the trained OpenOBB12):
   Base: OpenOBB12, the most accurate OpenOBB (0.743 / 0.472, F59); the OpenOBB14 line (direct boxes, own head and
   refiner) stayed below it with either neck (F60, F63, user logs 10-15), so it is not the base.
 """
+import copy
 import math
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .openobb3 import decode, fast_nms
+from .groups import grouped_candidates, parse_groups
+from .openobb3 import DIRECT_CH, REG_CH, OrientedHead, decode, fast_nms
 from .openobb6 import ConvBN
 from .openobb8 import _sample
 from .openobb9 import RepConv
+from .openobb7 import ContextOrientedHead
 from .openobb12 import OpenOBB12
 from .openobb14 import OpenOBB14
 
@@ -130,7 +133,7 @@ class OpenOBB17(OpenOBB12):
     arch = "v17"
 
     def __init__(self, size="x", num_classes=15, img_size=1024, lsk=True, max_det=1000, nms_iou=0.7, off=None,
-                 final_nms=None, box="dfl", ref_k=REF_K, **_):
+                 final_nms=None, box="dfl", ref_k=REF_K, groups=None, **_):
         off_names = [s_.strip() for s_ in (off.split(",") if isinstance(off, str) else (off or [])) if str(s_).strip()]
         self.no_field = "field" in off_names
         super().__init__(size, num_classes, img_size, lsk=lsk, max_det=max_det, nms_iou=nms_iou,
@@ -138,8 +141,42 @@ class OpenOBB17(OpenOBB12):
         self.field = None if self.no_field else BoundaryField(self.backbone._out_channels[0], self.encoder.hidden_dim)
         self.snap = None if self.no_field else BoundarySnap()
         self.ref_k, self.ref_k_train = int(ref_k), REF_K_TRAIN
+        # contention-aware class groups (OpenOBB19, models/groups.py): every point predicts one box per group
+        g = parse_groups(groups, num_classes)
+        self.n_groups = 1 if g is None else max(g) + 1
+        self.register_buffer("class_group", torch.tensor(g if g else [0] * num_classes, dtype=torch.long),
+                             persistent=False)
+        if self.n_groups > 1:
+            r = DIRECT_CH if box == "direct" else REG_CH
+            hid = self.encoder.hidden_dim
+            mk = ContextOrientedHead if "cls_ctx" not in self.off else OrientedHead
+            self.head = mk([hid] * 3, num_classes, reg_ch=self.n_groups * r)
+            self.head_o2o = copy.deepcopy(self.head)
 
     _with_jitter = OpenOBB14._with_jitter
+
+    @torch.no_grad()
+    def replicate_group_boxes(self):
+        """After loading a one-group checkpoint (its box rows landed in group 0): every group starts as that box
+        predictor."""
+        if self.n_groups == 1:
+            return
+        for head in (self.head, self.head_o2o):
+            for m in head.reg:
+                out = m[-1]
+                r = out.out_channels // self.n_groups
+                for k in range(1, self.n_groups):
+                    out.weight[k * r:(k + 1) * r].copy_(out.weight[:r])
+                    out.bias[k * r:(k + 1) * r].copy_(out.bias[:r])
+
+    def candidates(self, cls, reg, pts, st):
+        """-> (logits (B, N, C), boxes (B, N, 5) px): N = A anchors, or G x A (point, group) pairs with grouping."""
+        if self.n_groups == 1:
+            return cls, decode(reg, pts, st)
+        G = self.n_groups
+        r = reg.view(*reg.shape[:-1], G, reg.shape[-1] // G)
+        boxes = torch.stack([decode(r[..., k, :], pts, st) for k in range(G)], 2)          # (B, A, G, 5)
+        return grouped_candidates(cls, boxes, self.class_group)
 
     def snap_topk(self, field, cls, boxes, k):
         """Snap the k best-scoring boxes (B, A, 5) px in place -> (boxes, idx (B, k))."""
@@ -158,18 +195,20 @@ class OpenOBB17(OpenOBB12):
             # feats / input: for losses that compare the neck with a teacher (OpenOBB18); unused otherwise
             out = {"cls": cls, "reg": reg, "points": pts, "strides": st, "o2o_cls": c1, "o2o_reg": r1,
                    "feats": feats, "input": x}
+            if self.n_groups > 1:
+                out["class_group"] = self.class_group
             if field is not None:
                 out["field"] = field
-                boxes = decode(reg.detach(), pts, st)
+                cc, boxes = self.candidates(cls.detach(), reg.detach(), pts, st)
                 k = min(self.ref_k_train, boxes.shape[1])
-                idx = cls.detach().sigmoid().amax(-1).topk(k, dim=1).indices
+                idx = cc.sigmoid().amax(-1).topk(k, dim=1).indices
                 cand = boxes.gather(1, idx[..., None].expand(-1, -1, 5))
                 cand, valid = self._with_jitter(cand, targets)
                 out.update(ref_boxes=self.snap(field, cand), ref_cand=cand, ref_valid=valid)
             return out
         o2o = self.infer_head != "o2m"
         cls, reg = self.run_head(feats, o2o)
-        boxes = decode(reg, pts, st)
+        cls, boxes = self.candidates(cls, reg, pts, st)
         if field is not None and self.ref_k > 0:
             boxes, _ = self.snap_topk(field, cls, boxes, self.ref_k)
         conf = getattr(self, "nms_conf", 0.001)

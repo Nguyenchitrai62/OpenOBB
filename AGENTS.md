@@ -297,6 +297,8 @@ Câu hỏi còn mở:
   Cùng đợt: trainer khớp YOLO (warmup theo epoch tối thiểu 100 iteration, bias LR 0.1, `lf(epoch)`, `nbs=64`).
 - [x] **OpenOBB18 (10-15, F67, 0.17.0):** v17 với neck RepConv tự viết thay encoder lai + LSK, chưng cất từ encoder v12 đã train (`teacher=`).
   520 so với 686 GFLOPs, 50.6M tham số. [docs/OPENOBB18.md](docs/OPENOBB18.md). Luật user: mỗi vòng hai version (tinh chỉnh + đột phá) train song song.
+- [x] **OpenOBB19 (10-15, F72, 0.18.0):** v18 + head theo nhóm tranh chấp (mỗi điểm lưới một box cho mỗi nhóm class, nhóm tự chia từ nhãn).
+  Phát hiện: 60% junction và 86% tường ngắn không có điểm lưới riêng; recall tường < 12 px 0.33 so với YOLO 0.69. [docs/OPENOBB19.md](docs/OPENOBB19.md).
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.

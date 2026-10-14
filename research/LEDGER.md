@@ -1223,6 +1223,19 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     ≥ 0.76 / ≥ 0.50 (vượt YOLO26x 0.746 / 0.499 cả hai), ≤ 12.5 ms ở 1280, box trùng ≤ 3%. Bác bỏ giả thuyết "data bản vẽ": bước 2 không hơn A ≥ 0.01
     mAP50-95.
 
+- **F72. Khuôn "một điểm lưới, một object" là nút thắt trên bản vẽ → OpenOBB19 (head theo nhóm tranh chấp). (10-15, CPU)**
+  [docs/OPENOBB19.md](../docs/OPENOBB19.md). Script `research/analysis/miss_by_length.py`, `openobb/models/groups.py`.
+  - Recall (ProbIoU 0.5, conf 0.25) theo độ dài, v12 / YOLO26x: wall < 12 px **0.33 / 0.69** (72 object), 12–24 px 0.72 / 0.85 (151),
+    ≥ 24 px 0.94–0.97 / 0.89–0.96; wall_300 < 12 px 0.63 / 0.75. → khoảng cách wall mAP50 (−0.075) nằm ở tường ngắn.
+  - Điểm lưới riêng (stride 8, vùng ứng viên = box nới ≥ 8 px như `assign_slots`): không có điểm riêng junction 60%, wall < 12 px 86%,
+    wall_300 < 12 px 86%. Stride 4: 72%; ảnh 1920: 76%; nới 16 px (STAL): 93%. Đối thủ: junction 753, wall 245, door 99.
+    Ma trận tranh chấp (nghìn): junction ↔ wall 7.4, junction ↔ door 1.6, wall ↔ door 1.3, wall ↔ wall 2.4.
+    Tách nhóm junction / wall_300 / còn lại: junction 2%, wall_300 1%, wall ngắn 39%.
+  - Hiệu chỉnh `openobb17x.pt` theo luật F69 (CPU): o2m NMS 0.5 → 0.754 / 0.482, box trùng 7.3% → **2.2%** (file `F:\Downloads\openobb17x_calibrated.pt`).
+    `snap.gain × 20` học được: đầu 1.53, cạnh 1.05 → model có dùng bước bám ranh giới.
+  - OpenOBB19 = v18 + head nhóm (G = 3 tự chia: junction | wall, wall_300 | các loại cửa, note). Công tắc `groups=auto` cho v17 / v18.
+    Chi phí < 0.2% FLOPs. Bắt đầu đúng bằng model một nhóm (test). Kỳ vọng ghi trước: OPENOBB19 mục 4.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

@@ -144,7 +144,74 @@ class OpenOBB10Loss(OpenOBB8Loss):
         n = self.pos_count
         return (n.max() / n.clamp(min=1e-6)).sqrt().clamp(1.0, BAL_MAX)
 
+    @torch.no_grad()
+    def group_assign(self, cls, boxes, pts, st, targets, cg):
+        """Per class group g: the group's objects assigned to the group's boxes (boxes[g] (B, A, 5)) only.
+        -> class targets (B, A, C) summed over groups (disjoint columns), per group lists of fg (A,) and targets."""
+        G = len(boxes)
+        scores = cls.detach().sigmoid()
+        tsc = torch.zeros_like(cls, dtype=torch.float32)
+        fgs, tgts = [[] for _ in range(G)], [[] for _ in range(G)]
+        for b, t in enumerate(targets):
+            gb_all = t["boxes"].float().clone().to(cls.device)
+            gb_all[:, :4] *= self.img_size
+            gl_all = t["labels"].to(cls.device)
+            for g in range(G):
+                sel = cg[gl_all] == g
+                gb, gl = gb_all[sel], gl_all[sel]
+                k = (self.topk + gb[:, 2] / self.topk_len).round().clamp(max=self.topk_max).long()
+                fg, gi, ts = assign_slots(scores[b], boxes[g][b].detach(), pts, st, gl, gb, k, 1, self.alpha,
+                                          self.beta, self.min_side, self.across, self.reach)
+                tsc[b] += ts.float()
+                fgs[g].append(fg)
+                tgts[g].append(gb[gi] if len(gb) else boxes[g].new_zeros((len(fg), 5)))
+        return tsc, fgs, tgts
+
+    def grouped_dense_losses(self, outputs, targets):
+        """Contention-aware class groups (OpenOBB19): reg holds one box per group at every point. Each group is
+        assigned on its own (its classes only, its own boxes), so objects of different groups never compete for a
+        point; the class targets of the groups (disjoint columns) are summed into one classification loss."""
+        cls, reg, pts, st = outputs["cls"], outputs["reg"], outputs["points"], outputs["strides"]
+        cg = outputs["class_group"].to(cls.device)
+        G = int(cg.max()) + 1
+        R = reg.shape[-1] // G
+        regs = reg.view(*reg.shape[:-1], G, R)
+        boxes = [decode(regs[..., g, :], pts, st) for g in range(G)]
+        tsc, fgs, tgts = self.group_assign(cls, boxes, pts, st, targets, cg)
+        norm = tsc.sum().clamp(min=1.0)
+        mod = (cls.detach().sigmoid() - tsc).abs().pow(2)                              # quality focal loss
+        bce = F.binary_cross_entropy_with_logits(cls, tsc.to(cls.dtype), reduction="none") * mod
+        wc = None
+        if self.balance:
+            wc = self.class_weights(tsc)
+            bce = bce * torch.where(tsc > 0, wc.to(bce.dtype), torch.ones_like(bce))
+        out = {"cls": bce.sum() / norm}
+        z = reg.sum() * 0
+        acc = {"box": z, "dfl": z, "across": z, "angle": z}
+        for g in range(G):
+            fg = torch.stack(fgs[g])
+            if not fg.any():
+                continue
+            tgt = torch.stack(tgts[g])
+            tg = tsc[..., cg == g]
+            w = tg.sum(-1)[fg]
+            if wc is not None:
+                w = w * wc[cg == g][tg[fg].argmax(-1)]
+            r = regs[..., g, :][fg]
+            s = st[None].expand(fg.shape)[fg]
+            p_pts = pts[None].expand(fg.shape[0], -1, -1)[fg]
+            lt, rt, at, length, thick, th_t = frame_targets(p_pts, r[:, 0].detach(), tgt[fg])
+            tbox = torch.stack([tgt[fg][:, 0], tgt[fg][:, 1], length, thick, th_t], -1)
+            acc["box"] = acc["box"] + ((1 - probiou(boxes[g][fg], tbox)) * w).sum() / norm
+            acc["dfl"] = acc["dfl"] + (dist_loss(r, s, lt, rt, thick) * w).sum() / norm
+            acc["across"] = acc["across"] + (torch.log1p((r[:, 1] * s - at).abs() / thick.clamp(min=2.0)) * w).sum() / norm
+            acc["angle"] = acc["angle"] + ((1 - torch.cos(2 * (r[:, 0] - th_t))) * w).sum() / norm
+        out.update(acc)
+        return {f"loss_{k}": v * self.w[k] for k, v in out.items()}
+
     def dense_losses(self, outputs, targets):
+        if outputs.get("class_group") is not None:
+            return self.grouped_dense_losses(outputs, targets)
         S = int(outputs.get("slots", 1))
         if S == 1 and not self.reach and not self.balance:
             return super().dense_losses(outputs, targets)
