@@ -1087,6 +1087,21 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Kỳ vọng ghi trước (Wall_Color, COCO, 100 ep, `neck=dfine`): **≥ 0.76 / ≥ 0.53**, junction 50-95 ≥ .60, wall ≥ .63, R@.75 wall ≥ .55, ≤ 21 ms.
     Bác bỏ nếu không hơn v15 ≥ 0.01 mAP50-95, hoặc `ref_k=0` trên checkpoint v16 làm mAP50-95 giảm < 0.01.
 
+- **F63. OpenOBB15-x neck mặc định (`neck=own`) trên Wall_Color (user, 10-14): 0.653 / 0.416. Luồng gốc + P2 không giúp class nhắm tới; note sụp.**
+  [docs/OPENOBB15.md](../docs/OPENOBB15.md) mục 6a.
+  - Không phải hạt giống đăng ký (`neck=dfine`); user xác nhận chạy bản mặc định. Dòng `model` của log ghi "own re-parameterised neck" (cách kiểm
+    tra: bản `neck=dfine` ghi "D-FINE COCO hybrid encoder (control)").
+  - Điều kiện: 0.14.0, COCO init, 100 ep, ảnh vào 2560 (lõi 1280), batch 16 OOM → 8 (3100 bước, 53 GB), lr 1e-3 cos, G4. Best epoch 97.
+    Hiệu chỉnh o2m 0.5 (.4398; o2o none .3903).
+  - So v14 own (F60, 0.713 / 0.469): wall +.001, junction −.006, wall_300 +.008 (mAP50-95) → **đứng yên**; note .439 / .205 (−.218 / −.245),
+    double_door −.071, slide_door .149 / .067. Lỗi: slide_door → wall 58%, note → nền 27%, junction → nền 5%. Box trùng 4.2%. 14.5 ms / ảnh (batch 8).
+  - Bảng kỳ vọng OPENOBB15 mục 4 (viết cho `neck=dfine`): mAP50-95, junction, wall_300 đều **không đạt**; tốc độ đạt.
+  - Đọc: với neck tự thiết kế, thêm pixel (luồng 2560 + P2) không cải thiện độ khít của junction / tường / wall_300 → bằng chứng **chống** lại cơ chế
+    "nhiều pixel hơn" của F61, nhưng chưa đủ để bác bỏ vì (1) neck không có tiên nghiệm, (2) số v14 own có thêm 20 epoch fine-tune.
+    Phần mất lặp lại kiểu F60 (class ngữ nghĩa / hiếm), nặng hơn → càng củng cố giả thuyết "neck tự thiết kế mất tiên nghiệm COCO".
+  - Việc tiếp: đúng cặp đã đăng ký `openobb15x neck=dfine` vs `openobb14x neck=dfine`. Nếu có, xin log v14 own từ COCO 100 ep (cùng lịch) để so
+    sạch v15 own với v14 own.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

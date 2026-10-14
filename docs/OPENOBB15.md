@@ -71,3 +71,35 @@ openobb train model=openobb14x data=/content/data.yaml imgsz=1280 epochs=100 nec
 Log in `OpenOBB15: imgsz 1280 is the core's size; images are prepared at 2560 px`. Batch tự chọn theo VRAM và tự giảm khi thiếu.
 Khi gửi log: bảng theo class, confusion matrix (ô wall_300 → junction), `Duplicate boxes`, `NMS calibrated`, dòng `Speed`.
 Fine-tune từ checkpoint v14 (`weights=`): thân, neck, head P3–P5 nạp thẳng; luồng gốc, P2 và bộ tinh chỉnh khởi tạo mới.
+
+## 6. Kết quả thật
+
+### 6a. `openobb15x` neck mặc định (`neck=own`), user, 10-14 (LEDGER F63)
+
+Không phải hạt giống đã đăng ký (`neck=dfine`); ghi lại vì cơ chế luồng gốc / P2 giống hệt. Điều kiện: 0.14.0, COCO init, 100 epoch,
+`imgsz=1280` (ảnh vào 2560), batch 16 OOM → **batch 8** (31 bước / epoch, 3100 bước), lr 1e-3 cos, G4. Best ở epoch 97 (vẫn tăng rất chậm
+từ epoch 85). Hiệu chỉnh: o2o none .3903 | o2o 0.7 .4309 | o2m 0.7 .4397 | **o2m 0.5 .4398**.
+
+| | v15 own | v14 own (F60) | Δ |
+|---|---|---|---|
+| all | **0.653 / 0.416** | 0.713 / 0.469 | −.060 / −.053 |
+| wall | .889 / .566 | .878 / .565 | +.011 / +.001 |
+| junction | .887 / .536 | .899 / .542 | −.012 / −.006 |
+| door | .962 / .802 | .970 / .813 | −.008 / −.011 |
+| double_door | .551 / .439 | .634 / .510 | −.083 / −.071 |
+| note | **.439 / .205** | .657 / .450 | **−.218 / −.245** |
+| slide_door | .149 / .067 | .276 / .116 | −.127 / −.049 |
+| wall_300 | .690 / .299 | .677 / .291 | +.013 / +.008 |
+
+Lỗi hay gặp: junction → nền 89 (5%), wall → nền 67, slide_door → wall 18 (58%), note → nền 16 (27%). Box trùng 4.2%.
+Tốc độ 14.5 ms / ảnh (batch 8, 2560, trung bình 1906 × 2560).
+
+Đối chiếu bảng mục 4 (tiêu chí viết cho `neck=dfine`; dùng để đọc cơ chế, không phải phán quyết cuối):
+- mAP50-95 ≥ 0.49: **không đạt** (0.416).
+- junction 50-95 hơn v14 ≥ 0.02: **không đạt** (−.006).
+- wall_300 mAP50 tăng ≥ 0.05: **không đạt** (+.013).
+- tốc độ ≤ 20 ms: **đạt** (14.5 ms, batch 8).
+
+Đọc: ở neck tự thiết kế, luồng gốc + P2 **không làm tăng** đúng ba class nó nhắm (wall, junction, wall_300 đứng yên trong ±0.01), còn toàn bộ
+phần mất nằm ở class ngữ nghĩa / hiếm (note −.245, double_door −.071, slide_door −.049), cùng kiểu đã thấy ở v14 (F60) nhưng nặng hơn.
+Lưu ý gây nhiễu: số v14 own là sau một vòng fine-tune thêm 20 epoch, không cùng lịch. Phán quyết cho cơ chế chờ cặp `neck=dfine` ở mục 5.

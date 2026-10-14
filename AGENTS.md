@@ -286,6 +286,8 @@ Câu hỏi còn mở:
 - [x] **OpenOBB15 (2026-10-14, F61, 0.14.0):** v14 + luồng độ phân giải gốc + lưới P2 + bộ tinh chỉnh đọc luồng gốc, nhắm mAP50-95 của
   junction / tường / wall_300 trên Wall_Color. [docs/OPENOBB15.md](docs/OPENOBB15.md). Vòng hai hạt giống: `openobb15x neck=dfine` so với
   `openobb14x neck=dfine`. Chờ log user.
+  **Kết quả bản `neck=own` (F63):** 0.653 / 0.416, 14.5 ms (batch 8). wall / junction / wall_300 đứng yên so với v14 own, note sụp
+  (−.245 mAP50-95). Cặp đăng ký `neck=dfine` vẫn chưa chạy.
 - [x] **OpenOBB16 (2026-10-14, F62, 0.15.0):** v15 + cascade 3 bước tinh chỉnh box + điểm × độ khít dự đoán. [docs/OPENOBB16.md](docs/OPENOBB16.md).
   Công tắc mới `v14_off=stage4,widehead` cho bản nhanh. Chờ log v15 / v16 của user.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
@@ -364,7 +366,8 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 4. Cập nhật mục 8 của file này và memory của agent nếu user ra luật mới.
 
 ### B6. Trạng thái vòng hiện tại (2026-10-14 tối)
-- Đang train (user): `openobb15x neck=dfine` (v15, ảnh vào 2560). Có thể cả `openobb14x neck=dfine`.
+- Đã có: `openobb15x` neck mặc định (F63, 0.653 / 0.416). Cần chạy: `openobb15x neck=dfine` và `openobb14x neck=dfine`
+  (kiểm tra dòng `model` của log có "D-FINE COCO hybrid encoder (control)").
 - Sẵn sàng train: `openobb16x neck=dfine` (v16, 0.15.0). Bản nhanh nếu quá chậm: thêm `v14_off=stage4,widehead`.
 - Cây quyết định khi có log:
   - v15 ≥ 0.76 / 0.51 và wall_300 ≥ .78 → cơ chế độ phân giải gốc được xác nhận; chạy v16 từ `best.pt` của v15 (`weights=`), so cùng xuất phát.
@@ -383,6 +386,9 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 - `push_all.py` chỉ đồng bộ file đã commit; nó in danh sách file chưa commit, đọc để không bỏ sót.
 
 ## 9. Nhật ký
+
+- 2026-10-14 (tối): **Log v15 neck mặc định** (F63): 0.653 / 0.416, luồng gốc + P2 không giúp wall / junction / wall_300, note sụp.
+  Kết quả ghi ở `docs/OPENOBB15.md` mục 6a. Bước tiếp vẫn là cặp `neck=dfine` (v15 vs v14).
 
 - 2026-10-14: **OpenOBB14 + mổ bên trong backbone** (F58, [docs/OPENOBB14.md](docs/OPENOBB14.md); chưa train).
   - User: phải đào sâu vào bên trong MỌI backbone SOTA (không chỉ lắp thêm lên HGNetv2) mới có đột phá; mốc so sánh là
