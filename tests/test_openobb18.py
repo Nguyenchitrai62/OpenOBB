@@ -91,3 +91,8 @@ def test_cli_v18_uses_weights_as_teacher(tmp_path, monkeypatch):
           cache_dir=str(tmp_path / "cache"), workers=1, weights=str(w))
     argv = " ".join(calls[0])
     assert f"--teacher {w}" in argv and f"--weights {w}" in argv
+    w18 = tmp_path / "v18.pt"                                  # a v18 checkpoint is not used as its own teacher
+    torch.save({"model": {}, "classes": ["door", "window"], "args": {"arch": "v18"}}, w18)
+    train(str(data), model="openobb18s", epochs=1, batch=2, imgsz=256, project=str(tmp_path / "runs"), name="t2",
+          cache_dir=str(tmp_path / "cache"), workers=1, weights=str(w18))
+    assert "--teacher" not in " ".join(calls[1])

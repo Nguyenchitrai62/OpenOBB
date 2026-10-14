@@ -76,4 +76,17 @@ Train song song với v17 (thẻ v17 mục 5). Gửi lại: bảng theo class, c
 
 **Run 1 (user, 10-15, F70): sai thiết kế** (không `weights=`, không `teacher=`: neck học từ đầu trên thân COCO): 0.623 / 0.369.
 **Tốc độ 12.2 ms** so với v17 15.9 ms (−23%), v12 15.3 ms (−20%): phần tốc độ đạt. Phần độ chính xác chưa được thử.
-Từ 0.17.2, `weights=` tự được dùng làm `teacher=`.
+Từ 0.17.2, `weights=` tự được dùng làm `teacher=` (từ 0.17.3: chỉ khi `weights=` là v12 / v17).
+
+## 7. Kế hoạch vượt YOLO (F71)
+
+```bash
+# A: v18 đúng thiết kế trên Wall_Color (thầy = openobb12x.pt, tự bật)
+openobb train data=/content/data.yaml model=openobb18x epochs=60 imgsz=1280 batch=16 lr=0.001 nbs=0 warmup_bias_lr=0 epoch_lr=False weights=/content/openobb12x.pt
+# B: pretrain v18 trên FloorPlanCAD (tự tải + chuyển đổi khoảng 15 phút)
+git clone -q https://github.com/Nguyenchitrai62/OpenOBB /content/OpenOBB
+python /content/OpenOBB/colab/data/floorplancad.py --root /content/datasets
+openobb train model=openobb18x data=/content/datasets/floorplancad_1024 imgsz=1024 epochs=24 batch=16
+# Bước 2 (sau B): finetune Wall_Color từ checkpoint FloorPlanCAD
+openobb train data=/content/data.yaml model=openobb18x epochs=60 imgsz=1280 batch=16 lr=0.001 nbs=0 warmup_bias_lr=0 epoch_lr=False weights=<best.pt của B>
+```

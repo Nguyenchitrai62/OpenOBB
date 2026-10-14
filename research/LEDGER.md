@@ -1212,6 +1212,17 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Không phải phép thử giả thuyết độ chính xác của v18 (chưng cất từ v12 đã train). Sửa CLI (0.17.2): `model=openobb18x weights=X` tự dùng X làm
     `teacher=`; thiếu `weights=` thì cảnh báo. Chạy lại đúng thiết kế.
 
+- **F71. Kế hoạch vượt YOLO cả ba mặt (user 10-15: chính xác hơn ở mAP50 và 50-95, nhanh hơn, ít box trùng). Ghi trước.**
+  - Box trùng: đã giải bằng hiệu chỉnh (F69). Tốc độ: v18 −20% (F70). Độ chính xác: mọi kiến trúc + YOLO dừng quanh 0.74–0.75 trên 250 ảnh → giới hạn
+    là lượng bản vẽ đã học (F39, F21), không phải sơ đồ.
+  - Bước 1 (cặp song song): A = v18 đúng thiết kế trên Wall_Color (`weights=openobb12x.pt`, thầy tự bật; 60 ep, công thức cũ). B = **v18 pretrain
+    detection trên FloorPlanCAD** (khoảng 7k bản vẽ có nhãn, 30 class, 24 ep, 1024, từ COCO; neck có đủ data để học).
+  - Bước 2: finetune Wall_Color từ `best.pt` của B (CLI không tự lấy checkpoint v18 làm thầy, 0.17.3), thử cả `imgsz=1440` (tốc độ dư của v18 trả cho
+    pixel: 1440² × 0.8 ≈ thời gian của v17 ở 1280).
+  - Kỳ vọng ghi trước: B trên FloorPlanCAD val ≥ 0.78 / ≥ 0.70 (YOLO26x 0.802 / 0.750; VRDet-S c6 0.782 / 0.688). Bước 2 trên Wall_Color
+    ≥ 0.76 / ≥ 0.50 (vượt YOLO26x 0.746 / 0.499 cả hai), ≤ 12.5 ms ở 1280, box trùng ≤ 3%. Bác bỏ giả thuyết "data bản vẽ": bước 2 không hơn A ≥ 0.01
+    mAP50-95.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

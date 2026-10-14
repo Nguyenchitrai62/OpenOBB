@@ -594,8 +594,9 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         # OpenOBB18 is meant to start from a trained OpenOBB12 / 17 (trunk + head) and to distil its new neck from that
         # model's encoder; without both, the neck learns from scratch (F70: 0.623 / 0.369 instead of ~v12)
         src = opts.get("weights")
-        if src and not opts.get("teacher"):
-            opts["teacher"] = src
+        src_arch = _ckpt_args(src)[0].get("arch") if src and Path(str(src)).exists() else None
+        if src and not opts.get("teacher") and src_arch in ("v12", "v17"):
+            opts["teacher"] = src            # a v18 checkpoint (e.g. pretrained on drawings) already has its own neck
             print(f"[openobb] OpenOBB18: teacher= not given, distilling the neck from weights={src}")
         if not src:
             print("[openobb] WARNING: OpenOBB18 without weights= starts its neck from scratch (much lower accuracy, F70). "
