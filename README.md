@@ -27,13 +27,15 @@ hoặc là file được bàn giao). Đặt file `.whl` vào thư mục đang đ
 Máy có GPU NVIDIA:
 
 ```bash
-pip install -U torch ./openobb-X.Y.Z-py3-none-any.whl --index-url https://download.pytorch.org/whl/cu126 --extra-index-url https://pypi.org/simple
+pip install -U torch --index-url https://download.pytorch.org/whl/cu126
+pip install -U ./openobb-X.Y.Z-py3-none-any.whl
 ```
 
 Máy chỉ có CPU:
 
 ```bash
-pip install -U torch ./openobb-X.Y.Z-py3-none-any.whl --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple
+pip install -U torch --index-url https://download.pytorch.org/whl/cpu
+pip install -U ./openobb-X.Y.Z-py3-none-any.whl
 ```
 
 - Luôn cài bản mới nhất; chạy lại đúng lệnh để cập nhật. GPU RTX 50xx: đổi `cu126` thành `cu130`.
