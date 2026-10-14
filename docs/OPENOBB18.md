@@ -74,4 +74,6 @@ Train song song với v17 (thẻ v17 mục 5). Gửi lại: bảng theo class, c
 
 ## 6. Kết quả thật
 
-(chưa train)
+**Run 1 (user, 10-15, F70): sai thiết kế** (không `weights=`, không `teacher=`: neck học từ đầu trên thân COCO): 0.623 / 0.369.
+**Tốc độ 12.2 ms** so với v17 15.9 ms (−23%), v12 15.3 ms (−20%): phần tốc độ đạt. Phần độ chính xác chưa được thử.
+Từ 0.17.2, `weights=` tự được dùng làm `teacher=`.

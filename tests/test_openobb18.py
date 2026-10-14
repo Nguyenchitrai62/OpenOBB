@@ -76,3 +76,18 @@ def test_v18_fuse_and_registry():
         b = m.fuse()(x)
     assert torch.allclose(a["pred_boxes"], b["pred_boxes"], atol=1e-3)
     assert MODELS["openobb18x"] == ("v18", "x") and "v18" in KNOWN_ARCHS
+
+
+def test_cli_v18_uses_weights_as_teacher(tmp_path, monkeypatch):
+    import openobb.train as trainer
+    from openobb.cli import train
+    from tests.test_cli import _dataset
+    calls = []
+    monkeypatch.setattr(trainer, "main", lambda argv: calls.append(argv))
+    data = _dataset(tmp_path / "ds")
+    w = tmp_path / "v12.pt"
+    torch.save({"model": {}, "classes": ["door", "window"], "args": {"arch": "v12"}}, w)
+    train(str(data), model="openobb18s", epochs=1, batch=2, imgsz=256, project=str(tmp_path / "runs"), name="t",
+          cache_dir=str(tmp_path / "cache"), workers=1, weights=str(w))
+    argv = " ".join(calls[0])
+    assert f"--teacher {w}" in argv and f"--weights {w}" in argv

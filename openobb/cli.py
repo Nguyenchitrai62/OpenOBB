@@ -590,6 +590,16 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
             v = extra[k]
             extra[k] = ",".join(sorted({s.strip() for s in (v.split(",") if isinstance(v, str) else v) if str(s).strip()}))
     opts.update(extra)
+    if arch == "v18" and not resume:
+        # OpenOBB18 is meant to start from a trained OpenOBB12 / 17 (trunk + head) and to distil its new neck from that
+        # model's encoder; without both, the neck learns from scratch (F70: 0.623 / 0.369 instead of ~v12)
+        src = opts.get("weights")
+        if src and not opts.get("teacher"):
+            opts["teacher"] = src
+            print(f"[openobb] OpenOBB18: teacher= not given, distilling the neck from weights={src}")
+        if not src:
+            print("[openobb] WARNING: OpenOBB18 without weights= starts its neck from scratch (much lower accuracy, F70). "
+                  "Use weights=<trained openobb12x / 17x .pt> (it is also used as teacher=).")
     if float(opts["lr"]) > 3 * sd["lr"] and not dense_arch:
         print(f"[openobb] WARNING: lr0={opts['lr']:g} is {float(opts['lr']) / sd['lr']:.0f}x the default for OpenOBB1-{size} "
               f"({sd['lr']:g}). DETR-style detectors usually diverge (NaN boxes) above ~2e-4; the 1e-3 of one-stage "

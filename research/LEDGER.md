@@ -1202,6 +1202,16 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     fine-tune từ `best.pt` F68, cùng công thức với F68. Khi nạp checkpoint DFL, hàng khoảng cách / độ dày của lớp ra được đưa về 0 (góc / lệch ngang giữ).
     Kỳ vọng ghi trước: wall 50-95 ≥ .56, wall_300 ≥ .30, junction ≥ .54, tổng ≥ 0.495 / mAP50 ≥ 0.745, box trùng ≤ 3%. Bác bỏ: wall 50-95 < .535.
 
+- **F70. OpenOBB18-x chạy SAI thiết kế (user, 10-15): không `weights=`, không `teacher=` → 0.623 / 0.369; tốc độ ĐẠT 12.2 ms.**
+  - Log: "own re-parameterised neck (no teacher)", init "D-FINE COCO weights": neck học từ đầu trên thân COCO, head khởi tạo mới = đúng kịch bản v18
+    được thiết kế để tránh (giống v14 own, F60). 0.17.0, công thức YOLO mới (`nbs 64`, 100 ep, khoảng 375 bước cập nhật), batch 16, G4. Best ep 97, còn tăng.
+  - Theo class: wall .809 / .435, junction .845 / .450, wall_300 .534 / .183, note .707 / .407, door .959 / .754, slide_door .126 / .045,
+    double_door .382 / .311. Lỗi: wall_300 → junction 37%, slide_door → wall 68%. Box trùng 10.3%.
+  - **Tốc độ: 12.2 ms / ảnh so với v17 15.9 ms (−23%) và v12 15.3 ms (−20%)**, cùng G4 batch 16 → phần tốc độ của v18 được xác nhận
+    (kỳ vọng ≤ 11.5 ms: gần đạt; FLOPs −24%).
+  - Không phải phép thử giả thuyết độ chính xác của v18 (chưng cất từ v12 đã train). Sửa CLI (0.17.2): `model=openobb18x weights=X` tự dùng X làm
+    `teacher=`; thiếu `weights=` thì cảnh báo. Chạy lại đúng thiết kế.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
