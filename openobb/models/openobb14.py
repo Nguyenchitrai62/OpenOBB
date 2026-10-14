@@ -140,8 +140,9 @@ class EdgeRefiner(nn.Module):
     by openobb8.refine_boxes (ends in units of clamp(L / 10, 2, 32) px, log thickness, across offset in units of
     max(T / 2, 1) px, angle 0.2 tanh). The last layer starts at zero: the refiner is the identity at the start."""
 
-    def __init__(self, c4, c3, ce=64, hidden=256):
+    def __init__(self, c4, c3, ce=64, hidden=256, s4=4, s3=8):
         super().__init__()
+        self.s4, self.s3 = s4, s3                      # strides (input px) of the detail map and of P3
         self.p4 = ConvBN(c4, ce, 1, act=False)
         self.p3 = ConvBN(c3, ce, 1, act=False)
         u = (torch.arange(N_ALONG) + 0.5) / N_ALONG - 0.5
@@ -170,8 +171,8 @@ class EdgeRefiner(nn.Module):
         b = b.detach().float()
         B, K, _ = b.shape
         pts = self.points(b)
-        s4 = _sample(self.p4(f4), pts.reshape(B, -1, 2), 4).reshape(B, K, -1)
-        s3 = _sample(self.p3(p3), pts[:, :, -N_ALONG:].reshape(B, -1, 2), 8).reshape(B, K, -1)
+        s4 = _sample(self.p4(f4), pts.reshape(B, -1, 2), self.s4).reshape(B, K, -1)
+        s3 = _sample(self.p3(p3), pts[:, :, -N_ALONG:].reshape(B, -1, 2), self.s3).reshape(B, K, -1)
         geo = torch.stack([torch.log1p(b[..., 2]) / 7, torch.log1p(b[..., 3]) / 4, torch.sin(2 * b[..., 4]),
                            torch.cos(2 * b[..., 4])], -1)
         d = self.mlp(torch.cat([s4, s3, geo], -1).to(self.mlp[0].weight.dtype)).float()

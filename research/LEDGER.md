@@ -1061,6 +1061,20 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     và FloorPlanCAD (24 ep, `colab/data/floorplancad.py`). Lý do thêm FPC: Wall_Color gần trần 250 ảnh (ba model khác nhau trong 0.03 mAP50;
     class hiếm 25–31 object val là nhiễu). Kỳ vọng ghi trước: OPENOBB14 mục 4c.
 
+- **F61. OpenOBB15 (10-14, chưa train): v14 + luồng độ phân giải gốc + lưới P2 + bộ tinh chỉnh đọc luồng gốc.** [docs/OPENOBB15.md](../docs/OPENOBB15.md).
+  - User: cần kiến trúc mạnh hơn YOLO **trên chính Wall_Color**, không đi vòng qua DOTA. Phần thua (F59 / F60) nằm ở mAP50-95 của junction 9.5 px,
+    tường dày 5.6 px, wall_300 10 × 6 px ở 1280. Cơ chế duy nhất có lập luận vật lý rõ cho lỗi này là **nhiều pixel hơn trên mỗi vật**: ở ảnh gốc
+    2381 px chúng to gấp đôi; cùng sai số 1 px thì IoU ở 0.75 giữ được. 53% wall_300 chung ô với junction ở 1280 → 6% ở stride 4 trên 2560 (F52).
+    YOLO ở 1280 không thấy pixel này; muốn thấy phải chạy cả mạng ở 2560 (gấp 4 chi phí). v15 chỉ thêm luồng nhẹ 36 G + head P2 40 G.
+  - v15 = OpenOBB14 (kế thừa) + luồng gốc (`HiResStream` của v13, 192 kênh ở stride 8 ảnh gốc) + `to_p3` zero-init + P2 (lateral + P3 phóng → RepConv →
+    head kép riêng, rộng 80) + `EdgeRefiner(s4=8, s3=16)` đọc luồng gốc thay bản đồ stride 4 của thân. Strides ảnh gốc 16 / 32 / 64 / 8.
+    Lõi bắt đầu đúng bằng v14 ở nửa độ phân giải (test). `imgsz` = cỡ lõi, ảnh vào 2× (như v13 từ 0.12.0).
+  - Cỡ x: `neck=dfine` 71.1M, 882 GFLOPs ở 1920 × 2560 (v12 682 ở 960 × 1280, +29%); `neck=own` 62.7M, 752 G. v15 nhắm độ chính xác; v14 nhắm tốc độ.
+  - Kỳ vọng ghi trước (Wall_Color, COCO, 100 ep, `neck=dfine`): **≥ 0.76 / ≥ 0.51**; junction 50-95 ≥ .58 (v14 .542), wall ≥ .60 (.565),
+    wall_300 mAP50 ≥ .78 (.677), note ≥ .72; tốc độ ≤ 20 ms (batch 16, G4). Bác bỏ nếu mAP50-95 < 0.49, hoặc junction 50-95 không hơn v14 ≥ 0.02,
+    hoặc wall_300 mAP50 tăng < 0.05.
+  - Vòng hai hạt giống: A = `openobb15x neck=dfine`, B = `openobb14x neck=dfine` (khác đúng một yếu tố: luồng gốc + P2 + tinh chỉnh ở độ phân giải gốc).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

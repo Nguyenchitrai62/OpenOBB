@@ -282,6 +282,9 @@ Câu hỏi còn mở:
   Chi tiết và kỳ vọng ghi trước: [docs/OPENOBB14.md](docs/OPENOBB14.md).
   **Kết quả (F60):** 0.713 / 0.469, 10.9 ms (v12: 0.743 / 0.472, 15.3 ms). Tốc độ đạt, wall +.045 mAP50-95, nhưng note / slide_door /
   wall_300 tụt → mất tiên nghiệm encoder. Đang chờ phép thử `neck=dfine` (0.13.1) để tách nguyên nhân.
+- [x] **OpenOBB15 (2026-10-14, F61, 0.14.0):** v14 + luồng độ phân giải gốc + lưới P2 + bộ tinh chỉnh đọc luồng gốc, nhắm mAP50-95 của
+  junction / tường / wall_300 trên Wall_Color. [docs/OPENOBB15.md](docs/OPENOBB15.md). Vòng hai hạt giống: `openobb15x neck=dfine` so với
+  `openobb14x neck=dfine`. Chờ log user.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.

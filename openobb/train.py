@@ -42,7 +42,7 @@ def build_parser():
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14"],
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15"],
                     help="v1: OpenOBB (DETR-style decoder); v2: OpenOBB2 (dense segment-aware, NMS-free); "
                          "v3: OpenOBB3 (pretrained encoder + dense anisotropic oriented head); "
                          "v4: OpenOBB4 (DINOv2 backbone + DETR decoder + dense oriented branch); "
@@ -236,9 +236,10 @@ def main(argv=None):
 
     classes = dataset_classes(a.data)
     v2, v4, v5 = a.arch == "v2", a.arch == "v4", a.arch == "v5"
-    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14")
+    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15")
     v6, v7, v8, v10 = a.arch == "v6", a.arch == "v7", a.arch == "v8", a.arch == "v10"
-    v11, v12, v13, v14 = a.arch == "v11", a.arch == "v12", a.arch == "v13", a.arch == "v14"
+    v11, v12, v13, v14 = a.arch == "v11", a.arch == "v12", a.arch == "v13", a.arch in ("v14", "v15")
+    v15 = a.arch == "v15"
     v9 = a.arch == "v9"
     dense_arch = v2 or v3                       # dense heads: no queries / decoder
     if v4:                                      # DETR decoder fed and supervised by the dense oriented branch
@@ -252,8 +253,9 @@ def main(argv=None):
         from openobb.models.openobb3_loss import OpenOBB3Loss
         if v14:
             from openobb.models.openobb14 import OpenOBB14
-            model = OpenOBB14(a.size, num_classes=len(classes), img_size=a.img, max_det=a.num_top,
-                              off=a.v14_off or None, box=a.box, ref_k=a.ref_k, neck=a.neck)
+            from openobb.models.openobb15 import OpenOBB15
+            model = (OpenOBB15 if v15 else OpenOBB14)(a.size, num_classes=len(classes), img_size=a.img, max_det=a.num_top,
+                                                      off=a.v14_off or None, box=a.box, ref_k=a.ref_k, neck=a.neck)
         elif v12 or v13:
             from openobb.models.openobb12 import OpenOBB12, OpenOBB13
             model = (OpenOBB13 if v13 else OpenOBB12)(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk,
@@ -467,7 +469,9 @@ def main(argv=None):
                 f"init: {init_desc}")
         elif v14:
             neck_desc = "own re-parameterised neck" if a.neck == "own" else "D-FINE COCO hybrid encoder (control)"
-            say(f"model   OpenOBB14-{a.size} (pretrained HGNetv2 trunk + {neck_desc} + heavy dual dense "
+            if v15:
+                neck_desc = (f"{neck_desc} at {a.img // 2} px + full-resolution {a.img} px detail stream + P2 grid")
+            say(f"model   OpenOBB{15 if v15 else 14}-{a.size} (pretrained HGNetv2 trunk + {neck_desc} + heavy dual dense "
                 f"oriented head, box={a.box}, edge refiner on {a.ref_k} candidates"
                 f"{', off: ' + a.v14_off if a.v14_off else ''}), {n_par:.2f}M params, max {a.num_top} detections | "
                 f"init: {init_desc}")
