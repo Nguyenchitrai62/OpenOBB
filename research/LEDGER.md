@@ -1172,6 +1172,19 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Ghi chú vận hành: run v17 đầu tiên của user (0.16.0) chạy công thức YOLO mới (`nbs 64`, accumulate 4: 30 epoch chỉ khoảng 112 bước cập nhật)
     → đã đề nghị chạy lại với `nbs=0 warmup_bias_lr=0 epoch_lr=False`.
 
+- **F68. OpenOBB17-x trên Wall_Color (user, 10-15): 0.754 / 0.485 (head một-nhiều + NMS 0.7), 15.9 ms. Tổng vùng xám; cơ chế trường ranh giới CHƯA
+  được xác nhận (class nhắm tới không tăng).**
+  - Điều kiện: 0.16.0, công thức YOLO mới (`nbs 64`, accumulate 4, warmup 100 it, bias lr 0.1, lf theo epoch), 30 ep, batch 16, 1280, khởi tạo từ
+    `train2/best.pt` = v17 vòng 1 (30 ep từ `openobb12x.pt`, cùng công thức). Tổng: v12 + 2 vòng fine-tune → **không cùng điều kiện F59**.
+    Best epoch 20; ep 15–30 dao động 0.743–0.756 / 0.476–0.486 (đã chững). Hiệu chỉnh: o2o none .4889 | o2o 0.7 .5069 | **o2m 0.7 .5121**.
+  - Theo class so với v12 F59 (mAP50 / 50-95): wall .844 / .521 (−.033 / 0), junction .896 / .515 (0 / −.016), wall_300 .712 / .270 (−.009 / −.040),
+    note .777 / .508 (+.036 / +.049), slide_door .464 / .254 (+.054 / +.037), double_door .613 / .525 (+.041 / +.063), door .973 / .802.
+    Lỗi: wall → nền 10%, junction → nền 6%, wall_300 → junction 22%, slide_door → wall 39%. Box trùng 7.5%.
+  - So YOLO26x (0.746 / 0.499): mAP50 +0.008 (lần đầu OpenOBB vượt), mAP50-95 −0.014.
+  - Đối chiếu OPENOBB17 mục 4: tổng +0.013 (vùng xám +0.01..+0.025); wall ≥ .55 không đạt (.521), junction ≥ .56 không đạt (.515), wall_300 ≥ .34
+    không đạt (.270, còn tụt); tốc độ ≤ 17 ms đạt. Phần tăng ở class hiếm (nhiễu ±0.06–0.09, F64) và có thể do 2 vòng train thêm.
+  - Việc tiếp: đọc `snap.gain` + chạy `box_error_oracle.py` trên `best.pt` (CPU); nếu cần, v12 qua đúng 2 vòng cùng công thức làm đối chứng.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
