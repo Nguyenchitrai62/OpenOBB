@@ -63,6 +63,7 @@ def draw(img_rgb, dets, names, thickness, show_text):
 
 
 def main():
+    t_page = time.time()
     st.set_page_config(page_title="OpenOBB OBB test", page_icon="📐", layout="wide")
 
     with st.sidebar:
@@ -144,8 +145,9 @@ def main():
     thr = conf_thresholds(names, targs, "auto" if auto else conf)
     raw = [d for d in st.session_state["raw"] if d[2] >= thr[d[1]]]
     dets = [d for d in merge_dets(raw, names, 0.0, iou) if d["class_id"] in selected]
-    right.image(preview(draw(rgb, dets, names, thickness, show_text)), caption=f"{len(dets)} objects · "
-                f"{st.session_state['ms']:.0f} ms ({device})")
+    right.image(preview(draw(rgb, dets, names, thickness, show_text)), caption=f"{len(dets)} objects · model "
+                f"{st.session_state['ms']:.0f} ms ({device}, {torch.get_num_threads()} threads) · page update "
+                f"{(time.time() - t_page) * 1000:.0f} ms")
 
     counts = pd.Series([d["class"] for d in dets], dtype=str).value_counts()
     table = pd.DataFrame({"class": names, "count": [int(counts.get(n, 0)) for n in names]})
