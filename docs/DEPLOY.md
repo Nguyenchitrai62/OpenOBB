@@ -5,31 +5,43 @@ OpenOBB tự viết phần giao diện này; package không phụ thuộc Ultral
 
 ## Cài đặt
 
-**Máy có GPU NVIDIA:**
+### Bước 1: cài PyTorch (chọn một)
+
+Máy có GPU NVIDIA:
 
 ```bash
 pip install -U torch --index-url https://download.pytorch.org/whl/cu126
-pip install -U "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"
 ```
 
-**Máy chỉ có CPU:**
+Máy chỉ có CPU:
 
 ```bash
 pip install -U torch --index-url https://download.pytorch.org/whl/cpu
+```
+
+GPU RTX 50xx: đổi `cu126` thành `cu130`.
+
+### Bước 2: cài code (chọn một)
+
+Từ repo:
+
+```bash
 pip install -U "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"
 ```
 
-Luôn cài bản mới nhất; chạy lại đúng lệnh đó để cập nhật. GPU RTX 50xx: đổi `cu126` thành `cu130`.
+Từ file wheel (không cần quyền truy cập repo; file mới nhất nằm trong thư mục `wheels/` của repo sản phẩm, hoặc là file
+được bàn giao; `X.Y.Z` là phiên bản ghi trong tên file):
 
-- Phụ thuộc: torch, numpy, opencv-python, shapely, scipy, pyyaml. Pillow là tuỳ chọn, chỉ cần khi đưa ảnh PIL vào.
+```bash
+pip install -U ./openobb-X.Y.Z-py3-none-any.whl
+```
+
+- Bước 2 giữ nguyên PyTorch đã cài ở bước 1. Cập nhật: chạy lại bước 2.
+- Khi suy luận, model tự chạy trên GPU nếu có. Nếu máy có GPU NVIDIA mà PyTorch là bản CPU, lần dùng đầu tiên sẽ tự cài
+  bản GPU rồi báo chạy lại (tắt bằng biến môi trường `OPENOBB_AUTO_TORCH=0`).
+- Kiểm tra phiên bản: `python -c "import openobb; print(openobb.__version__)"`.
 - Nếu repo chuyển sang private: `pip install "openobb @ git+https://<token>@github.com/Nguyenchitrai62/OpenOBB.git"`.
 - Chỉ cần file `best.pt`. Mọi thông tin kiến trúc (v1–v5), class và imgsz đều nằm trong checkpoint.
-
-**GPU tự động:** khi suy luận, model chạy trên GPU nếu có, không thì CPU. Lần dùng đầu tiên (`from openobb import OpenOBB`, lệnh `openobb`, app Streamlit), package kiểm tra PyTorch:
-- máy có GPU NVIDIA nhưng PyTorch là bản CPU (mặc định của `pip install torch` trên Windows) → tự cài bản CUDA hợp với driver, rồi báo cần chạy lại;
-- máy không có GPU và chưa có PyTorch → cài bản CPU.
-
-Tắt bằng biến môi trường `OPENOBB_AUTO_TORCH=0`.
 
 ## File model giao cho khách (từ 0.8.1)
 
