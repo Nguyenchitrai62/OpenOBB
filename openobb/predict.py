@@ -120,7 +120,7 @@ def merge_iou_for(v, fit):
 
 def load_model(ckpt_path, device, queries=None, classes=None):
     if torch.device(device).type == "cpu":
-        # denormal floats take the slow x86 path: 2.1x slower on CPU with identical detections when flushed (F57)
+        # flush denormals (identical detections; speed effect not reproducible on the dev machine, F57)
         torch.set_flush_denormal(True)
     m, names, a = _load_model(ckpt_path, device, queries, classes)
     if a.get("infer_k") and getattr(m, "refiner", None) is not None:   # calibrated at training
@@ -232,6 +232,10 @@ def predict_image(model, img, size, gap, batch, device, num_top, vec=None, amp=T
     rect: an image that fits in one tile (whole-image resize) is padded only to multiples of 32 (rect_shape), top-left
     anchored like the square tile; larger images keep square size x size tiles. info (dict): gets "shape", the
     network input shape (B, 3, H, W) of the last batch."""
+    if torch.device(device).type == "cpu":
+        # flush denormals (identical detections; harmless). Its speed effect on the dev machine was NOT reproducible
+        # once runs alternated (3.4-10 s either way, F57). The flag is per thread, so it is set on every call
+        torch.set_flush_denormal(True)
     if scale != 1.0:
         h0, w0 = img.shape[:2]
         img = cv2.resize(img, (max(1, round(w0 * scale)), max(1, round(h0 * scale))),

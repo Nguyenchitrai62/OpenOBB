@@ -927,6 +927,13 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     - Đầu ra giống hệt: 378 / 378 box, cùng class và điểm, lệch góc box 0.000 px.
     - F47 kết luận "không phải denormal" chỉ dựa trên đầu ra của backbone; denormal nằm ở activation bên trong.
     → 0.12.3: `load_model` bật flush khi chạy CPU.
+    - **ĐÍNH CHÍNH (10-14): hiệu quả tốc độ của flush denormal KHÔNG lặp lại được.**
+      - Hook trên 830 module lá: không có đầu vào hay đầu ra nào là denormal; weights cũng không có (0 / 67 triệu).
+      - Chạy xen kẽ 4 vòng trong thread mới: có flush 10.0 / 9.1 / 9.4 / 3.6 s, không flush 10.3 / 9.4 / 7.0 / 3.4 s.
+      - → Chênh 19 s so với 9 s trước đó là do máy dao động (CPU lai nhân P + E, Chrome và các tiến trình khác chạy cùng),
+        không phải do denormal. Flush được giữ vì vô hại (đầu ra giống hệt), nhưng không phải bản sửa tốc độ.
+      - Trên máy dev, chỉ nên so tốc độ CPU khi chạy xen kẽ và nhìn trung vị; một lần đo đơn lẻ có thể lệch tới 3 lần.
+      - Mốc từ user: `OpenOBB.predict` (test.py, CPU máy user) = **2.9 s** / ảnh 928 × 1280.
   - Thời gian CPU giữa các tiến trình dao động 3.7–19 s cho cùng ảnh. Máy có 10 nhân / 16 luồng, 2.5 GHz, có thể là kiểu lai nhân P + E.
     App giờ dùng số luồng bằng số nhân vật lý (8 luồng nhanh gấp 2 lần 4 luồng).
 
