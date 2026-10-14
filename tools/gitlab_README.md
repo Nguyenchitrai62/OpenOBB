@@ -9,32 +9,26 @@ Giao diện predict / kết quả giống YOLO-OBB.
 **Từ file wheel (bàn giao cho khách, không cần quyền truy cập repo):**
 
 ```bash
-pip install torch --index-url https://download.pytorch.org/whl/cu126   # máy có GPU NVIDIA; máy chỉ có CPU: .../whl/cpu
-pip install openobb-X.Y.Z-py3-none-any.whl                              # các thư viện còn lại tự cài từ PyPI
+pip install -U torch openobb-X.Y.Z-py3-none-any.whl --index-url https://download.pytorch.org/whl/cu126 --extra-index-url https://pypi.org/simple   # máy chỉ có CPU: .../whl/cpu
 ```
 
 Wheel của phiên bản mới nhất nằm trong thư mục `wheels/` của repo (khoảng 200 KB, mỗi lần phát hành tự tạo lại).
 
 **Từ repo (cần tài khoản GitLab):**
 
-**Máy có GPU NVIDIA** (suy luận bằng GPU):
+**Máy có GPU NVIDIA:**
 
 ```bash
-pip install torch --index-url https://download.pytorch.org/whl/cu126
-pip install "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git"
+pip install -U torch "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git" --index-url https://download.pytorch.org/whl/cu126 --extra-index-url https://pypi.org/simple
 ```
 
 **Máy chỉ có CPU:**
 
 ```bash
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-pip install "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git"
+pip install -U torch "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git" --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple
 ```
 
-- Hai lệnh luôn cài bản mới nhất. Cập nhật về sau: `pip install -U --no-deps "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git"` (giữ nguyên torch đã cài).
-- Phải cài torch trước: `pip install torch` thường từ PyPI trên Windows là bản chỉ chạy CPU, nên máy có GPU vẫn chạy chậm.
-- GPU RTX 50xx (Blackwell): dùng `cu128` thay cho `cu126`.
-- Kiểm tra: `python -c "import torch; print(torch.cuda.is_available())"` in `True` là đã chạy được GPU.
+Luôn cài bản mới nhất; chạy lại đúng lệnh đó để cập nhật. GPU RTX 50xx: đổi `cu126` thành `cu130`.
 
 **GPU tự động:** khi suy luận, model chạy trên GPU nếu có, không thì CPU. Lần dùng đầu tiên (`from openobb import OpenOBB`, lệnh `openobb`, app Streamlit), package kiểm tra PyTorch:
 - máy có GPU NVIDIA nhưng PyTorch là bản CPU (mặc định của `pip install torch` trên Windows) → tự cài bản CUDA hợp với driver, rồi báo cần chạy lại;

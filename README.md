@@ -9,24 +9,19 @@ Train, predict và đọc kết quả giống YOLO-OBB. Không phụ thuộc Ult
 
 ## Cài đặt
 
-**Máy có GPU NVIDIA** (suy luận bằng GPU):
+**Máy có GPU NVIDIA:**
 
 ```bash
-pip install torch --index-url https://download.pytorch.org/whl/cu126
-pip install "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"
+pip install -U torch "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git" --index-url https://download.pytorch.org/whl/cu126 --extra-index-url https://pypi.org/simple
 ```
 
 **Máy chỉ có CPU:**
 
 ```bash
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-pip install "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"
+pip install -U torch "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git" --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple
 ```
 
-- Hai lệnh luôn cài bản mới nhất. Cập nhật về sau: `pip install -U --no-deps "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"` (giữ nguyên torch đã cài).
-- Phải cài torch trước: `pip install torch` thường từ PyPI trên Windows là bản chỉ chạy CPU, nên máy có GPU vẫn chạy chậm.
-- GPU RTX 50xx (Blackwell): dùng `cu128` thay cho `cu126`.
-- Kiểm tra: `python -c "import torch; print(torch.cuda.is_available())"` in `True` là đã chạy được GPU.
+Luôn cài bản mới nhất; chạy lại đúng lệnh đó để cập nhật. GPU RTX 50xx: đổi `cu126` thành `cu130`.
 
 Kiểm tra phiên bản đã cài: `python -c "import openobb; print(openobb.__version__)"`.
 Mỗi lần code thư viện thay đổi, `tools/push_all.py` tự tăng phiên bản và gắn tag `vX.Y.Z` trên cả GitHub lẫn GitLab.
