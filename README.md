@@ -21,10 +21,11 @@ pip install -U torch "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.g
 pip install -U torch "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git" --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple
 ```
 
-Luôn cài bản mới nhất; chạy lại đúng lệnh đó để cập nhật. GPU RTX 50xx: đổi `cu126` thành `cu130`.
-
-Kiểm tra phiên bản đã cài: `python -c "import openobb; print(openobb.__version__)"`.
-Mỗi lần code thư viện thay đổi, `tools/push_all.py` tự tăng phiên bản và gắn tag `vX.Y.Z` trên cả GitHub lẫn GitLab.
+- Luôn cài bản mới nhất; chạy lại đúng lệnh để cập nhật. GPU RTX 50xx: đổi `cu126` thành `cu130`.
+- Cài từ file wheel: thay `"openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"` trong lệnh bằng đường dẫn file `.whl`.
+- Khi suy luận, model tự chạy trên GPU nếu có. Nếu máy có GPU NVIDIA mà PyTorch là bản CPU, lần dùng đầu tiên sẽ tự cài
+  bản GPU rồi báo chạy lại (tắt bằng biến môi trường `OPENOBB_AUTO_TORCH=0`).
+- Kiểm tra phiên bản: `python -c "import openobb; print(openobb.__version__)"`.
 
 ## Train trên Colab
 

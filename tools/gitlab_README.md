@@ -6,16 +6,6 @@ Giao diện predict / kết quả giống YOLO-OBB.
 
 ## Cài đặt
 
-**Từ file wheel (bàn giao cho khách, không cần quyền truy cập repo):**
-
-```bash
-pip install -U torch openobb-X.Y.Z-py3-none-any.whl --index-url https://download.pytorch.org/whl/cu126 --extra-index-url https://pypi.org/simple   # máy chỉ có CPU: .../whl/cpu
-```
-
-Wheel của phiên bản mới nhất nằm trong thư mục `wheels/` của repo (khoảng 200 KB, mỗi lần phát hành tự tạo lại).
-
-**Từ repo (cần tài khoản GitLab):**
-
 **Máy có GPU NVIDIA:**
 
 ```bash
@@ -28,16 +18,11 @@ pip install -U torch "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/o
 pip install -U torch "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git" --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple
 ```
 
-Luôn cài bản mới nhất; chạy lại đúng lệnh đó để cập nhật. GPU RTX 50xx: đổi `cu126` thành `cu130`.
-
-**GPU tự động:** khi suy luận, model chạy trên GPU nếu có, không thì CPU. Lần dùng đầu tiên (`from openobb import OpenOBB`, lệnh `openobb`, app Streamlit), package kiểm tra PyTorch:
-- máy có GPU NVIDIA nhưng PyTorch là bản CPU (mặc định của `pip install torch` trên Windows) → tự cài bản CUDA hợp với driver, rồi báo cần chạy lại;
-- máy không có GPU và chưa có PyTorch → cài bản CPU.
-
-Tắt bằng biến môi trường `OPENOBB_AUTO_TORCH=0`.
-
-Phiên bản: `openobb.__version__`; mỗi phiên bản có tag `vX.Y.Z`. Model `.pt` nên giao bản đã làm gọn: `openobb strip`
-(xem `docs/DEPLOY.md`).
+- Luôn cài bản mới nhất; chạy lại đúng lệnh để cập nhật. GPU RTX 50xx: đổi `cu126` thành `cu130`.
+- Cài từ file wheel: thay `"openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git"` trong lệnh bằng đường dẫn file `.whl`.
+- Khi suy luận, model tự chạy trên GPU nếu có. Nếu máy có GPU NVIDIA mà PyTorch là bản CPU, lần dùng đầu tiên sẽ tự cài
+  bản GPU rồi báo chạy lại (tắt bằng biến môi trường `OPENOBB_AUTO_TORCH=0`).
+- Kiểm tra phiên bản: `python -c "import openobb; print(openobb.__version__)"`.
 
 ## Suy luận (thay YOLO)
 
