@@ -324,7 +324,10 @@ def main(argv=None):
     last = wdir / "last.pt"
     if not last.exists() and a.weights:
         # shape-tolerant copy of a OpenOBB checkpoint; class rows are matched by name (new classes start fresh)
-        src_cls = list(torch.load(a.weights, map_location="cpu", weights_only=False).get("classes") or [])
+        src_ck = torch.load(a.weights, map_location="cpu", weights_only=False)
+        src_cls = list(src_ck.get("classes") or [])
+        src_box = (src_ck.get("args") or {}).get("box") or "dfl"
+        del src_ck
         cmap = {i: src_cls.index(c) for i, c in enumerate(classes) if c in src_cls}
         load_dfine_coco(model, a.weights, log=lambda m: log(m, console=True), class_map=cmap)
         log(f"[init] fine-tuning from {a.weights} ({len(cmap)}/{len(classes)} classes carried over)")
@@ -333,6 +336,10 @@ def main(argv=None):
             model.head.copy_primary_box()       # single-slot checkpoint: extra slots start from slot 0's boxes
         if (v12 or v13 or v14) and not _has_keys(a.weights, "head_o2o."):
             model.copy_head_to_o2o()            # single-head checkpoint: the one-to-one head starts as its copy
+        if (v12 or v13) and a.box == "direct" and src_box != "direct":
+            from openobb.models.openobb12 import restart_direct_distances
+            restart_direct_distances(model)     # DFL checkpoint -> direct boxes: distances restart, angle / across kept
+            log("[init] box=direct from a DFL checkpoint: distance / thickness outputs restart at zero", console=True)
     elif not last.exists() and not a.no_pretrained and not v2 and not v6 and not v9:
         load_dfine_coco(model, a.size, class_names=classes, log=lambda m: log(m, console=True), init=a.init)
         init_desc = "D-FINE COCO weights (Apache-2.0)"
@@ -343,7 +350,8 @@ def main(argv=None):
     else:
         init_desc = "resume" if last.exists() else "random (trained from scratch)"
     sanitize_batchnorm(model, log=lambda m: log(m, console=True))
-    from openobb.predict import apply_head, apply_nms, merge_iou_for, parse_nms, postprocess_options
+    from openobb.predict import (DUP_TOL, apply_head, apply_nms, choose_postprocess, dup_rate, merge_iou_for, parse_nms,
+                                 postprocess_options)
     apply_nms(model, a.nms_iou)                 # fixed value: used for every val; auto: architecture default
     model.to(device)
     if a.channels_last:
@@ -848,13 +856,16 @@ def main(argv=None):
             apply_head(vm, h)
             r, d = final_eval(c)
             u = r.get("ultra") or r
-            tried.append((0.1 * u["mAP50"] + 0.9 * u["mAP50_95"], (h, c), r, d))
-        fit_best, (a.infer_head, a.nms_iou), res, dets = max(tried, key=lambda t: t[0])
+            tried.append((0.1 * u["mAP50"] + 0.9 * u["mAP50_95"], dup_rate(u), (h, c), r, d))
+        # best fitness, but within DUP_TOL of it the setting with the fewest duplicate boxes (F69)
+        fit_best, _, (a.infer_head, a.nms_iou), res, dets = choose_postprocess(tried)
         apply_head(vm, a.infer_head)
         apply_nms(vm, a.nms_iou)
         lab = lambda hc: f"{hc[0]} {hc[1]}" if hc[0] else f"{hc[1]}"  # noqa: E731
-        say("NMS calibrated on val (saved in best.pt, the inference default): "
-            + " | ".join(f"{lab(c)}: fitness {f:.4f}" for f, c, _, _ in tried) + f" -> {lab((a.infer_head, a.nms_iou))}")
+        dl = lambda q: "" if q is None else f", dup {100 * q:.1f}%"  # noqa: E731
+        say("NMS calibrated on val (saved in best.pt, the inference default; fitness, then fewer duplicates within "
+            f"{DUP_TOL:g}): " + " | ".join(f"{lab(c)}: fitness {f:.4f}{dl(q)}" for f, q, c, _, _ in tried)
+            + f" -> {lab((a.infer_head, a.nms_iou))}")
     else:
         res, dets = final_eval(a.nms_iou)
         u = res.get("ultra") or res

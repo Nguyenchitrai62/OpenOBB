@@ -1185,6 +1185,23 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     không đạt (.270, còn tụt); tốc độ ≤ 17 ms đạt. Phần tăng ở class hiếm (nhiễu ±0.06–0.09, F64) và có thể do 2 vòng train thêm.
   - Việc tiếp: đọc `snap.gain` + chạy `box_error_oracle.py` trên `best.pt` (CPU); nếu cần, v12 qua đúng 2 vòng cùng công thức làm đối chứng.
 
+- **F69. Box trùng là chuyện chọn ngưỡng NMS; độ khít của vật mảnh phải sửa ở hồi quy (10-15, CPU, ứng viên thô của v12 một-nhiều, 53 ảnh val).**
+  Script `research/analysis/postproc_oracle.py`, log `postproc_v12.log`.
+  - | Hậu xử lý | mAP50 | 50-95 | box trùng |
+    |---|---|---|---|
+    | NMS 0.7 (đang dùng) | 0.733 | 0.479 | 9.7% |
+    | **NMS 0.5** | **0.740** | **0.478** | **1.6%** |
+    | NMS nới vật mảnh ≥ 12 px | 0.735 | 0.479 | 5.6% |
+    | bỏ phiếu box (v 0.5–0.6) | 0.730–0.732 | 0.472–0.474 | 9–12% |
+  - Xếp hạng không phải vấn đề: ProbIoU của ứng viên điểm cao nhất so với ứng viên tốt nhất (trung vị) wall .805 / .837, junction .818 / .850,
+    wall_300 .717 / .723 → chênh trung vị 0.000–0.008. Bỏ phiếu box làm hại. → Các ứng viên tự chúng chưa đủ khít; phải sửa bước hồi quy.
+  - Sửa khung (0.17.1): hiệu chỉnh cuối train và `openobb calibrate` chọn fitness cao nhất, nhưng trong khoảng 0.005 thì chọn cài đặt ít box trùng hơn
+    (`predict.choose_postprocess`, `DUP_TOL`). v12 F59 (.4994 / .4948) và v17 F68 (.5121 / .5087) đều sẽ chọn NMS 0.5. Cơ chế một-nhiều + NMS của F54
+    giữ nguyên; chỉ đổi ngưỡng.
+  - Vòng 2 của v17 (bản tinh chỉnh): `box=direct` (head v12 hồi quy trực tiếp kiểu YOLO26; bằng chứng duy nhất: v14 wall 50-95 +0.045, F60),
+    fine-tune từ `best.pt` F68, cùng công thức với F68. Khi nạp checkpoint DFL, hàng khoảng cách / độ dày của lớp ra được đưa về 0 (góc / lệch ngang giữ).
+    Kỳ vọng ghi trước: wall 50-95 ≥ .56, wall_300 ≥ .30, junction ≥ .54, tổng ≥ 0.495 / mAP50 ≥ 0.745, box trùng ≤ 3%. Bác bỏ: wall 50-95 < .535.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

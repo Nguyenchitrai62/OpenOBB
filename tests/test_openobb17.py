@@ -100,3 +100,24 @@ def test_v17_fuse_keeps_output():
         a = m(x)
         b = m.fuse()(x)
     assert torch.allclose(a["pred_boxes"], b["pred_boxes"], atol=1e-3)
+
+
+def test_dfl_checkpoint_to_direct_boxes_restarts_distances():
+    from openobb.models.openobb1 import load_dfine_coco
+    from openobb.models.openobb12 import restart_direct_distances
+    torch.manual_seed(0)
+    src = OpenOBB17("s", num_classes=NC, img_size=128)                       # DFL boxes
+    for m in src.head.reg:
+        torch.nn.init.normal_(m[-1].weight)
+        torch.nn.init.normal_(m[-1].bias)
+    path = "dfl_src.pt"
+    import os
+    import tempfile
+    path = os.path.join(tempfile.mkdtemp(), path)
+    torch.save({"model": src.state_dict(), "classes": ["a", "b", "c"], "args": {"box": "dfl"}}, path)
+    dst = OpenOBB17("s", num_classes=NC, img_size=128, box="direct")
+    load_dfine_coco(dst, path, log=lambda m: None, class_map={0: 0, 1: 1, 2: 2})
+    restart_direct_distances(dst)
+    for ms, md in zip(src.head.reg, dst.head.reg):
+        assert torch.equal(md[-1].weight[:2], ms[-1].weight[:2])            # angle / across rows kept
+        assert md[-1].weight[2:].abs().sum() == 0 and md[-1].bias[2:].abs().sum() == 0

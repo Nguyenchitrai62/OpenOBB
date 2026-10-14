@@ -109,6 +109,25 @@ def postprocess_options(model):
     return [(None, 0.7), (None, 0.6), (None, 0.5)]
 
 
+DUP_TOL = 0.005   # fitness margin within which the post-processing with fewer duplicate boxes wins (F69)
+
+
+def dup_rate(u):
+    """Share of duplicate boxes (conf 0.25, same class on an already detected object) of an evaluate_ultra result."""
+    cm = u.get("confusion") or {}
+    d = cm.get("duplicates")
+    return None if d is None else sum(d.values()) / max(cm.get("detections", 0), 1)
+
+
+def choose_postprocess(tried, tol=DUP_TOL):
+    """tried: [(fitness, duplicate rate or None, ...)] -> the entry to keep. Among the settings within `tol` of the
+    best fitness (0.1 mAP50 + 0.9 mAP50-95), the one with the fewest duplicate boxes: duplicates inflate object counts
+    (take-off) and NMS 0.5 vs 0.7 typically costs < 0.005 fitness while cutting duplicates ~6x (F69)."""
+    best = max(t[0] for t in tried)
+    near = [t for t in tried if t[0] >= best - tol]
+    return min(near, key=lambda t: (t[1] if t[1] is not None else float("inf"), -t[0]))
+
+
 def merge_iou_for(v, fit):
     """Polygon NMS after the network (tile merge): whole-image models follow the model's NMS setting; tiled
     inference keeps 0.1 (overlapping tiles repeat the same object)."""

@@ -81,6 +81,21 @@ class DualHeadMixin:
 BOX_MODES = ("dfl", "direct")
 
 
+@torch.no_grad()
+def restart_direct_distances(model):
+    """After a shape-tolerant load of a DFL checkpoint into box="direct" heads, the output rows of the two end
+    distances and the thickness hold DFL bin logits (meaningless as values): zero them, as a fresh direct head starts.
+    The angle and across-offset rows (same meaning in both layouts) keep their trained weights."""
+    for head in (model.head, getattr(model, "head_o2o", None)):
+        if head is None:
+            continue
+        for m in head.reg:
+            out = m[-1]
+            if out.out_channels == DIRECT_CH:
+                out.weight[2:].zero_()
+                out.bias[2:].zero_()
+
+
 def make_head(ch, nc, ctx, box):
     """Dense oriented head: OpenOBB7's (context unit in the class tower unless cls_ctx is off); box="direct" regresses
     the distances and thickness as values (YOLO26-style, F54) instead of DFL distributions."""

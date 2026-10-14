@@ -79,3 +79,13 @@ Gửi lại: bảng theo class, confusion matrix, `Duplicate boxes`, `NMS calibr
 **Run 1 (user, 10-15, F68):** 0.754 / 0.485, 15.9 ms. Không cùng điều kiện mục 4: công thức YOLO mới (`nbs 64`) và hai vòng fine-tune
 (vòng 2 từ `best.pt` vòng 1). Tổng +0.013 so với F59 (vùng xám). wall .521, junction .515, wall_300 .270: **không đạt** cả ba mục tiêu class;
 tốc độ đạt. Phần tăng nằm ở note / slide_door / double_door. Chưa kết luận cơ chế: chờ `snap.gain` và `box_error_oracle.py` trên `best.pt`.
+
+**Vòng 2 (F69): `box=direct`.** Hậu xử lý không sửa được độ khít (box điểm cao nhất đã gần box tốt nhất); box trùng là do ngưỡng NMS
+(0.5 thay 0.7: 9.7% → 1.6%, mAP giữ nguyên) và từ 0.17.1 bước hiệu chỉnh tự chọn ngưỡng ít trùng khi chênh fitness < 0.005.
+
+```bash
+openobb train data=/content/data.yaml model=openobb17x epochs=30 imgsz=1280 batch=16 lr=0.001 box=direct weights=/content/runs/obb/train4/weights/best.pt
+openobb calibrate model=/content/runs/obb/train4/weights/best.pt data=/content/data.yaml
+```
+
+Lệnh thứ hai hiệu chỉnh lại checkpoint F68 theo luật mới (giảm box trùng ngay, không cần train). Kỳ vọng vòng 2: xem LEDGER F69.

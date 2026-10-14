@@ -53,3 +53,17 @@ def test_train_iou_alias_reaches_the_trainer(tmp_path, monkeypatch):
           name="t", cache_dir=str(tmp_path / "cache"), workers=1)
     assert "--nms-iou 0.5" in " ".join(argv[-1])
     assert "nms_iou" in trainer.build_parser().parse_args(["--data", "x", "--out", "y"]).__dict__
+
+
+def test_calibration_prefers_fewer_duplicates_within_tolerance():
+    from openobb.predict import choose_postprocess, dup_rate
+    # OpenOBB17 (F68): o2m 0.7 fitness .5121, o2m 0.5 .5087 -> 0.5 (duplicates ~6x fewer, F69)
+    tried = [(0.4889, 0.01, "o2o", "none"), (0.5121, 0.075, "o2m", 0.7), (0.5087, 0.016, "o2m", 0.5)]
+    assert choose_postprocess(tried)[2:] == ("o2m", 0.5)
+    # a clearly better setting still wins even with more duplicates
+    tried = [(0.5200, 0.075, "o2m", 0.7), (0.5087, 0.016, "o2m", 0.5)]
+    assert choose_postprocess(tried)[2:] == ("o2m", 0.7)
+    # no duplicate counts (older evaluators): plain best fitness
+    assert choose_postprocess([(0.50, None, None, 0.7), (0.499, None, None, 0.5)])[3] == 0.7
+    u = {"confusion": {"duplicates": {"wall": 3, "junction": 7}, "detections": 200}}
+    assert abs(dup_rate(u) - 0.05) < 1e-12 and dup_rate({}) is None

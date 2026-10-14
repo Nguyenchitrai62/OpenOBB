@@ -666,14 +666,16 @@ def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, b
 def calibrate(model, data=None, out=None, imgsz=None, batch=8, workers=8, cache_dir=None, device=None, seed=0,
               val_frac=0.15, gap=200):
     """Re-run the end-of-training calibration on val for a trained checkpoint: the inference head of dual-head models
-    (one-to-one / one-to-many + NMS) and the NMS threshold, by fitness 0.1 mAP50 + 0.9 mAP50-95. Writes the choice
+    (one-to-one / one-to-many + NMS) and the NMS threshold, by fitness 0.1 mAP50 + 0.9 mAP50-95 (within 0.005 of the
+    best, the setting with the fewest duplicate boxes). Writes the choice
     into the checkpoint's args (in place, or to `out`); everything else is unchanged."""
     _set_device(device)
     import torch
 
     from openobb.data.dota import dataset_classes
     from openobb.engine import eval_dota
-    from openobb.predict import apply_head, apply_nms, input_size, load_model, merge_iou_for, postprocess_options
+    from openobb.predict import (apply_head, apply_nms, choose_postprocess, dup_rate, input_size, load_model,
+                                 merge_iou_for, postprocess_options)
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net, names, targs = load_model(model, dev)
     imgsz = input_size(targs, imgsz)
@@ -696,10 +698,11 @@ def calibrate(model, data=None, out=None, imgsz=None, batch=8, workers=8, cache_
                            merge_iou=merge_iou_for(c, fit), ultra=True, metric="yolo")
         u = res.get("ultra") or res
         f = 0.1 * u["mAP50"] + 0.9 * u["mAP50_95"]
-        tried.append((f, h, c))
+        q = dup_rate(u)
+        tried.append((f, q, h, c))
         print(f"[calibrate] {(h + ' ') if h else ''}nms {c}: mAP50 {u['mAP50']:.4f}  mAP50-95 {u['mAP50_95']:.4f}  "
-              f"fitness {f:.4f}", flush=True)
-    f, h, c = max(tried, key=lambda t: t[0])
+              f"fitness {f:.4f}" + ("" if q is None else f"  duplicates {100 * q:.1f}%"), flush=True)
+    f, _, h, c = choose_postprocess(tried)            # best fitness; within DUP_TOL, the fewest duplicates
     ck = torch.load(model, map_location="cpu", weights_only=False)
     ck["args"] = dict(ck.get("args", {}), nms_iou=c, **({"infer_head": h} if h else {}))
     dst = Path(out or model)
