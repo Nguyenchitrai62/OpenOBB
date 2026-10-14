@@ -1134,6 +1134,29 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     **detector theo ranh giới / chia đoạn**: trường ranh giới dày đặc (stride 4, giám sát bằng mọi cạnh nhãn) + định vị đầu box bằng tìm kiếm 1D dọc trục
     trên trường đó, hàng xóm dùng chung một ranh giới. Trần đo được: đầu +0.116, ngang + dày khoảng +0.07. Benchmark chính chuyển sang FloorPlanCAD.
 
+- **F65. Log user 10-15 (đang chạy, val trong lúc train): họ v14–v16 kém v12 bất kể neck → giả thuyết F60 "neck mất tiên nghiệm" BỊ BÁC BỎ ở vai trò
+  nguyên nhân chính.**
+  - `openobb14x neck=dfine` (0.15.0, COCO, 50 ep, batch 12, 1000 bước, 1280): ep43 **0.622 / 0.380**; init nạp 1196 tensor COCO (encoder có tiên nghiệm).
+  - `openobb15x neck=dfine` (0.14.0, fine-tune 30 ep từ một `best.pt` v15 trước, 2560): ep29 **0.666 / 0.415**.
+  - `openobb16x` neck mặc định (0.15.0, COCO, 100 ep, batch 12, 2560): ep69 **0.604 / 0.390**, còn tăng chậm.
+  - So mốc v12 0.743 / 0.472 (F59, vòng hai) và v12 vòng một 0.722 / 0.468 (F54): cả ba thấp hơn 0.06–0.12 mAP50, ngoài 2σ (F64). Có encoder COCO
+    (v14 `neck=dfine`) vẫn tệ → phần làm hỏng nằm ở thứ chung của họ v14: head mới (`box=direct`, tower RepConv nặng, khởi tạo box 0) và bộ tinh chỉnh
+    cạnh, hoặc thiếu LSK. Chưa tách được; không đầu tư tiếp vào họ v14 (user cũng đánh giá "quá tệ").
+  - Hệ quả: **OpenOBB17 xây trên v12**, không trên v14 (F66).
+
+- **F66. OpenOBB17 (10-15, chưa train): v12 + trường ranh giới + bám ranh giới.** [docs/OPENOBB17.md](../docs/OPENOBB17.md).
+  - Từ F64: thành phần "hai đầu" +0.116 là phần lớn nhất; nhãn là quy ước (bám mép ảnh −0.09); 56–85% đầu object nằm trên cạnh object kề.
+  - Trường 2 kênh (đầu / cạnh dài) ở stride 2, từ stride-4 thân + P3, giám sát bằng dải Gaussian σ 1 px trên mọi cạnh nhãn (quality focal loss).
+    Bước bám: 4 cạnh × 3 đường × 33 mẫu trong bán kính tìm, soft-argmax, nhân độ tin cậy và hệ số bám (khởi tạo 0, × 20). Top-1500 ứng viên trước NMS.
+    Train: top-256 + box nhãn rung, loss box như bộ tinh chỉnh v14.
+  - 68.1M tham số (phần mới 0.125M = 0.18%, tự viết), khoảng +16 GFLOPs (+2.4%). Bắt đầu đúng bằng v12 (test). `v7_off=field` = v12.
+  - Kỳ vọng ghi trước (fine-tune 30 ep từ `openobb12x.pt`, cặp v17 / v12 cùng phiên, công thức F59): mAP50-95 ≥ v12 + 0.025; wall_300 ≥ .34,
+    junction ≥ .56, wall ≥ .55; thành phần "hai đầu" ≤ +0.08; hệ số bám đầu ≥ 0.3; ≤ 17 ms. Bác bỏ: chênh < 0.01, "hai đầu" giảm < 15%, hoặc hệ số < 0.1.
+  - Cùng đợt (0.16.0): **trainer khớp YOLO** theo yêu cầu user: warmup `max(round(warmup_epochs × số batch), 100)` iteration, nhóm bias riêng với LR
+    giảm từ `warmup_bias_lr` 0.1, các nhóm khác tăng từ 0 lên `lr0 × lf(epoch)`; `lf` đổi theo epoch; `nbs=64` cộng dồn gradient (tăng dần trong warmup)
+    và weight decay nhân `batch × accumulate / nbs`; EMA cập nhật theo bước optimizer. `nbs=0 warmup_bias_lr=0 epoch_lr=False` = công thức cũ.
+    Mọi run từ 0.16.0 trở đi không so trực tiếp được với run cũ trừ khi dùng ba tham số đó.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

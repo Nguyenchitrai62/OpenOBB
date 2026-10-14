@@ -59,6 +59,7 @@ r = OpenOBB("openobb3x").train(data="path/data.yaml", epochs=100, imgsz=1280)   
 | `openobb13s/m/l/x` | **mới, chưa train, nhắm độ chính xác:** OpenOBB12 + luồng độ phân giải gốc + lưới P2 (wall_300 và junction có điểm lưới riêng). `imgsz` là độ phân giải đầy đủ (Wall_Color: `imgsz=2560`), lõi chạy ở một nửa | x: 70.1M | [OPENOBB13.md](OPENOBB13.md) |
 | `openobb14s/m/l/x` | **mới, chưa train, nhắm cả độ chính xác lẫn tốc độ:** thân HGNetv2 pretrained (COCO) + neck conv dày tái tham số hoá tự thiết kế (thay LSK + encoder lai, 45% FLOPs của v12) + head kép nặng, hồi quy box trực tiếp (không DFL) + bộ tinh chỉnh box đọc nét ở stride 4 ngay trên cạnh box dự đoán. `box=direct` mặc định, `ref_k=1500` | x: 62.7M | [OPENOBB14.md](OPENOBB14.md) |
 | `openobb15s/m/l/x` | **mới, chưa train, nhắm độ chính xác:** OpenOBB14 + luồng độ phân giải gốc + lưới P2 + bộ tinh chỉnh box đọc nét ở độ phân giải gốc (junction 18 px thay vì 9 px). `imgsz` = cỡ lõi (1280), ảnh vào 2560 | x: 71.1M (`neck=dfine`) | [OPENOBB15.md](OPENOBB15.md) |
+| `openobb17s/m/l/x` | **mới, chưa train, nhắm mAP50-95:** OpenOBB12 + trường ranh giới stride 2 (đầu / cạnh, giám sát bằng mọi cạnh nhãn) + bám ranh giới: đầu và cạnh của top-1500 box dời về đỉnh của trường bằng soft-argmax 1-D trước NMS. Bắt đầu đúng bằng v12; `v7_off=field` tắt phần mới | x: 68.1M | [OPENOBB17.md](OPENOBB17.md) |
 | `openobb16s/m/l/x` | **mới, chưa train, nhắm mAP50-95:** OpenOBB15 + cascade 3 bước tinh chỉnh box theo cạnh (0.5 / 0.6 / 0.7) + điểm class × độ khít dự đoán trước NMS. Bắt đầu đúng bằng v15 | x: 72.3M (`neck=dfine`) | [OPENOBB16.md](OPENOBB16.md) |
 | `openobb10s/m/l/x` | **mới, chưa train:** OpenOBB8 + head 3 slot mỗi điểm (vật nhỏ chồng nhau không còn tranh điểm: 72% wall_300 không có điểm riêng ở v8), gán nhãn theo tầm với DFL (note không còn học box cụt), cân bằng class hiếm. Đi tiếp được từ `best.pt` của v8 (`weights=`) | x: 66.7M | [OPENOBB10.md](OPENOBB10.md) |
 | `openobb9s/m/l/x` | **mới, chưa train:** lõi tự thiết kế (conv 3×3 dày tái tham số hoá, nhắm nhanh gấp khoảng 1.8 lần v8) + head của v8; cần `openobb pretrain` (chưng cất từ D-FINE COCO + DINOv2) trước | x: 29.5M | [OPENOBB9.md](OPENOBB9.md), [PRETRAIN.md](PRETRAIN.md) |
@@ -83,7 +84,10 @@ Có thể khởi tạo `openobb3x` từ một checkpoint `openobb1` bằng `weig
 | `scale` | 0.5 | zoom ngẫu nhiên 0.5–1.5 |
 | `translate` | 0.1 | dịch ngẫu nhiên ±10% |
 | `hsv_h`, `hsv_s`, `hsv_v` | 0.015, 0.5, 0.3 | đổi màu |
-| `warmup_epochs` | 3 | khởi động learning rate |
+| `warmup_epochs` | 3 | khởi động learning rate, như YOLO (từ 0.16.0): `max(round(warmup_epochs × số batch mỗi epoch), 100)` iteration; LR bias giảm từ `warmup_bias_lr` về LR, các nhóm khác tăng từ 0 lên `lr0 × lf(epoch)` |
+| `warmup_bias_lr` | 0.1 | LR ban đầu của nhóm bias trong warmup (`0` = tắt nhóm riêng) |
+| `nbs` | 64 | batch danh nghĩa như YOLO: cộng dồn gradient `round(nbs / batch)` batch mỗi bước (tăng dần từ 1 trong warmup), weight decay nhân `batch × accumulate / nbs`; `nbs=0` = một bước mỗi batch (công thức cũ) |
+| `epoch_lr` | True | hệ số LR `lf(epoch)` đổi theo từng epoch như YOLO; `False` = cosine theo iteration (công thức trước 0.16.0) |
 | `iou` / `nms_iou` | `auto` | lọc trùng: `auto` = train xong tự thử trên val và lưu ngưỡng tốt nhất (v11 thử cả không NMS) vào `best.pt`, làm mặc định khi predict; hoặc một số cố định / `none`. Với v12 / v13, bước này chọn luôn head dùng khi suy luận (một-một không NMS, hoặc một-nhiều + NMS). Checkpoint đã train: `openobb calibrate model=best.pt data=data.yaml` |
 | `box` | `dfl` | v12 / v13: cách hồi quy box. `direct` = hồi quy trực tiếp độ dài, độ dày, lệch ngang (kiểu YOLO26, không DFL); box khít hơn với vật mảnh (F54) |
 | `pretrain` | không | chỉ `openobb9*` / `openobb6*`: `coco`, `dota` hoặc thư mục ảnh. Tự tải data, pretrain lõi (và train trên DOTA với `dota`), lưu cache rồi mới train. Xem [PRETRAIN.md](PRETRAIN.md) mục 0 |

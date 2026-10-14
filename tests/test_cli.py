@@ -128,8 +128,9 @@ def test_train_flags_and_oom_retry(tmp_path, monkeypatch):
     assert len(calls) == 2
     first, second = (" ".join(c) for c in calls)
     for flag in ("--fit", "--lsk", "--mosaic-p 1.0", "--mosaic-mode yolo", "--scale-jitter 0.5", "--translate 0.1",
-                 "--mosaic-off 10", "--patience 100", "--warmup 3", "--eval-every 1", "--batch 8",
-                 "--aug-iof 0.25", "--merge-iou 0.7", "--ema 0.986", "--schedule cos", "--min-lr-ratio 0.01"):
+                 "--mosaic-off 10", "--patience 100", "--warmup 100", "--eval-every 1", "--batch 8",
+                 "--aug-iof 0.25", "--merge-iou 0.7", "--ema 0.986", "--schedule cos", "--min-lr-ratio 0.01",
+                 "--epoch-lr", "--warmup-bias-lr 0.1", "--nbs 64"):
         assert flag in first, flag
     assert "--batch 4" in second                                             # halved after the OOM
 
@@ -153,6 +154,50 @@ def test_lr_schedules_and_ema():
     ema.update(net)
     d = 0.9 * (1 - _m.exp(-1))
     assert torch.allclose(ema.module.weight, d * w0 + (1 - d) * net.weight)
+
+
+def test_yolo_lr_factor_and_bias_groups():
+    import torch
+
+    from openobb.engine import param_groups, yolo_lf
+    assert yolo_lf(0, 100, 0.01) == 1.0 and abs(yolo_lf(100, 100, 0.01) - 0.01) < 1e-12
+    assert abs(yolo_lf(50, 100, 0.01) - 0.505) < 1e-12                                   # cosine midpoint
+    assert abs(yolo_lf(50, 100, 0.01, "linear") - 0.505) < 1e-12 and yolo_lf(100, 100, 0.01, "linear") == 0.01
+    net = torch.nn.Sequential(torch.nn.Conv2d(3, 4, 3), torch.nn.BatchNorm2d(4), torch.nn.Conv2d(4, 2, 1))
+    old = param_groups(net, 1e-3)
+    assert [g["name"] for g in old] == ["bb", "bb_norm", "nodecay", "rest"]               # resume of older runs
+    new = param_groups(net, 1e-3, split_bias=True)
+    by = {g["name"]: g for g in new}
+    assert sum(len(g["params"]) for g in new) == len(list(net.parameters()))
+    assert {id(p) for p in by["bias"]["params"]} == {id(net[0].bias), id(net[1].bias), id(net[2].bias)}
+    assert by["bias"]["weight_decay"] == 0.0 and by["rest"]["weight_decay"] == 1e-4
+
+
+@pytest.mark.skipif(os.environ.get("OPENOBB_SLOW") != "1", reason="CPU train steps (set OPENOBB_SLOW=1)")
+def test_nominal_batch_accumulation_and_warmup(tmp_path, monkeypatch):
+    """nbs = 4 with batch 1: accumulation ramps 1 -> 4 over the warmup, then one optimizer step per 4 batches; during
+    warmup the bias LR falls from warmup_bias_lr while the others rise from 0 (usual one-stage trainer)."""
+    import torch
+
+    import openobb.train as trainer
+    from openobb.data.prepare import prepare
+    out = prepare(str(_dataset(tmp_path / "ds", n_train=4)), tmp_path / "prep", size=256, fit=True, workers=1)
+    steps = []
+    real = torch.optim.AdamW.step
+
+    def counting(self, *args, **kw):
+        steps.append({g["name"]: g["lr"] for g in self.param_groups})
+        return real(self, *args, **kw)
+
+    monkeypatch.setattr(torch.optim.AdamW, "step", counting)
+    trainer.main(["--data", str(out), "--out", str(tmp_path / "run"), "--size", "s", "--img", "256", "--fit",
+                  "--epochs", "2", "--batch", "1", "--max-iters", "4", "--workers", "0", "--no-pretrained",
+                  "--threads", "1", "--epoch-lr", "--schedule", "linear", "--min-lr-ratio", "0.01", "--lr", "1e-3",
+                  "--warmup", "2", "--warmup-bias-lr", "0.1", "--nbs", "4", "--eval-every", "100", "--eval-images", "0"])
+    # iterations 0..7: accumulate 1 (it 0), 2 (it 1), 4 (it 2..): steps at it 0 and it 4 only
+    assert len(steps) == 2, steps
+    assert steps[0]["bias"] == pytest.approx(0.1) and steps[0]["rest"] == 0.0           # it 0 = start of warmup
+    assert steps[1]["rest"] == pytest.approx(1e-3 * (1 - 1 / 2 * 0.99))                 # epoch 1, lf linear
 
 
 def test_dataset_ram_cache(tmp_path):

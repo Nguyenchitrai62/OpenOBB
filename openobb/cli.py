@@ -27,7 +27,9 @@ the train images is held out. Prepared data is cached (~/.cache/openobb). Every 
 ({project}/{name}, then name2, name3...; exist_ok=True reuses it); resume=True continues a run from weights/last.pt.
 
 Training defaults follow the usual one-stage recipe: mosaic=1.0, scale=0.5 (random zoom 0.5-1.5), translate=0.1,
-close_mosaic=10, warmup_epochs=3, LR decayed by cosine to lr0 * lrf (lrf=0.01; cos_lr=False for linear, the YOLO default), patience=100,
+close_mosaic=10, warmup_epochs=3 (max(3 epochs, 100) batches; bias LR falls from warmup_bias_lr=0.1, the others rise from 0),
+LR factor per epoch, cosine to lr0 * lrf (lrf=0.01; cos_lr=False for linear, the YOLO default), nbs=64 (gradient
+accumulation to a nominal batch of 64, weight decay scaled to it), patience=100,
 cache=auto (decoded images in RAM when they fit), batch fitted to the GPU / dataset and halved on out-of-memory.
 """
 import gc
@@ -55,7 +57,8 @@ MODELS = {**{f"openobb1{s}": ("v1", s) for s in SIZES},
           **{f"openobb13{s}": ("v13", s) for s in SIZES},    # + full-res stream + P2 grid (docs/OPENOBB13.md)
           **{f"openobb14{s}": ("v14", s) for s in SIZES},    # pretrained trunk + own rep-conv neck + edge refiner (docs/OPENOBB14.md)
           **{f"openobb15{s}": ("v15", s) for s in SIZES},    # v14 + full-resolution stream + P2 grid (docs/OPENOBB15.md)
-          **{f"openobb16{s}": ("v16", s) for s in SIZES}}    # v15 + cascade refiners + fit-aware scores (docs/OPENOBB16.md)
+          **{f"openobb16{s}": ("v16", s) for s in SIZES},    # v15 + cascade refiners + fit-aware scores (docs/OPENOBB16.md)
+          **{f"openobb17{s}": ("v17", s) for s in SIZES}}    # v12 + boundary field + boundary snapping (docs/OPENOBB17.md)
 
 # Best architecture recipe measured on FloorPlanCAD / DOTA (research/LEDGER.md, c6): selective large-kernel
 # adapters (LSK), repeat-factor sampling, one-to-many query group, adaptive query denoising, square-aware angle loss,
@@ -115,6 +118,7 @@ RECIPE13 = dict(RECIPE3)                         # OpenOBB13: OpenOBB12 + full-r
 RECIPE14 = {"rfs": 0.1, "channels_last": True, "clip": 10.0, "num_top": 1000, "box": "direct", "ref_k": 1500}
 RECIPE15 = dict(RECIPE14)                        # OpenOBB15: v14 + full-resolution stream + P2 (imgsz = core size, input 2x)
 RECIPE16 = dict(RECIPE15)                        # OpenOBB16: v15 + 3-stage cascade of refiners + fit-aware scores
+RECIPE17 = dict(RECIPE12)                        # OpenOBB17: v12 + boundary field + boundary snapping
 SIZE_DEFAULTS15 = {s: dict(d, gb=round(d["gb"] * 0.5, 2)) for s, d in SIZE_DEFAULTS3.items()}
 # OpenOBB13: imgsz is the full resolution, the core runs at half of it -> memory per image ~0.45x by area
 SIZE_DEFAULTS13 = {s: dict(d, gb=round(d["gb"] * 0.45, 2)) for s, d in SIZE_DEFAULTS3.items()}
@@ -133,7 +137,7 @@ MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / pe
 ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every", "lrf": "min_lr_ratio",
            "iou": "nms_iou"}      # train: iou= (YOLO's val NMS IoU) = nms_iou, auto by default
 IGNORED = ("save_period", "plots", "momentum", "degrees", "shear", "perspective", "mixup", "cutmix",
-           "copy_paste", "rect", "multi_scale", "warmup_bias_lr", "warmup_momentum", "nbs", "dropout", "cls_pw")
+           "copy_paste", "rect", "multi_scale", "warmup_momentum", "dropout", "cls_pw")
 
 
 def _value(v):
@@ -386,11 +390,17 @@ def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_
     opts["wdir"] = "weights"
     for attempt in range(4):
         ipe = max(1, n_train // int(opts["batch"]))
-        total = ipe * int(epochs)
-        # warmup = warmup_epochs epochs of steps (at most epochs - 1), as in the usual one-stage trainer
-        opts["warmup"] = opts["ema_warmups"] = max(1, round(min(warmup_epochs, max(int(epochs) - 1, 0)) * ipe))
+        nbs = int(opts.get("nbs") or 0)
+        acc = max(round(nbs / int(opts["batch"])), 1) if nbs > 0 else 1
+        steps_ep = max(1, ipe // acc)                # optimizer steps per epoch
+        total = steps_ep * int(epochs)
+        if opts.get("epoch_lr"):                     # usual one-stage trainer: max(round(warmup_epochs x batches), 100)
+            opts["warmup"] = max(round(warmup_epochs * ipe), 100) if warmup_epochs > 0 else -1
+        else:                                        # older runs: warmup_epochs epochs (at most epochs - 1)
+            opts["warmup"] = max(1, round(min(warmup_epochs, max(int(epochs) - 1, 0)) * ipe))
+        opts["ema_warmups"] = max(1, round(max(opts["warmup"], 1) / acc))
         if not user_ema:                             # EMA half-life ~5% of the run (>= 1 epoch, >= 50 steps)
-            opts["ema"] = round(min(0.9998, 0.5 ** (1 / max(ipe, total // 20, 50))), 6)
+            opts["ema"] = round(min(0.9998, 0.5 ** (1 / max(steps_ep, total // 20, 50))), 6)
         argv = ["--data", str(prepared), "--out", str(save_dir)] + _to_argv(opts)
         args_file = save_dir / "openobb_args.json"
         saved = json.loads(args_file.read_text()) if args_file.exists() else {}
@@ -486,7 +496,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         raise SystemExit(f"model must be one of {', '.join(MODELS)} or an existing OpenOBB .pt checkpoint, "
                          f"got '{model}'")
     arch = inherited.get("arch", "v1")
-    v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16")
+    v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17")
     src_img = extra.pop("img", None)                 # a checkpoint's own input size (already the full size for v13)
     core_size = imgsz is not None or src_img is None
     imgsz = int(imgsz or src_img or 1024)
@@ -515,7 +525,8 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
     sd = {"v2": SIZE_DEFAULTS2, "v3": SIZE_DEFAULTS3, "v4": SIZE_DEFAULTS4,
           "v5": SIZE_DEFAULTS5, "v6": SIZE_DEFAULTS6, "v7": SIZE_DEFAULTS3,
           "v8": SIZE_DEFAULTS3, "v9": SIZE_DEFAULTS9, "v10": SIZE_DEFAULTS3, "v11": SIZE_DEFAULTS3, "v12": SIZE_DEFAULTS3, "v13": SIZE_DEFAULTS13,
-          "v14": SIZE_DEFAULTS3, "v15": SIZE_DEFAULTS15, "v16": SIZE_DEFAULTS15}.get(arch, SIZE_DEFAULTS)[size]
+          "v14": SIZE_DEFAULTS3, "v15": SIZE_DEFAULTS15, "v16": SIZE_DEFAULTS15,
+          "v17": SIZE_DEFAULTS3}.get(arch, SIZE_DEFAULTS)[size]
     if str(optimizer).lower() not in ("auto", "adamw"):
         raise SystemExit("optimizer must be 'auto' or 'AdamW'")   # lr0 given -> used; otherwise the measured LR
     prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, seed, fit=fit)
@@ -546,7 +557,10 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
             "schedule": "cos" if cos_lr else "linear", "min_lr_ratio": float(lrf),
             "lr": sd["lr"], "backbone_mult": sd["backbone_mult"], "wd": sd["wd"], "hsv": hsv,
             "eval_every": _eval_every(prepared, int(epochs)), "eval_images": 10**9, "patience": int(patience or 0),
-            "seed": seed}
+            "seed": seed,
+            # usual one-stage trainer: LR factor per epoch, warmup over max(3 epochs, 100) batches with the bias LR
+            # falling from 0.1, nominal batch 64 (gradient accumulation + weight decay scaled to it)
+            "epoch_lr": True, "warmup_bias_lr": 0.1, "nbs": 64}
     q = _queries_for(prepared)
     if q > 300 and not dense_arch:
         opts.update(queries=q, num_top=q)
@@ -556,7 +570,8 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
     if recipe:
         opts.update({"v2": RECIPE2, "v3": RECIPE3, "v4": RECIPE4, "v5": RECIPE5, "v6": RECIPE6, "v7": RECIPE7,
                      "v8": RECIPE8, "v9": RECIPE9, "v10": RECIPE10, "v11": RECIPE11, "v12": RECIPE12, "v13": RECIPE13,
-                     "v14": RECIPE14, "v15": RECIPE15, "v16": RECIPE16}.get(arch, RECIPE))
+                     "v14": RECIPE14, "v15": RECIPE15, "v16": RECIPE16,
+                     "v17": RECIPE17}.get(arch, RECIPE))
     if arch in ("v4", "v5") and "backbone" not in inherited:
         opts["backbone"] = BACKBONE4[size]
     if aug["mosaic"]:

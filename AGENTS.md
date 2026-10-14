@@ -290,6 +290,11 @@ Câu hỏi còn mở:
   (−.245 mAP50-95). Cặp đăng ký `neck=dfine` vẫn chưa chạy.
 - [x] **OpenOBB16 (2026-10-14, F62, 0.15.0):** v15 + cascade 3 bước tinh chỉnh box + điểm × độ khít dự đoán. [docs/OPENOBB16.md](docs/OPENOBB16.md).
   Công tắc mới `v14_off=stage4,widehead` cho bản nhanh. Chờ log v15 / v16 của user.
+- [x] **Chẩn đoán gốc (F64, 10-14):** thước Wall_Color ±0.024; phần thiếu là hình học box, lớn nhất là hai đầu (+0.116); nhãn là quy ước; đầu object trùng
+  cạnh object kề. Họ v14–v16 kém v12 bất kể neck (F65).
+- [x] **OpenOBB17 (10-15, F66, 0.16.0):** v12 + trường ranh giới stride 2 + bám ranh giới trước NMS. [docs/OPENOBB17.md](docs/OPENOBB17.md).
+  Vòng hai hạt giống: fine-tune 30 ep từ `openobb12x.pt`, `openobb17x` vs `openobb12x`, cùng phiên, `nbs=0 warmup_bias_lr=0 epoch_lr=False`.
+  Cùng đợt: trainer khớp YOLO (warmup theo epoch tối thiểu 100 iteration, bias LR 0.1, `lf(epoch)`, `nbs=64`).
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.
@@ -386,6 +391,13 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 - `push_all.py` chỉ đồng bộ file đã commit; nó in danh sách file chưa commit, đọc để không bỏ sót.
 
 ## 9. Nhật ký
+
+- 2026-10-15: **OpenOBB17 + trainer khớp YOLO** (F64–F66).
+  - User: đừng quanh quẩn tinh chỉnh nhẹ; warmup phải giống YOLO. Đo F64 (CPU) → hướng "detector theo ranh giới"; log v14 / v15 `neck=dfine`,
+    v16 cho thấy họ v14 hỏng bất kể neck → v17 xây trên v12.
+  - `openobb/models/openobb17.py`, `openobb17_loss.py`, `tests/test_openobb17.py`; `engine.yolo_lf`, `param_groups(split_bias=)`; trainer `--epoch-lr`,
+    `--warmup-bias-lr`, `--nbs`; CLI mặc định `epoch_lr=True, warmup_bias_lr=0.1, nbs=64`, warmup `max(3 epoch, 100)` iteration.
+  - `tools/gitlab_README.md` chưa thêm dòng v17 (file có sửa dở của user).
 
 - 2026-10-14 (tối): **Log v15 neck mặc định** (F63): 0.653 / 0.416, luồng gốc + P2 không giúp wall / junction / wall_300, note sụp.
   Kết quả ghi ở `docs/OPENOBB15.md` mục 6a. Bước tiếp vẫn là cặp `neck=dfine` (v15 vs v14).

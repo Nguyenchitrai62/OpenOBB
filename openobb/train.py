@@ -20,7 +20,7 @@ from torch.utils.data import DataLoader
 from openobb import __version__
 from openobb.data.dota import DotaPatches, collate, dataset_classes
 from openobb.engine import (ModelEMA, batchnorm_finite, eval_dota, lr_factor, param_groups, sanitize_batchnorm,
-                          to_device)
+                          to_device, yolo_lf)
 from openobb.console import EpochBar, val_rows
 from openobb.report import append_results, plot_labels, plot_results, plot_train_batch, plot_val_predictions
 from openobb.eval.dota import DOTA1_CLASSES, format_table, summary_table, write_task1
@@ -42,7 +42,7 @@ def build_parser():
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16"],
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17"],
                     help="v1: OpenOBB (DETR-style decoder); v2: OpenOBB2 (dense segment-aware, NMS-free); "
                          "v3: OpenOBB3 (pretrained encoder + dense anisotropic oriented head); "
                          "v4: OpenOBB4 (DINOv2 backbone + DETR decoder + dense oriented branch); "
@@ -95,6 +95,16 @@ def build_parser():
     ap.add_argument("--min-lr-ratio", type=float, default=0.1, help="final LR / initial LR (lrf)")
     ap.add_argument("--schedule", default="flatcos", choices=["flatcos", "linear", "cos"],
                     help="flatcos: flat then cosine (D-FINE); linear / cos: decay over the whole run to min-lr-ratio")
+    ap.add_argument("--epoch-lr", action="store_true",
+                    help="usual one-stage trainer: the LR factor lf(epoch) (linear / cos to min-lr-ratio) changes once per "
+                         "epoch; during the --warmup iterations every LR moves linearly to lr * lf(epoch)")
+    ap.add_argument("--warmup-bias-lr", type=float, default=0.0,
+                    help="> 0: biases get their own groups whose LR falls from this value to lr * lf(epoch) during warmup "
+                         "(usual one-stage trainer: 0.1); the other groups rise from 0")
+    ap.add_argument("--nbs", type=int, default=0,
+                    help="nominal batch size (usual one-stage trainer: 64): gradients are accumulated over "
+                         "round(nbs / batch) batches (ramped from 1 during warmup) and weight decay is scaled by "
+                         "batch * accumulate / nbs; 0 = one optimizer step per batch")
     ap.add_argument("--cache", action="store_true", help="decode training images once into RAM")
     ap.add_argument("--fliplr", type=float, default=0.5, help="horizontal flip probability")
     ap.add_argument("--flipud", type=float, default=0.5, help="vertical flip probability")
@@ -236,9 +246,10 @@ def main(argv=None):
 
     classes = dataset_classes(a.data)
     v2, v4, v5 = a.arch == "v2", a.arch == "v4", a.arch == "v5"
-    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16")
+    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17")
     v6, v7, v8, v10 = a.arch == "v6", a.arch == "v7", a.arch == "v8", a.arch == "v10"
-    v11, v12, v13, v14 = a.arch == "v11", a.arch == "v12", a.arch == "v13", a.arch in ("v14", "v15", "v16")
+    v11, v12, v13, v14 = a.arch == "v11", a.arch in ("v12", "v17"), a.arch == "v13", a.arch in ("v14", "v15", "v16")
+    v17 = a.arch == "v17"                       # OpenOBB12 + boundary field / snapping: every v12 path applies
     v15, v16 = a.arch in ("v15", "v16"), a.arch == "v16"
     v9 = a.arch == "v9"
     dense_arch = v2 or v3                       # dense heads: no queries / decoder
@@ -258,6 +269,10 @@ def main(argv=None):
             cls14 = OpenOBB16 if v16 else (OpenOBB15 if v15 else OpenOBB14)
             model = cls14(a.size, num_classes=len(classes), img_size=a.img, max_det=a.num_top,
                           off=a.v14_off or None, box=a.box, ref_k=a.ref_k, neck=a.neck)
+        elif v17:
+            from openobb.models.openobb17 import OpenOBB17
+            model = OpenOBB17(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top,
+                              off=a.v7_off or None, box=a.box, ref_k=a.ref_k)
         elif v12 or v13:
             from openobb.models.openobb12 import OpenOBB12, OpenOBB13
             model = (OpenOBB13 if v13 else OpenOBB12)(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk,
@@ -333,6 +348,9 @@ def main(argv=None):
         if v14:
             from openobb.models.openobb14_loss import OpenOBB14Loss
             crit = OpenOBB14Loss(img_size=a.img)
+        elif v17:
+            from openobb.models.openobb17_loss import OpenOBB17Loss
+            crit = OpenOBB17Loss(img_size=a.img)
         elif v12 or v13:
             from openobb.models.openobb12_loss import OpenOBB12Loss
             crit = OpenOBB12Loss(img_size=a.img, off="slots" if v13 else "slots,reach")   # v13: P2 reach is short
@@ -403,11 +421,15 @@ def main(argv=None):
     dl = make_loader()
     iters_per_epoch = len(dl) if a.max_iters is None else min(len(dl), a.max_iters)
     total_iters = iters_per_epoch * a.epochs
+    # nominal batch size (usual one-stage trainer): accumulate gradients over round(nbs / batch) batches, weight decay
+    # scaled by batch * accumulate / nbs so the decay per image seen stays that of nbs
+    accumulate = max(round(a.nbs / a.batch), 1) if a.nbs > 0 else 1
+    wd = a.wd * a.batch * accumulate / a.nbs if a.nbs > 0 else a.wd
+    groups = param_groups(model, a.lr, a.backbone_mult, wd, split_bias=a.warmup_bias_lr > 0)
     try:                                # fused AdamW: one kernel per step instead of one per tensor
-        opt = torch.optim.AdamW(param_groups(model, a.lr, a.backbone_mult, a.wd), lr=a.lr, betas=(0.9, 0.999),
-                                fused=device.type == "cuda")
+        opt = torch.optim.AdamW(groups, lr=a.lr, betas=(0.9, 0.999), fused=device.type == "cuda")
     except (RuntimeError, TypeError):
-        opt = torch.optim.AdamW(param_groups(model, a.lr, a.backbone_mult, a.wd), lr=a.lr, betas=(0.9, 0.999))
+        opt = torch.optim.AdamW(groups, lr=a.lr, betas=(0.9, 0.999))
     base_lrs = [g["lr"] for g in opt.param_groups]
     ema = ModelEMA(model, a.ema, a.ema_warmups)
     start_epoch, it, best_score, best_epoch = 0, 0, -1.0, -1
@@ -485,9 +507,11 @@ def main(argv=None):
                         f"head P2-P5")
             else:
                 core += "; dual dense oriented head P3-P5"
+            if v17 and "field" not in (a.v7_off or ""):
+                core += f"; boundary field (stride 2) + boundary snapping of {a.ref_k} candidates"
             if a.box == "direct":
                 core += ", direct box regression (no DFL)"
-            say(f"model   OpenOBB{13 if v13 else 12}-{a.size} ({core}: one-to-many for learning + one-to-one for "
+            say(f"model   OpenOBB{17 if v17 else (13 if v13 else 12)}-{a.size} ({core}: one-to-many for learning + one-to-one for "
                 f"inference, NMS-free), {n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")
             if v13 and a.img < 1536:
                 say(f"WARNING  OpenOBB13's core runs at {a.img // 2} px: drawings need the core at >= 1024 "
@@ -531,7 +555,9 @@ def main(argv=None):
         mode = f"whole image, long side {a.img}" if a.fit else f"tiles {a.img}, scale {a.scale}"
         say(f"data    {len(ds)} train tiles, {n_val} val images, {len(classes)} classes | {mode}")
         say(f"train   {a.epochs} epochs x {iters_per_epoch} it, batch {a.batch}, AdamW lr {a.lr:g} -> "
-            f"{a.lr * a.min_lr_ratio:g} ({a.schedule}), warmup {a.warmup} it | "
+            f"{a.lr * a.min_lr_ratio:g} ({a.schedule}{', per epoch' if a.epoch_lr else ''}), warmup {max(a.warmup, 0)} it"
+            f"{f' (bias lr {a.warmup_bias_lr:g} -> lr)' if a.warmup_bias_lr > 0 else ''}"
+            f"{f', nbs {a.nbs} (accumulate {accumulate}, weight decay {wd:.3g})' if a.nbs > 0 else ''} | "
             f"val every {a.eval_every} epoch(s) on {'all' if full_val else len(val_subset or [])} val images")
         aug = []
         if a.mosaic_p:
@@ -557,6 +583,8 @@ def main(argv=None):
         log(f"best.pt <- epoch {epoch} (val mAP50:95 {score:.4f})")
 
     t_train = time.time()
+    last_opt_step = it - 1                      # the first batch of a run / resume may step
+    opt.zero_grad(set_to_none=True)
     warned = set()                              # repeated warnings go to the log file after the first one
     for epoch in itertools.count(start_epoch):
         warned_ema = "ema" in warned
@@ -593,9 +621,22 @@ def main(argv=None):
                     log(f"[profile] top ops by {key}\n" + prof.key_averages().table(sort_by=key, row_limit=30))
                 return
             t_data += time.time() - tick
-            f = lr_factor(it, total_iters, a.warmup, a.flat, a.min_lr_ratio, a.schedule)
-            for g, b in zip(opt.param_groups, base_lrs):
-                g["lr"] = b * f
+            if a.epoch_lr:                      # usual one-stage trainer: lf(epoch), linear warmup over iterations
+                lfe = yolo_lf(epoch, a.epochs, a.min_lr_ratio, a.schedule)
+                for g, b in zip(opt.param_groups, base_lrs):
+                    if it <= a.warmup:          # biases fall from warmup_bias_lr, the rest rises from 0
+                        g0 = a.warmup_bias_lr * g.get("lr_mult", 1.0) * lr_scale if g.get("name", "").endswith(
+                            "bias") else 0.0
+                        g["lr"] = float(np.interp(it, [0, max(a.warmup, 1)], [g0, b * lfe]))
+                    else:
+                        g["lr"] = b * lfe
+            else:
+                f = lr_factor(it, total_iters, a.warmup, a.flat, a.min_lr_ratio, a.schedule)
+                for g, b in zip(opt.param_groups, base_lrs):
+                    g["lr"] = b * f
+            if a.nbs > 0:                       # accumulation ramps from 1 to nbs / batch during warmup
+                accumulate = (max(1, int(np.interp(it, [0, max(a.warmup, 1)], [1, a.nbs / a.batch]).round()))
+                              if it <= a.warmup else max(round(a.nbs / a.batch), 1))
             if bi == 0 and (epoch == start_epoch or epoch == a.epochs - a.mosaic_off):
                 try:
                     plot_train_batch(out / f"train_batch{'_nomosaic' if epoch and epoch == a.epochs - a.mosaic_off else '0'}.jpg",
@@ -618,15 +659,33 @@ def main(argv=None):
                     console=True)
                 bad += 1
                 opt.zero_grad(set_to_none=True)
+                last_opt_step = it
                 it += 1
                 tick = time.time()
                 continue
-            opt.zero_grad(set_to_none=True)
+            # gradients of `accumulate` batches are averaged before one optimizer step (accumulate = 1: every batch)
             if scaler is not None:
-                scaler.scale(loss).backward()
-                scaler.unscale_(opt)
+                scaler.scale(loss / accumulate).backward()
             else:
-                loss.backward()
+                (loss / accumulate).backward()
+            if it - last_opt_step < accumulate:
+                it += 1
+                main = {k: v.detach() for k, v in losses.items() if "_aux" not in k and "_dn" not in k
+                        and "_enc" not in k and "_pre" not in k}
+                main["total"] = loss.detach()
+                for k, v in main.items():
+                    sums[k] = sums[k] + v if k in sums else v.clone()
+                n += 1
+                if bar is not None:
+                    bar.update(bi + 1, {k: float(sums[k]) / n for k in sums if k in bar.keys},
+                               sum(len(t["labels"]) for t in targets),
+                               torch.cuda.memory_reserved() / 2**30 if device.type == "cuda" else None,
+                               force=bi + 1 == iters_per_epoch)
+                tick = time.time()
+                continue
+            last_opt_step = it
+            if scaler is not None:
+                scaler.unscale_(opt)
             gn = torch.nn.utils.clip_grad_norm_(model.parameters(), a.clip if a.clip > 0 else 1e9)
             if not torch.isfinite(gn):          # never let one bad batch poison the weights
                 if scaler is not None:
@@ -643,6 +702,7 @@ def main(argv=None):
                 scaler.update()
             else:
                 opt.step()
+            opt.zero_grad(set_to_none=True)
             ema.update(model)
             # keep running sums on the GPU: a float() per loss term per step forced ~40 device syncs
             main = {k: v.detach() for k, v in losses.items() if "_aux" not in k and "_dn" not in k and "_enc" not in k
@@ -676,6 +736,8 @@ def main(argv=None):
             ema.load_state_dict(ck["ema"])
             opt.load_state_dict(ck["opt"])
             it = ck["iter"]
+            last_opt_step = it - 1
+            opt.zero_grad(set_to_none=True)
             recoveries += 1
             lr_scale *= 0.5
             base_lrs = [b * 0.5 for b in base_lrs]

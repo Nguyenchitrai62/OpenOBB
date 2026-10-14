@@ -108,22 +108,35 @@ def lr_factor(it, total, warmup, flat=0.5, min_ratio=0.1, schedule="flatcos"):
     return base * min(1.0, (it + 1) / max(warmup, 1))
 
 
-def param_groups(model, lr, backbone_mult=0.5, wd=1e-4):
-    groups = {"bb": [], "bb_norm": [], "nodecay": [], "rest": []}
+def param_groups(model, lr, backbone_mult=0.5, wd=1e-4, split_bias=False):
+    """AdamW groups: backbone / rest x decayed weights / norm weights and biases (no decay). split_bias: biases get
+    their own groups (backbone and rest), as in the usual one-stage trainer whose bias LR warms up from warmup_bias_lr.
+    Every group records `lr_mult` (its LR / lr)."""
+    groups = {"bb": [], "bb_norm": [], "bb_bias": [], "nodecay": [], "bias": [], "rest": []}
     for n, p in model.named_parameters():
         if not p.requires_grad:
             continue
         normish = ("norm" in n) or ("bn" in n) or p.ndim <= 1      # biases, norm weights, scales: no decay
+        bias = split_bias and n.endswith(".bias")
         if n.startswith("backbone.") and not n.startswith("backbone.adapter."):   # ViT adapter: new layers
-            groups["bb_norm" if normish else "bb"].append(p)
+            groups["bb_bias" if bias else "bb_norm" if normish else "bb"].append(p)
+        elif bias:
+            groups["bias"].append(p)
         elif normish or n.endswith(".bias"):
             groups["nodecay"].append(p)
         else:
             groups["rest"].append(p)
-    return [dict(params=groups["bb"], lr=lr * backbone_mult, weight_decay=wd, name="bb"),
-            dict(params=groups["bb_norm"], lr=lr * backbone_mult, weight_decay=0.0, name="bb_norm"),
-            dict(params=groups["nodecay"], lr=lr, weight_decay=0.0, name="nodecay"),
-            dict(params=groups["rest"], lr=lr, weight_decay=wd, name="rest")]
+    spec = [("bb", backbone_mult, wd), ("bb_norm", backbone_mult, 0.0), ("bb_bias", backbone_mult, 0.0),
+            ("nodecay", 1.0, 0.0), ("bias", 1.0, 0.0), ("rest", 1.0, wd)]
+    return [dict(params=groups[k], lr=lr * m, weight_decay=w, name=k, lr_mult=m) for k, m, w in spec
+            if split_bias or k not in ("bb_bias", "bias")]
+
+
+def yolo_lf(epoch, epochs, lrf, schedule="cos"):
+    """Per-epoch LR factor of the usual one-stage trainer: cosine (one-cycle) or linear from 1 to lrf over the run."""
+    if schedule == "cos":
+        return ((1 - math.cos(epoch * math.pi / max(epochs, 1))) / 2) * (lrf - 1) + 1
+    return max(1 - epoch / max(epochs, 1), 0.0) * (1.0 - lrf) + lrf
 
 
 def ctx_batch(targets, device):
