@@ -1102,6 +1102,38 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Việc tiếp: đúng cặp đã đăng ký `openobb15x neck=dfine` vs `openobb14x neck=dfine`. Nếu có, xin log v14 own từ COCO 100 ep (cùng lịch) để so
     sạch v15 own với v14 own.
 
+- **F64. Chẩn đoán gốc trên Wall_Color (10-14, CPU, checkpoint v12 head một-nhiều + NMS 0.7, 53 ảnh val): thước nhiễu ±0.024; khoảng hụt nằm ở ĐẦU box;
+  nhãn là quy ước, không nằm trên nét ảnh; đầu box trùng cạnh object kề bên.** Script: `research/analysis/val_noise_bootstrap.py`,
+  `box_error_oracle.py`, `edge_snap_oracle.py`; log `val_noise_v12.log`, `box_error_v12.log`, `edge_snap_v12_r2.log`.
+  - **Độ nhiễu của thước** (bootstrap 100 lần trên ảnh val): mAP50 0.735 ± 0.025, mAP50-95 0.478 ± 0.024 (1σ). Theo class (AP50-95): wall ± .017,
+    door ± .018, junction ± .032, wall_300 ± .056, note ± .058, slide_door ± .077, double_door ± .091.
+    → Khoảng cách v12 với YOLO26x (−0.027 mAP50-95, −0.003 mAP50) chỉ khoảng 1σ; phần lớn chênh lệch giữa v3–v16 (F43, F44, F47, F60, F63) nằm trong 1–2σ.
+    Wall_Color 53 ảnh **không xếp hạng được kiến trúc** ở độ phân giải cần thiết. Mọi kết luận một run trên Wall_Color cần chênh ≥ 0.05 (2σ) hoặc hai hạt giống.
+  - **Phân rã sai số box** (thay một thành phần của mỗi detection đã khớp bằng giá trị nhãn, chấm lại; Δ mAP50-95):
+    | Class | gốc | độ dày | lệch ngang | **hai đầu** | góc | box hoàn hảo |
+    |---|---|---|---|---|---|---|
+    | wall | .516 | +.070 | +.073 | +.066 | +.013 | +.378 |
+    | note | .493 | +.046 | +.053 | **+.160** | 0 | +.387 |
+    | door | .808 | +.014 | +.039 | +.060 | +.006 | +.172 |
+    | slide_door | .203 | +.014 | +.040 | **+.123** | 0 | +.322 |
+    | double_door | .507 | +.015 | +.025 | +.037 | 0 | +.100 |
+    | wall_300 | .290 | +.058 | +.023 | **+.235** | 0 | +.487 |
+    | junction | .530 | +.035 | +.088 | **+.132** | 0 | +.400 |
+    | **all** | .478 | +.036 | +.049 | **+.116** | +.003 | +.321 (mAP50 +.064) |
+    → Hình học box chiếm gần hết phần còn thiếu (box hoàn hảo trên cùng detection / điểm: 0.799); phân loại + xếp hạng chỉ còn +0.064 mAP50.
+    Thành phần lớn nhất là **vị trí hai đầu dọc trục**; góc không đáng kể.
+  - **Nhãn không nằm trên mép nét ảnh:** kéo mỗi cạnh của box NHÃN về mép mạnh nhất trong ±2 px (ảnh gốc) → IoU trung vị với chính nó wall .611,
+    junction .598, wall_300 .511, slide_door .658, door .853; chỉ note .989. Làm cùng việc trên detection của v12: −0.090 mAP50-95 (wall −.204, junction −.230).
+    → Box của tường / nút / wall_300 là **quy ước của người gán nhãn** (dải quanh nét màu 2–3 px), không phải đường biên thấy được. Cơ chế "nhìn kỹ
+    pixel hơn" (v15: luồng 2560, P2) không tự sửa được → khớp F63.
+  - **Đầu box dùng chung với object kề bên:** tâm cạnh đầu nằm trên cạnh của object khác trong ≤ 2 px: wall_300 85%, slide_door 77%, wall 66%,
+    junction 56% (≤ 0.5 px chỉ 11–32% → nhãn rung khoảng 1 px). Đối tác chính: wall ↔ wall / door / junction, wall_300 ↔ wall / door.
+    → Tường là các nét liên tục được **chia đoạn** thành object; đầu của một object là ranh giới với object kế tiếp.
+  - **Hệ quả cho hướng nghiên cứu:** mọi version (v1–v16) và YOLO cùng một khuôn: mỗi object tự hồi quy độ dài từ một điểm neo, độc lập với hàng xóm.
+    Sai số lớn nhất đo được (đầu box) lại là quan hệ ranh giới giữa các object kề nhau trên cùng nét. Hướng đột phá đề xuất (chưa code, chờ user):
+    **detector theo ranh giới / chia đoạn**: trường ranh giới dày đặc (stride 4, giám sát bằng mọi cạnh nhãn) + định vị đầu box bằng tìm kiếm 1D dọc trục
+    trên trường đó, hàng xóm dùng chung một ranh giới. Trần đo được: đầu +0.116, ngang + dày khoảng +0.07. Benchmark chính chuyển sang FloorPlanCAD.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
