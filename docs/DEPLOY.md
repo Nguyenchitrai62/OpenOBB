@@ -5,9 +5,24 @@ OpenOBB tự viết phần giao diện này; package không phụ thuộc Ultral
 
 ## Cài đặt
 
+**Máy có GPU NVIDIA** (suy luận bằng GPU):
+
 ```bash
+pip install torch --index-url https://download.pytorch.org/whl/cu126
 pip install "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"
 ```
+
+**Máy chỉ có CPU:**
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"
+```
+
+- Hai lệnh luôn cài bản mới nhất. Cập nhật về sau: `pip install -U --no-deps "openobb @ git+https://github.com/Nguyenchitrai62/OpenOBB.git"` (giữ nguyên torch đã cài).
+- Phải cài torch trước: `pip install torch` thường từ PyPI trên Windows là bản chỉ chạy CPU, nên máy có GPU vẫn chạy chậm.
+- GPU RTX 50xx (Blackwell): dùng `cu128` thay cho `cu126`.
+- Kiểm tra: `python -c "import torch; print(torch.cuda.is_available())"` in `True` là đã chạy được GPU.
 
 - Phụ thuộc: torch, numpy, opencv-python, shapely, scipy, pyyaml. Pillow là tuỳ chọn, chỉ cần khi đưa ảnh PIL vào.
 - Nếu repo chuyển sang private: `pip install "openobb @ git+https://<token>@github.com/Nguyenchitrai62/OpenOBB.git"`.
