@@ -40,7 +40,7 @@ Sổ cái: F64 (chẩn đoán), F65 (thiết kế, kỳ vọng ghi trước).
 ## 4. Chỉ số kỳ vọng (ghi TRƯỚC khi train)
 
 Phép thử chính, rẻ nhất, khác đúng một yếu tố: fine-tune 30 epoch từ `openobb12x.pt`, cùng công thức với mốc F59
-(lr 1e-3 cos theo iteration, batch 16, 1280, không nbs). Hai hạt giống chạy **cùng phiên**: A = v17, B = v12.
+(lr 1e-3 cos theo iteration, batch 16, 1280, không nbs). A = v17; B = mốc F59 (chỉ chạy lại khi kết quả nằm vùng xám, mục 5).
 
 | | B: v12 (F59: 0.743 / 0.472) | **A: v17 kỳ vọng** |
 |---|---|---|
@@ -56,10 +56,16 @@ Phép thử chính, rẻ nhất, khác đúng một yếu tố: fine-tune 30 epo
 **Bác bỏ** nếu: A − B < 0.01 mAP50-95, hoặc thành phần "hai đầu" giảm < 15%, hoặc hệ số bám đầu < 0.1.
 Nếu đạt: chạy FloorPlanCAD (24 ep, cặp v17 / v12) để xác nhận trên data lớn, rồi mới train dài từ COCO.
 
-## 5. Lệnh (hai hạt giống, cùng phiên Colab)
+## 5. Lệnh
 
 ```bash
 openobb train model=openobb17x weights=/content/openobb12x.pt data=/content/data.yaml imgsz=1280 epochs=30 batch=16 lr0=0.001 nbs=0 warmup_bias_lr=0 epoch_lr=False name=v17_ft
+```
+
+Mốc so sánh là F59 (v12 fine-tune 30 epoch từ cùng `openobb12x.pt`, cùng công thức: 0.743 / 0.472), không cần train lại v12.
+Chỉ khi v17 rơi vào vùng xám (+0.01 đến +0.025 mAP50-95) mới chạy lại v12 cùng phiên để gỡ nhiễu giữa hai lần train:
+
+```bash
 openobb train model=openobb12x weights=/content/openobb12x.pt data=/content/data.yaml imgsz=1280 epochs=30 batch=16 lr0=0.001 nbs=0 warmup_bias_lr=0 epoch_lr=False name=v12_ft
 ```
 
