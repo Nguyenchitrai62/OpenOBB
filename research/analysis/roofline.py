@@ -102,6 +102,24 @@ def build(name, nc, hw):
                 pts, st = m.anchors(feats)
                 from openobb.models.openobb3 import decode
                 return m.refine(f4, feats[0], cls, decode(reg, pts, st), 1500)
+        elif arch in ("v17", "v18", "v19", "v20", "v21", "v22"):
+            from openobb.models.openobb17 import OpenOBB17
+            from openobb.models import openobb18 as m18
+            cls = {"v17": OpenOBB17, "v18": m18.OpenOBB18, "v19": m18.OpenOBB19, "v20": m18.OpenOBB20,
+                   "v21": m18.OpenOBB21, "v22": m18.OpenOBB22}[arch]
+            kw = dict(kv.split("=") for kv in opts.split(",") if kv)
+            groups = None if arch in ("v17", "v18") else "1,0,2,2,2,1,0"
+            m = cls(size, num_classes=nc, img_size=max(hw), groups=groups, **kw).eval().fuse()
+            parts = [("backbone.stem", "trunk stem"), ("backbone.stages.0", "trunk stage1 /4"),
+                     ("backbone.stages.1", "trunk stage2 /8"), ("backbone.stages.2", "trunk stage3 /16"),
+                     ("backbone.stages.3", "trunk stage4 /32"), ("spd", "spd (stride-4 -> P3)"), ("lsk.", "LSK adapters"),
+                     ("encoder.", "encoder (D-FINE hybrid)"), ("neck.", "own neck"),
+                     ("head.cls", "head cls (o2m)"), ("head.ctx", "head cls (o2m)"), ("head.reg", "head box (o2m)"),
+                     ("ang.", "head angle branch"), ("field", "boundary field"), ("snap", "boundary snapping"),
+                     ("edge", "edge refiner")]
+
+            def fn(x):
+                return m(x)                                  # inference forward: o2m head, refiner, snapping, NMS
         else:
             raise SystemExit(f"{name}: not supported by this script")
     else:

@@ -123,8 +123,15 @@ def fast_nms(logits, boxes, max_det=1000, conf=0.001, iou=0.7, pre=4000, min_sid
         if min_side > 0:
             bn = b.clone()
             bn[:, 2:4] = bn[:, 2:4].clamp(min=min_side)
-        ov = probiou(bn[:, None, :], bn[None, :, :]) * (lab[:, None] == lab[None, :])
-        keep = torch.triu(ov, diagonal=1).amax(0) <= iou
+        # class-wise: only same-class pairs can suppress, so the overlap matrix is computed per class block (the
+        # candidates stay in score order inside a block): same result as the full N x N matrix masked by class,
+        # ~C times fewer pairs (F92: the NMS took 3.0 ms / image at batch 16, YOLO26's postprocess 0.7 ms)
+        keep = torch.zeros_like(s, dtype=torch.bool)
+        for c in lab.unique():
+            j = (lab == c).nonzero(as_tuple=True)[0]
+            bj = bn[j]
+            ov = probiou(bj[:, None, :], bj[None, :, :])
+            keep[j] = torch.triu(ov, diagonal=1).amax(0) <= iou
         s, lab, b = s[keep][:max_det], lab[keep][:max_det], b[keep][:max_det]
         n = len(s)
         out_l[i, torch.arange(n, device=s.device), lab] = torch.logit(s.clamp(1e-6, 1 - 1e-6))

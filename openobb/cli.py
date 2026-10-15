@@ -41,7 +41,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-MODES = ("train", "val", "predict", "prepare", "pretrain", "strip", "calibrate")
+MODES = ("train", "val", "predict", "prepare", "pretrain", "strip", "calibrate", "profile")
 SIZES = ("s", "m", "l", "x")
 # model names: openobb1{s,m,l,x} (= s/m/l/x, DETR-style OpenOBB), openobb2{n,s,m,l,x} (dense segment-aware OpenOBB2),
 # openobb3{s,m,l,x} (pretrained encoder + dense anisotropic oriented head), openobb4x (DINOv2 + hybrid DETR)
@@ -826,6 +826,12 @@ def main(argv=None):
         if bad or "model" not in kv:
             raise SystemExit("usage: openobb strip model=<best.pt> [out=<deploy.pt>] [half=True]")
         strip(**kv)
+        return 0
+    if mode == "profile":
+        from openobb.profile import profile_parts
+        if "model" not in kv or any(k not in ("model", "imgsz", "batch", "runs") for k in kv):
+            raise SystemExit("usage: openobb profile model=<best.pt> [imgsz=1280] [batch=16] [runs=20]  (GPU)")
+        profile_parts(kv["model"], **{k: int(v) for k, v in kv.items() if k != "model"})
         return 0
     if mode == "calibrate":
         import inspect

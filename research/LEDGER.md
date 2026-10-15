@@ -1484,6 +1484,16 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Kỳ vọng ghi trước (150 ep từ best.pt v21, không xoay): box dài lệch ≤ 2%, mAP50-95 ≥ 0.51 (wall ≥ .60, junction ≥ .57, wall_300 ≥ .40),
     mAP50 ≥ 0.765, trùng ≤ 2.0%, ≤ 12.7 ms. Bác bỏ: lệch ≥ 8% (góc) hoặc wall 50-95 < .55 (hồi quy thẳng).
 
+- **F92. Tốc độ: NMS theo từng lớp (0.21.1) + v22 KHÔNG nặng hơn YOLO26x về FLOPs; khoảng cách nằm ngoài conv. (10-15, CPU)**
+  - `fast_nms` cũ tính ProbIoU cho mọi cặp (tới 4000², rồi mới lọc cùng lớp): 3.0 ms / ảnh trên G4 (F90) so với 0.7 ms của YOLO26 (không NMS, head
+    một-một). Bản mới tính theo khối từng lớp, kết quả y hệt (test `tests/test_nms_classwise.py`), CPU 4000 ứng viên: 1557 → 210 ms / ảnh (7.4×).
+  - `research/analysis/roofline.py openobb22x yolo26x-obb --hw 960x1280`: v22-x **523 GFLOPs**, 4.23 GB, roofline 4.13 ms; YOLO26x **605 GFLOPs**,
+    3.80 GB, 4.34 ms. Phần lớn của v22: neck tự viết 140 GFLOPs (24% thời gian roofline), thân stage 2 / 3 (18% / 21%), trường ranh giới 16 GFLOPs
+    (6%, tầng stride 2), head 43 GFLOPs. Đo thật trên G4: 9.7 ms so với 6.6 ms → 3 ms chênh nằm NGOÀI các lớp conv (chọn ứng viên G × A, bộ tinh
+    chỉnh + bám mép trên 1500 ứng viên, vòng lặp Python theo nhóm / tầng, nhiều kernel nhỏ).
+  - Công cụ `openobb profile model=best.pt` (0.21.1): thời gian GPU từng khối (thân + neck, head, trường ranh giới, decode + nhóm, top-k + tinh chỉnh
+    + bám mép, NMS). Cần chạy trên G4 trước khi thiết kế bản nhanh (OpenOBB23).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
