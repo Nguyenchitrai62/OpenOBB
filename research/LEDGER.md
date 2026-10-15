@@ -1367,8 +1367,16 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     Học trên 250 ảnh, nó khái quát kém sang bản vẽ khác kiểu (chữ viết tay, ghi chú).
   - Trên val, v20 vẫn khít hơn v17 + nhóm (box_quality, NMS 0.5): góc wall 0.24° / 0.40°, junction 0.91° / 3.08°, door 0.64° / 1.37°;
     đầu box wall 1.92 / 2.19 px; R@.75 wall .42 / .36. → Thước val không bắt được lỗi này.
-  - Hướng sửa (chưa làm): giới hạn góc xoay của bộ tinh chỉnh theo độ dài (đầu box không văng quá vài px), thử ngay trên `openobb20x.pt` bằng CPU
-    (val + ảnh 9F), không cần train lại.
+  - **ĐÍNH CHÍNH (cùng ngày):** tắt bộ tinh chỉnh của v20 (lớp cuối = 0, tức hành vi v19) trên ảnh 9F → box còn nghiêng hơn (hình chữ X trên
+    tường dọc dài), 248 box so với 233; tường chéo khoảng 25° vẫn sai, junction vẫn nằm thẳng trục thay vì xoay theo tường, junction lạc vẫn còn.
+    → Nguyên nhân KHÔNG phải bộ tinh chỉnh (nó còn sửa bớt) mà là **neck nhanh chưng cất của họ v18 / v19** so với encoder lai + LSK của v17
+    (ảnh `compare_two_out/openobb20x_norefiner_*.png`). Giả thuyết cơ chế: neck RepConv tầm nhìn cục bộ; góc của object dài / chéo cần ngữ cảnh
+    xa mà encoder (attention trên P5) + LSK (kernel lớn) cung cấp. Bỏ hướng "giới hạn góc của bộ tinh chỉnh".
+  - Thước val (mAP, trung vị sai số) không bắt được lỗi này → `research/analysis/infer_box_eval.py`: đuôi sai số góc / lệch đầu box theo độ dài,
+    đường predict thật, conf 0.25; cộng thước không nhãn "lệch trục" cho tường dài (nhãn val: 100% tường ≥ 100 px nằm trong 0.5° của trục).
+  - User nhắc lại log v17 + nhóm (F74): 0.757 / 0.487 (o2m 0.7, trùng 7.4%) hoặc 0.751 / 0.481 (o2m 0.5, trùng 2.2%), 16.1 ms. Cùng NMS 0.5 với v20
+    (0.764 / 0.482): mAP50 −0.013, mAP50-95 ngang (trong nhiễu ±0.024), nhưng box đúng hướng trên bản vẽ thật. → **Bản tốt nhất thực tế: v17 + nhóm.**
+    Họ v18 / v19 đổi 22% tốc độ lấy mất hướng box của object dài / chéo; thước val không thấy.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 

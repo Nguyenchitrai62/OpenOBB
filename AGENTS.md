@@ -304,7 +304,10 @@ Câu hỏi còn mở:
   **Lần 1 bản 1 (F78) lệch thiết kế:** file `openobb19x.pt` của user là v17 + nhóm (neck v19 học lại từ đầu), thầy `openobb17x_v2.pt` là một nhóm
   → 0.752 / 0.464, 12.4 ms, trùng 2.9%, wall → nền 13%.
   **Bản 2 = OpenOBB20-x (F79)**, cùng xuất phát lệch, khác đúng ở bộ tinh chỉnh: **0.764 / 0.482, 12.6 ms, trùng 2.6%**
-  (+0.012 / +0.018; wall 50-95 +.028). Bộ tinh chỉnh giữ lại. Đây là bản tốt nhất hiện tại: so với YOLO26x +0.018 / −0.017.
+  (+0.012 / +0.018; wall 50-95 +.028). Bộ tinh chỉnh giữ lại.
+  **Nhưng trên bản vẽ thật (F82) box của v20 nghiêng / lệch nặng ở tường dài và tường chéo; nguyên nhân là neck nhanh của họ v18 / v19
+  (tắt bộ tinh chỉnh còn tệ hơn).** v17 + nhóm (F74: 0.757 / 0.487 ở o2m 0.7; 0.751 / 0.481 ở o2m 0.5, 16.1 ms) ngang v20 về mAP và đúng
+  hướng box → **bản tốt nhất thực tế vẫn là v17 + nhóm**. Thước mới: `research/analysis/infer_box_eval.py` (đuôi sai số góc / đầu box theo độ dài).
   Không đề xuất đổi thầy nữa (v19 qua ba kiểu thầy, tổng không đổi; user phản biện). Vòng sau chưa chốt.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
