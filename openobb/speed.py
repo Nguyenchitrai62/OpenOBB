@@ -11,7 +11,9 @@ import time
 import torch
 
 _NMS_MODULES = ("openobb.models.openobb3", "openobb.models.openobb5", "openobb.models.openobb6",
-                "openobb.models.openobb7", "openobb.models.openobb8", "openobb.models.openobb9")
+                "openobb.models.openobb7", "openobb.models.openobb8", "openobb.models.openobb9",
+                "openobb.models.openobb10", "openobb.models.openobb11", "openobb.models.openobb12",
+                "openobb.models.openobb14", "openobb.models.openobb17", "openobb.models.openobb18")   # v12+ import fast_nms too
 
 
 def sync(device):

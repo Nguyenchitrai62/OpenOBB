@@ -1456,6 +1456,15 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     đúng như dự kiến (các mẫu dương sai giờ có trọng số). Giả thuyết F86 chưa được xác nhận bằng train; chưa có run sạch.
   - Yếu tố gây nhiễu còn lại: xoay góc bất kỳ 50% (tường nghiêng giả, YOLO `degrees=0`) và quá ít lần cập nhật. Phép thử sạch: bỏ `rotate_p`, `nbs=0`.
 
+- **F89. YOLO26x đo cùng thước, cùng G4 (user, 10-15; cell so sánh dùng `openobb.eval.ultra.confusion / geometry`):**
+  `train 16_9/best.pt` (150 ep, `degrees 0`, `nbs 64`): **0.743 / 0.499**, Speed 0.5 ms pre + **11.5 ms inference** + 17.3 ms postprocess (batch 16,
+  1280, fp16), trùng **1.6%**, Box geometry: góc > 1° **1.3%**, > 2° 0.9%, đầu lệch 0.1%; vật dài góc > 1° **0.0%**, đầu lệch 0.0%;
+  **box dài lệch trục > 1° 0.3%** của 577 (nhãn 0.2%).
+  - So v21 (F88, cùng thước): .751 / .474, trùng 2.1%, góc > 1° 26.8%, vật dài 9.8%, box dài lệch 13.9%; 12.7 ms. Khoảng cách còn lại: mAP50-95 −0.025,
+    hướng box (13.9% so với 0.3%), trùng +0.5 điểm.
+  - Tốc độ: `Speed` của OpenOBB v10–v21 đang tính NMS vào "inference" (module của v12+ không có trong `speed._NMS_MODULES`) → sửa 0.20.2 để
+    tách như Ultralytics. Mạng thuần: YOLO 11.5 ms; v21 ≤ 12.7 ms (gồm cả NMS + tinh chỉnh). Postprocess 17.3 ms của YOLO là phần val của Ultralytics.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
