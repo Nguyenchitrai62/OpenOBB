@@ -109,7 +109,8 @@ def postprocess_options(model):
     return [(None, 0.7), (None, 0.6), (None, 0.5)]
 
 
-DUP_TOL = 0.005   # fitness margin within which the post-processing with fewer duplicate boxes wins (F69)
+DUP_TOL = 0.01    # fitness margin within which the post-processing with fewer duplicate boxes wins (F69, F74: < half the
+                  # ruler noise of a 53-image val, +-0.024)
 
 
 def dup_rate(u):

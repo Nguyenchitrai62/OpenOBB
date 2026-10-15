@@ -1243,6 +1243,20 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     double_door .653 / .554. Lỗi: wall → nền 11%, junction → nền 7%, wall_300 → junction 13%.
   - So F68 (0.754 / 0.485): ngang → **v17 đã chạm trần trên Wall_Color**; train thêm không tăng. Phép thử A (`groups=auto`) cần chạy lại đúng cờ.
 
+- **F74. Phép thử A: `openobb17x groups=auto` (user, 10-15): 0.757 / 0.487 (o2m 0.7), box trùng 7.4%. Nhóm giúp wall và junction, wall_300 tụt.**
+  - Điều kiện y hệt F73 (khởi tạo `openobb17x.pt`, công thức YOLO mới, 30 ep, batch 16, 1280, G4), khác đúng một yếu tố: 3 nhóm tự chia
+    (note, junction | wall, wall_300 | door, slide_door, double_door). 68.27M tham số, 16.1 ms (F73: 16.0 ms). Best ep 29, còn nhích.
+  - So F73: wall .872 / .534 (+.032 / +.011; wall → nền 118 → 79, −33%), junction .904 / .531 (0 / +.026; junction → nền 122 → 100),
+    note .755 / .493 (+.052 / +.030), slide_door .513 / .256 (+.10 / +.03), door .976 / .808; wall_300 .691 / .273 (−.072 / −.035;
+    wall_300 → junction 13% → 21%), double_door .591 / .518 (−.06 / −.04). Tổng +.008 / +.004 (trong nhiễu).
+    wall AP50 nhiễu ±0.010 (F64) → +.032 là thay đổi thật; junction 50-95 ±0.032 → +.026 chưa chắc; wall_300 ±0.07 → −.072 khoảng 1σ.
+  - So YOLO26x (0.746 / 0.499): mAP50 +0.011, mAP50-95 −0.012.
+  - Đối chiếu OPENOBB19 mục 4 (A): mAP50 ≥ 0.775 không đạt; wall ≥ .88 không đạt (.872); wall_300 ≥ .76 không đạt; junction 50-95 ≥ .53 đạt;
+    box trùng ≤ 3% không đạt (hiệu chỉnh giữ 0.7: o2m 0.5 .5077 so với .5144, chênh .0067 > DUP_TOL 0.005). Không bị bác bỏ (wall mAP50 +0.032 ≥ 0.02).
+    Cần `best.pt` để đo recall tường < 12 px (`miss_by_length.py`).
+  - Chẩn đoán wall_300: nhóm cho phép junction và wall_300 cùng có box ở một điểm → phân loại phải tự phân biệt; nhầm wall_300 → junction tăng.
+  - Sửa khung (0.18.2): `DUP_TOL` 0.005 → 0.01 (dưới một nửa nhiễu thước ±0.024; user ưu tiên ít box trùng). Run này sẽ chọn o2m 0.5 (2.2%).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

@@ -67,4 +67,6 @@ Log phải có dòng `[groups] contention-aware class groups (from the training 
 
 ## 6. Kết quả thật
 
-(chưa train)
+**A. `openobb17x groups=auto` (F74):** 0.757 / 0.487 so với cùng điều kiện không nhóm (F73) 0.749 / 0.483. wall mAP50 +0.032 (tường bị sót −33%),
+junction 50-95 +0.026, wall_300 −0.072 (nhầm sang junction 13% → 21%). Tiêu chí: junction đạt; mAP50 tổng, wall ≥ .88, wall_300, box trùng không đạt;
+không bị bác bỏ. Box trùng 7.4% do hiệu chỉnh giữ NMS 0.7; từ 0.18.2 (DUP_TOL 0.01) sẽ chọn 0.5 (2.2%).

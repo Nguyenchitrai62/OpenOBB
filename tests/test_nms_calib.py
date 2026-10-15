@@ -57,11 +57,12 @@ def test_train_iou_alias_reaches_the_trainer(tmp_path, monkeypatch):
 
 def test_calibration_prefers_fewer_duplicates_within_tolerance():
     from openobb.predict import choose_postprocess, dup_rate
-    # OpenOBB17 (F68): o2m 0.7 fitness .5121, o2m 0.5 .5087 -> 0.5 (duplicates ~6x fewer, F69)
+    # OpenOBB17 (F68): o2m 0.7 fitness .5121, o2m 0.5 .5087 -> 0.5 (duplicates ~6x fewer, F69); F74: .5144 vs .5077 -> 0.5
+    assert choose_postprocess([(0.5144, 0.074, "o2m", 0.7), (0.5077, 0.022, "o2m", 0.5)])[2:] == ("o2m", 0.5)
     tried = [(0.4889, 0.01, "o2o", "none"), (0.5121, 0.075, "o2m", 0.7), (0.5087, 0.016, "o2m", 0.5)]
     assert choose_postprocess(tried)[2:] == ("o2m", 0.5)
     # a clearly better setting still wins even with more duplicates
-    tried = [(0.5200, 0.075, "o2m", 0.7), (0.5087, 0.016, "o2m", 0.5)]
+    tried = [(0.5250, 0.075, "o2m", 0.7), (0.5087, 0.016, "o2m", 0.5)]
     assert choose_postprocess(tried)[2:] == ("o2m", 0.7)
     # no duplicate counts (older evaluators): plain best fitness
     assert choose_postprocess([(0.50, None, None, 0.7), (0.499, None, None, 0.5)])[3] == 0.7

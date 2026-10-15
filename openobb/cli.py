@@ -684,7 +684,7 @@ def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, b
 def calibrate(model, data=None, out=None, imgsz=None, batch=8, workers=8, cache_dir=None, device=None, seed=0,
               val_frac=0.15, gap=200):
     """Re-run the end-of-training calibration on val for a trained checkpoint: the inference head of dual-head models
-    (one-to-one / one-to-many + NMS) and the NMS threshold, by fitness 0.1 mAP50 + 0.9 mAP50-95 (within 0.005 of the
+    (one-to-one / one-to-many + NMS) and the NMS threshold, by fitness 0.1 mAP50 + 0.9 mAP50-95 (within 0.01 of the
     best, the setting with the fewest duplicate boxes). Writes the choice
     into the checkpoint's args (in place, or to `out`); everything else is unchanged."""
     _set_device(device)
