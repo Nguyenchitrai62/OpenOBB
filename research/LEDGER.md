@@ -1286,6 +1286,27 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Kỳ vọng ghi trước: bản 1 ≥ 0.475 mAP50-95, junction ≥ .52; bản 2 ≥ bản 1 + 0.01, wall ≥ .55, ≤ 13.0 ms; cả hai box trùng ≤ 3%, mAP50 ≥ 0.75.
     Mục tiêu đột phá ≥ 0.499 ở ≤ 13 ms. Bác bỏ bộ tinh chỉnh nếu bản 2 không hơn bản 1 ≥ 0.005.
 
+- **F78. Bản 1 của F77 chạy LỆCH thiết kế (user, 10-15): v19 với neck mới, thầy một nhóm → 0.752 / 0.464, 12.4 ms, box trùng 2.9%.**
+  - Điều kiện: 0.19.0, `openobb19x`, 30 ep, batch 16, 1280, G4, `nbs=0` (warmup 45 it), cos. `weights=.../openobb19x.pt`, `teacher=.../openobb17x_v2.pt`.
+  - **Kiểm tra file (CPU, bản tải về `F:\Downloads`):** `openobb19x.pt` là **v17 + nhóm** (run A, F74: `arch v17`, `groups 1,0,2,2,2,1,0`, 68.5M,
+    0.18.0, ep 28), không phải v19. Nạp vào v19-x cho đúng `1084 full, 12 partial, 328 new`, 328 tensor mới đều là `neck` → neck học lại từ đầu
+    (ep 1: 0.131 / 0.060). `openobb17x_v2.pt` là **v17 một nhóm** (F73: `groups` rỗng, ep 25). Vậy thực tế: head + field + snap từ A, neck mới chưng cất
+    từ encoder của v17 một nhóm, LD + KD class từ thầy một nhóm (không có dòng cảnh báo "head layout differs" → LD bật; loss `ld` / `kd_cls` không in
+    trong log / `results.csv`, `report.LOSS_KEYS` chưa có cột này).
+  - Theo class (run này / v19 F75 / A F74 o2m 0.7 / thầy F73): wall .826 / .498 | .879 / .521 | .872 / .534 | .840 / .523;
+    junction .895 / .518 | .887 / .496 | .904 / .531 | .900 / .505; wall_300 .727 / .252 | .763 / .287 | .691 / .273 | .763 / .308;
+    note .700 / .477 | .718 / .441 | .755 / .493; door .974 / .797; slide_door .632 / .299 (cao nhất từ trước); double_door .509 / .408.
+    Lỗi: **wall → nền 133 (13%)** (F75 8%, A 79, thầy 118 = 11%), junction → nền 7%, wall_300 → junction 22%, slide_door → wall 52%.
+  - So mốc: v19 F75 −.003 / +.002; A đã hiệu chỉnh o2m 0.5 (F76 0.751 / 0.481) +.001 / −.017; YOLO26x +.006 / −.035; v12 +.009 / −.008, nhanh hơn 19%.
+  - Đối chiếu OPENOBB20 mục 3 (bản 1): mAP50-95 ≥ 0.475 không đạt; mAP50 ≥ 0.75 đạt; junction ≥ .52 không đạt (.518); wall ≥ .53 không đạt;
+    tốc độ đạt; box trùng ≤ 3% đạt. Tiêu chí "< 0.468 → LD không tác dụng" **không áp dụng**: xuất phát là neck mới, không phải `best.pt` v19.
+  - Đọc được: (1) neck chưng cất từ encoder đã train đạt mức v19 F75 (60 + 30 ep) chỉ sau 30 ep, đường cong còn lên (ep 23 → 30: .457 → .465).
+    (2) Giả thuyết cho wall tụt: thầy một nhóm chỉ có một box mỗi điểm, ở điểm tranh chấp junction thắng → xác suất wall của thầy thấp →
+    KD class kéo nhóm wall của học trò xuống, xoá phần lợi của nhóm (F74: wall → nền 118 → 79). Junction (bên thắng) không bị ảnh hưởng.
+    Phép thử: chạy lại đúng thiết kế với thầy có nhóm; dự đoán wall → nền ≤ 9%, wall mAP50 ≥ .86.
+  - Vòng sau (đúng F77): `weights=` `best.pt` của run này, `teacher=` file A (đang tên `openobb19x.pt`, nên đổi thành `openobb17x_groups.pt`); bản 2 =
+    `openobb20x` cùng mọi thứ. Kỳ vọng OPENOBB20 mục 3 giữ nguyên, mốc bản 1 so với run này (0.752 / 0.464).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

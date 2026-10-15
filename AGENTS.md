@@ -301,6 +301,8 @@ Câu hỏi còn mở:
   Phát hiện: 60% junction và 86% tường ngắn không có điểm lưới riêng; recall tường < 12 px 0.33 so với YOLO 0.69. [docs/OPENOBB19.md](docs/OPENOBB19.md).
 - [x] **Vòng mAP50-95 (10-15, F77, 0.19.0):** v19 + chưng cất box (LD, `teacher=` v17 + nhóm) và OpenOBB20 (v19 + bộ tinh chỉnh cạnh đọc thân stride 4).
   Kết quả trước đó: v17 + nhóm 0.751 / 0.481 (NMS 0.5, trùng 2.2%), v19 0.755 / 0.462, 12.4 ms, trùng 2.8% (F74–F76). [docs/OPENOBB20.md](docs/OPENOBB20.md).
+  **Lần 1 bản 1 (F78) lệch thiết kế:** file `openobb19x.pt` của user là v17 + nhóm (neck v19 học lại từ đầu), thầy `openobb17x_v2.pt` là một nhóm
+  → 0.752 / 0.464, 12.4 ms, trùng 2.9%, wall → nền 13%. Chạy lại: `weights=` best.pt lần 1, `teacher=` file v17 + nhóm; bản 2 `openobb20x` cùng điều kiện.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.
@@ -397,6 +399,10 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 - `push_all.py` chỉ đồng bộ file đã commit; nó in danh sách file chưa commit, đọc để không bỏ sót.
 
 ## 9. Nhật ký
+
+- 2026-10-15 (2): **Log bản 1 vòng F77** (F78). Mở checkpoint local thấy `openobb19x.pt` = v17 + nhóm, `openobb17x_v2.pt` = v17 một nhóm
+  (nạp thử vào v19-x khớp đúng `1084 / 12 / 328`, 328 tensor mới là neck). Kết quả 0.752 / 0.464 không dùng để chấm kỳ vọng.
+  Giả thuyết: KD class từ thầy một nhóm kéo nhóm wall xuống (wall → nền 13%). Kiểm tra dòng `[init]` trước mỗi lần train.
 
 - 2026-10-15: **OpenOBB17 + trainer khớp YOLO** (F64–F66).
   - User: đừng quanh quẩn tinh chỉnh nhẹ; warmup phải giống YOLO. Đo F64 (CPU) → hướng "detector theo ranh giới"; log v14 / v15 `neck=dfine`,

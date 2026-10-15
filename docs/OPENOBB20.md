@@ -61,4 +61,18 @@ stride-4 map" trong dòng `model`.
 
 ## 5. Kết quả thật
 
-(chưa train)
+**Lần 1 của bản 1 (F78): chạy lệch thiết kế, không dùng để chấm.** File `openobb19x.pt` trên Drive là v17 + nhóm (run A), còn
+`openobb17x_v2.pt` là v17 một nhóm. Vậy neck của v19 học lại từ đầu (328 tensor mới) và thầy không có head nhóm.
+Kết quả: 0.752 / 0.464, 12.4 ms, box trùng 2.9%; wall .826 / .498 (wall → nền 13%), junction .895 / .518.
+
+| Bản 1 | Kỳ vọng | Lần 1 (lệch) |
+|---|---|---|
+| mAP50-95 | ≥ 0.475 | 0.464, không đạt |
+| mAP50 | ≥ 0.75 | 0.752, đạt |
+| junction 50-95 | ≥ .52 | .518, không đạt |
+| wall 50-95 | ≥ .53 | .498, không đạt |
+| tốc độ | 12.4 ± 0.3 ms | 12.4 ms, đạt |
+| box trùng | ≤ 3% | 2.9%, đạt |
+
+Chạy lại đúng thiết kế: `weights=` `best.pt` của lần 1 (v19, neck đã học), `teacher=` file A (đổi tên thành `openobb17x_groups.pt` cho rõ).
+Bản 2 dùng cùng `weights=` / `teacher=`. Kiểm tra trước khi train: dòng `[init]` phải có 0 hoặc rất ít `new tensors` (bản 2 chỉ có bộ tinh chỉnh mới).
