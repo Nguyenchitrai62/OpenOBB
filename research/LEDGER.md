@@ -1494,6 +1494,16 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Công cụ `openobb profile model=best.pt` (0.21.1): thời gian GPU từng khối (thân + neck, head, trường ranh giới, decode + nhóm, top-k + tinh chỉnh
     + bám mép, NMS). Cần chạy trên G4 trước khi thiết kế bản nhanh (OpenOBB23).
 
+- **F93. OpenOBB22-x (user, 10-15), LỆCH điều kiện ghi trước: 0.760 / 0.479 (o2m 0.5), trùng 2.4%, 9.5 + 3.0 ms; wall SỤP (.747 / .466, wall → nền 24%).**
+  0.21.0, 30 ep, lr 0.0005, `nbs 64` (112 cập nhật), vẫn `rotate any angle 0.5` (kỳ vọng ghi cho 150 ep, không xoay). `[init] best.pt: 1442 full,
+  12 partial, 0 new` và KHÔNG có dòng "box outputs rebuilt" → checkpoint nguồn có `arch v22` trong args (mAP ep 1 = 0.471: box không bắt đầu lại);
+  12 tensor partial (lớp ra box) chưa giải thích được, cần biết file nguồn.
+  - Theo class (v22 / v21 F90): wall .747 / .466 | .863 / .545; junction .905 / .533 | .900 / .538; wall_300 .746 / .288 | .730 / .310;
+    note .711 / .470 | .775 / .487; door .975 / .817; slide_door .662 / .314; double_door .574 / .465. Vật dài tìm được 358 (v21 513), box dài lệch 16.2%.
+  - Đối chiếu OPENOBB22 mục 4: lệch ≤ 2% không đạt (16.2%); mAP50-95 ≥ 0.51 không đạt; wall ≥ .60 không đạt và **chạm ngưỡng bác bỏ hồi quy thẳng
+    (wall < .55)**; mAP50 ≥ 0.765 không đạt (0.760); trùng ≤ 2.0% không đạt; tốc độ đạt. Điều kiện chưa đúng (30 ep, xoay, 112 cập nhật) nên chưa kết
+    luận chính thức, nhưng bằng chứng đang chống lại hồi quy thẳng cho tường dài: softplus × stride phải học khoảng cách 12–40 stride từ 0.69.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

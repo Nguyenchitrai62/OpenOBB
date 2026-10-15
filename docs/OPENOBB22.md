@@ -73,4 +73,17 @@ và "direct box regression (no DFL)"; dòng `augment` không có `rotate any ang
 
 ## 6. Kết quả thật
 
-(chưa train)
+**Lần 1 (F93), lệch điều kiện:** 30 ep, lr 0.0005, `nbs 64` (112 cập nhật), còn `rotate_p=0.5`; khởi tạo từ một checkpoint mang `arch v22` (không có
+dòng "box outputs rebuilt"). 0.760 / 0.479, trùng 2.4%, 9.5 + 3.0 ms; **wall .747 / .466 (wall → nền 24%)**, junction .905 / .533, wall_300 .746 / .288;
+box dài lệch trục 16.2%.
+
+| | Kỳ vọng | Lần 1 |
+|---|---|---|
+| Box dài lệch > 1° | ≤ 2% | 16.2%, không đạt |
+| mAP50-95 | ≥ 0.51 | 0.479, không đạt |
+| wall / junction / wall_300 | ≥ .60 / .57 / .40 | .466 / .533 / .288, không đạt (wall < .55: ngưỡng bác bỏ) |
+| mAP50 | ≥ 0.765 | 0.760, không đạt |
+| Box trùng | ≤ 2.0% | 2.4%, không đạt |
+| Tốc độ | ≤ 12.7 ms | 12.5 ms, đạt |
+
+Chưa phải phép thử theo điều kiện ghi trước; cần run 150 ep, không xoay, từ best.pt v21.
