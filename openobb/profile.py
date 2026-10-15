@@ -5,14 +5,14 @@ OpenOBB22-x 523 GFLOPs vs YOLO26x 605, F92).
 Stages: trunk + neck (encode), head (run_head), boundary field, candidate decode + top-k, edge refiner + boundary
 snapping (refine_stages on the top ref_k candidates), NMS, rest of forward.
 
-usage:  openobb profile model=best.pt [imgsz=1280] [batch=16] [runs=20]
+usage:  openobb profile model=best.pt [imgsz=1280] [batch=16] [runs=20] [detail=True]
 """
 import time
 
 import torch
 
 
-def profile_parts(model_path, imgsz=1280, batch=16, runs=20, warmup=5, h_ratio=0.75, device=None):
+def profile_parts(model_path, imgsz=1280, batch=16, runs=20, warmup=5, h_ratio=0.75, device=None, detail=False):
     from openobb.predict import load_model
     from openobb.models import openobb3, openobb17
     dev = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
@@ -47,6 +47,20 @@ def profile_parts(model_path, imgsz=1280, batch=16, runs=20, warmup=5, h_ratio=0
     if getattr(net, "field", None) is not None:
         f = net.field.forward
         net.field.forward = timed("boundary field", f)
+    if detail:                                       # inside trunk + neck: every stage / neck block
+        subs = []
+        bb = getattr(net, "backbone", None)
+        if bb is not None:
+            subs += [("  trunk stem", bb.stem)] if hasattr(bb, "stem") else []
+            subs += [(f"  trunk stage {i + 1}", s) for i, s in enumerate(getattr(bb, "stages", []))]
+        for owner in ("lsk", "encoder", "neck"):
+            mod = getattr(net, owner, None)
+            if mod is not None:
+                subs += [(f"  {owner}.{n}", c) for n, c in mod.named_children()]
+        for name, mod in subs:
+            f = mod.forward
+            mod.forward = timed(name, f)
+            patches.append((mod, "forward", f))
     nms_mods = [m for m in (openobb3, openobb17) if hasattr(m, "fast_nms")]
     saved = [(m, m.fast_nms) for m in nms_mods]
     for m, fn in saved:

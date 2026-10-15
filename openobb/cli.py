@@ -829,9 +829,10 @@ def main(argv=None):
         return 0
     if mode == "profile":
         from openobb.profile import profile_parts
-        if "model" not in kv or any(k not in ("model", "imgsz", "batch", "runs") for k in kv):
-            raise SystemExit("usage: openobb profile model=<best.pt> [imgsz=1280] [batch=16] [runs=20]  (GPU)")
-        profile_parts(kv["model"], **{k: int(v) for k, v in kv.items() if k != "model"})
+        if "model" not in kv or any(k not in ("model", "imgsz", "batch", "runs", "detail") for k in kv):
+            raise SystemExit("usage: openobb profile model=<best.pt> [imgsz=1280] [batch=16] [runs=20] [detail=True]  (GPU)")
+        detail = str(kv.pop("detail", "False")).lower() in ("1", "true", "yes")
+        profile_parts(kv["model"], detail=detail, **{k: int(v) for k, v in kv.items() if k != "model"})
         return 0
     if mode == "calibrate":
         import inspect

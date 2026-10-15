@@ -1504,6 +1504,13 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     (wall < .55)**; mAP50 ≥ 0.765 không đạt (0.760); trùng ≤ 2.0% không đạt; tốc độ đạt. Điều kiện chưa đúng (30 ep, xoay, 112 cập nhật) nên chưa kết
     luận chính thức, nhưng bằng chứng đang chống lại hồi quy thẳng cho tường dài: softplus × stride phải học khoảng cách 12–40 stride từ 0.69.
 
+- **F94. `openobb profile` trên G4 (user, 10-15), v21-x, batch 16, 960 × 1280, bf16, ms / ảnh:** thân + neck **7.67**, trường ranh giới 0.57,
+  head 1.00, decode + nhóm 0.13, top-k + tinh chỉnh + bám mép 0.24, **NMS 3.42**, tổng 13.03 (YOLO26x cả mạng 6.6 + 0.7).
+  - Thân + neck chạy ở khoảng 44% hiệu suất roofline (3.37 ms ước lượng) so với khoảng 66% của YOLO → chi phí là bộ nhớ / kernel nhỏ (khối HG nhiều
+    concat, conv nhẹ, SPD stride 4, neck 384 kênh), không phải FLOPs. Cần `openobb profile ... detail=True` (0.21.2) để tách từng stage / khối neck.
+  - NMS theo từng lớp chậm hơn trên GPU (3.42 so với 3.0 ms, F90): vòng lặp lớp + `unique()` thêm đồng bộ và kernel nhỏ. 0.21.2: GPU dùng lại ma
+    trận đầy đủ, CPU giữ theo lớp. Cách dứt điểm: bỏ NMS (head một-một sạch như YOLO26; hiện o2o không NMS còn 31% trùng).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
