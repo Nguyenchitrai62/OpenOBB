@@ -1352,6 +1352,9 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     góc 0.91° / 0.06°, R@.75 .32 / .47. v20 hơn YOLO ở slide_door (R@.5 .61 / .16) và double_door (.80 / .40).
   - Kết luận: bộ tinh chỉnh đã sửa lệch độ dày (+0.66 → +0.18 px) → hướng B (bin độ dày mịn) chỉ còn trần khoảng +0.03, **bỏ**. Khoảng hụt với YOLO
     nằm ở vị trí hai đầu dọc trục (sai gấp 1.5–1.8 lần YOLO), sau đó là lệch ngang. Góc lệch lớn ở junction nhưng trần gần 0.
+  - User (10-15): thử thật thấy v20 tệ hơn v19, hướng box và vị trí box lệch nhiều. Đo `research/analysis/refiner_shift.py` (log
+    `refiner_shift_v20.log`, 1500 ứng viên / ảnh): bộ tinh chỉnh xoay rất ít (trung vị 0.15–0.23°, p99 0.8–3.2°, val và 3 bản vẽ ngoài val)
+    → hướng sai không do bộ tinh chỉnh; nó dịch ngang nhiều hơn (p90 5–9 px, p99 17–37 px; ngoài val lớn hơn val). Chờ ảnh / lệnh test của user.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
