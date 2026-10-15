@@ -1378,6 +1378,26 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     (0.764 / 0.482): mAP50 −0.013, mAP50-95 ngang (trong nhiễu ±0.024), nhưng box đúng hướng trên bản vẽ thật. → **Bản tốt nhất thực tế: v17 + nhóm.**
     Họ v18 / v19 đổi 22% tốc độ lấy mất hướng box của object dài / chéo; thước val không thấy.
 
+- **F83. Đánh giá lại v17 + nhóm / v19 / v20 / YOLO26x với thước hướng box: LỆCH GÓC là điểm yếu hệ thống của cả họ OpenOBB, YOLO gần như không có.
+  (10-15, CPU)** Script `research/analysis/eval_versions.py`, `tilt_real.py`; log `eval_versions.log`, `tilt_real.log`.
+  v19 = `openobb20x.pt` với lớp cuối bộ tinh chỉnh = 0 (cùng trọng số, không phải checkpoint F78). Ứng viên thô, NMS 0.5, box ở conf 0.25.
+  | | mAP50 / 50-95 | trùng | G4 ms | nhãn tìm được: góc > 1° / > 2° | đầu box lệch > 4 px | tường ≥ 100 px: góc > 1° / lệch > 4 px | box tường ≥ 100 px nghiêng > 1° / > 3° (không cần nhãn) |
+  |---|---|---|---|---|---|---|---|
+  | v17 + nhóm | .753 / .479 | 2.1% | 16.1 | 33.7% / 10.9% | 2.5% | 20.7% / 9.2% | 32.6% / 17.0% |
+  | v19 | .774 / .480 | 3.0% | 12.4 | 10.8% / 2.8% | 2.0% | 20.5% / 10.3% | 43.2% / 31.9% |
+  | v20 | .769 / .480 | 2.5% | 12.6 | 10.0% / 2.5% | 1.9% | 14.1% / 4.7% | 26.3% / 16.2% |
+  | YOLO26x | .746 / .499 (F59) | 1.5% | — | 1.3% / 0.9% | 0.8% | **0.0% / 0.0%** | **0.0% / 0.0%** |
+  - Nhãn val: 100% tường / wall_300 ≥ 100 px nằm trong 0.5° của trục → box tường dài nghiêng > 1° là sai, đo được không cần nhãn.
+  - Theo độ dài (wall + wall_300, góc > 1°): v17 + nhóm 33% / 12% / 20% / 23% (< 40, 40–100, 100–200, ≥ 200 px); v19 11% / 3% / 20% / 23%;
+    v20 10% / 3% / 12% / 22%; YOLO 3% / 0.2% / 0% / 0%. Lỗi của mình tăng theo độ dài; YOLO không.
+  - Bản vẽ thật (box tường ≥ 100 px nghiêng > 1°): 9F v17 + nhóm 20% / v19 67% / v20 47% / YOLO 0%; 三越 43% / 67% / 44% / 0%; きらぼし 20% / 40% / 25% / 0%.
+    (250805 có tường chéo thật: 100% ở cả bốn model, bỏ.) → Khớp nhận xét của user: v19 / v20 nghiêng nặng hơn v17 trên bản vẽ thật.
+  - Theo class (góc > 2°): v17 + nhóm kém nhất ở note 26%, double_door 24%, door 17%, junction 12% (v19 / v20 ≤ 2%) → encoder v17 không phải lời giải;
+    YOLO ≤ 1.6% mọi class.
+  - Giả thuyết cơ chế (từ code): loss góc của head dense là 1 − cos 2Δθ ≈ 2Δθ²: ở 1° chỉ 6e-4, gần như không có gradient để kéo góc về đúng dưới vài độ;
+    sai số góc nhân với độ dài thành lệch đầu box, nên box dài hỏng nhất. Góc của box dài lại suy từ một điểm neo có tầm nhìn cục bộ.
+  - mAP và trung vị sai số đều không thấy lỗi này (v19 có mAP50 cao nhất nhưng nghiêng nhiều nhất). → Thước mới bắt buộc cho mọi version.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
