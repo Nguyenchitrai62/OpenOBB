@@ -552,10 +552,15 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         cache = n_train * imgsz * imgsz * 3 < 0.25 * _ram_bytes()
     batch = _batch_from(batch, sd, imgsz, n_train)
 
-    steps = max(1, n_train // int(batch)) * int(epochs)
+    nbs_ = int(extra.get("nbs", 64) or 0)
+    acc_ = max(round(nbs_ / int(batch)), 1) if nbs_ > 0 else 1        # gradient accumulation (nominal batch)
+    ipe_ = max(1, n_train // int(batch))
+    steps = ipe_ * int(epochs) // acc_
     if steps < MIN_STEPS and not extra.get("time"):
-        print(f"[openobb] WARNING: only {steps} optimizer steps ({max(1, n_train // int(batch))}/epoch x {epochs} epochs); this "
-              f"detector needs ~{MIN_STEPS}+ to converge: raise epochs or lower batch")
+        acc_txt = f", 1 update per {acc_} batches (nbs={nbs_})" if acc_ > 1 else ""
+        print(f"[openobb] WARNING: only {steps} optimizer steps ({ipe_} batches/epoch x {epochs} epochs{acc_txt}); this "
+              f"detector needs ~{MIN_STEPS}+ to converge: raise epochs, lower batch"
+              f"{' or pass nbs=0' if acc_ > 1 else ''}")
     opts = {"size": size, "img": imgsz, "scale": scale, "fit": fit, "epochs": int(epochs), "batch": int(batch),
             "aug_iof": 0.25, "merge_iou": 0.7 if fit else 0.1, "cache": bool(cache),
             "schedule": "cos" if cos_lr else "linear", "min_lr_ratio": float(lrf),
