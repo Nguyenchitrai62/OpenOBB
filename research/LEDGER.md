@@ -1271,6 +1271,10 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     Vòng này neck không có thầy và chỉ khoảng 112 lần cập nhật. Phép thử rẻ: train tiếp với `nbs=0` + `teacher=` = A (v17 + nhóm).
     Cần `best.pt` của v19 và A để chạy `box_quality.py` / `box_error_oracle.py`.
 
+- **F76. Luật hiệu chỉnh NMS cuối cùng (0.18.4) trên v17 + nhóm (F74): chọn o2m 0.5 → 0.751 / 0.481, box trùng 2.2%** (so o2m 0.7: 0.759 / 0.488, 7.5%).
+  0.18.2 (chỉ "trong 0.01 thì ít trùng nhất") đã chọn o2o 0.5 (0.742 / 0.479, 2.1%): bớt 0.1 điểm trùng mà mất 0.009 mAP50 → 0.18.4 coi các mức trùng
+  chênh < 0.5 điểm là ngang nhau rồi chọn bản chính xác hơn (`DUP_EQ`). Calibrate in phiên bản + ngưỡng ở dòng đầu (0.18.3).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
