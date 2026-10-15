@@ -31,7 +31,7 @@ import torch.nn.functional as F
 from .common import FrozenBatchNorm2d
 from .openobb1 import SelectiveKernel
 from .openobb2 import Conv
-from .openobb3 import OpenOBB3, OrientedHead, decode, fast_nms
+from .openobb3 import OpenOBB3, OrientedHead, decode, fast_nms, reg_out
 from .openobb6 import ConvBN, StripMix
 
 PARTS7 = ("guard", "lsk_bound", "spd", "cls_ctx")
@@ -98,7 +98,7 @@ class ContextOrientedHead(OrientedHead):
             for layer in list(mc)[2:]:
                 h = layer(h)
             cls.append(h.flatten(2))
-            reg.append(mr(f).flatten(2))
+            reg.append(reg_out(mr, f).flatten(2))
         return torch.cat(cls, 2).transpose(1, 2).float(), torch.cat(reg, 2).transpose(1, 2).float()
 
 

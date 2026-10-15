@@ -23,6 +23,20 @@ from .openobb2_loss import assign
 from .openobb3 import ALONG_BINS, DIRECT_CH, THICK_BINS, decode, direct_dists
 
 
+# angle loss (F84): "vec" = L1 between the double-angle unit vectors (cos 2t, sin 2t) of prediction and target: a
+# gradient of ~2 per radian at any error and no edge anywhere (pi-periodic); "cos" = the former 1 - cos 2(dt), whose
+# gradient vanishes near the optimum (1 deg -> 6e-4), which left vertical objects (angle near +-pi/2) tilted by
+# 1-5 deg. Set from the trainer's --angle-loss.
+ANGLE_LOSS = "vec"
+
+
+def angle_loss(th_p, th_t):
+    """(N,) predicted / target angles -> (N,) angle loss (see ANGLE_LOSS)."""
+    if ANGLE_LOSS == "cos":
+        return 1 - torch.cos(2 * (th_p - th_t))
+    return (torch.cos(2 * th_p) - torch.cos(2 * th_t)).abs() + (torch.sin(2 * th_p) - torch.sin(2 * th_t)).abs()
+
+
 def dist_loss(r, s, lt, rt, thick):
     """Along-axis distances + thickness: DFL on the distributions, or (box=direct, YOLO26-style) L1 in stride /
     half-stride units on the regressed values."""
@@ -102,7 +116,7 @@ class OpenOBB3Loss(nn.Module):
         dfl = dist_loss(r, s, lt, rt, thick)
         out["dfl"] = (dfl * w).sum() / norm
         out["across"] = (torch.log1p((r[:, 1] * s - at).abs() / thick.clamp(min=2.0)) * w).sum() / norm
-        out["angle"] = ((1 - torch.cos(2 * (r[:, 0] - th_t))) * w).sum() / norm
+        out["angle"] = (angle_loss(r[:, 0], th_t) * w).sum() / norm
         return {f"loss_{k}": v * self.w[k] for k, v in out.items()}
 
 

@@ -22,7 +22,9 @@ Why (research/LEDGER.md F37, F50, F58, F60, F64-F66):
     and dilated 3x3 context at P3 / P4.
 """
 import torch
+import torch.nn as nn
 
+from .openobb3 import fp32_out
 from .openobb14 import SCALES14, Neck14
 from .openobb17 import OpenOBB17
 
@@ -92,3 +94,65 @@ class OpenOBB20(OpenOBB19):
     def refine_stages(self, f4, p3, field, cand):
         r = self.edge(f4, p3, cand)
         return [(cand, r)] + ([] if field is None else [(r, self.snap(field, r))])
+
+
+class OpenOBB21(OpenOBB20):
+    """OpenOBB20 + an angle predicted in the double-angle space (docs/OPENOBB21.md, research/LEDGER.md F83-F84).
+
+    Evidence: long walls more than 1 deg off their (axis-aligned) labels: 28% of the long detections of v20 vs 0% for
+    YOLO26x (F83); 88-93% of the tilted ones are VERTICAL in the image, whose angle sits at +-pi/2, the edge of the le90
+    range, and the error follows the image orientation (rot90 of the input moves it to the walls that become vertical,
+    F84). The angle was a single linear output, 0 for horizontal objects but +-1.57 for vertical ones, trained in bf16
+    with a loss (1 - cos 2dt) whose gradient vanishes near the optimum.
+
+    Here every head level gets a second, zero-initialised 1x1 output on the regression tower: a residual (dc, ds) added
+    to the double-angle unit vector (cos 2t, sin 2t) of the head's angle t, and the angle becomes
+    t + atan2(v x v', v . v') / 2 with v' = v + (dc, ds): a correction expressed in a space where 0 and 90 deg are
+    symmetric (both unit vectors, no edge), bounded, in fp32. With (dc, ds) = 0 the model is exactly OpenOBB20
+    (test_v21_starts_as_v20). The shared F84 fixes (fp32 output conv, angle loss on the double-angle vector) apply
+    to every dense version; OpenOBB21 adds this head on top."""
+    arch = "v21"
+
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        G = self.n_groups
+
+        def make(head):
+            mods = nn.ModuleList(nn.Conv2d(m[-1].in_channels, 2 * G, 1) for m in head.reg)
+            for m in mods:
+                nn.init.zeros_(m.weight)
+                nn.init.zeros_(m.bias)
+            return mods
+        self.ang = make(self.head)
+        self.ang_o2o = make(self.head_o2o)
+
+    def copy_head_to_o2o(self):
+        super().copy_head_to_o2o()
+        self.ang_o2o.load_state_dict(self.ang.state_dict())
+
+    def run_head(self, feats, o2o):
+        head, ang = (self.head_o2o, self.ang_o2o) if o2o else (self.head, self.ang)
+        G = self.n_groups
+        ctx = getattr(head, "ctx", None)
+        cls, reg = [], []
+        for i, f in enumerate(feats):
+            mc, mr = head.cls[i], head.reg[i]
+            h = mc[1](mc[0](f))
+            if ctx is not None:
+                h = ctx[i](h)
+            for layer in list(mc)[2:]:
+                h = layer(h)
+            cls.append(h.flatten(2))
+            t = mr[:-1](f)
+            r = fp32_out(mr[-1], t)                                   # (B, G R, H, W)
+            d = fp32_out(ang[i], t)                                   # (B, 2 G, H, W)
+            R = r.shape[1] // G
+            r = r.view(r.shape[0], G, R, *r.shape[2:])
+            d = d.view(d.shape[0], G, 2, *d.shape[2:])
+            th = r[:, :, 0]
+            c, s = torch.cos(2 * th), torch.sin(2 * th)
+            c2, s2 = c + d[:, :, 0], s + d[:, :, 1]
+            th = th + 0.5 * torch.atan2(c * s2 - s * c2, c * c2 + s * s2)
+            r = torch.cat([th[:, :, None], r[:, :, 1:]], 2).reshape(r.shape[0], G * R, *r.shape[3:])
+            reg.append(r.flatten(2))
+        return torch.cat(cls, 2).transpose(1, 2).float(), torch.cat(reg, 2).transpose(1, 2).float()

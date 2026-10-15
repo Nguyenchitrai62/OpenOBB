@@ -1398,6 +1398,24 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     sai số góc nhân với độ dài thành lệch đầu box, nên box dài hỏng nhất. Góc của box dài lại suy từ một điểm neo có tầm nhìn cục bộ.
   - mAP và trung vị sai số đều không thấy lỗi này (v19 có mAP50 cao nhất nhưng nghiêng nhiều nhất). → Thước mới bắt buộc cho mọi version.
 
+- **F84. Nguyên nhân lệch góc: tường DỌC trong ảnh (góc ở mép ±π/2 của le90), loss góc không có gradient gần tối ưu. Sửa chung cho mọi
+  version dense + OpenOBB21. (10-15, CPU)** Script `research/analysis/tilt_probe.py` (log `tilt_probe_v20v2*.log`, `tilt_probe_v17groups.log`).
+  - Run user (10-15): `openobb20x` fine-tune từ `openobb20x.pt`, tắt xoay góc bất kỳ, lr 0.0005, `nbs 64`, 30 ep → **0.756 / 0.487**
+    (o2m 0.5), trùng 2.3%, 12.6 ms (file `openobb20x_v2.pt`). Thước F83: box tường dài nghiêng > 1° **28.4%** (val), 9F 31% / 三越 44% (YOLO 0%).
+  - Checkpoint cũ (args lưu trong file): v12, v17, v17 + nhóm train với `rotate_p=0.5` (xoay góc bất kỳ, notebook truyền vào, log không in);
+    v20 F79 và v20_v2 không xoay nhưng vẫn lệch → tăng cường xoay không phải nguyên nhân chính.
+  - Dò bên trong head (20 ảnh val, ứng viên tự tin dài ≥ 100 px): **tường dọc 88.7% lệch > 1°, tường ngang 0.3%**; theo tầng: gần như toàn
+    stride 8; theo vị trí neo: |u| < 0.5 lệch 25–27%, |u| 0.5–0.75 lệch 0.7%. Xoay ảnh vào 90°: tường vừa thành dọc lệch 87.5%, tường
+    vừa thành ngang 0.9% → lỗi theo HƯỚNG TRONG ẢNH, không theo nội dung. Góc tường dọc vượt ±90° (trung vị +3.9°, 76% ở ngoài); v17 + nhóm:
+    tường dọc 67.6% lệch, tản hai phía. Tường dọc cũng có ít ứng viên tự tin hơn (ảnh 0: 21 tường ngang → 73 ứng viên khi nằm ngang, 10 khi dọc).
+  - Đã loại trừ: nhãn (polys_to_obb: tường dọc θ = −π/2 đúng), `fuse()` (giống hệt), bám ranh giới (không đổi góc), bộ tinh chỉnh (giảm lệch:
+    loss góc của nó là L1 × 5). Còn lại: loss góc head 1 − cos 2Δθ (gradient 4Δθ → 0.07 ở 1°) + lớp ra góc chạy bf16 (bước 0.45° ở 1.57 rad).
+    Phép thử suy luận bf16 trên CPU chưa xong (rất chậm).
+  - **Sửa chung (0.20.0, mọi model dense v3–v21):** loss góc = L1 trên (cos 2θ, sin 2θ) (`--angle-loss vec`, mặc định; `cos` = cũ); lớp ra
+    hồi quy chạy fp32 (`openobb3.reg_out`). **OpenOBB21** = v20 + nhánh sửa góc trong không gian góc kép (zero-init). Thước `Box geometry`
+    thêm vào `openobb val` và cuối log train. Kỳ vọng + lệnh: [docs/OPENOBB21.md](../docs/OPENOBB21.md). Checkpoint cũ không tự hết lệch:
+    phải fine-tune lại bằng code mới.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

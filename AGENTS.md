@@ -308,6 +308,10 @@ Câu hỏi còn mở:
   **Nhưng trên bản vẽ thật (F82) box của v20 nghiêng / lệch nặng ở tường dài và tường chéo; nguyên nhân là neck nhanh của họ v18 / v19
   (tắt bộ tinh chỉnh còn tệ hơn).** v17 + nhóm (F74: 0.757 / 0.487 ở o2m 0.7; 0.751 / 0.481 ở o2m 0.5, 16.1 ms) ngang v20 về mAP và đúng
   hướng box → **bản tốt nhất thực tế vẫn là v17 + nhóm**. Thước mới: `research/analysis/infer_box_eval.py` (đuôi sai số góc / đầu box theo độ dài).
+- [x] **Lỗi lệch góc + OpenOBB21 (10-15, F83–F84, 0.20.0):** mọi model dense lệch góc ở tường DỌC (88% so với 0.3% tường ngang; YOLO 0%),
+  do loss góc 1 − cos 2Δθ (không có gradient gần tối ưu) + lớp ra bf16 ở ±π/2. Sửa chung bật mặc định: loss góc vectơ (cos 2θ, sin 2θ),
+  lớp ra hồi quy fp32; thước `Box geometry` in trong mọi val. v21 = v20 + nhánh sửa góc góc kép. [docs/OPENOBB21.md](docs/OPENOBB21.md).
+  Checkpoint cũ phải fine-tune lại bằng code mới. Vòng này: A `openobb20x` vs B `openobb21x`, cùng `weights=openobb20x_v2.pt`.
   Không đề xuất đổi thầy nữa (v19 qua ba kiểu thầy, tổng không đổi; user phản biện). Vòng sau chưa chốt.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
@@ -405,6 +409,10 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 - `push_all.py` chỉ đồng bộ file đã commit; nó in danh sách file chưa commit, đọc để không bỏ sót.
 
 ## 9. Nhật ký
+
+- 2026-10-15 (4): **Đánh giá hướng box + sửa lỗi góc + OpenOBB21** (F82–F84). User thấy v20 lệch hướng trên bản vẽ thật; thước mAP không thấy.
+  `research/analysis/eval_versions.py`, `tilt_real.py`, `tilt_probe.py`; `openobb.eval.ultra.geometry`; `--angle-loss`; `openobb3.reg_out`; `OpenOBB21`.
+  Dòng `augment` giờ in `rotate any angle` (trước đây ẩn) và `angle loss`.
 
 - 2026-10-15 (3): **Log OpenOBB20-x** (F79): 0.764 / 0.482, 12.6 ms. Cặp với F78 khác đúng một yếu tố (bộ tinh chỉnh), nên giữ v20.
   Đề xuất đổi thầy cho vòng sau đã bỏ theo phản biện của user (F79).

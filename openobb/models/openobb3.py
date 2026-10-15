@@ -65,6 +65,19 @@ def decode(reg, pts, strides):
     return torch.stack([cx, cy, left + right, thick, th], -1)
 
 
+def fp32_out(layer, h):
+    """An output layer run in fp32 even under AMP (see reg_out)."""
+    with torch.autocast(device_type=h.device.type, enabled=False):
+        return layer(h.float())
+
+
+def reg_out(mr, f):
+    """Regression tower `mr` (Sequential, last layer the plain output conv) on f, the output conv in fp32 even under
+    AMP: the angle channel of a vertical object sits near +-pi/2, where bf16 has a step of 0.45 deg and its rounding
+    noise grows with the magnitude of the terms; horizontal objects (angle ~ 0) do not have the problem (F84)."""
+    return fp32_out(mr[-1], mr[:-1](f) if len(mr) > 1 else f)
+
+
 class OrientedHead(nn.Module):
     """Per level: class logits (light depthwise tower) + oriented regression (angle, across offset, two along-axis
     distance distributions, thickness distribution)."""
@@ -84,7 +97,8 @@ class OrientedHead(nn.Module):
 
     def forward(self, feats):
         cat = lambda mods: torch.cat([m(f).flatten(2) for m, f in zip(mods, feats)], 2).transpose(1, 2).float()  # noqa: E731
-        return cat(self.cls), cat(self.reg)
+        reg = torch.cat([reg_out(m, f).flatten(2) for m, f in zip(self.reg, feats)], 2).transpose(1, 2).float()
+        return cat(self.cls), reg
 
 
 @torch.no_grad()

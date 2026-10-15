@@ -42,7 +42,7 @@ def build_parser():
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20"],
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21"],
                     help="v1: OpenOBB (DETR-style decoder); v2: OpenOBB2 (dense segment-aware, NMS-free); "
                          "v3: OpenOBB3 (pretrained encoder + dense anisotropic oriented head); "
                          "v4: OpenOBB4 (DINOv2 backbone + DETR decoder + dense oriented branch); "
@@ -180,6 +180,8 @@ def build_parser():
                     help="H17: weight of the query->primitive membership loss (vector-grounded boxes); 0 = off")
     ap.add_argument("--layer-drop", type=float, default=0.0, help="H16: chance to merge all layers of a sample")
     ap.add_argument("--rotate-p", type=float, default=0.0, help="H8: arbitrary-angle rotation prob")
+    ap.add_argument("--angle-loss", default="vec", choices=["vec", "cos"],
+                    help="dense heads: vec = L1 on (cos 2t, sin 2t) (F84 fix: vertical objects were tilted), cos = former 1 - cos 2dt")
     ap.add_argument("--mosaic-p", type=float, default=0.0, help="H8: oriented mosaic prob")
     ap.add_argument("--mosaic-mode", default="half", choices=["half", "yolo"],
                     help="half: 4 half-scale patches; yolo: 4 full-res patches around a random centre + warp")
@@ -258,13 +260,14 @@ def main(argv=None):
 
     classes = dataset_classes(a.data)
     v2, v4, v5 = a.arch == "v2", a.arch == "v4", a.arch == "v5"
-    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20")
+    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21")
     v6, v7, v8, v10 = a.arch == "v6", a.arch == "v7", a.arch == "v8", a.arch == "v10"
-    v11, v12, v13, v14 = a.arch == "v11", a.arch in ("v12", "v17", "v18", "v19", "v20"), a.arch == "v13", a.arch in ("v14", "v15", "v16")
-    v17 = a.arch in ("v17", "v18", "v19", "v20")   # OpenOBB12 + boundary field / snapping: every v12 path applies
-    v18 = a.arch in ("v18", "v19", "v20")       # OpenOBB17 with the own neck distilled from a trained encoder
-    v19 = a.arch in ("v19", "v20")              # OpenOBB18 + contention-aware class groups
-    v20 = a.arch == "v20"                       # OpenOBB19 + edge refiner on the trunk's stride-4 map
+    v11, v12, v13, v14 = a.arch == "v11", a.arch in ("v12", "v17", "v18", "v19", "v20", "v21"), a.arch == "v13", a.arch in ("v14", "v15", "v16")
+    v17 = a.arch in ("v17", "v18", "v19", "v20", "v21")   # OpenOBB12 + boundary field / snapping: every v12 path applies
+    v18 = a.arch in ("v18", "v19", "v20", "v21")       # OpenOBB17 with the own neck distilled from a trained encoder
+    v19 = a.arch in ("v19", "v20", "v21")              # OpenOBB18 + contention-aware class groups
+    v20 = a.arch in ("v20", "v21")             # OpenOBB19 + edge refiner on the trunk's stride-4 map
+    v21 = a.arch == "v21"                       # OpenOBB20 + double-angle residual angle head
     if v17:
         from openobb.models.groups import parse_groups
         if v19 and not a.groups:
@@ -305,8 +308,8 @@ def main(argv=None):
         elif v17:
             from openobb.models.openobb17 import OpenOBB17
             from openobb.models.openobb18 import OpenOBB18
-            from openobb.models.openobb18 import OpenOBB19, OpenOBB20
-            model = (OpenOBB20 if v20 else OpenOBB19 if v19 else OpenOBB18 if v18 else OpenOBB17)(
+            from openobb.models.openobb18 import OpenOBB19, OpenOBB20, OpenOBB21
+            model = (OpenOBB21 if v21 else OpenOBB20 if v20 else OpenOBB19 if v19 else OpenOBB18 if v18 else OpenOBB17)(
                 a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top, off=a.v7_off or None,
                 box=a.box, ref_k=a.ref_k, groups=a.groups or None)
         elif v12 or v13:
@@ -389,6 +392,8 @@ def main(argv=None):
     model.to(device)
     if a.channels_last:
         model.to(memory_format=torch.channels_last)
+    from openobb.models import openobb3_loss as _l3
+    _l3.ANGLE_LOSS = a.angle_loss
     if v2:
         crit = OpenOBB2Loss(img_size=a.img)
     elif v3:
@@ -572,11 +577,13 @@ def main(argv=None):
                 core += f"; {max(map(int, a.groups.split(','))) + 1} contention-aware class groups ({a.groups})"
             if v20:
                 core += "; edge refiner on the trunk's stride-4 map"
+            if v21:
+                core += "; angle corrected in the double-angle space"
             if v17 and "field" not in (a.v7_off or ""):
                 core += f"; boundary field (stride 2) + boundary snapping of {a.ref_k} candidates"
             if a.box == "direct":
                 core += ", direct box regression (no DFL)"
-            say(f"model   OpenOBB{20 if v20 else 19 if v19 else (18 if v18 else (17 if v17 else (13 if v13 else 12)))}-{a.size} ({core}: one-to-many for learning + one-to-one for "
+            say(f"model   OpenOBB{21 if v21 else 20 if v20 else 19 if v19 else (18 if v18 else (17 if v17 else (13 if v13 else 12)))}-{a.size} ({core}: one-to-many for learning + one-to-one for "
                 f"inference, NMS-free), {n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")
             if v13 and a.img < 1536:
                 say(f"WARNING  OpenOBB13's core runs at {a.img // 2} px: drawings need the core at >= 1024 "
@@ -634,6 +641,9 @@ def main(argv=None):
         aug.append(f"flip lr {a.fliplr:g} / ud {a.flipud:g}")
         if not a.no_rot90:
             aug.append("rot90")
+        if a.rotate_p:
+            aug.append(f"rotate any angle {a.rotate_p:g}")
+        aug.append(f"angle loss {a.angle_loss}")
         aug.append("hsv " + "/".join(f"{v:g}" for v in a.hsv))
         say("augment " + ", ".join(aug) + (f" | freeze {a.freeze}" if a.freeze else ""))
         say(f"save    {out}  (best.pt, last.pt, results.csv/png, labels.jpg, val_pred.jpg, train_progress.log)")
@@ -957,6 +967,9 @@ def main(argv=None):
         from openobb.eval.ultra import duplicate_line
         if duplicate_line(final["ultra"]["confusion"]):
             say(duplicate_line(final["ultra"]["confusion"]))
+        from openobb.eval.ultra import geometry_line
+        if geometry_line(final["ultra"].get("geometry")):
+            say(geometry_line(final["ultra"]["geometry"]))
     if final.get("metric") != "yolo" and final.get("ultra"):
         u = final["ultra"]
         say(f"Ultralytics-style metric (ProbIoU matching, 101-point AP; compare with YOLO's printed mAP): "

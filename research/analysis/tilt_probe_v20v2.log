@@ -1,0 +1,23 @@
+wall_val_0020: 81 long candidates
+wall_val_0021: 7 long candidates
+wall_val_0022: 180 long candidates
+wall_val_0023: 31 long candidates
+
+openobb20x_v2.pt: 1162 confident long candidates (score >= 0.25, L >= 100 px, L >= 10 T) on 20 val images
+  head     > 1 deg 22.5%  > 3 deg 16.6%  median 0.11
+  stage 1  > 1 deg 15.7%  > 3 deg  5.3%  median 0.27
+  stage 2  > 1 deg 15.7%  > 3 deg  5.3%  median 0.27
+  stride  8: n 1156 head > 1 deg 22.7%  final > 1 deg 15.7%
+  stride 16: n    6 head > 1 deg  0.0%  final > 1 deg 33.3%
+  anchor |u| 0.00-0.25: n  667 head > 1 deg 24.6%  final > 1 deg 18.0%
+  anchor |u| 0.25-0.50: n  357 head > 1 deg 27.2%  final > 1 deg 17.6%
+  anchor |u| 0.50-0.75: n  137 head > 1 deg  0.7%  final > 1 deg  0.0%
+  anchor |u| 0.75-2.00: n    1 head > 1 deg  0.0%  final > 1 deg  0.0%
+  length 100-200: n  534 head > 1 deg 20.2%  final > 1 deg 14.2%
+  length 200-400: n  471 head > 1 deg 32.7%  final > 1 deg 22.7%
+  length 400-: n  157 head > 1 deg  0.0%  final > 1 deg  0.0%
+  |raw angle| 0-1 rad: n  876 head > 1 deg  0.3%
+  |raw angle| 1-2 rad: n  286 head > 1 deg 90.6%
+  |raw angle| 2-4 rad: n    0 head > 1 deg   n/a
+  |raw angle| 4-100 rad: n    0 head > 1 deg   n/a
+  vertical (|raw| 1-2 rad): |raw| < pi/2 (pulled towards 0) 15.7%; of the tilted > 1 deg: 15.4%; median |raw| - pi/2 = +3.90 deg

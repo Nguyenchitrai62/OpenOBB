@@ -23,7 +23,7 @@ import math
 import torch
 import torch.nn as nn
 
-from .openobb3 import REG_CH
+from .openobb3 import REG_CH, fp32_out
 from .openobb8 import OpenOBB8
 
 PARTS10 = ("slots", "reach", "balance")
@@ -80,10 +80,10 @@ class SlotHead(nn.Module):
             h = mc[3](mc[2](h))
             r = mr[1](mr[0](f))
             cls[0].append(mc[4](h).flatten(2))
-            reg[0].append(mr[2](r).flatten(2))
+            reg[0].append(fp32_out(mr[2], r).flatten(2))
             for j in range(self.slots - 1):
                 cls[j + 1].append(self.cls_slot[i][j](h).flatten(2))
-                reg[j + 1].append(self.reg_slot[i][j](r).flatten(2))
+                reg[j + 1].append(fp32_out(self.reg_slot[i][j], r).flatten(2))
         cat = lambda lst: torch.cat([torch.cat(s, 2) for s in lst], 2).transpose(1, 2).float()  # noqa: E731
         return cat(cls), cat(reg)
 

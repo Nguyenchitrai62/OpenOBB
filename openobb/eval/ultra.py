@@ -124,6 +124,7 @@ def evaluate_ultra(dets, gts, classes, conf=0.001, max_det=300, iou_thrs=None):
             res["classes"][c]["P"], res["classes"][c]["R"] = float(pc), float(rc)
         res["conf_best_f1"] = float(grid[i])
     res["confusion"] = confusion(per_img, gts, classes)
+    res["geometry"] = geometry(per_img, gts, classes)
     vals = list(res["classes"].values())
     res["mAP50"] = float(np.mean([v["AP50"] for v in vals])) if vals else 0.0
     res["mAP75"] = float(np.mean([v["AP75"] for v in vals])) if vals else 0.0
@@ -171,6 +172,74 @@ def confusion(per_img, gts, classes, conf=0.25, iou_thr=0.5):
         np.add.at(cm[:, n], gc[~taken], 1)
     return {"classes": list(classes) + ["background"], "matrix": cm.tolist(),
             "duplicates": {c: int(v) for c, v in zip(classes, dup)}, "detections": int(cm[:, :n].sum())}
+
+
+def _canon(b):
+    b = np.asarray(b, np.float64).reshape(-1, 5).copy()
+    sw = b[:, 2] < b[:, 3]
+    b[sw, 2], b[sw, 3] = b[sw, 3], b[sw, 2].copy()
+    b[sw, 4] += np.pi / 2
+    return b
+
+
+def _axis_dev(th):
+    """degrees to the nearest multiple of 90 deg"""
+    return np.abs(np.rad2deg((th + np.pi / 4) % (np.pi / 2) - np.pi / 4))
+
+
+def geometry(per_img, gts, classes, conf=0.25, iou_thr=0.5, long_ratio=10.0):
+    """Orientation / position quality that mAP hides (a long thin box tilted by 2 deg keeps IoU > 0.5 but leaves its
+    line): every label takes its best same-class detection (score >= conf, ProbIoU >= iou_thr = found), then
+      angle: |angle error| (modulo 90 deg for near-square labels, whose long axis is arbitrary);
+      end:   largest distance of the detection's two end centres from the label's centre line, in units of the
+             label's thickness (> 0.5 = an end lies outside the drawn object);
+    over all found labels and over long ones (length / thickness >= long_ratio). Label-free: share of long
+    detections more than 1 deg off the nearest axis, next to the same share of the long labels (drawings are mostly
+    axis-aligned; when the labels are, a tilted detection is wrong whatever its IoU)."""
+    ang, end, lng = [], [], []
+    det_dev, lab_dev = [], []
+    for img, objs in gts.items():
+        objs = [o for o in objs if o[1] in classes]
+        gb = _canon(polys_to_obb(np.array([o[0] for o in objs], np.float32).reshape(-1, 8)))
+        gc = np.array([classes.index(o[1]) for o in objs], int)
+        d = [t for t in per_img.get(img, []) if t[0] >= conf]
+        pb = _canon(polys_to_obb(np.stack([t[2] for t in d]).astype(np.float32))) if d else np.zeros((0, 5))
+        pc = np.array([t[1] for t in d], int)
+        lab_dev += list(_axis_dev(gb[gb[:, 2] >= long_ratio * np.maximum(gb[:, 3], 1e-6), 4]))
+        det_dev += list(_axis_dev(pb[pb[:, 2] >= long_ratio * np.maximum(pb[:, 3], 1e-6), 4]))
+        if not len(gb) or not len(pb):
+            continue
+        iou = probiou(gb, pb) * (gc[:, None] == pc[None, :])
+        for i in range(len(gb)):
+            j = int(np.argmax(iou[i]))
+            if iou[i, j] < iou_thr:
+                continue
+            g, p = gb[i], pb[j]
+            best = None
+            for q in ([p] + ([np.array([p[0], p[1], p[3], p[2], p[4] + np.pi / 2])] if g[2] < 1.5 * g[3] else [])):
+                dth = abs(np.rad2deg((q[4] - g[4] + np.pi / 2) % np.pi - np.pi / 2))
+                u, v = np.array([np.cos(q[4]), np.sin(q[4])]), np.array([-np.sin(g[4]), np.cos(g[4])])
+                off = max(abs((q[:2] + s * u * q[2] / 2 - g[:2]) @ v) for s in (-1, 1)) / max(g[3], 1e-6)
+                if best is None or dth < best[0]:
+                    best = (dth, off)
+            ang.append(best[0]), end.append(best[1]), lng.append(g[2] >= long_ratio * g[3])
+    ang, end, lng = np.array(ang), np.array(end), np.array(lng, bool)
+    share = lambda x: float(np.mean(x)) if len(x) else 0.0  # noqa: E731
+    det_dev, lab_dev = np.array(det_dev), np.array(lab_dev)
+    return {"found": int(len(ang)), "angle_gt1": share(ang > 1), "angle_gt2": share(ang > 2), "end_out": share(end > 0.5),
+            "long": int(lng.sum()), "long_angle_gt1": share(ang[lng] > 1), "long_end_out": share(end[lng] > 0.5),
+            "long_dets": int(len(det_dev)), "long_dets_tilted": share(det_dev > 1), "long_labels_tilted": share(lab_dev > 1)}
+
+
+def geometry_line(g):
+    """'Box geometry ...' summary of geometry()."""
+    if not g or not g.get("found"):
+        return ""
+    return (f"Box geometry (conf 0.25, {g['found']} found objects): angle error > 1 deg {100 * g['angle_gt1']:.1f}%, "
+            f"> 2 deg {100 * g['angle_gt2']:.1f}%, an end off the object (> 0.5 thickness) {100 * g['end_out']:.1f}% | "
+            f"long objects (length >= 10 x thickness, {g['long']}): angle > 1 deg {100 * g['long_angle_gt1']:.1f}%, "
+            f"end off {100 * g['long_end_out']:.1f}% | long detections > 1 deg off the axes {100 * g['long_dets_tilted']:.1f}% "
+            f"of {g['long_dets']} (labels {100 * g['long_labels_tilted']:.1f}%)")
 
 
 def duplicate_line(cm):

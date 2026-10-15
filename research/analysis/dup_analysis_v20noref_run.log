@@ -60,3 +60,6 @@ NMS 0.5 + containment 0.8                  mAP50 0.7682 mAP50-95 0.4834 | dups 1
 NMS 0.7 + floor 12 px                      mAP50 0.7661 mAP50-95 0.4841 | dups 288 of 5085 | {'wall': 84, 'note': 6, 'door': 3, 'slide_door': 19, 'double_door': 12, 'wall_300': 64, 'junction': 100}
 NMS 0.7 + containment 0.8                  mAP50 0.7606 mAP50-95 0.4821 | dups 426 of 5250 | {'wall': 98, 'note': 6, 'door': 4, 'slide_door': 17, 'double_door': 11, 'wall_300': 73, 'junction': 217}
 ORACLE: model NMS + perfect duplicate removal mAP50 0.7640 mAP50-95 0.4846 | dups 454 of 5331 | {'wall': 118, 'note': 6, 'door': 4, 'slide_door': 20, 'double_door': 12, 'wall_300': 74, 'junction': 220}
+NMS 0.7 + floor 12 + containment 0.8       mAP50 0.7628 mAP50-95 0.4820 | dups 262 of 5005 | {'wall': 63, 'note': 6, 'door': 4, 'slide_door': 16, 'double_door': 11, 'wall_300': 63, 'junction': 99}
+same-class overlapping pairs after the model's NMS: {'contained (short inside long)': 120, 'near-identical (IoU >= 0.5)': 216, 'partial overlap': 1076}
+saved F:\Source_code\NEW_architecture\research\analysis\dup_analysis_openobb20x_noref_o2m.json
