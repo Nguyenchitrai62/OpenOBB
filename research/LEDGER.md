@@ -1444,6 +1444,18 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   wall .874 / .539, junction .909 / .523, wall_300 .711 / .272, note .691 / .451. `Box geometry`: góc > 1° 19.4%, vật dài góc > 1° 13.2%.
   Chỉ bớt 4.5 điểm lệch → khớp F86 (dạng loss một mình không đủ). Chưa phải phép thử của 0.20.1.
 
+- **F88. Hai run 10-15 (user), CẢ HAI vẫn `rotate any angle 0.5` + `nbs 64` (112 cập nhật):**
+  | | phiên bản | khởi tạo | mAP50 / 50-95 | trùng | ms | góc > 1° (tất cả / vật dài) | đầu lệch (vật dài) | box dài lệch trục > 1° |
+  |---|---|---|---|---|---|---|---|---|
+  | v17 + nhóm | 0.20.1 (trọng số góc đều) | `openobb19x.pt` | .748 / .482 | 2.3% | 16.2 | 21.2% / 18.7% | 7.2% | 28.9% |
+  | v17 + nhóm (F87) | 0.20.0 | `openobb19x.pt` | .752 / .482 | 2.2% | 16.1 | 19.4% / 13.2% | 3.3% | 20.3% |
+  | **v21** | 0.20.0 | v21 vòng trước (`train3/best.pt`, 0 tensor mới) | .751 / .474 | 2.1% | 12.7 | 26.8% / **9.8%** | **0.6%** | **13.9%** |
+  - v21: wall **.892 / .560** (cao nhất của OpenOBB, recall .825; YOLO .624 50-95), note .825 / .517; tụt slide_door .420 / .179, double_door .564 / .457
+    (lớp hiếm, nhiễu ±0.08–0.09). Hiệu chỉnh: o2o không NMS 36.8% trùng → o2m 0.5.
+  - Trọng số góc đều (0.20.1) KHÔNG giảm lệch ở v17 + nhóm trong 112 cập nhật (28.9% so với 20.3%); loss góc in ra tăng (0.27 → 0.15 so với 0.18 → 0.08)
+    đúng như dự kiến (các mẫu dương sai giờ có trọng số). Giả thuyết F86 chưa được xác nhận bằng train; chưa có run sạch.
+  - Yếu tố gây nhiễu còn lại: xoay góc bất kỳ 50% (tường nghiêng giả, YOLO `degrees=0`) và quá ít lần cập nhật. Phép thử sạch: bỏ `rotate_p`, `nbs=0`.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
