@@ -1343,6 +1343,16 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     từ quan hệ với box kề bên. Không làm OpenOBB21 theo hướng này. Hạn chế: junction gần vuông nên trục dài / ngắn dễ đảo, con số junction kém tin cậy.
   - Bước tiếp: đo `best.pt` v20 (`box_quality.py`, `box_error_oracle.py`) để biết sau bộ tinh chỉnh phần còn lại nằm ở đầu box hay độ dày.
 
+- **F81. Sai số box của OpenOBB20 (F79) so với YOLO26x: phần còn lại gần hết là ĐẦU box; độ dày đã gần bằng YOLO. (10-15, CPU, 53 ảnh val)**
+  `F:\Downloads\openobb20x.pt`, head một-nhiều + NMS 0.5: 0.767 / 0.485 trên máy (Colab 0.764 / 0.482). Log `box_error_v20.log`, `box_quality_v20.log`.
+  - Trần từng thành phần (Δ mAP50-95; v12 F64 trong ngoặc): độ dày +0.032 (+0.036), lệch ngang +0.052 (+0.049), **hai đầu +0.132** (+0.116),
+    góc +0.004, box hoàn hảo +0.348. Theo class, hai đầu: wall +.100, wall_300 +.314, junction +.125, note +.186, slide_door +.111.
+  - Độ khít (trung vị, px ở 1280; v20 / YOLO26x): wall đầu box 1.92 / 1.30, |độ dày| 0.72 / 0.54, **lệch độ dày +0.18 / −0.04** (v12 +0.66),
+    ngang 0.36 / 0.28, góc 0.24° / 0.01°, R@.75 .42 / .56; wall_300 đầu 1.88 / 1.05, R@.75 .11 / .24; junction đầu 0.85 / 0.63, ngang 0.53 / 0.38,
+    góc 0.91° / 0.06°, R@.75 .32 / .47. v20 hơn YOLO ở slide_door (R@.5 .61 / .16) và double_door (.80 / .40).
+  - Kết luận: bộ tinh chỉnh đã sửa lệch độ dày (+0.66 → +0.18 px) → hướng B (bin độ dày mịn) chỉ còn trần khoảng +0.03, **bỏ**. Khoảng hụt với YOLO
+    nằm ở vị trí hai đầu dọc trục (sai gấp 1.5–1.8 lần YOLO), sau đó là lệch ngang. Góc lệch lớn ở junction nhưng trần gần 0.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
