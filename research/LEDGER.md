@@ -1236,6 +1236,13 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - OpenOBB19 = v18 + head nhóm (G = 3 tự chia: junction | wall, wall_300 | các loại cửa, note). Công tắc `groups=auto` cho v17 / v18.
     Chi phí < 0.2% FLOPs. Bắt đầu đúng bằng model một nhóm (test). Kỳ vọng ghi trước: OPENOBB19 mục 4.
 
+- **F73. v17 train thêm 30 ep (user, 10-15; định chạy A = `groups=auto` nhưng thiếu cờ, log không có `[groups]`): 0.749 / 0.483, box trùng 2.0%.**
+  - 0.18.0, khởi tạo `openobb17x.pt` (F68), công thức YOLO mới (`nbs 64`), 30 ep, batch 16, G4, 16.0 ms. Best ep 26; ep 14–30 dao động 0.746–0.761 / 0.482–0.487.
+  - Hiệu chỉnh mới (F69) chọn **o2o 0.5** (fitness .5099, dup 2.0%) thay o2m 0.7 (.5137, dup 6.8%): box trùng 2.0%, mAP giữ trong nhiễu.
+  - Theo class: wall .840 / .523, junction .900 / .505, wall_300 .763 / .308, note .703 / .463, door .972 / .800, slide_door .411 / .230,
+    double_door .653 / .554. Lỗi: wall → nền 11%, junction → nền 7%, wall_300 → junction 13%.
+  - So F68 (0.754 / 0.485): ngang → **v17 đã chạm trần trên Wall_Color**; train thêm không tăng. Phép thử A (`groups=auto`) cần chạy lại đúng cờ.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
