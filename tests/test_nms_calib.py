@@ -68,3 +68,7 @@ def test_calibration_prefers_fewer_duplicates_within_tolerance():
     assert choose_postprocess([(0.50, None, None, 0.7), (0.499, None, None, 0.5)])[3] == 0.7
     u = {"confusion": {"duplicates": {"wall": 3, "junction": 7}, "detections": 200}}
     assert abs(dup_rate(u) - 0.05) < 1e-12 and dup_rate({}) is None
+    # F76: o2o 0.5 (2.1%) vs o2m 0.5 (2.2%): equal duplicates -> the more accurate one
+    tried = [(0.4866, 0.314, "o2o", "none"), (0.5080, 0.076, "o2o", 0.7), (0.5053, 0.021, "o2o", 0.5),
+             (0.5149, 0.075, "o2m", 0.7), (0.5081, 0.022, "o2m", 0.5)]
+    assert choose_postprocess(tried)[2:] == ("o2m", 0.5)

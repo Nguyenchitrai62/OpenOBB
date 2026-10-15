@@ -109,6 +109,7 @@ def postprocess_options(model):
     return [(None, 0.7), (None, 0.6), (None, 0.5)]
 
 
+DUP_EQ = 0.005    # duplicate rates closer than this (0.5 points) are treated as equal (F76: 2.1% vs 2.2%)
 DUP_TOL = 0.01    # fitness margin within which the post-processing with fewer duplicate boxes wins (F69, F74: < half the
                   # ruler noise of a 53-image val, +-0.024)
 
@@ -126,7 +127,12 @@ def choose_postprocess(tried, tol=DUP_TOL):
     (take-off) and NMS 0.5 vs 0.7 typically costs < 0.005 fitness while cutting duplicates ~6x (F69)."""
     best = max(t[0] for t in tried)
     near = [t for t in tried if t[0] >= best - tol]
-    return min(near, key=lambda t: (t[1] if t[1] is not None else float("inf"), -t[0]))
+    dups = [t[1] for t in near if t[1] is not None]
+    if not dups:
+        return max(near, key=lambda t: t[0])
+    # duplicate rates within DUP_EQ of the lowest count as equal: among those, the most accurate setting
+    low = [t for t in near if t[1] is not None and t[1] <= min(dups) + DUP_EQ]
+    return max(low, key=lambda t: t[0])
 
 
 def merge_iou_for(v, fit):
