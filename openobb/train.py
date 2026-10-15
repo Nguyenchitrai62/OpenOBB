@@ -182,6 +182,8 @@ def build_parser():
     ap.add_argument("--rotate-p", type=float, default=0.0, help="H8: arbitrary-angle rotation prob")
     ap.add_argument("--angle-loss", default="vec", choices=["vec", "cos"],
                     help="dense heads: vec = L1 on (cos 2t, sin 2t) (F84 fix: vertical objects were tilted), cos = former 1 - cos 2dt")
+    ap.add_argument("--angle-balance", default="uniform", choices=["uniform", "tal"],
+                    help="dense heads: angle loss weight per positive; uniform (F86 fix: vertical objects got ~0 weight), tal = former")
     ap.add_argument("--mosaic-p", type=float, default=0.0, help="H8: oriented mosaic prob")
     ap.add_argument("--mosaic-mode", default="half", choices=["half", "yolo"],
                     help="half: 4 half-scale patches; yolo: 4 full-res patches around a random centre + warp")
@@ -393,7 +395,7 @@ def main(argv=None):
     if a.channels_last:
         model.to(memory_format=torch.channels_last)
     from openobb.models import openobb3_loss as _l3
-    _l3.ANGLE_LOSS = a.angle_loss
+    _l3.ANGLE_LOSS, _l3.ANGLE_WEIGHT = a.angle_loss, a.angle_balance
     if v2:
         crit = OpenOBB2Loss(img_size=a.img)
     elif v3:
@@ -643,7 +645,7 @@ def main(argv=None):
             aug.append("rot90")
         if a.rotate_p:
             aug.append(f"rotate any angle {a.rotate_p:g}")
-        aug.append(f"angle loss {a.angle_loss}")
+        aug.append(f"angle loss {a.angle_loss} ({a.angle_balance} weights)")
         aug.append("hsv " + "/".join(f"{v:g}" for v in a.hsv))
         say("augment " + ", ".join(aug) + (f" | freeze {a.freeze}" if a.freeze else ""))
         say(f"save    {out}  (best.pt, last.pt, results.csv/png, labels.jpg, val_pred.jpg, train_progress.log)")

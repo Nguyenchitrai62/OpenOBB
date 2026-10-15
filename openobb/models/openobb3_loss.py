@@ -37,6 +37,22 @@ def angle_loss(th_p, th_t):
     return (torch.cos(2 * th_p) - torch.cos(2 * th_t)).abs() + (torch.sin(2 * th_p) - torch.sin(2 * th_t)).abs()
 
 
+# angle loss weights (F86): "uniform" = every positive point gets the mean weight of the positives (same total weight
+# as before); "tal" = the task-aligned target score of the point, as the box losses. With "tal" a point whose box is
+# off by 90 deg has ProbIoU ~ 0, so ~0 weight: the angle output starts at 0 (horizontal), so VERTICAL objects never
+# received an angle gradient (their positives still predicted ~5 deg after training, F86) and only a few stray points
+# produced their boxes, tilted. Set from the trainer's --angle-weight.
+ANGLE_WEIGHT = "uniform"
+
+
+def angle_term(th_p, th_t, w, norm):
+    """Weighted angle loss of the positives th_p / th_t (N,) with target weights w (N,) -> scalar (see ANGLE_WEIGHT)."""
+    l = angle_loss(th_p, th_t)
+    if ANGLE_WEIGHT == "tal" or not len(w):
+        return (l * w).sum() / norm
+    return l.sum() * (w.sum() / len(w)) / norm
+
+
 def dist_loss(r, s, lt, rt, thick):
     """Along-axis distances + thickness: DFL on the distributions, or (box=direct, YOLO26-style) L1 in stride /
     half-stride units on the regressed values."""
@@ -116,7 +132,7 @@ class OpenOBB3Loss(nn.Module):
         dfl = dist_loss(r, s, lt, rt, thick)
         out["dfl"] = (dfl * w).sum() / norm
         out["across"] = (torch.log1p((r[:, 1] * s - at).abs() / thick.clamp(min=2.0)) * w).sum() / norm
-        out["angle"] = (angle_loss(r[:, 0], th_t) * w).sum() / norm
+        out["angle"] = angle_term(r[:, 0], th_t, w, norm)
         return {f"loss_{k}": v * self.w[k] for k, v in out.items()}
 
 

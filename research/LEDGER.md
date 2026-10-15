@@ -1416,6 +1416,29 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     thêm vào `openobb val` và cuối log train. Kỳ vọng + lệnh: [docs/OPENOBB21.md](../docs/OPENOBB21.md). Checkpoint cũ không tự hết lệch:
     phải fine-tune lại bằng code mới.
 
+- **F85. v17 (một nhóm) fine-tune với bản sửa góc 0.20.0 (user, 10-15): 0.761 / 0.486, trùng 2.2%, 16.0 ms; vật dài lệch > 1°: 24.1% → chưa hết lệch.**
+  - Điều kiện: `openobb17x`, khởi tạo `openobb17x.pt` (F68, một nhóm), 30 ep, lr 0.001, **`nbs 64` (112 lần cập nhật)**, **vẫn `rotate any angle 0.5`**
+    (notebook truyền `rotate_p=0.5`; nay dòng `augment` in ra), `angle loss vec`, G4. Best ep 17; ep 13–30 đi ngang 0.484–0.488.
+  - Theo class: wall .856 / .530, junction .899 / .514, wall_300 .699 / .256, note .840 / .520, door .974 / .806, slide_door .456 / .263, double_door .604 / .513.
+  - `Box geometry`: góc > 1° 23.9%, > 2° 6.1%; vật dài (≥ 10 × độ dày) góc > 1° 14.0%, đầu lệch 6.4%; **box dài lệch trục > 1° 24.1%** của 610 (nhãn 0.2%).
+    Cùng thước trên cache CPU (NMS 0.5): v17 + nhóm 24.8%, v19 25.0%, v20 F79 15.8%, v20 không xoay 15.3%.
+  - Không phải phép thử sạch cho bản sửa: còn xoay góc bất kỳ 50% (tạo tường nghiêng giả trong data) và chỉ 112 lần cập nhật. Run v20 / v21 phải
+    bỏ `rotate_p` và dùng `nbs=0` (450 lần cập nhật).
+
+- **F86. NGUYÊN NHÂN GỐC của lệch góc: mẫu dương của tường DỌC không bao giờ được dạy góc (trọng số TAL ~0). Sửa: trọng số loss góc đều trên
+  mẫu dương (0.20.1, mặc định mọi model dense). (10-15, CPU)** Script `research/analysis/grad_probe.py` (một forward có nhãn trên ảnh train,
+  BN đóng băng, không cập nhật; ghi các mẫu dương mà loss dùng).
+  - `openobb20x_v2.pt` trên ảnh train đầu tiên: 50 mẫu dương thuộc tường DÀI DỌC → góc dự đoán |θ| trung vị **5.6°** (10% / 90%: 0.2° / 177.6°,
+    tức gần như NẰM NGANG), lệch so với nhãn trung vị −77.8°, 96% sai > 1°; 94 mẫu dương của tường dài ngang: lệch 0.00°, 12.8% > 1°.
+  - Cơ chế: lớp ra góc khởi tạo 0 = mọi box nằm ngang. Gán mẫu TAL đặt trọng số = điểm × ProbIoU^6 (chuẩn hoá theo object): box sai 90° có
+    ProbIoU ~0 → trọng số loss góc / box ~0 → tường dọc không được dạy, vòng lặp tự duy trì qua mọi fine-tune. Box tường dọc lúc suy luận chỉ đến từ
+    vài điểm lẻ → ít ứng viên tự tin (F84), lệch đều +2–4°, chồng chéo hình chữ X. YOLO khởi tạo góc 45° nên dọc và ngang sai đều nhau từ đầu.
+  - Vì vậy bản sửa 0.20.0 (dạng loss vectơ) không đủ: F85 (v17 mới) vẫn 24.1%. Bộ tinh chỉnh (v20) giảm lệch vì nó train trên ứng viên + nhãn rung
+    với trọng số đều (L1 × 5).
+  - Sửa (0.20.1): `--angle-balance uniform` (mặc định): mỗi mẫu dương nhận trọng số trung bình của các mẫu dương (tổng trọng số không đổi);
+    `tal` = cũ. Test `test_uniform_angle_weights_reach_positives_with_no_alignment`.
+  - Kỳ vọng: sau fine-tune, mẫu dương tường dọc lệch trung vị < 1° (đo lại bằng grad_probe), box tường dài lệch trục > 1° ≤ 5% (dòng `Box geometry`).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

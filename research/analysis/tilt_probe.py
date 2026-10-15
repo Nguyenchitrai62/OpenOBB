@@ -64,7 +64,7 @@ def dev(th):
 
 
 rows = []
-for p in sorted((ROOT / "images" / "val").iterdir())[:n]:
+for p in sorted((ROOT / "images" / os.environ.get("PROBE_SPLIT", "val")).iterdir())[:n]:
     img = imread(str(p))
     if os.environ.get("PROBE_ROT90"):                  # rotate the drawing: horizontal walls become vertical
         img = np.ascontiguousarray(np.rot90(img))
@@ -121,3 +121,12 @@ if k.any():
     inside = raw[k] < np.pi / 2
     print(f"  vertical (|raw| 1-2 rad): |raw| < pi/2 (pulled towards 0) {pc(inside)}; of the tilted > 1 deg: "
           f"{pc(inside[a[k, 0] > 1])}; median |raw| - pi/2 = {np.rad2deg(np.median(raw[k] - np.pi / 2)):+.2f} deg")
+# two basins: a vertical object is right at +pi/2 and at -pi/2; does the head split its anchors between the two, and do
+# the two sides tilt in opposite directions (the X pairs seen on the drawings)?
+k = (raw >= 1) & (raw < 2)
+if k.any():
+    sgn = np.sign(a[k, -1])
+    signed = np.rad2deg(np.abs(a[k, -1]) - np.pi / 2) * sgn              # >0: rotated towards +, in image terms
+    print(f"  vertical: raw angle > 0 on {pc(sgn > 0)} of the candidates; tilt (deg, image sense) median on the + side "
+          f"{np.median(signed[sgn > 0]) if (sgn > 0).any() else float('nan'):+.2f}, on the - side "
+          f"{np.median(signed[sgn < 0]) if (sgn < 0).any() else float('nan'):+.2f}")

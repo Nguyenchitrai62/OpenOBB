@@ -85,3 +85,19 @@ def test_v21_registry():
     from openobb.cli import MODELS
     from openobb.predict import KNOWN_ARCHS
     assert MODELS["openobb21x"] == ("v21", "x") and "v21" in KNOWN_ARCHS
+
+
+def test_uniform_angle_weights_reach_positives_with_no_alignment():
+    """F86: a positive whose box is 90 deg off has a task-aligned weight ~0; its angle must still be trained."""
+    th_p = torch.tensor([0.05, 0.0], requires_grad=True)          # a vertical object predicted horizontal, a correct one
+    th_t = torch.tensor([math.pi / 2, 0.0])
+    w = torch.tensor([1e-6, 1.0])
+    old = openobb3_loss.ANGLE_WEIGHT
+    try:
+        openobb3_loss.ANGLE_WEIGHT = "tal"
+        g_tal, = torch.autograd.grad(openobb3_loss.angle_term(th_p, th_t, w, 1.0), th_p)
+        openobb3_loss.ANGLE_WEIGHT = "uniform"
+        g_uni, = torch.autograd.grad(openobb3_loss.angle_term(th_p, th_t, w, 1.0), th_p)
+    finally:
+        openobb3_loss.ANGLE_WEIGHT = old
+    assert abs(float(g_tal[0])) < 1e-4 and abs(float(g_uni[0])) > 0.5

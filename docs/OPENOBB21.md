@@ -16,7 +16,11 @@ Sổ cái: F83 (đánh giá lại có thước hướng box), F84 (nguyên nhân
 | Loss góc của head | 1 − cos 2Δθ: ở 1° chỉ 6e-4, gradient gần như bằng 0 dưới vài độ; bộ tinh chỉnh (L1 × 5) có gradient và đã giảm lệch (v19 → v20) | code, F83 |
 | Đã loại trừ | nhãn (tường dọc chuẩn hoá đúng −π/2), tăng cường xoay (tắt vẫn lệch), bộ tinh chỉnh (tắt còn tệ hơn), bám ranh giới (không đổi góc), `fuse()` (giống hệt) | F82–F84 |
 
-## 2. Bản sửa chung (mọi model dense v3–v21, bật mặc định từ 0.20.0)
+## 2. Bản sửa chung (mọi model dense v3–v21, bật mặc định từ 0.20.0 / 0.20.1)
+
+**Nguyên nhân gốc (F86, 0.20.1):** mẫu dương của tường dọc vẫn dự đoán box nằm ngang (góc khởi tạo 0) nên trọng số TAL (∝ ProbIoU^6) ≈ 0 và
+góc của chúng không bao giờ được dạy. Sửa: loss góc dùng trọng số đều trên mẫu dương (`--angle-balance uniform`, mặc định; `tal` = cũ).
+
 
 | Bài học | Cơ chế | Kỳ vọng | Điều chứng minh sai |
 |---|---|---|---|
@@ -55,12 +59,13 @@ góc hoặc mAP50-95 thấp hơn A quá 0.01. Bản vẽ thật: chạy `researc
 
 ```bash
 # A: v20 + bản sửa góc chung (mặc định từ 0.20.0)
-openobb train data=/content/data.yaml model=openobb20x epochs=30 imgsz=1280 batch=16 weights=<openobb20x_v2.pt>
+openobb train data=/content/data.yaml model=openobb20x epochs=30 imgsz=1280 batch=16 nbs=0 weights=<openobb20x_v2.pt>
 # B: OpenOBB21, cùng mọi thứ
-openobb train data=/content/data.yaml model=openobb21x epochs=30 imgsz=1280 batch=16 weights=<openobb20x_v2.pt>
+openobb train data=/content/data.yaml model=openobb21x epochs=30 imgsz=1280 batch=16 nbs=0 weights=<openobb20x_v2.pt>
 ```
 
-Kiểm tra trong log: dòng `augment` có `angle loss vec`; `[init]` của A báo 0 tensor mới, của B chỉ `ang.*` / `ang_o2o.*` (6 tensor × 2);
+Cần **0.20.1** trở lên. Bỏ `rotate_p` khỏi notebook và dùng `nbs=0` (450 lần cập nhật thay vì 112).
+Kiểm tra trong log: dòng `augment` có `angle loss vec (uniform weights)` và không có `rotate any angle`; `[init]` của A báo 0 tensor mới, của B chỉ `ang.*` / `ang_o2o.*` (6 tensor × 2);
 dòng `model` của B có "angle corrected in the double-angle space"; cuối log có dòng `Box geometry`.
 
 ## 6. Kết quả thật

@@ -312,6 +312,8 @@ Câu hỏi còn mở:
   do loss góc 1 − cos 2Δθ (không có gradient gần tối ưu) + lớp ra bf16 ở ±π/2. Sửa chung bật mặc định: loss góc vectơ (cos 2θ, sin 2θ),
   lớp ra hồi quy fp32; thước `Box geometry` in trong mọi val. v21 = v20 + nhánh sửa góc góc kép. [docs/OPENOBB21.md](docs/OPENOBB21.md).
   Checkpoint cũ phải fine-tune lại bằng code mới. Vòng này: A `openobb20x` vs B `openobb21x`, cùng `weights=openobb20x_v2.pt`.
+  **Nguyên nhân gốc (F86, 0.20.1):** mẫu dương tường dọc dự đoán ngang (góc khởi tạo 0) → trọng số TAL ~0 → không được dạy góc. Sửa: trọng số
+  loss góc đều (`--angle-balance uniform`, mặc định). F85 (v17, 0.20.0, còn `rotate_p=0.5`, nbs 64) vẫn lệch 24%: cần 0.20.1 + bỏ rotate_p + nbs=0.
   Không đề xuất đổi thầy nữa (v19 qua ba kiểu thầy, tổng không đổi; user phản biện). Vòng sau chưa chốt.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
