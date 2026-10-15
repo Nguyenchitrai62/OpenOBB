@@ -1439,6 +1439,11 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     `tal` = cũ. Test `test_uniform_angle_weights_reach_positives_with_no_alignment`.
   - Kỳ vọng: sau fine-tune, mẫu dương tường dọc lệch trung vị < 1° (đo lại bằng grad_probe), box tường dài lệch trục > 1° ≤ 5% (dòng `Box geometry`).
 
+- **F87. v17 + nhóm fine-tune với 0.20.0 (user, 10-15): 0.752 / 0.482, trùng 2.2%, 16.1 ms; box dài lệch trục > 1° 20.3% (xuất phát 24.8%).**
+  Khởi tạo `openobb19x.pt` (v17 + nhóm), vẫn `rotate any angle 0.5`, `nbs 64` (112 cập nhật), `angle loss vec` nhưng CHƯA có trọng số đều (0.20.1).
+  wall .874 / .539, junction .909 / .523, wall_300 .711 / .272, note .691 / .451. `Box geometry`: góc > 1° 19.4%, vật dài góc > 1° 13.2%.
+  Chỉ bớt 4.5 điểm lệch → khớp F86 (dạng loss một mình không đủ). Chưa phải phép thử của 0.20.1.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
