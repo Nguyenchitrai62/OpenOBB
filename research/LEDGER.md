@@ -1465,6 +1465,16 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Tốc độ: `Speed` của OpenOBB v10–v21 đang tính NMS vào "inference" (module của v12+ không có trong `speed._NMS_MODULES`) → sửa 0.20.2 để
     tách như Ultralytics. Mạng thuần: YOLO 11.5 ms; v21 ≤ 12.7 ms (gồm cả NMS + tinh chỉnh). Postprocess 17.3 ms của YOLO là phần val của Ultralytics.
 
+- **F90. v21 từ `openobb20x_v2.pt` với 0.20.2 (user, 10-15): 0.769 / 0.492 (o2m 0.5), trùng 1.8%, 9.7 + 3.0 ms; box dài lệch trục 14.4%.**
+  Vẫn `rotate any angle 0.5`, `nbs 64` (112 cập nhật); `[init]` 12 tensor mới (nhánh góc). Best ep 28. wall .863 / .545, junction .900 / .538,
+  wall_300 .730 / .310, note .775 / .487, door .975 / .810, slide_door .601 / .320, double_door .537 / .435.
+  - So xuất phát (v20_v2, cache CPU cùng thước): mAP +0.013 / +0.005, box dài lệch 15.3% → 14.4% (không đổi). Bản sửa góc + nhánh góc KHÔNG giảm lệch
+    khi còn xoay góc bất kỳ 50%.
+  - **Speed sau sửa 0.20.2 (NMS tách ra):** v21 9.7 ms mạng + 3.0 ms NMS = 12.7 ms; YOLO26x cùng G4 khi máy đã nóng (lần đo thứ hai) 6.6 + 0.7 = 7.3 ms
+    (lần đầu 11.5 + 17.3 là do khởi tạo, bỏ). → v21 chậm 1.7 lần; NMS (fast_nms, vòng lặp từng ảnh, ProbIoU trên 4000 ứng viên) chiếm 3.0 ms so với
+    0.7 ms của YOLO.
+  - So YOLO26x cùng thước: mAP50 +0.026, mAP50-95 −0.007 (trong nhiễu ±0.024), trùng +0.2 điểm; còn thua: tốc độ (1.7×) và hướng box (14.4% / 0.3%).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
