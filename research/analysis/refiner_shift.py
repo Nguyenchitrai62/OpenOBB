@@ -44,8 +44,18 @@ def stats(pairs, conf_scores=None):
     dl = (r[:, 2] - b[:, 2]).abs()
     tr = r[:, 3] / b[:, 3].clamp(min=1e-3)
     q = lambda x: " ".join(f"{float(x.quantile(p)):6.2f}" for p in (0.5, 0.9, 0.99))  # noqa: E731
-    return (f"n {len(b):6d} | angle deg p50/90/99 {q(dth)} | across px {q(across)} | length px {q(dl)} | "
-            f"thick ratio {q(tr)} | angle > 3 deg {float((dth > 3).float().mean()):.1%}")
+    s = (f"n {len(b):6d} | angle deg p50/90/99 {q(dth)} | across px {q(across)} | length px {q(dl)} | "
+         f"thick ratio {q(tr)} | angle > 3 deg {float((dth > 3).float().mean()):.1%}")
+    # by length: the sideways move of a box end = across shift + (L / 2) sin(rotation)
+    L = torch.maximum(b[:, 2], b[:, 3])
+    swing = across + L / 2 * torch.deg2rad(dth).sin()
+    for lo, hi in ((0, 40), (40, 100), (100, 200), (200, 10**5)):
+        k = (L >= lo) & (L < hi)
+        if k.sum() > 10:
+            s += (f"\n    L {lo:4d}-{hi:<6d} n {int(k.sum()):6d}  angle p50/p90 {float(dth[k].median()):5.2f}/"
+                  f"{float(dth[k].quantile(.9)):5.2f} deg  end sideways move p50/p90 {float(swing[k].median()):5.2f}/"
+                  f"{float(swing[k].quantile(.9)):6.2f} px")
+    return s
 
 
 def run(path):

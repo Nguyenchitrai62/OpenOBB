@@ -1356,6 +1356,20 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     `refiner_shift_v20.log`, 1500 ứng viên / ảnh): bộ tinh chỉnh xoay rất ít (trung vị 0.15–0.23°, p99 0.8–3.2°, val và 3 bản vẽ ngoài val)
     → hướng sai không do bộ tinh chỉnh; nó dịch ngang nhiều hơn (p90 5–9 px, p99 17–37 px; ngoài val lớn hơn val). Chờ ảnh / lệnh test của user.
 
+- **F82. v20 trên bản vẽ thật của user (`9F作図資料（新規作図） - trang 1 @2x.png`): tường dài bị nghiêng và lệch ngang; bộ tinh chỉnh xoay
+  box dài nhiều hơn hẳn so với val. (10-15, CPU)** Script `compare_two.py`, `refiner_shift.py`; log `refiner_shift_v20_bylen.log`,
+  `box_quality_v17groups.log`; ảnh `research/analysis/compare_two_out/`.
+  - User so `openobb20x.pt` với `openobb19x.pt`, nhưng file sau là **v17 + nhóm** (F78), không phải v19.
+  - Trên ảnh 9F (2381 × 1683): v20 233 box, v17 + nhóm 212. Cặp khớp cùng class: góc lệch trung vị wall 0.25°, door 1.39° (p90 22°).
+    Nhìn ảnh: ba tường dọc dài, box v20 nghiêng khoảng 3–5° và một box lệch hẳn sang bên; v17 + nhóm cũng nghiêng ở hai tường, nhưng tường giữa đúng.
+  - Bộ tinh chỉnh theo độ dài box (góc xoay p90, val / 9F): 40–100 px 0.64° / 1.11°, **100–200 px 0.77° / 3.95°**, ≥ 200 px 0.63° / 1.35°;
+    ứng viên bị xoay > 3°: 1.0% / 3.6%. Bộ tinh chỉnh xoay tới ±0.2 rad (11.5°) không phụ thuộc độ dài: với box dài, vài độ làm đầu box văng nhiều px.
+    Học trên 250 ảnh, nó khái quát kém sang bản vẽ khác kiểu (chữ viết tay, ghi chú).
+  - Trên val, v20 vẫn khít hơn v17 + nhóm (box_quality, NMS 0.5): góc wall 0.24° / 0.40°, junction 0.91° / 3.08°, door 0.64° / 1.37°;
+    đầu box wall 1.92 / 2.19 px; R@.75 wall .42 / .36. → Thước val không bắt được lỗi này.
+  - Hướng sửa (chưa làm): giới hạn góc xoay của bộ tinh chỉnh theo độ dài (đầu box không văng quá vài px), thử ngay trên `openobb20x.pt` bằng CPU
+    (val + ảnh 9F), không cần train lại.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
