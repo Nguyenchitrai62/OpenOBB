@@ -1475,6 +1475,15 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     0.7 ms của YOLO.
   - So YOLO26x cùng thước: mAP50 +0.026, mAP50-95 −0.007 (trong nhiễu ±0.024), trùng +0.2 điểm; còn thua: tốc độ (1.7×) và hướng box (14.4% / 0.3%).
 
+- **F91. OpenOBB22 (10-15, chưa train): v21 + head hình học kiểu YOLO26: góc (sigmoid − ¼)·π ∈ (−45°, 135°) khởi tạo 45°, hồi quy thẳng hai đầu +
+  độ dày (bỏ DFL).** [docs/OPENOBB22.md](../docs/OPENOBB22.md).
+  - Lý do: v21 đã ngang / hơn YOLO26x ở mAP50, mAP50-95 (trong nhiễu), box trùng, lớp hiếm (F89, F90); phần thua là hình học box của wall / junction /
+    wall_300 (đầu box F81, hướng F86). Góc khởi tạo 45° làm tường ngang và dọc sai đều lúc đầu (khắc phục F86 từ gốc); hồi quy thẳng bỏ bin 8 px.
+  - Sửa kèm: chuyển checkpoint DFL → `box=direct` trước đây sai với nhóm class (chép hàng theo vị trí trộn layout các nhóm); `OpenOBB22.after_weights`
+    dựng lại theo từng nhóm (góc 45°, đầu / độ dày từ 0, lệch ngang giữ). 51.06M tham số.
+  - Kỳ vọng ghi trước (150 ep từ best.pt v21, không xoay): box dài lệch ≤ 2%, mAP50-95 ≥ 0.51 (wall ≥ .60, junction ≥ .57, wall_300 ≥ .40),
+    mAP50 ≥ 0.765, trùng ≤ 2.0%, ≤ 12.7 ms. Bác bỏ: lệch ≥ 8% (góc) hoặc wall 50-95 < .55 (hồi quy thẳng).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

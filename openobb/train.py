@@ -42,7 +42,7 @@ def build_parser():
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21"],
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22"],
                     help="v1: OpenOBB (DETR-style decoder); v2: OpenOBB2 (dense segment-aware, NMS-free); "
                          "v3: OpenOBB3 (pretrained encoder + dense anisotropic oriented head); "
                          "v4: OpenOBB4 (DINOv2 backbone + DETR decoder + dense oriented branch); "
@@ -262,14 +262,17 @@ def main(argv=None):
 
     classes = dataset_classes(a.data)
     v2, v4, v5 = a.arch == "v2", a.arch == "v4", a.arch == "v5"
-    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21")
+    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22")
     v6, v7, v8, v10 = a.arch == "v6", a.arch == "v7", a.arch == "v8", a.arch == "v10"
-    v11, v12, v13, v14 = a.arch == "v11", a.arch in ("v12", "v17", "v18", "v19", "v20", "v21"), a.arch == "v13", a.arch in ("v14", "v15", "v16")
-    v17 = a.arch in ("v17", "v18", "v19", "v20", "v21")   # OpenOBB12 + boundary field / snapping: every v12 path applies
-    v18 = a.arch in ("v18", "v19", "v20", "v21")       # OpenOBB17 with the own neck distilled from a trained encoder
-    v19 = a.arch in ("v19", "v20", "v21")              # OpenOBB18 + contention-aware class groups
-    v20 = a.arch in ("v20", "v21")             # OpenOBB19 + edge refiner on the trunk's stride-4 map
-    v21 = a.arch == "v21"                       # OpenOBB20 + double-angle residual angle head
+    v11, v12, v13, v14 = a.arch == "v11", a.arch in ("v12", "v17", "v18", "v19", "v20", "v21", "v22"), a.arch == "v13", a.arch in ("v14", "v15", "v16")
+    v17 = a.arch in ("v17", "v18", "v19", "v20", "v21", "v22")   # OpenOBB12 + boundary field / snapping: every v12 path applies
+    v18 = a.arch in ("v18", "v19", "v20", "v21", "v22")       # OpenOBB17 with the own neck distilled from a trained encoder
+    v19 = a.arch in ("v19", "v20", "v21", "v22")              # OpenOBB18 + contention-aware class groups
+    v20 = a.arch in ("v20", "v21", "v22")             # OpenOBB19 + edge refiner on the trunk's stride-4 map
+    v21 = a.arch in ("v21", "v22")             # OpenOBB20 + double-angle residual angle head
+    v22 = a.arch == "v22"                       # OpenOBB21 + bounded angle from 45 deg + direct boxes
+    if v22:
+        a.box = "direct"
     if v17:
         from openobb.models.groups import parse_groups
         if v19 and not a.groups:
@@ -310,8 +313,8 @@ def main(argv=None):
         elif v17:
             from openobb.models.openobb17 import OpenOBB17
             from openobb.models.openobb18 import OpenOBB18
-            from openobb.models.openobb18 import OpenOBB19, OpenOBB20, OpenOBB21
-            model = (OpenOBB21 if v21 else OpenOBB20 if v20 else OpenOBB19 if v19 else OpenOBB18 if v18 else OpenOBB17)(
+            from openobb.models.openobb18 import OpenOBB19, OpenOBB20, OpenOBB21, OpenOBB22
+            model = (OpenOBB22 if v22 else OpenOBB21 if v21 else OpenOBB20 if v20 else OpenOBB19 if v19 else OpenOBB18 if v18 else OpenOBB17)(
                 a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top, off=a.v7_off or None,
                 box=a.box, ref_k=a.ref_k, groups=a.groups or None)
         elif v12 or v13:
@@ -374,7 +377,10 @@ def main(argv=None):
             model.copy_head_to_o2o()            # single-head checkpoint: the one-to-one head starts as its copy
         if v17 and getattr(model, "n_groups", 1) > 1 and not src_groups:
             model.replicate_group_boxes()       # one-box checkpoint: every class group starts as its box predictor
-        if (v12 or v13) and a.box == "direct" and src_box != "direct":
+        if hasattr(model, "after_weights") and model.after_weights(a.weights):
+            log("[init] OpenOBB22: box outputs rebuilt per class group (angle from 45 deg, ends / thickness restart, "
+                "across offset kept)", console=True)
+        elif (v12 or v13) and a.box == "direct" and src_box != "direct":
             from openobb.models.openobb12 import restart_direct_distances
             restart_direct_distances(model)     # DFL checkpoint -> direct boxes: distances restart, angle / across kept
             log("[init] box=direct from a DFL checkpoint: distance / thickness outputs restart at zero", console=True)
@@ -581,11 +587,13 @@ def main(argv=None):
                 core += "; edge refiner on the trunk's stride-4 map"
             if v21:
                 core += "; angle corrected in the double-angle space"
+            if v22:
+                core += "; angle in (-45, 135) deg from 45 deg"
             if v17 and "field" not in (a.v7_off or ""):
                 core += f"; boundary field (stride 2) + boundary snapping of {a.ref_k} candidates"
             if a.box == "direct":
                 core += ", direct box regression (no DFL)"
-            say(f"model   OpenOBB{21 if v21 else 20 if v20 else 19 if v19 else (18 if v18 else (17 if v17 else (13 if v13 else 12)))}-{a.size} ({core}: one-to-many for learning + one-to-one for "
+            say(f"model   OpenOBB{22 if v22 else 21 if v21 else 20 if v20 else 19 if v19 else (18 if v18 else (17 if v17 else (13 if v13 else 12)))}-{a.size} ({core}: one-to-many for learning + one-to-one for "
                 f"inference, NMS-free), {n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")
             if v13 and a.img < 1536:
                 say(f"WARNING  OpenOBB13's core runs at {a.img // 2} px: drawings need the core at >= 1024 "

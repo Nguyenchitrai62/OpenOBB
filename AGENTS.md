@@ -314,6 +314,9 @@ Câu hỏi còn mở:
   Checkpoint cũ phải fine-tune lại bằng code mới. Vòng này: A `openobb20x` vs B `openobb21x`, cùng `weights=openobb20x_v2.pt`.
   **Nguyên nhân gốc (F86, 0.20.1):** mẫu dương tường dọc dự đoán ngang (góc khởi tạo 0) → trọng số TAL ~0 → không được dạy góc. Sửa: trọng số
   loss góc đều (`--angle-balance uniform`, mặc định). F85 (v17, 0.20.0, còn `rotate_p=0.5`, nbs 64) vẫn lệch 24%: cần 0.20.1 + bỏ rotate_p + nbs=0.
+- [x] **YOLO26x cùng thước (F89–F90):** v21 .769 / .492, trùng 1.8%, 12.7 ms so với YOLO .743 / .499, 1.6%, 7.3 ms (máy nóng); hướng box
+  14.4% so với 0.3%. **OpenOBB22 (F91, 0.21.0):** v21 + góc sigmoid 45° + hồi quy box thẳng. [docs/OPENOBB22.md](docs/OPENOBB22.md).
+  Cặp đang chờ: A = v21 không `rotate_p` (user đang chạy), B = `openobb22x epochs=150` từ best.pt v21.
   Không đề xuất đổi thầy nữa (v19 qua ba kiểu thầy, tổng không đổi; user phản biện). Vòng sau chưa chốt.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
@@ -411,6 +414,9 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 - `push_all.py` chỉ đồng bộ file đã commit; nó in danh sách file chưa commit, đọc để không bỏ sót.
 
 ## 9. Nhật ký
+
+- 2026-10-15 (5): **OpenOBB22** (F91), YOLO26x đo cùng thước trên G4 (F89, cell so sánh), `Speed` tách NMS của v10+ (0.20.2).
+  Notebook của user truyền `rotate_p=0.5` (mặc định code = 0, giống `degrees=0` của YOLO): nhắc user bỏ.
 
 - 2026-10-15 (4): **Đánh giá hướng box + sửa lỗi góc + OpenOBB21** (F82–F84). User thấy v20 lệch hướng trên bản vẽ thật; thước mAP không thấy.
   `research/analysis/eval_versions.py`, `tilt_real.py`, `tilt_probe.py`; `openobb.eval.ultra.geometry`; `--angle-loss`; `openobb3.reg_out`; `OpenOBB21`.

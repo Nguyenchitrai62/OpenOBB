@@ -21,6 +21,8 @@ Why (research/LEDGER.md F37, F50, F58, F60, F64-F66):
     ends are the largest box error, +0.116 mAP50-95 ceiling), and the neck brings stride-4 detail by space-to-depth
     and dilated 3x3 context at P3 / P4.
 """
+import math
+
 import torch
 import torch.nn as nn
 
@@ -130,6 +132,10 @@ class OpenOBB21(OpenOBB20):
         super().copy_head_to_o2o()
         self.ang_o2o.load_state_dict(self.ang.state_dict())
 
+    def base_angle(self, raw):
+        """The head's angle output -> angle (rad) before the double-angle correction: the raw value here."""
+        return raw
+
     def run_head(self, feats, o2o):
         head, ang = (self.head_o2o, self.ang_o2o) if o2o else (self.head, self.ang)
         G = self.n_groups
@@ -149,10 +155,68 @@ class OpenOBB21(OpenOBB20):
             R = r.shape[1] // G
             r = r.view(r.shape[0], G, R, *r.shape[2:])
             d = d.view(d.shape[0], G, 2, *d.shape[2:])
-            th = r[:, :, 0]
+            th = self.base_angle(r[:, :, 0])
             c, s = torch.cos(2 * th), torch.sin(2 * th)
             c2, s2 = c + d[:, :, 0], s + d[:, :, 1]
             th = th + 0.5 * torch.atan2(c * s2 - s * c2, c * c2 + s * s2)
             r = torch.cat([th[:, :, None], r[:, :, 1:]], 2).reshape(r.shape[0], G * R, *r.shape[3:])
             reg.append(r.flatten(2))
         return torch.cat(cls, 2).transpose(1, 2).float(), torch.cat(reg, 2).transpose(1, 2).float()
+
+
+class OpenOBB22(OpenOBB21):
+    """OpenOBB21 with a YOLO26-grade box geometry head (docs/OPENOBB22.md, research/LEDGER.md F81, F84-F90).
+
+    v21 matches YOLO26x on mAP50 (+0.026), mAP50-95 (-0.007, in the noise) and duplicates, but 14% of its long walls
+    are tilted (YOLO 0.3%) and the ends of its thin boxes are 1.5-1.8x less precise (F81). Two head changes, both
+    ideas proven in YOLO26 (own code, no Ultralytics code):
+      * angle = (sigmoid(u) - 1/4) pi in (-45, 135) deg, its output starting at 45 deg: 0 deg and 90 deg are both
+        inside the range and EQUALLY wrong at the start. With a raw angle starting at 0 (horizontal) the positives of
+        vertical objects predicted horizontal boxes, got a task-aligned weight ~0 and were never trained (F86);
+      * direct regression of the two end distances and the thickness (softplus x stride, L1 + ProbIoU) instead of 32-bin
+        distributions whose bin is 8 px at P3 (ends 1.9 px off vs 1.3 px for YOLO, F81).
+    Kept: contention-aware class groups, the edge refiner, the boundary field + snapping, the fast neck, the
+    double-angle correction branch, so the parts where v21 beats YOLO stay. Fine-tuning from a v20 / v21 checkpoint
+    keeps the trunk, neck, class towers, refiner and field; the box outputs restart (after_weights)."""
+    arch = "v22"
+
+    def __init__(self, *args, **kw):
+        kw["box"] = "direct"
+        super().__init__(*args, **kw)
+        self.reset_box_outputs()
+
+    def base_angle(self, raw):
+        return (torch.sigmoid(raw) - 0.25) * math.pi
+
+    @torch.no_grad()
+    def reset_box_outputs(self, src=None):
+        """Box output rows of every head / group: angle row 0 (sigmoid 0.5 -> 45 deg), across offset copied from a DFL
+        checkpoint state `src` when given (same meaning), ends / thickness 0; the double-angle branch 0."""
+        G = self.n_groups
+        for name in ("head", "head_o2o"):
+            for i, m in enumerate(getattr(self, name).reg):
+                out = m[-1]
+                R = out.out_channels // G
+                out.weight.zero_()
+                out.bias.zero_()
+                if src is not None:
+                    w, b = src.get(f"{name}.reg.{i}.{len(m) - 1}.weight"), src.get(f"{name}.reg.{i}.{len(m) - 1}.bias")
+                    if w is not None and w.shape[0] % G == 0 and w.shape[1:] == out.weight.shape[1:]:
+                        Rs = w.shape[0] // G
+                        for k in range(G):
+                            out.weight[k * R + 1].copy_(w[k * Rs + 1])          # across offset (stride units)
+                            out.bias[k * R + 1].copy_(b[k * Rs + 1])
+        for mods in (self.ang, self.ang_o2o):
+            for m in mods:
+                m.weight.zero_()
+                m.bias.zero_()
+
+    def after_weights(self, path):
+        """Called after a shape-tolerant load of `path`: unless it is an OpenOBB22 checkpoint, the box rows are rebuilt
+        per class group (the generic loader copies rows by position, which mixes the groups' layouts)."""
+        ck = torch.load(path, map_location="cpu", weights_only=False)
+        if (ck.get("args") or {}).get("arch") == "v22":
+            return False
+        src = ck["ema"]["module"] if isinstance(ck.get("ema"), dict) and "module" in ck["ema"] else ck.get("model", ck)
+        self.reset_box_outputs(src)
+        return True

@@ -62,7 +62,8 @@ MODELS = {**{f"openobb1{s}": ("v1", s) for s in SIZES},
           **{f"openobb18{s}": ("v18", s) for s in SIZES},
           **{f"openobb19{s}": ("v19", s) for s in SIZES},
           **{f"openobb20{s}": ("v20", s) for s in SIZES},
-          **{f"openobb21{s}": ("v21", s) for s in SIZES}}    # v20 + angle in the double-angle space (docs/OPENOBB21.md)    # v19 + edge refiner on the trunk's stride-4 map (docs/OPENOBB20.md)    # v18 + contention-aware class groups (docs/OPENOBB19.md)    # v17 with an own fast neck distilled from a trained encoder (docs/OPENOBB18.md)
+          **{f"openobb21{s}": ("v21", s) for s in SIZES},
+          **{f"openobb22{s}": ("v22", s) for s in SIZES}}    # v21 + YOLO26-grade box geometry head (docs/OPENOBB22.md)    # v20 + angle in the double-angle space (docs/OPENOBB21.md)    # v19 + edge refiner on the trunk's stride-4 map (docs/OPENOBB20.md)    # v18 + contention-aware class groups (docs/OPENOBB19.md)    # v17 with an own fast neck distilled from a trained encoder (docs/OPENOBB18.md)
 
 # Best architecture recipe measured on FloorPlanCAD / DOTA (research/LEDGER.md, c6): selective large-kernel
 # adapters (LSK), repeat-factor sampling, one-to-many query group, adaptive query denoising, square-aware angle loss,
@@ -126,6 +127,7 @@ RECIPE17 = dict(RECIPE12)                        # OpenOBB17: v12 + boundary fie
 RECIPE18 = dict(RECIPE12)                        # OpenOBB18: v17 + own neck distilled from a trained encoder (teacher=)
 RECIPE19 = dict(RECIPE18, groups="auto")         # OpenOBB19: v18 + one box per contention-aware class group
 RECIPE20 = dict(RECIPE19)                        # OpenOBB20: v19 + edge refiner reading the trunk's stride-4 map
+RECIPE22 = dict(RECIPE20)                        # OpenOBB22: v21 + bounded angle from 45 deg + direct boxes
 RECIPE21 = dict(RECIPE20)                        # OpenOBB21: v20 + double-angle residual angle head
 SIZE_DEFAULTS15 = {s: dict(d, gb=round(d["gb"] * 0.5, 2)) for s, d in SIZE_DEFAULTS3.items()}
 # OpenOBB13: imgsz is the full resolution, the core runs at half of it -> memory per image ~0.45x by area
@@ -504,7 +506,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         raise SystemExit(f"model must be one of {', '.join(MODELS)} or an existing OpenOBB .pt checkpoint, "
                          f"got '{model}'")
     arch = inherited.get("arch", "v1")
-    v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21")
+    v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22")
     src_img = extra.pop("img", None)                 # a checkpoint's own input size (already the full size for v13)
     core_size = imgsz is not None or src_img is None
     imgsz = int(imgsz or src_img or 1024)
@@ -534,7 +536,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
           "v5": SIZE_DEFAULTS5, "v6": SIZE_DEFAULTS6, "v7": SIZE_DEFAULTS3,
           "v8": SIZE_DEFAULTS3, "v9": SIZE_DEFAULTS9, "v10": SIZE_DEFAULTS3, "v11": SIZE_DEFAULTS3, "v12": SIZE_DEFAULTS3, "v13": SIZE_DEFAULTS13,
           "v14": SIZE_DEFAULTS3, "v15": SIZE_DEFAULTS15, "v16": SIZE_DEFAULTS15,
-          "v17": SIZE_DEFAULTS3, "v18": SIZE_DEFAULTS3, "v19": SIZE_DEFAULTS3, "v20": SIZE_DEFAULTS3, "v21": SIZE_DEFAULTS3}.get(arch, SIZE_DEFAULTS)[size]
+          "v17": SIZE_DEFAULTS3, "v18": SIZE_DEFAULTS3, "v19": SIZE_DEFAULTS3, "v20": SIZE_DEFAULTS3, "v21": SIZE_DEFAULTS3, "v22": SIZE_DEFAULTS3}.get(arch, SIZE_DEFAULTS)[size]
     if str(optimizer).lower() not in ("auto", "adamw"):
         raise SystemExit("optimizer must be 'auto' or 'AdamW'")   # lr0 given -> used; otherwise the measured LR
     prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, seed, fit=fit)
@@ -584,7 +586,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         opts.update({"v2": RECIPE2, "v3": RECIPE3, "v4": RECIPE4, "v5": RECIPE5, "v6": RECIPE6, "v7": RECIPE7,
                      "v8": RECIPE8, "v9": RECIPE9, "v10": RECIPE10, "v11": RECIPE11, "v12": RECIPE12, "v13": RECIPE13,
                      "v14": RECIPE14, "v15": RECIPE15, "v16": RECIPE16,
-                     "v17": RECIPE17, "v18": RECIPE18, "v19": RECIPE19, "v20": RECIPE20, "v21": RECIPE21}.get(arch, RECIPE))
+                     "v17": RECIPE17, "v18": RECIPE18, "v19": RECIPE19, "v20": RECIPE20, "v21": RECIPE21, "v22": RECIPE22}.get(arch, RECIPE))
     if arch in ("v4", "v5") and "backbone" not in inherited:
         opts["backbone"] = BACKBONE4[size]
     if aug["mosaic"]:
@@ -601,7 +603,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
             v = extra[k]
             extra[k] = ",".join(sorted({s.strip() for s in (v.split(",") if isinstance(v, str) else v) if str(s).strip()}))
     opts.update(extra)
-    if arch in ("v18", "v19", "v20", "v21") and not resume:
+    if arch in ("v18", "v19", "v20", "v21", "v22") and not resume:
         # OpenOBB18 is meant to start from a trained OpenOBB12 / 17 (trunk + head) and to distil its new neck from that
         # model's encoder; without both, the neck learns from scratch (F70: 0.623 / 0.369 instead of ~v12)
         src = opts.get("weights")
