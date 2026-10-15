@@ -74,5 +74,22 @@ Kết quả: 0.752 / 0.464, 12.4 ms, box trùng 2.9%; wall .826 / .498 (wall →
 | tốc độ | 12.4 ± 0.3 ms | 12.4 ms, đạt |
 | box trùng | ≤ 3% | 2.9%, đạt |
 
-Chạy lại đúng thiết kế: `weights=` `best.pt` của lần 1 (v19, neck đã học), `teacher=` file A (đổi tên thành `openobb17x_groups.pt` cho rõ).
-Bản 2 dùng cùng `weights=` / `teacher=`. Kiểm tra trước khi train: dòng `[init]` phải có 0 hoặc rất ít `new tensors` (bản 2 chỉ có bộ tinh chỉnh mới).
+**Bản 2 (F79): OpenOBB20-x, cùng xuất phát lệch như lần 1 của bản 1** (cùng `weights=`, `teacher=`; `[init]` 346 tensor mới = 328 neck + 18 bộ tinh
+chỉnh). Hai run khác nhau đúng ở bộ tinh chỉnh, nên phép thử bộ tinh chỉnh vẫn hợp lệ.
+Kết quả: **0.764 / 0.482**, 12.6 ms, box trùng 2.6%.
+
+| Bản 2 | Kỳ vọng | Kết quả |
+|---|---|---|
+| mAP50-95 | ≥ bản 1 + 0.01 (0.474) | 0.482 (+0.018), đạt |
+| mAP50 | ≥ 0.75 | 0.764, đạt |
+| junction 50-95 | ≥ .53 | .529, không đạt (sát) |
+| wall 50-95 | ≥ .55 | .526 (+.028 so với bản 1), không đạt |
+| tốc độ | ≤ 13.0 ms | 12.6 ms, đạt |
+| box trùng | ≤ 3% | 2.6%, đạt |
+
+Bộ tinh chỉnh **giữ lại**: không chạm tiêu chí bác bỏ, 6 / 7 class tăng mAP50-95. Đây là một hạt giống, +0.018 vào khoảng 0.75σ của thước.
+Mục tiêu đột phá (≥ 0.499) chưa đạt: so với YOLO26x là +0.018 mAP50 và −0.017 mAP50-95. Recall wall vẫn kém run A (wall → nền 11% so với 7.6%).
+
+Vòng tiếp theo: train tiếp v20 từ `best.pt` của F79. Hai hạt giống khác nhau đúng ở thầy: v17 + nhóm (file A, nên đổi tên thành
+`openobb17x_groups.pt`) so với v17 một nhóm (`openobb17x_v2.pt`). Phép thử này kiểm tra giả thuyết F78 và tách được hiệu ứng "train thêm".
+Kiểm tra trước khi train: dòng `[init]` phải báo 0 tensor mới.

@@ -1307,6 +1307,23 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Vòng sau (đúng F77): `weights=` `best.pt` của run này, `teacher=` file A (đang tên `openobb19x.pt`, nên đổi thành `openobb17x_groups.pt`); bản 2 =
     `openobb20x` cùng mọi thứ. Kỳ vọng OPENOBB20 mục 3 giữ nguyên, mốc bản 1 so với run này (0.752 / 0.464).
 
+- **F79. Bản 2 của F77 = OpenOBB20-x, lệch thiết kế giống hệt F78 (user, 10-15): 0.764 / 0.482 (o2m 0.5), 12.6 ms, box trùng 2.6%.**
+  - Cùng `weights=openobb19x.pt` (v17 + nhóm) và `teacher=openobb17x_v2.pt` (một nhóm), cùng công thức với F78. `[init]` 1084 / 12 / **346** new
+    = 328 neck + 18 của bộ tinh chỉnh → **so với F78 khác đúng một yếu tố (bộ tinh chỉnh cạnh)**: cặp này hợp lệ cho phép thử bộ tinh chỉnh,
+    dù cả hai lệch khỏi xuất phát đã định. 51.27M tham số (+0.59M). Best ep 27 (val trong train 0.763 / 0.488); ep 23–30 đi ngang 0.479–0.488.
+  - Hiệu chỉnh: o2m 0.7 fitness .5130 (trùng 6.0%) so với o2m 0.5 .5102 (2.6%) → chọn o2m 0.5. o2o không NMS: 33.3% trùng.
+  - Theo class (v20 / v19 F78, Δ): wall .835 / .526 (+.009 / **+.028**), junction .897 / .529 (+.002 / +.011), note .820 / .488 (+.120 / +.011),
+    door .974 / .807 (0 / +.010), double_door .561 / .464 (+.052 / +.056), wall_300 .695 / .279 (−.032 / +.027), slide_door .568 / .280 (−.064 / −.019).
+    P .733 (F78 .689), R .723 (.749). Lỗi: wall → nền 114 (11%; F78 13%, A 7.6%), junction → nền 7%, wall_300 → junction 16% (F78 22%).
+  - Tổng so F78: **+0.012 / +0.018**, tốc độ +0.2 ms. Sáu class / bảy tăng 50-95; class tăng nhiều nhất là các class có đầu box dài (wall, double_door,
+    wall_300), đúng chỗ F64 chỉ ra (sai số hai đầu). Độ lớn: +0.018 khoảng 0.75σ của thước (±0.024, F64), wall +.028 khoảng 1.6σ (±.017), một hạt giống.
+  - So mốc: YOLO26x (0.746 / 0.499) **+0.018 / −0.017**; v12 (0.743 / 0.472) +0.021 / +0.010, nhanh hơn 18% (12.6 so với 15.3 ms);
+    v17 + nhóm cùng hiệu chỉnh (F76 0.751 / 0.481) +0.013 / +0.001 ở 12.6 so với 16.1 ms. **Bản tốt nhất hiện tại ở cả ba mặt trừ mAP50-95 so với YOLO.**
+  - Đối chiếu OPENOBB20 mục 3 (bản 2): ≥ bản 1 + 0.01 đạt (+0.018); mAP50 ≥ 0.75 đạt; junction ≥ .53 không đạt sát (.529); wall ≥ .55 không đạt (.526);
+    ≤ 13.0 ms đạt; box trùng ≤ 3% đạt. Tiêu chí bác bỏ (< bản 1 + 0.005) không chạm → **bộ tinh chỉnh cạnh giữ lại**. Mục tiêu đột phá ≥ 0.499 chưa đạt.
+  - Recall wall vẫn thấp (wall → nền 11% so với A 7.6%) dù box khít hơn: bộ tinh chỉnh không sửa recall, khớp giả thuyết F78 (thầy một nhóm kéo xác suất
+    wall xuống). Phép thử một yếu tố: train tiếp v20 từ `best.pt` này, thầy v17 + nhóm so với thầy một nhóm.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

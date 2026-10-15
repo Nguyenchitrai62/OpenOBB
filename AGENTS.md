@@ -302,7 +302,10 @@ Câu hỏi còn mở:
 - [x] **Vòng mAP50-95 (10-15, F77, 0.19.0):** v19 + chưng cất box (LD, `teacher=` v17 + nhóm) và OpenOBB20 (v19 + bộ tinh chỉnh cạnh đọc thân stride 4).
   Kết quả trước đó: v17 + nhóm 0.751 / 0.481 (NMS 0.5, trùng 2.2%), v19 0.755 / 0.462, 12.4 ms, trùng 2.8% (F74–F76). [docs/OPENOBB20.md](docs/OPENOBB20.md).
   **Lần 1 bản 1 (F78) lệch thiết kế:** file `openobb19x.pt` của user là v17 + nhóm (neck v19 học lại từ đầu), thầy `openobb17x_v2.pt` là một nhóm
-  → 0.752 / 0.464, 12.4 ms, trùng 2.9%, wall → nền 13%. Chạy lại: `weights=` best.pt lần 1, `teacher=` file v17 + nhóm; bản 2 `openobb20x` cùng điều kiện.
+  → 0.752 / 0.464, 12.4 ms, trùng 2.9%, wall → nền 13%.
+  **Bản 2 = OpenOBB20-x (F79)**, cùng xuất phát lệch, khác đúng ở bộ tinh chỉnh: **0.764 / 0.482, 12.6 ms, trùng 2.6%**
+  (+0.012 / +0.018; wall 50-95 +.028). Bộ tinh chỉnh giữ lại. Đây là bản tốt nhất hiện tại: so với YOLO26x +0.018 / −0.017.
+  Vòng tiếp: v20 train tiếp từ best.pt F79, thầy v17 + nhóm so với thầy một nhóm.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.
@@ -399,6 +402,9 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 - `push_all.py` chỉ đồng bộ file đã commit; nó in danh sách file chưa commit, đọc để không bỏ sót.
 
 ## 9. Nhật ký
+
+- 2026-10-15 (3): **Log OpenOBB20-x** (F79): 0.764 / 0.482, 12.6 ms. Cặp với F78 khác đúng một yếu tố (bộ tinh chỉnh), nên giữ v20.
+  Lệnh vòng sau ở `docs/OPENOBB20.md` mục 5.
 
 - 2026-10-15 (2): **Log bản 1 vòng F77** (F78). Mở checkpoint local thấy `openobb19x.pt` = v17 + nhóm, `openobb17x_v2.pt` = v17 một nhóm
   (nạp thử vào v19-x khớp đúng `1084 / 12 / 328`, 328 tensor mới là neck). Kết quả 0.752 / 0.464 không dùng để chấm kỳ vọng.
