@@ -44,7 +44,7 @@ def windows(length, size, gap):
 
 # architecture labels this package can rebuild (args["arch"] written at training; identical in every build of the
 # package whatever its name, so a model trained with one build loads in another of the same or a newer version)
-KNOWN_ARCHS = ("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19")
+KNOWN_ARCHS = ("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20")
 
 
 def _ver(v):
@@ -183,13 +183,13 @@ def _load_model(ckpt_path, device, queries=None, classes=None):
                       box=a.get("box") or "direct", ref_k=int(a.get("ref_k", 1500)), neck=a.get("neck") or "own")
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval().fuse(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
-    if a.get("arch") in ("v7", "v8", "v10", "v11", "v12", "v13", "v17", "v18", "v19"):
+    if a.get("arch") in ("v7", "v8", "v10", "v11", "v12", "v13", "v17", "v18", "v19", "v20"):
         common = dict(num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
                       max_det=max(int(a.get("num_top", 1000)), int(queries or 0)))
-        if a["arch"] in ("v17", "v18", "v19"):
+        if a["arch"] in ("v17", "v18", "v19", "v20"):
             from openobb.models.openobb17 import OpenOBB17
-            from openobb.models.openobb18 import OpenOBB18, OpenOBB19
-            m = {"v17": OpenOBB17, "v18": OpenOBB18, "v19": OpenOBB19}[a["arch"]](
+            from openobb.models.openobb18 import OpenOBB18, OpenOBB19, OpenOBB20
+            m = {"v17": OpenOBB17, "v18": OpenOBB18, "v19": OpenOBB19, "v20": OpenOBB20}[a["arch"]](
                 a.get("size", "x"), off=a.get("v7_off") or None, box=a.get("box") or "dfl",
                 ref_k=int(a.get("ref_k", 1500)), groups=a.get("groups") or None, **common)
         elif a["arch"] in ("v12", "v13"):

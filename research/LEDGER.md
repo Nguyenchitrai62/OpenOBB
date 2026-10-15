@@ -1275,6 +1275,17 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   0.18.2 (chỉ "trong 0.01 thì ít trùng nhất") đã chọn o2o 0.5 (0.742 / 0.479, 2.1%): bớt 0.1 điểm trùng mà mất 0.009 mAP50 → 0.18.4 coi các mức trùng
   chênh < 0.5 điểm là ngang nhau rồi chọn bản chính xác hơn (`DUP_EQ`). Calibrate in phiên bản + ngưỡng ở dòng đầu (0.18.3).
 
+- **F77. Vòng nhắm mAP50-95 (10-15, chưa train): v19 + chưng cất box (LD) và OpenOBB20 (bộ tinh chỉnh cạnh đọc thân stride 4).**
+  [docs/OPENOBB20.md](../docs/OPENOBB20.md).
+  - User: v19 đạt mAP50 / tốc độ / box trùng; chỉ còn mAP50-95. Hai bản song song: cải tiến v19 + bản agent chọn.
+  - Chưng cất box (`openobb18_loss.py`, `--w-ld 0.25`, `--w-kd-cls 0.5`, tự bật khi có `teacher=` và head khớp): KL T = 10 trên phân phối DFL
+    (hai đầu, độ dày), L1 góc / lệch ngang, BCE quality-focal tới xác suất class của thầy; theo nhóm (thầy một nhóm cũng dùng được).
+    Thầy = v17 + nhóm (F74 / F76: box khít hơn v19, cùng head nhóm).
+  - OpenOBB20 = v19 + `EdgeRefiner` (v14) đọc thân stride 4 + P3 trên cạnh box, trước bước bám ranh giới; zero-init (bắt đầu đúng bằng v19).
+    Lý do: neck nhanh làm mất độ khít (F75); bộ tinh chỉnh đi vòng qua neck; bằng chứng F60 (wall 50-95 +0.045).
+  - Kỳ vọng ghi trước: bản 1 ≥ 0.475 mAP50-95, junction ≥ .52; bản 2 ≥ bản 1 + 0.01, wall ≥ .55, ≤ 13.0 ms; cả hai box trùng ≤ 3%, mAP50 ≥ 0.75.
+    Mục tiêu đột phá ≥ 0.499 ở ≤ 13 ms. Bác bỏ bộ tinh chỉnh nếu bản 2 không hơn bản 1 ≥ 0.005.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

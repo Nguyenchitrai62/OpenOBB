@@ -75,3 +75,20 @@ class OpenOBB19(OpenOBB18):
     one box per class group at every grid point (models/groups.py, docs/OPENOBB19.md). groups = list of one group id
     per class, computed from the training labels by the trainer (groups=auto)."""
     arch = "v19"
+
+
+class OpenOBB20(OpenOBB19):
+    """OpenOBB19 + an edge refiner that reads the TRUNK's stride-4 map (and P3) on the edges of each candidate box,
+    before the boundary snapping (docs/OPENOBB20.md). The fast neck finds objects as well as the encoder it replaced
+    but places their boxes less tightly (F75: junction / door / note mAP50-95 down); the refiner goes around the neck
+    to the pretrained trunk's detail. Its last layer starts at zero: OpenOBB20 begins exactly as OpenOBB19."""
+    arch = "v20"
+
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        from .openobb14 import EdgeRefiner
+        self.edge = EdgeRefiner(self.backbone._out_channels[0], self.hid, s4=4, s3=8)
+
+    def refine_stages(self, f4, p3, field, cand):
+        r = self.edge(f4, p3, cand)
+        return [(cand, r)] + ([] if field is None else [(r, self.snap(field, r))])

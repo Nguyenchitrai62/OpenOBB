@@ -178,12 +178,20 @@ class OpenOBB17(OpenOBB12):
         boxes = torch.stack([decode(r[..., k, :], pts, st) for k in range(G)], 2)          # (B, A, G, 5)
         return grouped_candidates(cls, boxes, self.class_group)
 
-    def snap_topk(self, field, cls, boxes, k):
-        """Snap the k best-scoring boxes (B, A, 5) px in place -> (boxes, idx (B, k))."""
+    def refine_stages(self, f4, p3, field, cand):
+        """Box refinement of candidates (B, K, 5) px -> [(input, output) per stage]: here the boundary snapping
+        (OpenOBB20 puts its edge refiner first)."""
+        return [] if field is None else [(cand, self.snap(field, cand))]
+
+    def snap_topk(self, field, cls, boxes, k, f4=None, p3=None):
+        """Refine (every stage of refine_stages) the k best-scoring boxes (B, A, 5) px in place -> (boxes, idx)."""
         k = min(int(k), cls.shape[1])
         idx = cls.detach().sigmoid().amax(-1).topk(k, dim=1).indices
         cand = boxes.gather(1, idx[..., None].expand(-1, -1, 5))
-        return boxes.scatter(1, idx[..., None].expand(-1, -1, 5), self.snap(field, cand).to(boxes.dtype)), idx
+        stages = self.refine_stages(f4, p3, field, cand)
+        if not stages:
+            return boxes, idx
+        return boxes.scatter(1, idx[..., None].expand(-1, -1, 5), stages[-1][1].to(boxes.dtype)), idx
 
     def forward(self, x, targets=None, ctx=None):
         f4, feats = self.encode(x)
@@ -199,18 +207,22 @@ class OpenOBB17(OpenOBB12):
                 out["class_group"] = self.class_group
             if field is not None:
                 out["field"] = field
+            if field is not None or getattr(self, "edge", None) is not None:
                 cc, boxes = self.candidates(cls.detach(), reg.detach(), pts, st)
                 k = min(self.ref_k_train, boxes.shape[1])
                 idx = cc.sigmoid().amax(-1).topk(k, dim=1).indices
                 cand = boxes.gather(1, idx[..., None].expand(-1, -1, 5))
                 cand, valid = self._with_jitter(cand, targets)
-                out.update(ref_boxes=self.snap(field, cand), ref_cand=cand, ref_valid=valid)
+                stages = self.refine_stages(f4, feats[0], field, cand)
+                out.update(ref_boxes=stages[0][1], ref_cand=stages[0][0], ref_valid=valid)
+                if len(stages) > 1:                    # later stages: trained on the boxes the stage before produced
+                    out["ref_stages"] = [(c, r, 0.5) for c, r in stages[1:]]
             return out
         o2o = self.infer_head != "o2m"
         cls, reg = self.run_head(feats, o2o)
         cls, boxes = self.candidates(cls, reg, pts, st)
-        if field is not None and self.ref_k > 0:
-            boxes, _ = self.snap_topk(field, cls, boxes, self.ref_k)
+        if (field is not None or getattr(self, "edge", None) is not None) and self.ref_k > 0:
+            boxes, _ = self.snap_topk(field, cls, boxes, self.ref_k, f4, feats[0])
         conf = getattr(self, "nms_conf", 0.001)
         nms = self.final_nms if o2o or self.final_nms is not None else self.nms_iou   # one-to-many: always NMS
         if nms is not None:

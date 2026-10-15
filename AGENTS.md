@@ -299,6 +299,8 @@ Câu hỏi còn mở:
   520 so với 686 GFLOPs, 50.6M tham số. [docs/OPENOBB18.md](docs/OPENOBB18.md). Luật user: mỗi vòng hai version (tinh chỉnh + đột phá) train song song.
 - [x] **OpenOBB19 (10-15, F72, 0.18.0):** v18 + head theo nhóm tranh chấp (mỗi điểm lưới một box cho mỗi nhóm class, nhóm tự chia từ nhãn).
   Phát hiện: 60% junction và 86% tường ngắn không có điểm lưới riêng; recall tường < 12 px 0.33 so với YOLO 0.69. [docs/OPENOBB19.md](docs/OPENOBB19.md).
+- [x] **Vòng mAP50-95 (10-15, F77, 0.19.0):** v19 + chưng cất box (LD, `teacher=` v17 + nhóm) và OpenOBB20 (v19 + bộ tinh chỉnh cạnh đọc thân stride 4).
+  Kết quả trước đó: v17 + nhóm 0.751 / 0.481 (NMS 0.5, trùng 2.2%), v19 0.755 / 0.462, 12.4 ms, trùng 2.8% (F74–F76). [docs/OPENOBB20.md](docs/OPENOBB20.md).
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.

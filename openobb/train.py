@@ -42,7 +42,7 @@ def build_parser():
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19"],
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20"],
                     help="v1: OpenOBB (DETR-style decoder); v2: OpenOBB2 (dense segment-aware, NMS-free); "
                          "v3: OpenOBB3 (pretrained encoder + dense anisotropic oriented head); "
                          "v4: OpenOBB4 (DINOv2 backbone + DETR decoder + dense oriented branch); "
@@ -72,6 +72,10 @@ def build_parser():
                     help="OpenOBB18: trained OpenOBB12 / 17 checkpoint whose encoder output (P3-P5) the own neck is "
                          "distilled from during training (not part of the saved model)")
     ap.add_argument("--w-distill", type=float, default=2.0, help="OpenOBB18: weight of the neck distillation loss")
+    ap.add_argument("--w-ld", type=float, default=0.25,
+                    help="OpenOBB18+: weight of the teacher's box-distribution distillation (localization distillation; 0: off)")
+    ap.add_argument("--w-kd-cls", type=float, default=0.5,
+                    help="OpenOBB18+: weight of the teacher's class-probability distillation (0: off)")
     ap.add_argument("--groups", default="",
                     help="OpenOBB17 / 18 / 19: contention-aware class groups (one box per group at every point): 'auto' "
                          "(from the training labels, OpenOBB19's default), a group id per class '0,0,1,...', or '' (one)")
@@ -254,12 +258,13 @@ def main(argv=None):
 
     classes = dataset_classes(a.data)
     v2, v4, v5 = a.arch == "v2", a.arch == "v4", a.arch == "v5"
-    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19")
+    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20")
     v6, v7, v8, v10 = a.arch == "v6", a.arch == "v7", a.arch == "v8", a.arch == "v10"
-    v11, v12, v13, v14 = a.arch == "v11", a.arch in ("v12", "v17", "v18", "v19"), a.arch == "v13", a.arch in ("v14", "v15", "v16")
-    v17 = a.arch in ("v17", "v18", "v19")       # OpenOBB12 + boundary field / snapping: every v12 path applies
-    v18 = a.arch in ("v18", "v19")              # OpenOBB17 with the own neck distilled from a trained encoder
-    v19 = a.arch == "v19"                       # OpenOBB18 + contention-aware class groups
+    v11, v12, v13, v14 = a.arch == "v11", a.arch in ("v12", "v17", "v18", "v19", "v20"), a.arch == "v13", a.arch in ("v14", "v15", "v16")
+    v17 = a.arch in ("v17", "v18", "v19", "v20")   # OpenOBB12 + boundary field / snapping: every v12 path applies
+    v18 = a.arch in ("v18", "v19", "v20")       # OpenOBB17 with the own neck distilled from a trained encoder
+    v19 = a.arch in ("v19", "v20")              # OpenOBB18 + contention-aware class groups
+    v20 = a.arch == "v20"                       # OpenOBB19 + edge refiner on the trunk's stride-4 map
     if v17:
         from openobb.models.groups import parse_groups
         if v19 and not a.groups:
@@ -300,8 +305,8 @@ def main(argv=None):
         elif v17:
             from openobb.models.openobb17 import OpenOBB17
             from openobb.models.openobb18 import OpenOBB18
-            from openobb.models.openobb18 import OpenOBB19
-            model = (OpenOBB19 if v19 else OpenOBB18 if v18 else OpenOBB17)(
+            from openobb.models.openobb18 import OpenOBB19, OpenOBB20
+            model = (OpenOBB20 if v20 else OpenOBB19 if v19 else OpenOBB18 if v18 else OpenOBB17)(
                 a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top, off=a.v7_off or None,
                 box=a.box, ref_k=a.ref_k, groups=a.groups or None)
         elif v12 or v13:
@@ -399,7 +404,7 @@ def main(argv=None):
                 for p_ in teacher.parameters():
                     p_.requires_grad_(False)
                 log(f"[distill] neck distilled from the encoder of {a.teacher} (weight {a.w_distill:g})", console=True)
-            crit = OpenOBB18Loss(img_size=a.img, teacher=teacher, w_distill=a.w_distill)
+            crit = OpenOBB18Loss(img_size=a.img, teacher=teacher, w_distill=a.w_distill, w_ld=a.w_ld, w_kd_cls=a.w_kd_cls)
         elif v17:
             from openobb.models.openobb17_loss import OpenOBB17Loss
             crit = OpenOBB17Loss(img_size=a.img)
@@ -565,11 +570,13 @@ def main(argv=None):
                 core += "; dual dense oriented head P3-P5"
             if v17 and a.groups:
                 core += f"; {max(map(int, a.groups.split(','))) + 1} contention-aware class groups ({a.groups})"
+            if v20:
+                core += "; edge refiner on the trunk's stride-4 map"
             if v17 and "field" not in (a.v7_off or ""):
                 core += f"; boundary field (stride 2) + boundary snapping of {a.ref_k} candidates"
             if a.box == "direct":
                 core += ", direct box regression (no DFL)"
-            say(f"model   OpenOBB{19 if v19 else (18 if v18 else (17 if v17 else (13 if v13 else 12)))}-{a.size} ({core}: one-to-many for learning + one-to-one for "
+            say(f"model   OpenOBB{20 if v20 else 19 if v19 else (18 if v18 else (17 if v17 else (13 if v13 else 12)))}-{a.size} ({core}: one-to-many for learning + one-to-one for "
                 f"inference, NMS-free), {n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")
             if v13 and a.img < 1536:
                 say(f"WARNING  OpenOBB13's core runs at {a.img // 2} px: drawings need the core at >= 1024 "
