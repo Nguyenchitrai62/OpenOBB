@@ -70,3 +70,6 @@ Log phải có dòng `[groups] contention-aware class groups (from the training 
 **A. `openobb17x groups=auto` (F74):** 0.757 / 0.487 so với cùng điều kiện không nhóm (F73) 0.749 / 0.483. wall mAP50 +0.032 (tường bị sót −33%),
 junction 50-95 +0.026, wall_300 −0.072 (nhầm sang junction 13% → 21%). Tiêu chí: junction đạt; mAP50 tổng, wall ≥ .88, wall_300, box trùng không đạt;
 không bị bác bỏ. Box trùng 7.4% do hiệu chỉnh giữ NMS 0.7; từ 0.18.2 (DUP_TOL 0.01) sẽ chọn 0.5 (2.2%).
+
+**B. `openobb19x` vòng 2 (F75):** 0.755 / 0.462, **12.4 ms** (v12 15.3, v17 16.1), box trùng **2.8%**. wall mAP50 .879 (cao nhất từ trước).
+Tiêu chí: tốc độ ≤ 12.5 ms đạt, box trùng ≤ 3% đạt, ≥ 0.77 / ≥ 0.50 không đạt (mAP50-95 hụt do độ khít: junction / door / note).

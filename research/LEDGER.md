@@ -1257,6 +1257,20 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Chẩn đoán wall_300: nhóm cho phép junction và wall_300 cùng có box ở một điểm → phân loại phải tự phân biệt; nhầm wall_300 → junction tăng.
   - Sửa khung (0.18.2): `DUP_TOL` 0.005 → 0.01 (dưới một nửa nhiễu thước ±0.024; user ưu tiên ít box trùng). Run này sẽ chọn o2m 0.5 (2.2%).
 
+- **F75. OpenOBB19-x vòng 2 (user, 10-15): 0.755 / 0.462, 12.4 ms, box trùng 2.8%. Nhanh + ít trùng + mAP50 cao nhất; mAP50-95 hụt (độ khít).**
+  - Điều kiện: 0.18.0, khởi tạo `best.pt` của v19 vòng 1 (log vòng 1 chưa có: 60 ep từ `openobb12x.pt`, thầy v12; công thức chưa rõ), 30 ep,
+    công thức YOLO mới (`nbs 64`, khoảng 112 lần cập nhật), **không thầy** (weights là v19), batch 16, 1280, G4, 70.6 GB. Best ep 29, còn nhích.
+    Hiệu chỉnh: o2m 0.5 (.4909, dup 2.8%) so với o2m 0.7 (.4874, 9.6%), o2o none .4270.
+  - Theo class (so A = v17 + nhóm F74): wall .879 / .521 (+.007 / −.013; recall .818, cao nhất từ trước), junction .887 / .496 (−.017 / −.035),
+    wall_300 .763 / .287 (+.072 / +.014), note .718 / .441 (−.037 / −.052), door .970 / .793, slide_door .547 / .279, double_door .522 / .413
+    (−.07 / −.105; double_door → door 52%). Lỗi: junction → nền 8%, wall → nền 8%, wall_300 → junction 23%. P 0.672 (A 0.711).
+  - So v12 (F59): mAP50 +0.012, mAP50-95 −0.010, tốc độ −19% (12.4 so với 15.3 ms), box trùng 2.8% so với 8.2%. So YOLO26x: +0.009 / −0.037.
+  - Đối chiếu OPENOBB19 mục 4 (B): ≤ 12.5 ms đạt; box trùng ≤ 3% đạt; ≥ 0.77 / ≥ 0.50 không đạt. OPENOBB18 "đột phá" (≤ 0.75 × v12 tốc độ và
+    50-95 ≥ v12 − 0.01): tốc độ 0.81 × không đạt sát; 50-95 −0.010 vừa chạm ngưỡng.
+  - Chẩn đoán: neck chưng cất tìm object tốt (recall, mAP50) nhưng box kém khít hơn encoder (junction / door / note 50-95 tụt), độ chính xác (P) thấp hơn.
+    Vòng này neck không có thầy và chỉ khoảng 112 lần cập nhật. Phép thử rẻ: train tiếp với `nbs=0` + `teacher=` = A (v17 + nhóm).
+    Cần `best.pt` của v19 và A để chạy `box_quality.py` / `box_error_oracle.py`.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
