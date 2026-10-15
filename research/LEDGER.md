@@ -1410,7 +1410,7 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     tường dọc 67.6% lệch, tản hai phía. Tường dọc cũng có ít ứng viên tự tin hơn (ảnh 0: 21 tường ngang → 73 ứng viên khi nằm ngang, 10 khi dọc).
   - Đã loại trừ: nhãn (polys_to_obb: tường dọc θ = −π/2 đúng), `fuse()` (giống hệt), bám ranh giới (không đổi góc), bộ tinh chỉnh (giảm lệch:
     loss góc của nó là L1 × 5). Còn lại: loss góc head 1 − cos 2Δθ (gradient 4Δθ → 0.07 ở 1°) + lớp ra góc chạy bf16 (bước 0.45° ở 1.57 rad).
-    Phép thử suy luận bf16 trên CPU chưa xong (rất chậm).
+    Phép thử suy luận bf16 trên CPU (sau đó): tường dọc vẫn 88.4% lệch > 1°, ngang 0.3% → độ chính xác bf16 KHÔNG phải nguyên nhân (log `tilt_probe_v20v2_bf16.log`).
   - **Sửa chung (0.20.0, mọi model dense v3–v21):** loss góc = L1 trên (cos 2θ, sin 2θ) (`--angle-loss vec`, mặc định; `cos` = cũ); lớp ra
     hồi quy chạy fp32 (`openobb3.reg_out`). **OpenOBB21** = v20 + nhánh sửa góc trong không gian góc kép (zero-init). Thước `Box geometry`
     thêm vào `openobb val` và cuối log train. Kỳ vọng + lệnh: [docs/OPENOBB21.md](../docs/OPENOBB21.md). Checkpoint cũ không tự hết lệch:

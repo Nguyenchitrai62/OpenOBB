@@ -1,0 +1,5 @@
+openobb20x_v2.pt: 1188 confident long candidates (score >= 0.25, L >= 100 px, L >= 10 T) on 20 val images
+  head     > 1 deg 22.7%  > 3 deg 17.2%  median 0.11
+  stage 1  > 1 deg 15.7%  > 3 deg  5.1%  median 0.28
+  vertical in the image: n 302 head > 1 deg 88.4% | horizontal: n 886 head > 1 deg  0.3% | head angle near +-pi/2 among vertical walls 97.7%
+  vertical (|raw| 1-2 rad): |raw| < pi/2 (pulled towards 0) 17.6%; of the tilted > 1 deg: 15.0%; median |raw| - pi/2 = +4.00 deg

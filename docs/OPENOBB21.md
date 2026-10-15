@@ -70,4 +70,24 @@ dòng `model` của B có "angle corrected in the double-angle space"; cuối lo
 
 ## 6. Kết quả thật
 
-(chưa train)
+Wall_Color val 53 ảnh, thước YOLO, NMS hiệu chỉnh (o2m 0.5), G4 batch 16. Cả hai run đều train với `rotate_p=0.5` (notebook) và 30 epoch.
+
+| | **v21 lần 2 (F90)** | v21 lần 1 (F88) | YOLO26x (F89, cùng thước, cùng G4) |
+|---|---|---|---|
+| Phiên bản / khởi tạo | 0.20.2, `openobb20x_v2.pt` (12 tensor mới) | 0.20.0, một v21 trước (`train3/best.pt`) | 150 ep, `degrees 0` |
+| Lần cập nhật | 112 (`nbs 64`) | 112 | khoảng 600 |
+| mAP50 / mAP50-95 | **0.769 / 0.492** | 0.751 / 0.474 | 0.743 / 0.499 |
+| P / R | 0.743 / 0.732 | 0.706 / 0.757 | 0.717 / 0.793 |
+| Box trùng | 1.8% | 2.1% | 1.6% |
+| Speed (ms / ảnh) | 0.1 + **9.7** + **3.0** (NMS) | 12.7 (NMS chưa tách) | 0.5 + **6.6** + **0.7** (máy nóng) |
+| Góc > 1° / > 2° (mọi object) | 27.1% / 9.0% | 26.8% / 7.4% | 1.3% / 0.9% |
+| Vật dài: góc > 1° / đầu lệch | 11.3% / 1.9% | 9.8% / **0.6%** | 0.0% / 0.0% |
+| Box dài lệch trục > 1° | 14.4% | **13.9%** | 0.3% |
+
+mAP50 / mAP50-95 theo class (v21 lần 2 | YOLO26x): wall .863 / .545 | .919 / .624; note .775 / .487 | .764 / .517; door .975 / .810 | .965 / .811;
+slide_door .601 / .320 | .345 / .123; double_door .537 / .435 | .494 / .392; wall_300 .730 / .310 | .824 / .441; junction .900 / .538 | .910 / .584.
+Lỗi hay gặp (lần 2): junction → nền 7%, wall → nền 9%, wall_300 → junction 15%, slide_door → wall 39%.
+
+Đối chiếu mục 4 (B: v21): box dài lệch ≤ 3% **không đạt** (14.4%); mAP50-95 ≥ 0.495 **không đạt** (0.492, trong nhiễu); mAP50 ≥ 0.750 đạt;
+trùng ≤ 2.6% đạt; tốc độ ≤ 12.9 ms đạt (12.7). Cả hai run còn xoay góc bất kỳ và chỉ 112 cập nhật, nên chưa phải phép thử sạch của nhánh góc.
+Nguyên nhân gốc của lệch góc tìm thấy sau đó (F86) → OpenOBB22 ([OPENOBB22.md](OPENOBB22.md)).
