@@ -1327,6 +1327,22 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     Chênh lệch wall → nền giữa F75 (8%) và F78 (13%) bị lẫn với độ dài train của neck: F75 neck đã học 60 + 30 ep, F78 neck mới học 30 ep.
     Đổi thầy là tinh chỉnh nhỏ, bằng chứng yếu, nên không làm hạt giống. Đường cong v20 đi ngang từ ep 23 → train thêm cùng điều kiện cũng ít lợi.
 
+- **F80. Oracle "đầu box dùng chung với box kề bên": BÁC BỎ hướng A (OpenOBB21) trước khi code. (10-15, CPU, 53 ảnh val)**
+  Script `research/analysis/shared_end_oracle.py`, log `shared_end_v17groups.log`, `shared_end_v12.log`. Model: v17 + nhóm (run A, file
+  `openobb19x.pt`), head một-nhiều + NMS 0.5: 0.750 / 0.482 (khớp F76).
+  - Cách đo, không dùng nhãn: sau NMS, mỗi đầu box được kéo về giao điểm gần nhất giữa trục box với một cạnh của box kề bên (conf ≥ 0.25, góc
+    cắt ≥ 30°) nếu cách ≤ R px. Trần tham chiếu: thay hai đầu bằng đầu nhãn (`ends(gt)`, như F64). Thêm trần của một cổng hoàn hảo: chỉ kéo khi
+    cạnh kề bên gần đầu nhãn hơn (dùng nhãn để chọn).
+  - Δ mAP50-95 (v17 + nhóm): ends(gt) **+0.126**; kéo hẳn R 2 / 3 / 4 / 6 px: −0.014 / −0.029 / −0.041 / −0.054; kéo nửa đường R 3 / R 4: −0.009 / −0.013;
+    **cổng hoàn hảo R 4: −0.002** (wall +.003, wall_300 +.019, junction −.036). v12 cho cùng kết luận (cổng hoàn hảo +0.001).
+  - Chẩn đoán (detection khớp ProbIoU ≥ 0.5, có cạnh kề bên trong 4 px): sai số dọc trục tới đầu nhãn, trung vị đầu của chính box / cạnh kề bên:
+    wall 1.83 / 2.93 px, junction 2.38 / 3.10, wall_300 1.75 / 1.97, door 3.58 / 4.54. Cạnh kề bên gần đầu nhãn hơn chỉ trong 30–34% trường hợp
+    (wall, junction, wall_300), double_door 44%.
+  - Kết luận: nhãn có đầu trùng cạnh hàng xóm (F64), nhưng **cạnh của detection hàng xóm không mang thêm thông tin về vị trí đầu**: nó sai nhiều hơn
+    chính đầu của box, và kể cả biết trước lúc nào nên kéo cũng không tăng. Phần +0.126 của đầu box phải lấy từ đặc trưng ảnh của chính object, không
+    từ quan hệ với box kề bên. Không làm OpenOBB21 theo hướng này. Hạn chế: junction gần vuông nên trục dài / ngắn dễ đảo, con số junction kém tin cậy.
+  - Bước tiếp: đo `best.pt` v20 (`box_quality.py`, `box_error_oracle.py`) để biết sau bộ tinh chỉnh phần còn lại nằm ở đầu box hay độ dày.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
