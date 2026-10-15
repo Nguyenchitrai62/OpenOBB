@@ -1321,8 +1321,11 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     v17 + nhóm cùng hiệu chỉnh (F76 0.751 / 0.481) +0.013 / +0.001 ở 12.6 so với 16.1 ms. **Bản tốt nhất hiện tại ở cả ba mặt trừ mAP50-95 so với YOLO.**
   - Đối chiếu OPENOBB20 mục 3 (bản 2): ≥ bản 1 + 0.01 đạt (+0.018); mAP50 ≥ 0.75 đạt; junction ≥ .53 không đạt sát (.529); wall ≥ .55 không đạt (.526);
     ≤ 13.0 ms đạt; box trùng ≤ 3% đạt. Tiêu chí bác bỏ (< bản 1 + 0.005) không chạm → **bộ tinh chỉnh cạnh giữ lại**. Mục tiêu đột phá ≥ 0.499 chưa đạt.
-  - Recall wall vẫn thấp (wall → nền 11% so với A 7.6%) dù box khít hơn: bộ tinh chỉnh không sửa recall, khớp giả thuyết F78 (thầy một nhóm kéo xác suất
-    wall xuống). Phép thử một yếu tố: train tiếp v20 từ `best.pt` này, thầy v17 + nhóm so với thầy một nhóm.
+  - Recall wall vẫn thấp (wall → nền 11% so với A 7.6%) dù box khít hơn: bộ tinh chỉnh không sửa recall.
+  - **Bỏ giả thuyết "thầy một nhóm kéo wall xuống" (user phản biện, 10-15).** v19 đã qua ba kiểu thầy và tổng gần như không đổi:
+    thầy v12 (vòng 1), không thầy (F75: 0.755 / 0.462), thầy v17 một nhóm (F78: 0.752 / 0.464).
+    Chênh lệch wall → nền giữa F75 (8%) và F78 (13%) bị lẫn với độ dài train của neck: F75 neck đã học 60 + 30 ep, F78 neck mới học 30 ep.
+    Đổi thầy là tinh chỉnh nhỏ, bằng chứng yếu, nên không làm hạt giống. Đường cong v20 đi ngang từ ep 23 → train thêm cùng điều kiện cũng ít lợi.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 

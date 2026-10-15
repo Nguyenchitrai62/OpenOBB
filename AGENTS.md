@@ -305,7 +305,7 @@ Câu hỏi còn mở:
   → 0.752 / 0.464, 12.4 ms, trùng 2.9%, wall → nền 13%.
   **Bản 2 = OpenOBB20-x (F79)**, cùng xuất phát lệch, khác đúng ở bộ tinh chỉnh: **0.764 / 0.482, 12.6 ms, trùng 2.6%**
   (+0.012 / +0.018; wall 50-95 +.028). Bộ tinh chỉnh giữ lại. Đây là bản tốt nhất hiện tại: so với YOLO26x +0.018 / −0.017.
-  Vòng tiếp: v20 train tiếp từ best.pt F79, thầy v17 + nhóm so với thầy một nhóm.
+  Không đề xuất đổi thầy nữa (v19 qua ba kiểu thầy, tổng không đổi; user phản biện). Vòng sau chưa chốt.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.
@@ -404,7 +404,7 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 ## 9. Nhật ký
 
 - 2026-10-15 (3): **Log OpenOBB20-x** (F79): 0.764 / 0.482, 12.6 ms. Cặp với F78 khác đúng một yếu tố (bộ tinh chỉnh), nên giữ v20.
-  Lệnh vòng sau ở `docs/OPENOBB20.md` mục 5.
+  Đề xuất đổi thầy cho vòng sau đã bỏ theo phản biện của user (F79).
 
 - 2026-10-15 (2): **Log bản 1 vòng F77** (F78). Mở checkpoint local thấy `openobb19x.pt` = v17 + nhóm, `openobb17x_v2.pt` = v17 một nhóm
   (nạp thử vào v19-x khớp đúng `1084 / 12 / 328`, 328 tensor mới là neck). Kết quả 0.752 / 0.464 không dùng để chấm kỳ vọng.

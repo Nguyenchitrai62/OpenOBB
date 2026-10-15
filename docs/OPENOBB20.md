@@ -90,6 +90,5 @@ Kết quả: **0.764 / 0.482**, 12.6 ms, box trùng 2.6%.
 Bộ tinh chỉnh **giữ lại**: không chạm tiêu chí bác bỏ, 6 / 7 class tăng mAP50-95. Đây là một hạt giống, +0.018 vào khoảng 0.75σ của thước.
 Mục tiêu đột phá (≥ 0.499) chưa đạt: so với YOLO26x là +0.018 mAP50 và −0.017 mAP50-95. Recall wall vẫn kém run A (wall → nền 11% so với 7.6%).
 
-Vòng tiếp theo: train tiếp v20 từ `best.pt` của F79. Hai hạt giống khác nhau đúng ở thầy: v17 + nhóm (file A, nên đổi tên thành
-`openobb17x_groups.pt`) so với v17 một nhóm (`openobb17x_v2.pt`). Phép thử này kiểm tra giả thuyết F78 và tách được hiệu ứng "train thêm".
-Kiểm tra trước khi train: dòng `[init]` phải báo 0 tensor mới.
+Đề xuất đổi thầy (v17 + nhóm so với một nhóm) đã bỏ: v19 qua ba kiểu thầy mà tổng không đổi (F75, F78), xem F79.
+Vòng sau chưa chốt.
