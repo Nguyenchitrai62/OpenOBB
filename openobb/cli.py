@@ -692,8 +692,11 @@ def calibrate(model, data=None, out=None, imgsz=None, batch=8, workers=8, cache_
 
     from openobb.data.dota import dataset_classes
     from openobb.engine import eval_dota
-    from openobb.predict import (apply_head, apply_nms, choose_postprocess, dup_rate, input_size, load_model,
+    from openobb import __version__
+    from openobb.predict import (DUP_TOL, apply_head, apply_nms, choose_postprocess, dup_rate, input_size, load_model,
                                  merge_iou_for, postprocess_options)
+    print(f"[calibrate] OpenOBB {__version__}: best fitness (0.1 mAP50 + 0.9 mAP50-95); within {DUP_TOL:g} of it, the "
+          f"setting with the fewest duplicate boxes", flush=True)
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net, names, targs = load_model(model, dev)
     imgsz = input_size(targs, imgsz)
