@@ -2,7 +2,8 @@
 Val images of Wall_Color, the model's raw boxes before NMS (model NMS disabled), then several suppression rules,
 each scored with the Ultralytics-style mAP and the duplicate count (conf 0.25). CPU inference only.
 
-usage: python dup_analysis.py <checkpoint.pt> [n_images]   (DUP_HEAD=o2m: dual-head models use the one-to-many head)
+usage: python dup_analysis.py <checkpoint.pt> [n_images]   (DUP_HEAD=o2m: dual-head models use the one-to-many head;
+       DUP_STAGES=head | edge: candidates before the edge refiner / before the boundary snapping)
 """
 import json
 import os
@@ -49,10 +50,15 @@ if os.environ.get("DUP_DECODE") == "peak":       # DFL read around the distribut
         return (w * idx.to(p.dtype)).sum(-1) / w.sum(-1).clamp(min=1e-9) * width
 
     _m3._expect = _peak                                             # decode() looks _expect up at call time
+STAGES = os.environ.get("DUP_STAGES")            # head: no edge refiner / snapping; edge: refiner, no snapping
+if STAGES == "head":
+    net.ref_k = 0
+elif STAGES == "edge":
+    net.refine_stages = lambda f4, p3, field, cand: [(cand, net.edge(f4, p3, cand))]
 raw, gts = {}, {}
 imgs = sorted((ROOT / "images" / "val").iterdir())[:n_img]
 t0 = time.time()
-CACHE = Path(__file__).with_name(f"dup_raw_{Path(ck).stem}{'_' + os.environ['DUP_HEAD'] if os.environ.get('DUP_HEAD') else ''}{'_' + os.environ['DUP_DECODE'] if os.environ.get('DUP_DECODE') else ''}_{len(imgs)}.npz")
+CACHE = Path(__file__).with_name(f"dup_raw_{Path(ck).stem}{'_' + os.environ['DUP_HEAD'] if os.environ.get('DUP_HEAD') else ''}{'_' + os.environ['DUP_DECODE'] if os.environ.get('DUP_DECODE') else ''}{'_' + STAGES if STAGES else ''}_{len(imgs)}.npz")
 cached = dict(np.load(CACHE, allow_pickle=True)) if CACHE.exists() else {}
 for k, p in enumerate(imgs):
     if p.stem in cached:

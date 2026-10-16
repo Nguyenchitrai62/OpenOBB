@@ -116,7 +116,8 @@ Kết quả tốt nhất của mỗi kiến trúc trên Wall_Color val (cỡ x, 
 | YOLO26x-obb (tham chiếu) | Ultralytics | 57.6M | 0.743 | 0.499 | |
 
 Số epoch và điểm khởi tạo khác nhau giữa các lần train. Cỡ s / m / l có cho mọi kiến trúc trên (`openobb23s`...). Các kiến trúc thử nghiệm
-khác (v1, v2, v5–v11, v13, v15, v16, v18) chưa có kết quả đủ điều kiện trên Wall_Color; tài liệu ở `docs/`. Mỗi thẻ có lập luận
+khác (v1, v2, v5–v11, v13, v15, v16, v18) chưa có kết quả đủ điều kiện trên Wall_Color; tài liệu ở `docs/`. Mới, chưa train:
+`openobb24x` (v23 + độ khít học được, dùng để chọn box trong NMS, [OPENOBB24](docs/OPENOBB24.md)). Mỗi thẻ có lập luận
 thiết kế, kỳ vọng ghi trước khi train, kết quả thật và phụ lục kiến trúc theo lớp.
 
 ## Kiến trúc OpenOBB23

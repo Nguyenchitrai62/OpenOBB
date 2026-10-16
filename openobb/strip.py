@@ -14,7 +14,8 @@ import torch
 DEPLOY_KEYS = ("arch", "size", "img", "scale", "fit", "num_top", "queries", "post", "lsk", "p2", "strip_k",
                "ortho_heads", "dense", "dense_queries", "denoising", "no_rotate_sampling", "context", "backbone",
                "dense_v3", "primary", "geo_cls", "relate", "rel_k", "vectors", "vec_dim", "vec_layers", "vec_lfe",
-               "vec_ground", "v6_off", "v7_off", "v8_off", "v9_off", "v10_off", "nms_iou", "infer_k", "infer_head", "box")
+               "vec_ground", "v6_off", "v7_off", "v8_off", "v9_off", "v10_off", "nms_iou", "infer_k", "infer_head", "box",
+               "groups", "ref_k", "neck", "v14_off", "v24_off", "q_beta", "q_alpha", "snap_skip")
 LEAKS = ("openobb", "vrdet", "/content", "/root", "\\users\\", "runs/", "drive/")
 
 

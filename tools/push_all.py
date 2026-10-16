@@ -33,7 +33,7 @@ CHECKOUT = ROOT / ".gitlab_export"                     # persistent working clon
 ALLOW = ["openobb", "tests", "docs/DEPLOY.md", "docs/FINETUNE.md", "docs/OPENOBB2.md", "docs/OPENOBB3.md",
          "docs/OPENOBB4.md", "docs/OPENOBB5.md", "docs/OPENOBB6.md", "docs/OPENOBB7.md",
          "docs/OPENOBB8.md", "docs/OPENOBB9.md", "docs/OPENOBB10.md", "docs/OPENOBB11.md", "docs/OPENOBB12.md", "docs/OPENOBB13.md",
-         *[f"docs/OPENOBB{n}.md" for n in range(14, 24)], "docs/PRETRAIN.md", "docs/OPENOBB1.md", "app/streamlit_app.py", "app/viewer/index.html",
+         *[f"docs/OPENOBB{n}.md" for n in range(14, 25)], "docs/PRETRAIN.md", "docs/OPENOBB1.md", "app/streamlit_app.py", "app/viewer/index.html",
          "run_app.bat",
          "LICENSE", "LICENSES", "THIRD_PARTY_NOTICES.md", "pyproject.toml", "requirements.txt"]
 # files from older layouts removed from GitLab when present (renamed in the research repo)

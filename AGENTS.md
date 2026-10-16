@@ -331,6 +331,10 @@ Câu hỏi còn mở:
 - [x] **Mốc hiện tại (F107, 10-16): OpenOBB23-x 0.798 / 0.526, trùng 1.8%, 7.9 + 1.3 ms** (fine-tune nối tiếp F96 → F103 → F107, thân đóng
   băng, khung YOLO 0.23.0) so với YOLO26x 0.743 / 0.499. Còn thua ở wall / junction / wall_300 (độ khít box) và hướng box vật dài
   (6.0% box dài lệch trục so với 0.3%). Train tiếp gần bão hoà trên 250 ảnh (F102–F107). Mở khoá thân thua đóng băng (F100–F106).
+- [x] **OpenOBB24 (F108, 0.24.0, chưa train):** chẩn đoán trên checkpoint F107: recall đã ngang YOLO, khoảng hụt là độ khít box; điểm class
+  không biết độ khít, trong cụm NMS có box khít hơn (+0.052), tín hiệu trường ranh giới thô chọn box trong cụm đã +0.015 không cần train.
+  v24 = v23 + `LocQuality` (dự đoán ProbIoU của box cuối) + NMS theo điểm × q^β + bỏ bám mép theo nhóm, chọn trên val.
+  [docs/OPENOBB24.md](docs/OPENOBB24.md). Vòng này: A `openobb23x` vs B `openobb24x`, cùng `weights=` best F107, 60 epoch.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.
@@ -427,6 +431,11 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 - `push_all.py` chỉ đồng bộ file đã commit; nó in danh sách file chưa commit, đọc để không bỏ sót.
 
 ## 9. Nhật ký
+
+- 2026-10-16 (6): **OpenOBB24 + chẩn đoán F108** (theo user: tìm phần còn nhiều không gian tối ưu nhất).
+  Script đo mới: `rank_vote_oracle.py`, `score_iou_corr.py`, `consensus_probe.py`, `band_width_probe.py`, `quality_probe.py`;
+  `dup_analysis.py DUP_STAGES=head|edge`. `fast_nms(out_logits=)`, `EdgeRefiner.refine_with_fit(hidden=)`, `fit_loss` đọc `ref_fit_valid`.
+  Sửa `strip` thiếu `groups` (checkpoint v19+ đã strip không nạp được).
 
 - 2026-10-16 (6): **0.24.0: LR giảm theo cosine là mặc định** (theo user, F108). `cos_lr=False` để về lịch tuyến tính của YOLO.
   Đánh giá theo đồ thị LR (F108): hợp lý; user chốt không cần chạy A/B riêng.

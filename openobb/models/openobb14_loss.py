@@ -35,8 +35,10 @@ class OpenOBB14Loss(OpenOBB12Loss):
         return losses
 
     def fit_loss(self, outputs, targets):
-        """BCE of the fit logit against ProbIoU(final refined box, matched object) (0 for unmatched candidates)."""
-        fit, rb, valid = outputs["ref_fit"].float(), outputs["ref_fit_boxes"].float().detach(), outputs.get("ref_valid")
+        """BCE of the fit logit against ProbIoU(final refined box, matched object) (0 for unmatched candidates).
+        `ref_fit_valid` (OpenOBB24): the rows the fit is learnt on (dense candidates only), else `ref_valid`."""
+        fit, rb = outputs["ref_fit"].float(), outputs["ref_fit_boxes"].float().detach()
+        valid = outputs.get("ref_fit_valid", outputs.get("ref_valid"))
         tgt = torch.zeros_like(fit)
         for b, t in enumerate(targets):
             if not len(t["labels"]):

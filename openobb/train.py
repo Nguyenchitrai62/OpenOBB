@@ -42,7 +42,7 @@ def build_parser():
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--size", default="s")
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23"],
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23", "v24"],
                     help="v1: OpenOBB (DETR-style decoder); v2: OpenOBB2 (dense segment-aware, NMS-free); "
                          "v3: OpenOBB3 (pretrained encoder + dense anisotropic oriented head); "
                          "v4: OpenOBB4 (DINOv2 backbone + DETR decoder + dense oriented branch); "
@@ -66,6 +66,7 @@ def build_parser():
     ap.add_argument("--v9-off", default="", help="OpenOBB9 ablation: core parts switched off, comma-separated")
     ap.add_argument("--v14-off", default="", help="OpenOBB14 ablation: parts switched off, comma-separated "
                                                   "(attn, spd, edge, dilate, maxpool, guard, dual, stage4, widehead)")
+    ap.add_argument("--v24-off", default="", help="OpenOBB24 ablation: 'quality' (no localisation-quality head)")
     ap.add_argument("--ref-k", type=int, default=1500, help="OpenOBB14: candidates refined by the edge refiner at "
                                                             "inference (0: off)")
     ap.add_argument("--teacher", default=None,
@@ -266,16 +267,17 @@ def main(argv=None):
 
     classes = dataset_classes(a.data)
     v2, v4, v5 = a.arch == "v2", a.arch == "v4", a.arch == "v5"
-    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23")
+    v3 = a.arch in ("v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23", "v24")
     v6, v7, v8, v10 = a.arch == "v6", a.arch == "v7", a.arch == "v8", a.arch == "v10"
-    v11, v12, v13, v14 = a.arch == "v11", a.arch in ("v12", "v17", "v18", "v19", "v20", "v21", "v22", "v23"), a.arch == "v13", a.arch in ("v14", "v15", "v16")
-    v17 = a.arch in ("v17", "v18", "v19", "v20", "v21", "v22", "v23")   # OpenOBB12 + boundary field / snapping: every v12 path applies
-    v18 = a.arch in ("v18", "v19", "v20", "v21", "v22", "v23")       # OpenOBB17 with the own neck distilled from a trained encoder
-    v19 = a.arch in ("v19", "v20", "v21", "v22", "v23")              # OpenOBB18 + contention-aware class groups
-    v20 = a.arch in ("v20", "v21", "v22", "v23")             # OpenOBB19 + edge refiner on the trunk's stride-4 map
-    v21 = a.arch in ("v21", "v22", "v23")             # OpenOBB20 + double-angle residual angle head
+    v11, v12, v13, v14 = a.arch == "v11", a.arch in ("v12", "v17", "v18", "v19", "v20", "v21", "v22", "v23", "v24"), a.arch == "v13", a.arch in ("v14", "v15", "v16")
+    v17 = a.arch in ("v17", "v18", "v19", "v20", "v21", "v22", "v23", "v24")   # OpenOBB12 + boundary field / snapping: every v12 path applies
+    v18 = a.arch in ("v18", "v19", "v20", "v21", "v22", "v23", "v24")       # OpenOBB17 with the own neck distilled from a trained encoder
+    v19 = a.arch in ("v19", "v20", "v21", "v22", "v23", "v24")              # OpenOBB18 + contention-aware class groups
+    v20 = a.arch in ("v20", "v21", "v22", "v23", "v24")             # OpenOBB19 + edge refiner on the trunk's stride-4 map
+    v21 = a.arch in ("v21", "v22", "v23", "v24")             # OpenOBB20 + double-angle residual angle head
     v22 = a.arch == "v22"                       # OpenOBB21 + bounded angle from 45 deg + direct boxes
-    v23 = a.arch == "v23"                       # OpenOBB21 + rotational boundary snapping + peak filter
+    v23 = a.arch in ("v23", "v24")              # OpenOBB21 + rotational boundary snapping + peak filter
+    v24 = a.arch == "v24"                       # OpenOBB23 + learnt localisation quality (quality-guided NMS)
     if v22:
         a.box = "direct"
     if v17:
@@ -319,9 +321,11 @@ def main(argv=None):
             from openobb.models.openobb17 import OpenOBB17
             from openobb.models.openobb18 import OpenOBB18
             from openobb.models.openobb18 import OpenOBB19, OpenOBB20, OpenOBB21, OpenOBB22, OpenOBB23
-            model = (OpenOBB23 if v23 else OpenOBB22 if v22 else OpenOBB21 if v21 else OpenOBB20 if v20 else OpenOBB19 if v19 else OpenOBB18 if v18 else OpenOBB17)(
+            from openobb.models.openobb24 import OpenOBB24
+            v17_kw = {"off24": a.v24_off or None} if v24 else {}
+            model = (OpenOBB24 if v24 else OpenOBB23 if v23 else OpenOBB22 if v22 else OpenOBB21 if v21 else OpenOBB20 if v20 else OpenOBB19 if v19 else OpenOBB18 if v18 else OpenOBB17)(
                 a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk, max_det=a.num_top, off=a.v7_off or None,
-                box=a.box, ref_k=a.ref_k, groups=a.groups or None)
+                box=a.box, ref_k=a.ref_k, groups=a.groups or None, **v17_kw)
         elif v12 or v13:
             from openobb.models.openobb12 import OpenOBB12, OpenOBB13
             model = (OpenOBB13 if v13 else OpenOBB12)(a.size, num_classes=len(classes), img_size=a.img, lsk=a.lsk,
@@ -603,11 +607,13 @@ def main(argv=None):
                 core += "; angle in (-45, 135) deg from 45 deg"
             if v23:
                 core += "; rotational boundary snapping (long sides, line fit)"
+            if v24 and "quality" not in (a.v24_off or ""):
+                core += "; learnt localisation quality of the refined boxes (quality-guided NMS, calibrated)"
             if v17 and "field" not in (a.v7_off or ""):
                 core += f"; boundary field (stride 2) + boundary snapping of {a.ref_k} candidates"
             if a.box == "direct":
                 core += ", direct box regression (no DFL)"
-            say(f"model   OpenOBB{23 if v23 else 22 if v22 else 21 if v21 else 20 if v20 else 19 if v19 else (18 if v18 else (17 if v17 else (13 if v13 else 12)))}-{a.size} ({core}: one-to-many for learning + one-to-one for "
+            say(f"model   OpenOBB{24 if v24 else 23 if v23 else 22 if v22 else 21 if v21 else 20 if v20 else 19 if v19 else (18 if v18 else (17 if v17 else (13 if v13 else 12)))}-{a.size} ({core}: one-to-many for learning + one-to-one for "
                 f"inference, NMS-free), {n_par:.2f}M params, max {a.num_top} detections | init: {init_desc}")
             if v13 and a.img < 1536:
                 say(f"WARNING  OpenOBB13's core runs at {a.img // 2} px: drawings need the core at >= 1024 "
@@ -947,6 +953,36 @@ def main(argv=None):
         res, dets = final_eval(a.nms_iou)
         u = res.get("ultra") or res
         fit_best = 0.1 * u["mAP50"] + 0.9 * u["mAP50_95"]
+    a.q_beta = a.q_alpha = a.snap_skip = None
+    if hasattr(vm, "q_beta") and not a.eval_only:
+        # OpenOBB24: how the learnt localisation quality is used (quality-guided NMS / score) and which class groups skip
+        # the boundary snapping, chosen on val after the NMS like it; (0, 0, none) = OpenOBB23 (docs/OPENOBB24.md)
+        from openobb.predict import apply_quality, quality_options, snap_skip_options
+        u0 = res.get("ultra") or res
+        best = (0.1 * u0["mAP50"] + 0.9 * u0["mAP50_95"], (0.0, 0.0), (), res, dets)
+        rows = []
+        for qb, qa in quality_options(vm)[1:]:
+            apply_quality(vm, qb, qa, ())
+            r, d = final_eval(a.nms_iou)
+            u = r.get("ultra") or r
+            f = 0.1 * u["mAP50"] + 0.9 * u["mAP50_95"]
+            rows.append(f"q^{qb:g} in NMS{f', score^{1 - qa:g} q^{qa:g}' if qa else ''}: {f:.4f}")
+            if f > best[0]:
+                best = (f, (qb, qa), (), r, d)
+        for sk in snap_skip_options(vm)[1:]:
+            apply_quality(vm, *best[1], sk)
+            r, d = final_eval(a.nms_iou)
+            u = r.get("ultra") or r
+            f = 0.1 * u["mAP50"] + 0.9 * u["mAP50_95"]
+            rows.append(f"no snapping for group {','.join(map(str, sk))}: {f:.4f}")
+            if f > best[0]:
+                best = (f, best[1], sk, r, d)
+        fit_best, (a.q_beta, a.q_alpha), sk, res, dets = best
+        a.snap_skip = ",".join(map(str, sk))
+        apply_quality(vm, a.q_beta, a.q_alpha, sk)
+        say(f"Localisation quality calibrated on val (saved in best.pt; fitness, base {0.1 * u0['mAP50'] + 0.9 * u0['mAP50_95']:.4f}): "
+            + " | ".join(rows) + f" -> q^{a.q_beta:g} in NMS, score^{1 - a.q_alpha:g} q^{a.q_alpha:g}, "
+            f"no snapping for groups [{a.snap_skip}]")
     a.infer_k = None
     ref = getattr(vm, "refiner", None)
     if ref is not None and not a.eval_only:
@@ -1012,6 +1048,8 @@ def main(argv=None):
             ck["args"]["infer_head"] = a.infer_head
         if a.infer_k:
             ck["args"]["infer_k"] = a.infer_k
+        if a.q_beta is not None:
+            ck["args"].update(q_beta=a.q_beta, q_alpha=a.q_alpha, snap_skip=a.snap_skip)
         ck["conf_f1"] = final.get("conf_f1")
         torch.save(ck, wdir / "best.tmp")
         os.replace(wdir / "best.tmp", wdir / "best.pt")
@@ -1035,9 +1073,11 @@ def main(argv=None):
     if not a.eval_only and last.exists():   # finished: drop the optimiser state from last.pt (like best.pt)
         ck = torch.load(last, map_location="cpu", weights_only=False)
         if "opt" in ck:
+            q_args = {} if a.q_beta is None else dict(q_beta=a.q_beta, q_alpha=a.q_alpha, snap_skip=a.snap_skip)
             torch.save({"model": ck["ema"]["module"], "epoch": ck["epoch"], "args": dict(ck["args"], nms_iou=a.nms_iou,
                                                                        **({"infer_head": a.infer_head}
-                                                                          if getattr(a, "infer_head", None) else {})),
+                                                                          if getattr(a, "infer_head", None) else {}),
+                                                                       **q_args),
                         "classes": ck["classes"], "best_score": ck.get("best_score"),
                         "version": ck.get("version", __version__)}, wdir / "last.tmp")
             os.replace(wdir / "last.tmp", last)

@@ -124,11 +124,13 @@ def nms_keep_near(b, lab, iou):
 
 
 @torch.no_grad()
-def fast_nms(logits, boxes, max_det=1000, conf=0.001, iou=0.7, pre=4000, min_side=0.0):
+def fast_nms(logits, boxes, max_det=1000, conf=0.001, iou=0.7, pre=4000, min_side=0.0, out_logits=None):
     """Per image class-wise Fast-NMS on ProbIoU -> padded (B, max_det, C) logits and (B, max_det, 5) boxes px.
     min_side > 0: the overlap test sees every side at least min_side px (the kept boxes are unchanged). For thin
     objects IoU is dominated by a few px of lateral noise (thickness uncertainty ~2.7 px, F37): two 5 px walls 2.5 px
-    apart have IoU 0.33 and both survive; with a floor of ~12 px they are recognised as the same wall."""
+    apart have IoU 0.33 and both survive; with a floor of ~12 px they are recognised as the same wall.
+    out_logits (same shape as logits): the boxes are ranked / kept by `logits` but returned with these scores
+    (OpenOBB24: the localisation quality chooses the kept box of each cluster, the class score stays its score)."""
     B, A, C = logits.shape
     out_l = logits.new_full((B, max_det, C), -30.0)
     out_b = boxes.new_zeros((B, max_det, 5))
@@ -146,6 +148,8 @@ def fast_nms(logits, boxes, max_det=1000, conf=0.001, iou=0.7, pre=4000, min_sid
             bn = b.clone()
             bn[:, 2:4] = bn[:, 2:4].clamp(min=min_side)
         keep = nms_keep_near(bn, lab, iou)               # near same-class pairs only (F97), same result
+        if out_logits is not None:
+            s = out_logits[i].sigmoid().flatten()[idx]
         s, lab, b = s[keep][:max_det], lab[keep][:max_det], b[keep][:max_det]
         n = len(s)
         out_l[i, torch.arange(n, device=s.device), lab] = torch.logit(s.clamp(1e-6, 1 - 1e-6))

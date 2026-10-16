@@ -66,7 +66,8 @@ MODELS = {**{f"openobb1{s}": ("v1", s) for s in SIZES},
           **{f"openobb20{s}": ("v20", s) for s in SIZES},
           **{f"openobb21{s}": ("v21", s) for s in SIZES},
           **{f"openobb22{s}": ("v22", s) for s in SIZES},
-          **{f"openobb23{s}": ("v23", s) for s in SIZES}}    # v21 + rotational boundary snapping + peak filter (docs/OPENOBB23.md)    # v21 + YOLO26-grade box geometry head (docs/OPENOBB22.md)    # v20 + angle in the double-angle space (docs/OPENOBB21.md)    # v19 + edge refiner on the trunk's stride-4 map (docs/OPENOBB20.md)    # v18 + contention-aware class groups (docs/OPENOBB19.md)    # v17 with an own fast neck distilled from a trained encoder (docs/OPENOBB18.md)
+          **{f"openobb23{s}": ("v23", s) for s in SIZES},
+          **{f"openobb24{s}": ("v24", s) for s in SIZES}}   # v23 + learnt localisation quality in NMS (docs/OPENOBB24.md)    # v21 + rotational boundary snapping + peak filter (docs/OPENOBB23.md)    # v21 + YOLO26-grade box geometry head (docs/OPENOBB22.md)    # v20 + angle in the double-angle space (docs/OPENOBB21.md)    # v19 + edge refiner on the trunk's stride-4 map (docs/OPENOBB20.md)    # v18 + contention-aware class groups (docs/OPENOBB19.md)    # v17 with an own fast neck distilled from a trained encoder (docs/OPENOBB18.md)
 
 # Best architecture recipe measured on FloorPlanCAD / DOTA (research/LEDGER.md, c6): selective large-kernel
 # adapters (LSK), repeat-factor sampling, one-to-many query group, adaptive query denoising, square-aware angle loss,
@@ -131,6 +132,7 @@ RECIPE18 = dict(RECIPE12)                        # OpenOBB18: v17 + own neck dis
 RECIPE19 = dict(RECIPE18, groups="auto")         # OpenOBB19: v18 + one box per contention-aware class group
 RECIPE20 = dict(RECIPE19)                        # OpenOBB20: v19 + edge refiner reading the trunk's stride-4 map
 RECIPE23 = dict(RECIPE20)                        # OpenOBB23: v21 + rotational snapping + local-peak filter
+RECIPE24 = dict(RECIPE20)                        # OpenOBB24: v23 + learnt localisation quality (quality-guided NMS)
 RECIPE22 = dict(RECIPE20)                        # OpenOBB22: v21 + bounded angle from 45 deg + direct boxes
 RECIPE21 = dict(RECIPE20)                        # OpenOBB21: v20 + double-angle residual angle head
 SIZE_DEFAULTS15 = {s: dict(d, gb=round(d["gb"] * 0.5, 2)) for s, d in SIZE_DEFAULTS3.items()}
@@ -145,7 +147,7 @@ RECIPE9 = {"rfs": 0.1, "channels_last": True, "clip": 10.0, "num_top": 1000, "re
 # architecture flags a fine-tune inherits from its source checkpoint (weights only load into the same shape)
 ARCH_KEYS = ("unlock_all", "arch", "size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_queries", "denoising",
              "no_rotate_sampling", "context", "backbone", "dense_v3", "primary", "geo_cls", "relate", "rel_k",
-             "v6_off", "v7_off", "v8_off", "v9_off", "v10_off", "box", "v14_off", "ref_k", "neck", "groups")
+             "v6_off", "v7_off", "v8_off", "v9_off", "v10_off", "box", "v14_off", "ref_k", "neck", "groups", "v24_off")
 PRETRAIN_KEYS = ("pretrain", "pretrain_epochs", "pretrain_det_epochs", "pretrain_dir", "pretrain_teacher")
 MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / per epoch on small datasets
 ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every", "lrf": "min_lr_ratio",
@@ -531,7 +533,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         raise SystemExit(f"model must be one of {', '.join(MODELS)} or an existing OpenOBB .pt checkpoint, "
                          f"got '{model}'")
     arch = inherited.get("arch", "v1")
-    v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23")
+    v2, dense_arch = arch == "v2", arch in ("v2", "v3", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23", "v24")
     src_img = extra.pop("img", None)                 # a checkpoint's own input size (already the full size for v13)
     core_size = imgsz is not None or src_img is None
     imgsz = int(imgsz or src_img or 1024)
@@ -561,7 +563,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
           "v5": SIZE_DEFAULTS5, "v6": SIZE_DEFAULTS6, "v7": SIZE_DEFAULTS3,
           "v8": SIZE_DEFAULTS3, "v9": SIZE_DEFAULTS9, "v10": SIZE_DEFAULTS3, "v11": SIZE_DEFAULTS3, "v12": SIZE_DEFAULTS3, "v13": SIZE_DEFAULTS13,
           "v14": SIZE_DEFAULTS3, "v15": SIZE_DEFAULTS15, "v16": SIZE_DEFAULTS15,
-          "v17": SIZE_DEFAULTS3, "v18": SIZE_DEFAULTS3, "v19": SIZE_DEFAULTS3, "v20": SIZE_DEFAULTS3, "v21": SIZE_DEFAULTS3, "v22": SIZE_DEFAULTS3, "v23": SIZE_DEFAULTS3}.get(arch, SIZE_DEFAULTS)[size]
+          "v17": SIZE_DEFAULTS3, "v18": SIZE_DEFAULTS3, "v19": SIZE_DEFAULTS3, "v20": SIZE_DEFAULTS3, "v21": SIZE_DEFAULTS3, "v22": SIZE_DEFAULTS3, "v23": SIZE_DEFAULTS3, "v24": SIZE_DEFAULTS3}.get(arch, SIZE_DEFAULTS)[size]
     if str(optimizer).lower() not in ("auto", "adamw"):
         raise SystemExit("optimizer must be 'auto' or 'AdamW'")   # lr0 given -> used; otherwise the measured LR
     prepared = prepare_data(data, imgsz, gap, val_frac, scale, cache_dir, workers, seed, fit=fit)
@@ -617,7 +619,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         opts.update({"v2": RECIPE2, "v3": RECIPE3, "v4": RECIPE4, "v5": RECIPE5, "v6": RECIPE6, "v7": RECIPE7,
                      "v8": RECIPE8, "v9": RECIPE9, "v10": RECIPE10, "v11": RECIPE11, "v12": RECIPE12, "v13": RECIPE13,
                      "v14": RECIPE14, "v15": RECIPE15, "v16": RECIPE16,
-                     "v17": RECIPE17, "v18": RECIPE18, "v19": RECIPE19, "v20": RECIPE20, "v21": RECIPE21, "v22": RECIPE22, "v23": RECIPE23}.get(arch, RECIPE))
+                     "v17": RECIPE17, "v18": RECIPE18, "v19": RECIPE19, "v20": RECIPE20, "v21": RECIPE21, "v22": RECIPE22, "v23": RECIPE23, "v24": RECIPE24}.get(arch, RECIPE))
     if arch in ("v4", "v5") and "backbone" not in inherited:
         opts["backbone"] = BACKBONE4[size]
     if aug["mosaic"]:
@@ -629,12 +631,12 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
     if extra.get("v6_off"):                          # OpenOBB6 ablation: v6_off=strip,attn or v6_off=[strip,attn]
         from openobb.models.openobb6 import parse_off
         extra["v6_off"] = ",".join(sorted(parse_off(extra["v6_off"])))
-    for k in ("v7_off", "v8_off", "v9_off", "v10_off", "v14_off"):   # OpenOBB7 / 8 / 9 / 10 / 14 ablation switches
+    for k in ("v7_off", "v8_off", "v9_off", "v10_off", "v14_off", "v24_off"):   # OpenOBB7 / 8 / 9 / 10 / 14 ablation switches
         if extra.get(k):
             v = extra[k]
             extra[k] = ",".join(sorted({s.strip() for s in (v.split(",") if isinstance(v, str) else v) if str(s).strip()}))
     opts.update(extra)
-    if arch in ("v18", "v19", "v20", "v21", "v22", "v23") and not resume:
+    if arch in ("v18", "v19", "v20", "v21", "v22", "v23", "v24") and not resume:
         # OpenOBB18 is meant to start from a trained OpenOBB12 / 17 (trunk + head) and to distil its new neck from that
         # model's encoder; without both, the neck learns from scratch (F70: 0.623 / 0.369 instead of ~v12)
         src = opts.get("weights")
@@ -764,8 +766,36 @@ def calibrate(model, data=None, out=None, imgsz=None, batch=8, workers=8, cache_
         print(f"[calibrate] {(h + ' ') if h else ''}nms {c}: mAP50 {u['mAP50']:.4f}  mAP50-95 {u['mAP50_95']:.4f}  "
               f"fitness {f:.4f}" + ("" if q is None else f"  duplicates {100 * q:.1f}%"), flush=True)
     f, _, h, c = choose_postprocess(tried)            # best fitness; within DUP_TOL, the fewest duplicates
+    q_args = {}
+    if hasattr(net, "q_beta"):                        # OpenOBB24: localisation quality in NMS / score, snapping skip
+        from openobb.predict import apply_quality, quality_options, snap_skip_options
+        apply_head(net, h)
+        apply_nms(net, c)
+
+        def fitness_now():
+            r, _ = eval_dota(net, prepared, dev, None, batch=batch, workers=workers, img_size=imgsz,
+                             num_top=int(targs.get("num_top", 1000)), merge_iou=merge_iou_for(c, fit), ultra=True,
+                             metric="yolo")
+            u = r.get("ultra") or r
+            return 0.1 * u["mAP50"] + 0.9 * u["mAP50_95"]
+
+        best = (f, (0.0, 0.0), ())
+        for qb, qa in quality_options(net)[1:]:
+            apply_quality(net, qb, qa, ())
+            fq = fitness_now()
+            print(f"[calibrate] q^{qb:g} in NMS, score^{1 - qa:g} q^{qa:g}: fitness {fq:.4f}", flush=True)
+            best = max(best, (fq, (qb, qa), ()), key=lambda t: t[0])
+        for sk in snap_skip_options(net)[1:]:
+            apply_quality(net, *best[1], sk)
+            fq = fitness_now()
+            print(f"[calibrate] no snapping for group {','.join(map(str, sk))}: fitness {fq:.4f}", flush=True)
+            if fq > best[0]:
+                best = (fq, best[1], sk)
+        f, (qb, qa), sk = best
+        q_args = dict(q_beta=qb, q_alpha=qa, snap_skip=",".join(map(str, sk)))
+        print(f"[calibrate] -> q^{qb:g} in NMS, score^{1 - qa:g} q^{qa:g}, no snapping for groups [{q_args['snap_skip']}]")
     ck = torch.load(model, map_location="cpu", weights_only=False)
-    ck["args"] = dict(ck.get("args", {}), nms_iou=c, **({"infer_head": h} if h else {}))
+    ck["args"] = dict(ck.get("args", {}), nms_iou=c, **({"infer_head": h} if h else {}), **q_args)
     dst = Path(out or model)
     torch.save(ck, dst.with_suffix(".tmp"))
     os.replace(dst.with_suffix(".tmp"), dst)

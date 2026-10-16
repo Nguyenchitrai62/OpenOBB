@@ -44,7 +44,7 @@ def windows(length, size, gap):
 
 # architecture labels this package can rebuild (args["arch"] written at training; identical in every build of the
 # package whatever its name, so a model trained with one build loads in another of the same or a newer version)
-KNOWN_ARCHS = ("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23")
+KNOWN_ARCHS = ("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23", "v24")
 
 
 def _ver(v):
@@ -112,6 +112,36 @@ def postprocess_options(model):
     if hasattr(model, "final_nms"):
         return [(None, "none"), (None, 0.7), (None, 0.5)]
     return [(None, 0.7), (None, 0.6), (None, 0.5)]
+
+
+def apply_quality(model, beta=None, alpha=None, skip=None):
+    """OpenOBB24: how the learnt localisation quality q is used (calibrated at training, args q_beta / q_alpha /
+    snap_skip): the NMS visits boxes by score x q^beta, the output score is score^(1 - alpha) x q^alpha, the class
+    groups in `skip` keep the refiner's box (no boundary snapping). None leaves the model's current value."""
+    if not hasattr(model, "q_beta"):
+        return model
+    if beta is not None:
+        model.q_beta = float(beta)
+    if alpha is not None:
+        model.q_alpha = float(alpha)
+    if skip is not None:
+        model.snap_skip = tuple(int(g) for g in (str(skip).split(",") if isinstance(skip, str) else skip) if str(g) != "")
+    return model
+
+
+def quality_options(model):
+    """(q_beta, q_alpha) settings the end-of-training calibration tries after the NMS (OpenOBB24); (0, 0) = OpenOBB23."""
+    if getattr(model, "quality", None) is None:
+        return [(0.0, 0.0)]
+    return [(0.0, 0.0), (1.0, 0.0), (2.0, 0.0), (4.0, 0.0), (1.0, 0.5), (2.0, 0.5)]
+
+
+def snap_skip_options(model):
+    """Class groups whose boundary snapping is skipped, tried after the quality settings (OpenOBB24): none, then each
+    single group (F108: the snapping costs junctions 0.015 mAP50-95 and helps the other classes)."""
+    if not hasattr(model, "snap_skip") or getattr(model, "snap", None) is None:
+        return [()]
+    return [()] + [(g,) for g in range(int(getattr(model, "n_groups", 1)))]
 
 
 DUP_EQ = 0.005    # duplicate rates closer than this (0.5 points) are treated as equal (F76: 2.1% vs 2.2%)
@@ -196,6 +226,7 @@ def load_model(ckpt_path, device, queries=None, classes=None):
     m = fast_layout(m, device)
     if a.get("infer_k") and getattr(m, "refiner", None) is not None:   # calibrated at training
         m.refiner.k = int(a["infer_k"])
+    apply_quality(m, a.get("q_beta"), a.get("q_alpha"), a.get("snap_skip"))
     return apply_head(apply_nms(m, a.get("nms_iou")), a.get("infer_head")), names, a
 
 
@@ -228,14 +259,17 @@ def _load_model(ckpt_path, device, queries=None, classes=None):
                       box=a.get("box") or "direct", ref_k=int(a.get("ref_k", 1500)), neck=a.get("neck") or "own")
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval().fuse(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
-    if a.get("arch") in ("v7", "v8", "v10", "v11", "v12", "v13", "v17", "v18", "v19", "v20", "v21", "v22", "v23"):
+    if a.get("arch") in ("v7", "v8", "v10", "v11", "v12", "v13", "v17", "v18", "v19", "v20", "v21", "v22", "v23", "v24"):
         common = dict(num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
                       max_det=max(int(a.get("num_top", 1000)), int(queries or 0)))
-        if a["arch"] in ("v17", "v18", "v19", "v20", "v21", "v22", "v23"):
+        if a["arch"] in ("v17", "v18", "v19", "v20", "v21", "v22", "v23", "v24"):
             from openobb.models.openobb17 import OpenOBB17
             from openobb.models.openobb18 import OpenOBB18, OpenOBB19, OpenOBB20, OpenOBB21, OpenOBB22, OpenOBB23
+            from openobb.models.openobb24 import OpenOBB24
+            if a["arch"] == "v24":
+                common["off24"] = a.get("v24_off") or None
             m = {"v17": OpenOBB17, "v18": OpenOBB18, "v19": OpenOBB19, "v20": OpenOBB20, "v21": OpenOBB21,
-                 "v22": OpenOBB22, "v23": OpenOBB23}[a["arch"]](
+                 "v22": OpenOBB22, "v23": OpenOBB23, "v24": OpenOBB24}[a["arch"]](
                 a.get("size", "x"), off=a.get("v7_off") or None, box=a.get("box") or "dfl",
                 ref_k=int(a.get("ref_k", 1500)), groups=a.get("groups") or None, **common)
         elif a["arch"] in ("v12", "v13"):

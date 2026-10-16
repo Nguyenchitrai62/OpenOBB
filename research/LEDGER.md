@@ -1684,6 +1684,34 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     So với YOLO26x: **+0.055 mAP50, +0.027 mAP50-95**; vẫn thua ở wall (−.025), junction (−.042), wall_300 (−.079) — đúng ba class độ khít
     box của vật mảnh / tí hon; thắng rõ ở class hiếm (slide_door, double_door) và note. Hướng box vật dài cải thiện thêm nhưng còn xa YOLO.
 
+- **F108. Chẩn đoán chỗ còn nhiều không gian nhất trên checkpoint F107 (10-16, CPU, 53 ảnh val) → OpenOBB24 (độ khít học được + NMS theo
+  độ khít).** Log `research/analysis/*_v23f107*.log`; checkpoint `F:\Downloads\openobb23x_new.pt` (= best F107, epoch 27).
+  - **Tìm object đã ngang YOLO:** recall ProbIoU 0.5 theo độ dài (v23 / YOLO26x): tường < 12 px 0.68 / 0.69, 12–24 0.89 / 0.85, wall_300 < 12
+    0.88 / 0.75, junction 0.94 / 0.92 (`miss_by_length.py`). Khoảng hụt nằm ở độ khít: recall ở 0.75 wall 0.50 / 0.56, junction 0.38 / 0.47,
+    wall_300 0.17 / 0.24; AP50-95 chỉ trên detection conf ≥ 0.25: wall .632 / .687, junction .579 / .652, wall_300 .398 / .504.
+  - **Phân rã sai số (trung vị, px ở 1280, v23 / YOLO):** wall đầu 1.41 / 1.30, độ dày 0.70 / 0.54, góc 0.32° / 0.01°; junction đầu 0.79 / 0.63,
+    độ dày 0.92 / 0.71; wall_300 đầu 1.41 / 1.05, độ dày 0.95 / 0.77. Trần một thành phần: đầu +0.119 (wall_300 +0.270, junction +0.124),
+    ngang +0.054, dày +0.037, góc +0.005 (`box_error_oracle.py`, như F64 trên v12: phần thiếu vẫn là hình học box).
+  - **Từng bước (NMS 0.5, `dup_analysis.py DUP_STAGES=head|edge`):** box head 0.517 → tinh chỉnh cạnh 0.527 → bám mép 0.528. Tinh chỉnh sửa
+    đầu tường (1.95 → 1.47 px) nhưng không sửa độ dày / góc; bám mép: junction −0.015 (lệch độ dày +0.14 → −0.50 px), wall_300 −0.004, các
+    class khác +0.003 đến +0.012.
+  - **Điểm số không biết độ khít, và đó là điểm chung với YOLO:** Spearman(điểm, ProbIoU) trên detection đúng: v23 0.33 (wall 0.22,
+    junction 0.19), YOLO 0.37; hệ số chất lượng hoàn hảo (box sai × IoU trung vị): v23 +0.044, YOLO +0.048 (`score_iou_corr.py`).
+    Trong cụm NMS có ứng viên khít hơn: +0.052 nếu giữ đúng nó; bỏ phiếu toạ độ +0.003 (`rank_vote_oracle.py`).
+  - **Hướng bị loại bằng số đo:** (1) độ dày nhãn gần như hằng số trong một bản vẽ (lệch trung vị: junction 0.20 px, wall 0.58, door 0.43) nhưng
+    kéo về đồng thuận của detection chỉ +0.002, trần (trung vị nhãn) +0.016 (`consensus_probe.py`); (2) bề rộng dải màu trên ảnh gốc dự
+    đoán độ dày nhãn kém (tương quan 0.31, dư 1.26 px; nhãn dày 5.6 px, lõi màu 2.9 px) → nhãn là quy ước, đọc pixel mịn hơn không đủ
+    (`band_width_probe.py`, cùng kết luận F64 / F63).
+  - **Tín hiệu có sẵn, chưa dùng (không train):** độ khớp của trường ranh giới với 4 cạnh box cuối, dùng để chọn box giữ lại trong cụm NMS:
+    **+0.015 mAP50-95** (junction +0.019, wall +0.012), mAP50 +0.002; dùng để nhân vào điểm thì hại (−0.005 ở β 2): trường tốt để chọn trong
+    cụm, kém để xếp hạng giữa object. Độ sắc DFL: ±0.003 (`quality_probe.py`).
+  - **OpenOBB24 (0.24.0):** v23 + `LocQuality` (MLP 0.068M dự đoán ProbIoU của box cuối từ lớp ẩn bộ tinh chỉnh, trường ranh giới trên
+    4 cạnh, DFL, độ dịch, hình học; đầu vào detach; học bằng loss fit có sẵn trên ứng viên dày đặc) + NMS theo điểm × q^β (xuất điểm class
+    hoặc trộn α) + bỏ bám mép theo nhóm; β, α, nhóm chọn trên val cuối train ((0, 0, không) = v23). [docs/OPENOBB24.md](../docs/OPENOBB24.md).
+    Kỳ vọng ghi trước (60 ep từ best F107, đối chứng v23 cùng phiên): mAP50-95 ≥ A + 0.010; bác bỏ nếu < A + 0.005 hoặc hiệu chỉnh chọn q^0.
+  - Sửa kèm: `openobb strip` bỏ mất `groups` / `ref_k` / `neck` (checkpoint v19+ đã strip không dựng lại được head nhóm) → thêm vào
+    `DEPLOY_KEYS`.
+
 - **F108. 0.24.0: LR giảm theo cosine là mặc định (`cos_lr=True`), điểm khác YOLO duy nhất của khung training (quyết định của user, 10-16).**
   - Lập luận của user: đầu run cần giữ LR cao để dò được nhiều vùng lõm; nửa sau mới hạ nhanh để đi sâu vào tâm vùng đã chọn. Lịch tuyến tính
     hạ quá đều: đầu run chưa dò hết, cuối run chưa kịp vào tâm thì đã dừng. Áp dụng cho cả fine-tune lẫn train mới.

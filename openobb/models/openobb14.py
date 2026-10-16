@@ -184,8 +184,9 @@ class EdgeRefiner(nn.Module):
         """f4 (B, c4, H/4, W/4), p3 (B, c3, H/8, W/8), candidate boxes b (B, K, 5) px -> refined boxes (B, K, 5)."""
         return self.refine_with_fit(f4, p3, b)[0]
 
-    def refine_with_fit(self, f4, p3, b):
-        """-> (refined boxes (B, K, 5), fit logits (B, K) or None)."""
+    def refine_with_fit(self, f4, p3, b, hidden=False):
+        """-> (refined boxes (B, K, 5), fit logits (B, K) or None), plus the MLP's last hidden layer (B, K, hidden)
+        when `hidden` (OpenOBB24's localisation-quality head reads it)."""
         b = b.detach().float()
         B, K, _ = b.shape
         pts = self.points(b)
@@ -198,7 +199,7 @@ class EdgeRefiner(nn.Module):
             h = layer(h)
         d = self.mlp[-1](h).float()
         fit = None if self.fit is None else self.fit(h).float()[..., 0]
-        return refine_boxes(b, d), fit
+        return (refine_boxes(b, d), fit, h) if hidden else (refine_boxes(b, d), fit)
 
 
 class OpenOBB14(nn.Module):

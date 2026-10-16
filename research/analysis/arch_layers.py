@@ -65,7 +65,10 @@ def build(arch, size):
     from openobb.models.openobb17 import OpenOBB17
     from openobb.models import openobb18 as m18
     cls = {"v17": OpenOBB17, "v18": m18.OpenOBB18, "v19": m18.OpenOBB19, "v20": m18.OpenOBB20, "v21": m18.OpenOBB21,
-           "v22": m18.OpenOBB22, "v23": m18.OpenOBB23}[arch]
+           "v22": m18.OpenOBB22, "v23": m18.OpenOBB23}.get(arch)
+    if arch == "v24":
+        from openobb.models.openobb24 import OpenOBB24
+        cls = OpenOBB24
     groups = None if arch in ("v17", "v18") else GROUPS
     return cls(size, lsk=True, box="direct" if arch == "v22" else "dfl", ref_k=1500, groups=groups, **kw)
 
