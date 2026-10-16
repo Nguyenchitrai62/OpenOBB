@@ -1,6 +1,6 @@
 """OpenOBB24: OpenOBB23 + a learnt LOCALISATION QUALITY of every refined box, used where the box is chosen.
 
-Evidence (docs/OPENOBB24.md, research/LEDGER.md F108, checkpoint of F107, Wall_Color val):
+Evidence (docs/OPENOBB24.md, research/LEDGER.md F109, checkpoint of F107, Wall_Color val):
   * recall at ProbIoU 0.5 is level with YOLO26x at every length; the gap is box tightness on wall / junction / wall_300
     (recall at 0.75: 0.50 / 0.38 / 0.17 vs YOLO 0.56 / 0.47 / 0.24);
   * the one-to-many head leaves several candidates on each object and NMS keeps the one with the best CLASS score; in
@@ -8,7 +8,7 @@ Evidence (docs/OPENOBB24.md, research/LEDGER.md F108, checkpoint of F107, Wall_C
     localisation factor on the score adds +0.044 for this model and +0.048 for YOLO26x (score_iou_corr.py): the class
     score barely knows how tight its box is (Spearman 0.19-0.22 on walls / junctions);
   * the score is learnt on the head's box, but the box that is kept is the one after the edge refiner and the boundary
-    snapping (+0.011 together, the snapping alone -0.015 on junctions, F108);
+    snapping (+0.011 together, the snapping alone -0.015 on junctions, F109);
   * without any training, letting the boundary field's agreement with the final box's four sides choose the kept box
     of each cluster already gives +0.015 mAP50-95 (junction +0.019, wall +0.012), mAP50 unchanged (quality_probe.py).
 

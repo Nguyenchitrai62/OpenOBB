@@ -1,6 +1,6 @@
 # OpenOBB24: v23 + độ khít học được của box đã tinh chỉnh, dùng để chọn box trong NMS
 
-Sổ cái: F107 (mốc v23 0.798 / 0.526), **F108** (chẩn đoán + thiết kế + kỳ vọng ghi trước). Code: `openobb/models/openobb24.py`
+Sổ cái: F107 (mốc v23 0.798 / 0.526), **F109** (chẩn đoán + thiết kế + kỳ vọng ghi trước). Code: `openobb/models/openobb24.py`
 (`LocQuality`, `OpenOBB24`), `openobb/models/openobb3.py` (`fast_nms(out_logits=)`), `openobb/predict.py` (`apply_quality`,
 `quality_options`, `snap_skip_options`). Test: `tests/test_openobb24.py`. Model: `model=openobb24s|m|l|x`.
 
@@ -51,7 +51,7 @@ Sơ đồ và bảng từng lớp: mục 7 (cuối file).
 
 ## 4. Chỉ số kỳ vọng (ghi TRƯỚC khi train)
 
-Hai hạt giống, cùng phiên G4, cùng điểm xuất phát `best.pt` của F107, cùng công thức (khung YOLO 0.24, 60 epoch, batch 16, imgsz 1280,
+Hai hạt giống, cùng phiên G4, cùng điểm xuất phát `best.pt` của F107, cùng công thức (0.25.0: khung YOLO, LR cosine mặc định F108; 60 epoch, batch 16, imgsz 1280,
 `rotate_p=0.5` như các run trước), khác đúng một yếu tố là kiến trúc:
 
 | | A: `openobb23x` (đối chứng) | **B: `openobb24x`** | Bác bỏ nếu |

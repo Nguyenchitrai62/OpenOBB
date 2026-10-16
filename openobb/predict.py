@@ -138,7 +138,7 @@ def quality_options(model):
 
 def snap_skip_options(model):
     """Class groups whose boundary snapping is skipped, tried after the quality settings (OpenOBB24): none, then each
-    single group (F108: the snapping costs junctions 0.015 mAP50-95 and helps the other classes)."""
+    single group (F109: the snapping costs junctions 0.015 mAP50-95 and helps the other classes)."""
     if not hasattr(model, "snap_skip") or getattr(model, "snap", None) is None:
         return [()]
     return [()] + [(g,) for g in range(int(getattr(model, "n_groups", 1)))]

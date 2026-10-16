@@ -1684,7 +1684,26 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     So với YOLO26x: **+0.055 mAP50, +0.027 mAP50-95**; vẫn thua ở wall (−.025), junction (−.042), wall_300 (−.079) — đúng ba class độ khít
     box của vật mảnh / tí hon; thắng rõ ở class hiếm (slide_door, double_door) và note. Hướng box vật dài cải thiện thêm nhưng còn xa YOLO.
 
-- **F108. Chẩn đoán chỗ còn nhiều không gian nhất trên checkpoint F107 (10-16, CPU, 53 ảnh val) → OpenOBB24 (độ khít học được + NMS theo
+- **F108. 0.24.0: LR giảm theo cosine là mặc định (`cos_lr=True`), điểm khác YOLO duy nhất của khung training (quyết định của user, 10-16).**
+  - Lập luận của user: đầu run cần giữ LR cao để dò được nhiều vùng lõm; nửa sau mới hạ nhanh để đi sâu vào tâm vùng đã chọn. Lịch tuyến tính
+    hạ quá đều: đầu run chưa dò hết, cuối run chưa kịp vào tâm thì đã dừng. Áp dụng cho cả fine-tune lẫn train mới.
+  - Hình dạng (lrf 0.01, `lf(epoch)` của YOLO): ở 25% / 50% / 75% / 90% run, cosine 0.855 / 0.505 / 0.155 / 0.034, tuyến tính 0.753 / 0.505 /
+    0.258 / 0.109. Trung bình và điểm cuối bằng nhau; cosine dồn LR lên nửa đầu và để khoảng 20% cuối ở < 10% lr0.
+  - Bằng chứng trước đó: chưa có phép thử tách riêng lịch LR. A (F104, có cosine) và B (F103, tuyến tính) khác nhau 8 yếu tố khung; mAP ngang.
+    Phép thử tách một yếu tố: cùng `weights=` và 0.24.0, A mặc định so với B `cos_lr=False`.
+  - Code: `openobb/cli.py` (`train(cos_lr=True)`), test `tests/test_cli.py`, `docs/FINETUNE.md`, README hai repo. `cos_lr=False` trả về lịch YOLO.
+  - Đánh giá theo đồ thị LR (user chốt: đủ để quyết, không cần chạy A/B), 30 epoch, warmup 3, lrf 0.01:
+    - Diện tích dưới đường bằng nhau (trung bình 0.505 lr0): cosine không thêm bước, chỉ dời LR. Nửa đầu cosine trung bình 0.82 so với 0.75
+      (+9%), nửa sau 0.19 so với 0.26 (−26%).
+    - Đầu run cosine gần phẳng (đạo hàm 0) nên giữ sát đỉnh lâu hơn: đúng ý "dò vùng lõm".
+    - Thời gian ở dưới 10% lr0: cosine khoảng 20% cuối run, tuyến tính khoảng 9%. Pha tinh chỉnh dài gấp đôi: đúng ý "đi vào tâm".
+    - 10 epoch cuối không mosaic: cosine 0.26 → 0.01, tuyến tính 0.34 → 0.01; pha ảnh thật nằm trọn trong vùng LR thấp.
+    - Khớp với log cũ (có nhiễu do khác công thức): F107 tuyến tính đạt đỉnh ở ep27 / 30 (còn lên lúc dừng); F104 cosine đỉnh ep20 rồi đi ngang.
+    - Rủi ro nhỏ: fine-tune từ checkpoint đã hội tụ nhận LR cao hơn tối đa khoảng 0.1 lr0 ở đầu run, warmup 3 epoch vẫn giữ nguyên.
+  - Kết luận: hợp lý, giữ cosine mặc định. Mức lợi kỳ vọng nhỏ (trong khoảng nhiễu val 53 ảnh); không lập cặp A/B riêng. Nếu một run sau thấy
+    đường val tụt ở nửa đầu khi fine-tune, thử `cos_lr=False`.
+
+- **F109. Chẩn đoán chỗ còn nhiều không gian nhất trên checkpoint F107 (10-16, CPU, 53 ảnh val) → OpenOBB24 (độ khít học được + NMS theo
   độ khít).** Log `research/analysis/*_v23f107*.log`; checkpoint `F:\Downloads\openobb23x_new.pt` (= best F107, epoch 27).
   - **Tìm object đã ngang YOLO:** recall ProbIoU 0.5 theo độ dài (v23 / YOLO26x): tường < 12 px 0.68 / 0.69, 12–24 0.89 / 0.85, wall_300 < 12
     0.88 / 0.75, junction 0.94 / 0.92 (`miss_by_length.py`). Khoảng hụt nằm ở độ khít: recall ở 0.75 wall 0.50 / 0.56, junction 0.38 / 0.47,
@@ -1705,31 +1724,12 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - **Tín hiệu có sẵn, chưa dùng (không train):** độ khớp của trường ranh giới với 4 cạnh box cuối, dùng để chọn box giữ lại trong cụm NMS:
     **+0.015 mAP50-95** (junction +0.019, wall +0.012), mAP50 +0.002; dùng để nhân vào điểm thì hại (−0.005 ở β 2): trường tốt để chọn trong
     cụm, kém để xếp hạng giữa object. Độ sắc DFL: ±0.003 (`quality_probe.py`).
-  - **OpenOBB24 (0.24.0):** v23 + `LocQuality` (MLP 0.068M dự đoán ProbIoU của box cuối từ lớp ẩn bộ tinh chỉnh, trường ranh giới trên
+  - **OpenOBB24 (0.25.0):** v23 + `LocQuality` (MLP 0.068M dự đoán ProbIoU của box cuối từ lớp ẩn bộ tinh chỉnh, trường ranh giới trên
     4 cạnh, DFL, độ dịch, hình học; đầu vào detach; học bằng loss fit có sẵn trên ứng viên dày đặc) + NMS theo điểm × q^β (xuất điểm class
     hoặc trộn α) + bỏ bám mép theo nhóm; β, α, nhóm chọn trên val cuối train ((0, 0, không) = v23). [docs/OPENOBB24.md](../docs/OPENOBB24.md).
-    Kỳ vọng ghi trước (60 ep từ best F107, đối chứng v23 cùng phiên): mAP50-95 ≥ A + 0.010; bác bỏ nếu < A + 0.005 hoặc hiệu chỉnh chọn q^0.
+    Kỳ vọng ghi trước (0.25.0, LR cosine mặc định F108; 60 ep từ best F107, đối chứng v23 cùng phiên): mAP50-95 ≥ A + 0.010; bác bỏ nếu < A + 0.005 hoặc hiệu chỉnh chọn q^0.
   - Sửa kèm: `openobb strip` bỏ mất `groups` / `ref_k` / `neck` (checkpoint v19+ đã strip không dựng lại được head nhóm) → thêm vào
     `DEPLOY_KEYS`.
-
-- **F108. 0.24.0: LR giảm theo cosine là mặc định (`cos_lr=True`), điểm khác YOLO duy nhất của khung training (quyết định của user, 10-16).**
-  - Lập luận của user: đầu run cần giữ LR cao để dò được nhiều vùng lõm; nửa sau mới hạ nhanh để đi sâu vào tâm vùng đã chọn. Lịch tuyến tính
-    hạ quá đều: đầu run chưa dò hết, cuối run chưa kịp vào tâm thì đã dừng. Áp dụng cho cả fine-tune lẫn train mới.
-  - Hình dạng (lrf 0.01, `lf(epoch)` của YOLO): ở 25% / 50% / 75% / 90% run, cosine 0.855 / 0.505 / 0.155 / 0.034, tuyến tính 0.753 / 0.505 /
-    0.258 / 0.109. Trung bình và điểm cuối bằng nhau; cosine dồn LR lên nửa đầu và để khoảng 20% cuối ở < 10% lr0.
-  - Bằng chứng trước đó: chưa có phép thử tách riêng lịch LR. A (F104, có cosine) và B (F103, tuyến tính) khác nhau 8 yếu tố khung; mAP ngang.
-    Phép thử tách một yếu tố: cùng `weights=` và 0.24.0, A mặc định so với B `cos_lr=False`.
-  - Code: `openobb/cli.py` (`train(cos_lr=True)`), test `tests/test_cli.py`, `docs/FINETUNE.md`, README hai repo. `cos_lr=False` trả về lịch YOLO.
-  - Đánh giá theo đồ thị LR (user chốt: đủ để quyết, không cần chạy A/B), 30 epoch, warmup 3, lrf 0.01:
-    - Diện tích dưới đường bằng nhau (trung bình 0.505 lr0): cosine không thêm bước, chỉ dời LR. Nửa đầu cosine trung bình 0.82 so với 0.75
-      (+9%), nửa sau 0.19 so với 0.26 (−26%).
-    - Đầu run cosine gần phẳng (đạo hàm 0) nên giữ sát đỉnh lâu hơn: đúng ý "dò vùng lõm".
-    - Thời gian ở dưới 10% lr0: cosine khoảng 20% cuối run, tuyến tính khoảng 9%. Pha tinh chỉnh dài gấp đôi: đúng ý "đi vào tâm".
-    - 10 epoch cuối không mosaic: cosine 0.26 → 0.01, tuyến tính 0.34 → 0.01; pha ảnh thật nằm trọn trong vùng LR thấp.
-    - Khớp với log cũ (có nhiễu do khác công thức): F107 tuyến tính đạt đỉnh ở ep27 / 30 (còn lên lúc dừng); F104 cosine đỉnh ep20 rồi đi ngang.
-    - Rủi ro nhỏ: fine-tune từ checkpoint đã hội tụ nhận LR cao hơn tối đa khoảng 0.1 lr0 ở đầu run, warmup 3 epoch vẫn giữ nguyên.
-  - Kết luận: hợp lý, giữ cosine mặc định. Mức lợi kỳ vọng nhỏ (trong khoảng nhiễu val 53 ảnh); không lập cặp A/B riêng. Nếu một run sau thấy
-    đường val tụt ở nửa đầu khi fine-tune, thử `cos_lr=False`.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
