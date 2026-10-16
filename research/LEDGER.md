@@ -1619,6 +1619,14 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Đọc: không vượt trần mAP (0.800 / 0.512); chênh với điểm xuất phát C (+0.003 / +0.002) nằm trong nhiễu ±0.024. Run B sạch (`trainer=yolo`
     một mình, từ best v23 gốc) mới trả lời được câu hỏi khung training.
 
+- **F102. Lặp lại F101 (log user 10-16, định chạy B nhưng xuất phát từ best của run C nên `unlock_all` tự kế thừa): đo độ dao động giữa hai run
+  giống hệt.**
+  - Cùng điểm xuất phát, cùng thiết lập với F101. Kết quả cuối (o2m 0.5): **0.780 / 0.498** (F101: 0.774 / 0.496), trùng 1.6% (1.9%).
+  - Hướng box: vật dài lệch > 1° **4.9% / 4.9%**; box dài lệch trục **5.7% / 7.0%**; góc lệch > 1° trên mọi box **17.3% / 12.3%**.
+  - Đọc: mAP lặp lại trong khoảng ±0.006 / ±0.002; cải thiện hướng box của vật dài so với v23 (10.3%) là thật. Chỉ số "góc > 1° mọi box"
+    dao động ±5 điểm giữa hai run giống hệt → không dùng để kết luận. Bài học: checkpoint đã mở khoá truyền `unlock_all` cho fine-tune sau;
+    run B sạch phải xuất phát từ best v23 gốc.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
