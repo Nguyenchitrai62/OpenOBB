@@ -1692,6 +1692,16 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Bằng chứng trước đó: chưa có phép thử tách riêng lịch LR. A (F104, có cosine) và B (F103, tuyến tính) khác nhau 8 yếu tố khung; mAP ngang.
     Phép thử tách một yếu tố: cùng `weights=` và 0.24.0, A mặc định so với B `cos_lr=False`.
   - Code: `openobb/cli.py` (`train(cos_lr=True)`), test `tests/test_cli.py`, `docs/FINETUNE.md`, README hai repo. `cos_lr=False` trả về lịch YOLO.
+  - Đánh giá theo đồ thị LR (user chốt: đủ để quyết, không cần chạy A/B), 30 epoch, warmup 3, lrf 0.01:
+    - Diện tích dưới đường bằng nhau (trung bình 0.505 lr0): cosine không thêm bước, chỉ dời LR. Nửa đầu cosine trung bình 0.82 so với 0.75
+      (+9%), nửa sau 0.19 so với 0.26 (−26%).
+    - Đầu run cosine gần phẳng (đạo hàm 0) nên giữ sát đỉnh lâu hơn: đúng ý "dò vùng lõm".
+    - Thời gian ở dưới 10% lr0: cosine khoảng 20% cuối run, tuyến tính khoảng 9%. Pha tinh chỉnh dài gấp đôi: đúng ý "đi vào tâm".
+    - 10 epoch cuối không mosaic: cosine 0.26 → 0.01, tuyến tính 0.34 → 0.01; pha ảnh thật nằm trọn trong vùng LR thấp.
+    - Khớp với log cũ (có nhiễu do khác công thức): F107 tuyến tính đạt đỉnh ở ep27 / 30 (còn lên lúc dừng); F104 cosine đỉnh ep20 rồi đi ngang.
+    - Rủi ro nhỏ: fine-tune từ checkpoint đã hội tụ nhận LR cao hơn tối đa khoảng 0.1 lr0 ở đầu run, warmup 3 epoch vẫn giữ nguyên.
+  - Kết luận: hợp lý, giữ cosine mặc định. Mức lợi kỳ vọng nhỏ (trong khoảng nhiễu val 53 ảnh); không lập cặp A/B riêng. Nếu một run sau thấy
+    đường val tụt ở nửa đầu khi fine-tune, thử `cos_lr=False`.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
