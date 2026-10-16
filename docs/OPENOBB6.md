@@ -21,18 +21,8 @@ Wall_Color chỉ là một bài test.
 
 ## 2. Kiến trúc chi tiết (cỡ x, ảnh 1280)
 
-```
-ảnh ─ Stem (3×3 s2 → [3×3 s2 ‖ max-pool] → 1×1)                          stride 4, 144 kênh
-   ─ S4  CSP(2 unit, k=7)                                                  stride 4
-   ─ Down(max-pool ‖ dw 3×3 s2) ─ S8  CSP(6 unit, k=11)                    stride 8, 288 kênh
-   ─ Down ─ S16 CSP(6 unit, k=11) ─ AxisContext                            stride 16, 576 kênh
-   ─ Down ─ S32 CSP(2 unit, k=9) ─ AxisContext ─ GlobalAttention           stride 32, 768 kênh
-Neck: S32 → (lên) + S16 → N4;  N4 → (lên) + S8 + SpaceToDepth(S4) → N3 (P3)
-      N3 → Down + N4 → P4;  P4 → Down + S32 → P5
-Head mỗi tầng P3 / P4 / P5: hộp (3×3, 3×3, 1×1 → góc, lệch ngang, 2 DFL đầu mút, DFL độ dày)
-                            class (3×3, StripMix k=11, 3×3, 1×1)
-Gán nhãn TAL xoay (min_side = 8, kiểu STAL), NMS ProbIoU; suy luận gộp BN vào conv (fuse)
-```
+Sơ đồ khối và bảng từng lớp: mục 7 (phụ lục, cuối file).
+
 
 | Phần | Làm gì | Nguyên lý / bằng chứng | Ý tưởng từ đâu | Code | Tham số (x) | GFLOPs (x, 1280) |
 |---|---|---|---|---|---|---|
@@ -116,3 +106,111 @@ openobb train model=openobb6x weights=<pretrain.pt> data=/content/data.yaml epoc
   - so OpenOBB6 (pretrain) với OpenOBB6 (không pretrain) trên cùng data;
   - so với OpenOBB3 cùng ngân sách epoch.
 - **Head chiếm 40% FLOPs** (YOLO26 là 20%). Nếu ablation `cls_ctx` cho thấy đơn vị ngữ cảnh không giúp, có thể giảm head để nhanh hơn.
+
+## 7. Phụ lục: kiến trúc theo lớp (cỡ x)
+
+Kích thước ghi cho ảnh vào 1 × 3 × 1280 × 1280, Wall_Color (7 class). Ký hiệu: `conv k×k sS a→b` = Conv + BN + SiLU,
+`dw` = depthwise, `/N` = stride N so với ảnh. Toàn bộ tự viết; thân được pretrain bằng chưng cất (mục 4).
+
+### Luồng dữ liệu
+
+Xanh lá: tự viết.
+
+```mermaid
+flowchart TB
+  IMG[/"Ảnh<br/>3 × 1280²"/]
+
+  subgraph BB["Backbone StripMix · 16.7M"]
+    direction TB
+    STEM["stem · /4<br/>144 × 320²"]
+    F4["S4 · CSP 2 × StripMix k7<br/>f4 144 × 320²"]
+    F8["Down + S8 · CSP 6 × k11<br/>f8 288 × 160²"]
+    F16["Down + S16 · CSP 6 × k11<br/>+ ngữ cảnh hàng / cột<br/>f16 576 × 80²"]
+    F32["Down + S32 · CSP 2 × k9<br/>+ ngữ cảnh hàng / cột + attention<br/>f32 768 × 40²"]
+    STEM --> F4 --> F8 --> F16 --> F32
+  end
+
+  subgraph NK["Neck · 10.0M"]
+    direction TB
+    TD4["top-down<br/>576 × 80²"]
+    SPD["space-to-depth<br/>f4 → /8"]
+    P3["top-down<br/>P3 384 × 160²"]
+    P4["bottom-up<br/>P4 576 × 80²"]
+    P5["bottom-up<br/>P5 768 × 40²"]
+    TD4 --> P3 --> P4 --> P5
+    SPD --> P3
+  end
+
+  subgraph HD["Head · 10.6M"]
+    direction TB
+    H3["P3 · 160²"]
+    H4["P4 · 80²"]
+    H5["P5 · 40²"]
+  end
+
+  NMS["NMS ProbIoU<br/>≤ 1000 box"]
+  OUT[/"Box xoay + class + điểm"/]
+
+  IMG --> STEM
+  F32 --> TD4
+  F16 --> TD4
+  F8 --> P3
+  F4 --> SPD
+  P3 --> H3
+  P4 --> H4
+  P5 --> H5
+  H3 & H4 & H5 --> NMS --> OUT
+
+  classDef own fill:#dcfce7,stroke:#16a34a,color:#0f172a
+  classDef io fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  class STEM,F4,F8,F16,F32,TD4,SPD,P3,P4,P5,H3,H4,H5,NMS own
+  class IMG,OUT io
+```
+
+### Backbone (tự viết), 16.71M
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| stem | conv 3×3 s2 3→72; [conv 3×3 s2 72→144 ∥ max-pool 2]; nối 216 → conv 1×1 → 144 | 144 × 320² (/4) | 0.13M |
+| S4 | CSPStage(144, n = 2, k = 7) | **f4** 144 × 320² | 0.11M |
+| d8 + S8 | Down 144→288; CSPStage(288, n = 6, k = 11) | **f8** 288 × 160² (/8) | 1.03M |
+| d16 + S16 | Down 288→576; CSPStage(576, n = 6, k = 11); AxisContext | **f16** 576 × 80² (/16) | 5.06M |
+| d32 + S32 | Down 576→768; CSPStage(768, n = 2, k = 9); AxisContext | 768 × 40² (/32) | 5.65M |
+| attn | 1 lớp transformer trên 1600 token: vị trí dw 3×3; LayerNorm → attention 8 đầu; LayerNorm → FFN 768→1536→768 (GELU); hai nhánh dư nhân cổng khởi tạo 0 | **f32** 768 × 40² | 4.74M |
+
+- **StripMix(c, k):** x + MLP(dw 3×3(x) + BN(dw k×1(dw 1×k(x)))); MLP = conv 1×1 c→2c → conv 1×1 2c→c (BN cuối khởi tạo 0).
+- **CSPStage(c, n, k):** conv 1×1 → tách hai nửa; nửa sau qua n StripMix nối tiếp; nối 2 nửa + n đầu ra → conv 1×1.
+- **Down(a→b):** [max-pool 2 ∥ dw 3×3 s2] nối 2a → conv 1×1 → b (nhánh max-pool giữ nét mảnh).
+- **AxisContext(c):** x + conv 1×1 (khởi tạo 0) của SiLU(1×1(trung bình theo hàng) + 1×1(trung bình theo cột)).
+
+### Neck (tự viết), 10.03M
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| lat5 | conv 1×1 f32 768→576 | 576 × 40² | 0.44M |
+| td4 | nối [f16, upsample lat5] 1152 → CSPStage(n = 2, k = 11) → n4 | 576 × 80² | 2.02M |
+| lat4 | conv 1×1 576→384 | 384 × 80² | 0.22M |
+| spd | f4 space-to-depth (144 × 320² → 576 × 160²) → conv 1×1 → 192 | 192 × 160² | 0.11M |
+| td3 | nối [f8, upsample lat4, spd] 864 → CSPStage(n = 2, k = 11) | **P3** 384 × 160² | 0.94M |
+| dn3 + bu4 | Down 384→384; nối n4 → CSPStage(n = 2, k = 11) | **P4** 576 × 80² | 2.21M |
+| dn4 + bu5 | Down 576→576; nối f32 → CSPStage(n = 2, k = 9) | **P5** 768 × 40² | 4.09M |
+
+### Head (tự viết), 10.62M
+
+| Nhánh | Lớp (một tầng, c = 384 / 576 / 768) | Ra mỗi điểm | Tham số (3 tầng) |
+|---|---|---|---|
+| class | conv 3×3 c→256 → StripMix(256, k = 11) → conv 3×3 256→256 → 1×1 →7 (khởi tạo 0, bias tiên nghiệm 0.01) | 7 logit | 6.58M |
+| box | conv 3×3 c→192 → conv 3×3 192→192 → 1×1 →98 (khởi tạo 0) | 98 kênh (bố cục v3) | 4.04M |
+
+98 kênh box: góc θ, lệch ngang tâm, 32 bin khoảng cách tới mỗi đầu dọc trục (bin = 1 stride), 32 bin độ dày (bin = 1/2 stride).
+
+### Tổng hợp
+
+| Phần | Tham số | Tỉ lệ | Nguồn |
+|---|---|---|---|
+| Backbone | 16.71M | 44.7% | tự viết |
+| Neck | 10.03M | 26.9% | tự viết |
+| Head | 10.62M | 28.4% | tự viết |
+| **Tổng** | **37.36M** | | 100% tự viết |
+
+Suy luận: BN gộp vào conv (`fuse()`); 33 600 điểm → Fast-NMS ProbIoU theo class → tối đa 1000 box.

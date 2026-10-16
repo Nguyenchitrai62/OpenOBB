@@ -40,6 +40,8 @@ OpenOBB11 giữ **lõi pretrained và head dense của OpenOBB8**. Thay đổi n
 
 ## 2. Lập luận
 
+Sơ đồ khối và bảng từng lớp: mục 6 (phụ lục, cuối file).
+
 | Mảnh | Bài học / số đo | Cơ chế | Kỳ vọng | Điều sẽ chứng minh sai |
 |---|---|---|---|---|
 | **Tầng quan hệ train một-một** (mới) | Mục 1: bản sao được dạy là dương; IoU không phân biệt được bản sao với vật mảnh | Mỗi ảnh: ghép Hungarian giữa ứng viên đã tinh chỉnh và object, chi phí −(p^α · ProbIoU^β) (α = 1, β = 6 như bộ gán nhãn dense). Một ứng viên mỗi object là dương, còn lại là âm (đích 0). Tầng quan hệ thấy cả cụm bản sao, nên học được cái nào giữ. Ý tưởng: Relation Networks (Hu 2018, module quan hệ thay NMS); DETR / YOLOv10 / YOLO26 (gán một-một để bỏ NMS) | Box trùng gần 0 mà không cần NMS; chọn box khít nhất (β = 6) nên mAP50-95 của vật dài tăng | Box trùng (conf 0.25) không xuống dưới 5% số detection |
@@ -127,3 +129,172 @@ openobb train model=openobb11x data=/content/data.yaml imgsz=1280 epochs=100
 | Thiết kế mới | Bộ giải mã tập một-một trên đề xuất dense, đọc ứng viên trong khung xoay và so theo hình học tương đối, cho OBB vật mảnh | loss + suy luận |
 
 Tham số và FLOPs bằng v8-x (66.58M; khoảng 969 GFLOPs ở 1280), ít hơn v10 (không có slot).
+
+## 6. Phụ lục: kiến trúc theo lớp (cỡ x)
+
+Kích thước ghi cho ảnh vào 1 × 3 × 1280 × 1280, Wall_Color (7 class). Ký hiệu: `conv k×k sS a→b` = Conv + BN + kích hoạt,
+`dw` = depthwise, `/N` = stride N so với ảnh.
+
+### Luồng dữ liệu
+
+Xanh dương: mượn (pretrained, Apache-2.0). Xanh lá: tự viết. Cam: khác v8. Lớp và tham số giống hệt v8; khác ở chỗ tầng quan hệ được train một-một (ghép Hungarian, bản sao là mẫu âm) và đầu ra của nó là kết quả cuối, không NMS. Mỗi stage của thân đi qua bộ chặn độ lớn (guard, không tham số).
+
+```mermaid
+flowchart TB
+  IMG[/"Ảnh<br/>3 × 1280²"/]
+
+  subgraph BB["Thân HGNetv2-x · 33.2M"]
+    direction TB
+    STEM["stem<br/>64 × 320²"]
+    S1["stage1 · /4<br/>f4 128 × 320²"]
+    S2["stage2 · /8<br/>c3 512 × 160²"]
+    S3["stage3 · /16<br/>c4 1024 × 80²"]
+    S4["stage4 · /32<br/>c5 2048 × 40²"]
+    STEM --> S1 --> S2 --> S3 --> S4
+  end
+
+  SPD["space-to-depth f4<br/>+ vào c3 · 0.26M"]
+
+  subgraph LK["LSK chặn tanh · 8.5M"]
+    direction TB
+    L3["LSK c3"]
+    L4["LSK c4"]
+    L5["LSK c5"]
+  end
+
+  subgraph EN["Encoder lai D-FINE · 20.7M · 384 kênh"]
+    direction TB
+    AIFI["AIFI /32<br/>1600 token"]
+    FPN4["FPN<br/>80²"]
+    P3["FPN<br/>P3 160²"]
+    P4["PAN<br/>P4 80²"]
+    P5["PAN<br/>P5 40²"]
+    AIFI --> FPN4 --> P3 --> P4 --> P5
+  end
+
+  IMG --> STEM
+  S1 --> SPD
+  S2 --> SPD
+  SPD --> L3
+  S3 --> L4
+  S4 --> L5
+  L5 --> AIFI
+  L4 --> FPN4
+  L3 --> P3
+
+  subgraph HD["Head oriented + StripMix · 2.6M"]
+    direction TB
+    H3["P3 · 160²"]
+    H4["P4 · 80²"]
+    H5["P5 · 40²"]
+  end
+
+  subgraph RF["Bộ giải mã tập một-một · 1.2M"]
+    direction TB
+    CAND["600 ứng viên khác nhau"]
+    SAMP["24 mẫu trong box (f4 + P3)<br/>+ 18 mẫu vòng ngữ cảnh (P3 + P4)"]
+    LOC["transformer cục bộ · 2 lớp"]
+    REL["attention giữa ứng viên<br/>+ bias hình học tương đối"]
+    DEL["logit dư + box dư<br/>= đầu ra"]
+    CAND --> SAMP --> LOC --> REL --> DEL
+  end
+
+  NMS["xếp theo điểm<br/>≤ 1000 box · không NMS"]
+  OUT[/"Box xoay + class + điểm"/]
+
+  P3 --> H3
+  P4 --> H4
+  P5 --> H5
+  H3 & H4 & H5 --> CAND
+  S1 -.-> SAMP
+  P3 -.-> SAMP
+  DEL --> NMS --> OUT
+
+  classDef borrowed fill:#dbeafe,stroke:#2563eb,color:#0f172a
+  classDef own fill:#dcfce7,stroke:#16a34a,color:#0f172a
+  classDef newv fill:#ffedd5,stroke:#ea580c,color:#0f172a
+  classDef io fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  class STEM,S1,S2,S3,S4,AIFI,FPN4,P3,P4,P5 borrowed
+  class SPD,L3,L4,L5,H3,H4,H5,CAND,SAMP,LOC own
+  class REL,DEL,NMS newv
+  class IMG,OUT io
+```
+
+### Thân: HGNetv2-x (mượn, Apache-2.0, trọng số D-FINE COCO), 33.23M
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| stem | conv 3×3 s2 3→32; nhánh [conv 2×2 32→16 → conv 2×2 16→32] ∥ max-pool 2; nối 64 → conv 3×3 s2 64→32 → conv 1×1 32→64 | 64 × 320² (/4) | 0.03M |
+| stage1 | 1 khối HG: 6 × conv 3×3 64→64, nối 448 kênh → 1×1 →64 → 1×1 →128 | **f4** 128 × 320² | 0.26M |
+| stage2 | dw 3×3 s2; 2 khối HG: 6 × conv 3×3 128, nối → 1×1 → 512 | **c3** 512 × 160² (/8) | 3.03M |
+| stage3 | dw 3×3 s2; 5 khối HG nhẹ: 6 × (1×1 → dw 5×5) 256, nối → 1×1 512 → 1×1 1024 | **c4** 1024 × 80² (/16) | 11.93M |
+| stage4 | dw 3×3 s2; 2 khối HG nhẹ: 6 × (1×1 → dw 5×5) 512, nối → 1×1 → 2048 | **c5** 2048 × 40² (/32) | 17.99M |
+
+BN của thân bị đóng băng (FrozenBatchNorm), kích hoạt ReLU.
+
+### Chặn độ lớn + chi tiết stride 4 (tự viết), 0.26M
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| guard | sau mỗi stage của thân: x · min(1, 4 / rms(x)) theo từng ảnh (tính fp32); đồng nhất khi rms ≤ 4 | như đầu vào | 0 |
+| spd | f4 space-to-depth (128 × 320² → 512 × 160²) → conv 1×1 512→512 + BN (gamma khởi tạo 0) → **cộng** vào c3 trước LSK | 512 × 160² | 0.26M |
+
+### Adapter LSK (tự viết, ý tưởng LSKNet), 8.54M
+
+Trên c3 / c4 / c5, mỗi tầng một khối (c = 512 / 1024 / 2048 kênh; 0.43M / 1.65M / 6.45M):
+a = dw 5×5(x); b = dw 7×7 giãn 3(a) (trường nhìn khoảng 23 ô); a, b → conv 1×1 về c/2; cổng = conv 7×7 trên [trung bình, max theo kênh]
+của [a, b] → 2 kênh sigmoid; m = conv 1×1 c/2→c (khởi tạo 0) của (a·g₁ + b·g₂); ra **x + x·tanh(m)** (hệ số khuếch đại luôn trong (0, 2)). Khởi tạo = đồng nhất.
+
+### Encoder lai D-FINE (mượn, Apache-2.0, trọng số COCO), 20.70M, 384 kênh
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| input_proj | ba conv 1×1 + BN: c3 512→384, c4 1024→384, c5 2048→384 | | 1.38M |
+| AIFI | 1 lớp transformer trên 1600 token của /32: attention 8 đầu, FFN 384→2048→384 (GELU), vị trí sin-cos 2-D | 384 × 40² | 2.17M |
+| FPN (2 bước) | lateral 1×1 384→384; upsample ×2; nối 768 → RepNCSPELAN4 → 384 | 384 × 80², **P3** 384 × 160² | 8.57M |
+| PAN (2 bước) | SCDown [1×1 384→384 → dw 3×3 s2]; nối 768 → RepNCSPELAN4 → 384 | **P4** 384 × 80², **P5** 384 × 40² | 8.58M |
+
+RepNCSPELAN4(768→384): conv 1×1 768→768, tách 2 nửa 384; nửa sau qua [CSP 384→192 (3 khối RepVGG 3×3 ∥ 1×1) → conv 3×3 192] rồi
+[CSP 192→192 (3 khối) → conv 3×3 192]; nối 384 + 384 + 192 + 192 → conv 1×1 → 384. Kích hoạt SiLU.
+
+### Head oriented có ngữ cảnh (tự viết, của v7), 2.63M
+
+| Nhánh | Lớp (một tầng) | Ra mỗi điểm | Tham số (3 tầng) |
+|---|---|---|---|
+| class | dw 3×3 384 → 1×1 384→192 → StripMix(192, k = 11) → dw 3×3 192 → 1×1 192→192 → 1×1 →7 (bias tiên nghiệm 0.01) | 7 logit | 0.82M |
+| box | conv 3×3 384→128 → conv 3×3 128→128 → 1×1 128→98 (chạy fp32) | 98 kênh | 1.81M |
+
+98 kênh box (một nhóm): góc θ, lệch ngang tâm (× stride), phân phối 32 bin khoảng cách tới đầu sau và 32 bin tới đầu trước dọc trục
+(bin = 1 stride), 32 bin độ dày (bin = 1/2 stride). Mỗi tầng một tháp riêng; điểm lưới = tâm ô.
+
+### Tầng suy luận quan hệ (tự viết), 1.22M
+
+K = 600 ứng viên mỗi ảnh, d = 192.
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| chọn ứng viên | 600 điểm tốt nhất, bỏ trùng (ProbIoU > 0.7) khi chọn; khi train thêm bản rung của box nhãn | 600 box | 0 |
+| mẫu bên trong | lưới 8 dọc × 3 ngang trong khung xoay (hai hàng ngang ngay ngoài hai cạnh dài), đọc song tuyến f4 (128 kênh) và P3 (384) → Linear 128→192 + Linear 384→192 | 600 × 24 × 192 | 0.10M |
+| vòng ngữ cảnh | 18 điểm quanh box, cách khoảng một chiều dài (clamp(L, 32, 192) px), đọc P3 + P4 → hai Linear 384→192 | 600 × 18 × 192 | 0.15M |
+| vị trí + hình học | MLP vị trí mẫu (2→192→192); token hình học MLP (log L, log T, sin / cos 2θ, xác suất nền → 192 → 192) | | 0.08M |
+| transformer cục bộ | 2 lớp, pre-norm, 6 đầu, FFN 192→384→192, trên 43 token mỗi ứng viên → 1 token | 600 × 192 | 0.59M |
+| lớp quan hệ | 1 lớp attention giữa 600 ứng viên + bias hình học tương đối mỗi đầu: MLP (7 số của j trong khung i → 32 → 6), fp32 | 600 × 192 | 0.30M |
+| đầu ra | LayerNorm → Linear 192→7 (logit dư) và 192→5 (dịch hai đầu, log độ dày, lệch ngang, góc ±0.2 rad), khởi tạo 0 | 600 × (7 + 5) | 0.003M |
+
+Khi suy luận, delta logit của mỗi ứng viên được lan sang các điểm trùng nó (ProbIoU > 0.7) trong 4000 điểm tốt nhất, rồi mới NMS.
+
+Ở v11 không có bước lan delta và không có NMS: 600 ứng viên đã tinh chỉnh chính là đầu ra (`final_nms` là ngưỡng ProbIoU tuỳ chọn, mặc định tắt).
+
+### Tổng hợp
+
+| Phần | Tham số | Tỉ lệ | Nguồn |
+|---|---|---|---|
+| Thân HGNetv2-x | 33.23M | 49.9% | mượn (Apache-2.0) |
+| guard + spd | 0.26M | 0.4% | tự viết |
+| LSK | 8.54M | 12.8% | tự viết |
+| Encoder lai | 20.70M | 31.1% | mượn (Apache-2.0) |
+| Head | 2.63M | 4.0% | tự viết |
+| Tầng suy luận quan hệ | 1.22M | 1.8% | tự viết |
+| **Tổng** | **66.58M** | | 19.0% tự viết |
+
+Suy luận: 33 600 điểm → 600 ứng viên khác nhau → bộ giải mã tập → xếp theo điểm, không NMS.

@@ -88,14 +88,8 @@ Trong khi đó mất cân bằng theo object là **54 : 1** (junction 6986, slid
 
 ## 4. Kiến trúc chi tiết (cỡ x, ảnh 1280)
 
-```
-ảnh ─ lõi OpenOBB7 (pretrained COCO, không đổi) ─ f4 + P3 / P4 / P5
-        ─ head dense: tháp class + tháp box của v8 (dùng chung cho mọi slot)
-              ├ slot 0: lớp 1×1 class + lớp 1×1 box của v8
-              └ slot 1, 2: thêm lớp 1×1 class (khởi tạo 0, prior 1e-4) + lớp 1×1 box (chép từ slot 0)
-        ─ đầu ra = S slot nối theo trục anchor (slot 0 P3 P4 P5, slot 1 ..., slot 2 ...)
-        ─ tầng suy luận quan hệ của v8 (K = 600 ứng viên trên toàn bộ S × A anchor) ─ NMS theo class
-```
+Sơ đồ khối và bảng từng lớp: mục 10 (phụ lục, cuối file).
+
 
 | Phần | Làm gì | Ý tưởng từ đâu | Code | Tham số (x) | GFLOPs (x, 1280) |
 |---|---|---|---|---|---|
@@ -194,3 +188,178 @@ Cách đọc kết quả:
 - Slot phụ có thể học trùng object của slot 0. NMS theo class gộp lại, nhưng nếu `Duplicate boxes` tăng thì phải xem lại.
 - Cân bằng class có thể tăng box sai ở class hiếm (precision giảm). Nếu vậy, giảm trần 4 hoặc tắt `balance`.
 - Tầng quan hệ chọn K = 600 ứng viên trên 3 × A anchor. Ảnh rất đông vật có thể cần `rel_k` lớn hơn.
+
+## 10. Phụ lục: kiến trúc theo lớp (cỡ x)
+
+Kích thước ghi cho ảnh vào 1 × 3 × 1280 × 1280, Wall_Color (7 class). Ký hiệu: `conv k×k sS a→b` = Conv + BN + kích hoạt,
+`dw` = depthwise, `/N` = stride N so với ảnh.
+
+### Luồng dữ liệu
+
+Xanh dương: mượn (pretrained, Apache-2.0). Xanh lá: tự viết. Cam: mới ở v10 (3 slot mỗi điểm). Gán nhãn theo tầm với và cân bằng mức object chỉ ở loss, không thêm lớp. Mỗi stage của thân đi qua bộ chặn độ lớn (guard, không tham số).
+
+```mermaid
+flowchart TB
+  IMG[/"Ảnh<br/>3 × 1280²"/]
+
+  subgraph BB["Thân HGNetv2-x · 33.2M"]
+    direction TB
+    STEM["stem<br/>64 × 320²"]
+    S1["stage1 · /4<br/>f4 128 × 320²"]
+    S2["stage2 · /8<br/>c3 512 × 160²"]
+    S3["stage3 · /16<br/>c4 1024 × 80²"]
+    S4["stage4 · /32<br/>c5 2048 × 40²"]
+    STEM --> S1 --> S2 --> S3 --> S4
+  end
+
+  SPD["space-to-depth f4<br/>+ vào c3 · 0.26M"]
+
+  subgraph LK["LSK chặn tanh · 8.5M"]
+    direction TB
+    L3["LSK c3"]
+    L4["LSK c4"]
+    L5["LSK c5"]
+  end
+
+  subgraph EN["Encoder lai D-FINE · 20.7M · 384 kênh"]
+    direction TB
+    AIFI["AIFI /32<br/>1600 token"]
+    FPN4["FPN<br/>80²"]
+    P3["FPN<br/>P3 160²"]
+    P4["PAN<br/>P4 80²"]
+    P5["PAN<br/>P5 40²"]
+    AIFI --> FPN4 --> P3 --> P4 --> P5
+  end
+
+  IMG --> STEM
+  S1 --> SPD
+  S2 --> SPD
+  SPD --> L3
+  S3 --> L4
+  S4 --> L5
+  L5 --> AIFI
+  L4 --> FPN4
+  L3 --> P3
+
+  subgraph HD["Head 3 slot / điểm · 2.7M"]
+    direction TB
+    H3["P3 · 160² × 3 slot"]
+    H4["P4 · 80² × 3 slot"]
+    H5["P5 · 40² × 3 slot"]
+  end
+
+  subgraph RF["Tầng suy luận quan hệ · 1.2M"]
+    direction TB
+    CAND["600 ứng viên khác nhau<br/>trong 100 800 (điểm × slot)"]
+    SAMP["24 mẫu trong box (f4 + P3)<br/>+ 18 mẫu vòng ngữ cảnh (P3 + P4)"]
+    LOC["transformer cục bộ · 2 lớp"]
+    REL["attention giữa ứng viên<br/>+ bias hình học tương đối"]
+    DEL["logit dư + box dư"]
+    CAND --> SAMP --> LOC --> REL --> DEL
+  end
+
+  NMS["lan delta sang điểm trùng<br/>→ NMS ProbIoU"]
+  OUT[/"Box xoay + class + điểm"/]
+
+  P3 --> H3
+  P4 --> H4
+  P5 --> H5
+  H3 & H4 & H5 --> CAND
+  S1 -.-> SAMP
+  P3 -.-> SAMP
+  DEL --> NMS --> OUT
+
+  classDef borrowed fill:#dbeafe,stroke:#2563eb,color:#0f172a
+  classDef own fill:#dcfce7,stroke:#16a34a,color:#0f172a
+  classDef newv fill:#ffedd5,stroke:#ea580c,color:#0f172a
+  classDef io fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  class STEM,S1,S2,S3,S4,AIFI,FPN4,P3,P4,P5 borrowed
+  class SPD,L3,L4,L5,CAND,SAMP,LOC,REL,DEL,NMS own
+  class H3,H4,H5 newv
+  class IMG,OUT io
+```
+
+### Thân: HGNetv2-x (mượn, Apache-2.0, trọng số D-FINE COCO), 33.23M
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| stem | conv 3×3 s2 3→32; nhánh [conv 2×2 32→16 → conv 2×2 16→32] ∥ max-pool 2; nối 64 → conv 3×3 s2 64→32 → conv 1×1 32→64 | 64 × 320² (/4) | 0.03M |
+| stage1 | 1 khối HG: 6 × conv 3×3 64→64, nối 448 kênh → 1×1 →64 → 1×1 →128 | **f4** 128 × 320² | 0.26M |
+| stage2 | dw 3×3 s2; 2 khối HG: 6 × conv 3×3 128, nối → 1×1 → 512 | **c3** 512 × 160² (/8) | 3.03M |
+| stage3 | dw 3×3 s2; 5 khối HG nhẹ: 6 × (1×1 → dw 5×5) 256, nối → 1×1 512 → 1×1 1024 | **c4** 1024 × 80² (/16) | 11.93M |
+| stage4 | dw 3×3 s2; 2 khối HG nhẹ: 6 × (1×1 → dw 5×5) 512, nối → 1×1 → 2048 | **c5** 2048 × 40² (/32) | 17.99M |
+
+BN của thân bị đóng băng (FrozenBatchNorm), kích hoạt ReLU.
+
+### Chặn độ lớn + chi tiết stride 4 (tự viết), 0.26M
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| guard | sau mỗi stage của thân: x · min(1, 4 / rms(x)) theo từng ảnh (tính fp32); đồng nhất khi rms ≤ 4 | như đầu vào | 0 |
+| spd | f4 space-to-depth (128 × 320² → 512 × 160²) → conv 1×1 512→512 + BN (gamma khởi tạo 0) → **cộng** vào c3 trước LSK | 512 × 160² | 0.26M |
+
+### Adapter LSK (tự viết, ý tưởng LSKNet), 8.54M
+
+Trên c3 / c4 / c5, mỗi tầng một khối (c = 512 / 1024 / 2048 kênh; 0.43M / 1.65M / 6.45M):
+a = dw 5×5(x); b = dw 7×7 giãn 3(a) (trường nhìn khoảng 23 ô); a, b → conv 1×1 về c/2; cổng = conv 7×7 trên [trung bình, max theo kênh]
+của [a, b] → 2 kênh sigmoid; m = conv 1×1 c/2→c (khởi tạo 0) của (a·g₁ + b·g₂); ra **x + x·tanh(m)** (hệ số khuếch đại luôn trong (0, 2)). Khởi tạo = đồng nhất.
+
+### Encoder lai D-FINE (mượn, Apache-2.0, trọng số COCO), 20.70M, 384 kênh
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| input_proj | ba conv 1×1 + BN: c3 512→384, c4 1024→384, c5 2048→384 | | 1.38M |
+| AIFI | 1 lớp transformer trên 1600 token của /32: attention 8 đầu, FFN 384→2048→384 (GELU), vị trí sin-cos 2-D | 384 × 40² | 2.17M |
+| FPN (2 bước) | lateral 1×1 384→384; upsample ×2; nối 768 → RepNCSPELAN4 → 384 | 384 × 80², **P3** 384 × 160² | 8.57M |
+| PAN (2 bước) | SCDown [1×1 384→384 → dw 3×3 s2]; nối 768 → RepNCSPELAN4 → 384 | **P4** 384 × 80², **P5** 384 × 40² | 8.58M |
+
+RepNCSPELAN4(768→384): conv 1×1 768→768, tách 2 nửa 384; nửa sau qua [CSP 384→192 (3 khối RepVGG 3×3 ∥ 1×1) → conv 3×3 192] rồi
+[CSP 192→192 (3 khối) → conv 3×3 192]; nối 384 + 384 + 192 + 192 → conv 1×1 → 384. Kích hoạt SiLU.
+
+### Head 3 slot mỗi điểm (tự viết), 2.72M
+
+Head có ngữ cảnh của v7 là slot 0; thêm 2 slot, mỗi slot một lớp 1×1 class (192→7, bias tiên nghiệm 1e-4: tắt cho tới khi học) và một
+lớp 1×1 box (128→98, chép từ slot 0) trên đầu ra cuối của hai tháp. Mỗi điểm lưới đưa ra tối đa 3 box (cho các object chung một ô).
+
+| Nhánh | Lớp (một tầng) | Ra mỗi điểm | Tham số (3 tầng) |
+|---|---|---|---|
+| class | dw 3×3 384 → 1×1 384→192 → StripMix(192, k = 11) → dw 3×3 192 → 1×1 192→192 → 1×1 →7 (bias tiên nghiệm 0.01) | 7 logit | 0.82M |
+| box | conv 3×3 384→128 → conv 3×3 128→128 → 1×1 128→98 (chạy fp32) | 98 kênh | 1.81M |
+
+98 kênh box (một nhóm): góc θ, lệch ngang tâm (× stride), phân phối 32 bin khoảng cách tới đầu sau và 32 bin tới đầu trước dọc trục
+(bin = 1 stride), 32 bin độ dày (bin = 1/2 stride). Mỗi tầng một tháp riêng; điểm lưới = tâm ô.
+
+| Thêm cho slot 1, 2 | Lớp (một tầng) | Tham số (3 tầng) |
+|---|---|---|
+| class | 2 × conv 1×1 192→7 | 0.008M |
+| box | 2 × conv 1×1 128→98 (fp32) | 0.076M |
+
+### Tầng suy luận quan hệ (tự viết), 1.22M
+
+K = 600 ứng viên mỗi ảnh, d = 192.
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| chọn ứng viên | 600 điểm tốt nhất, bỏ trùng (ProbIoU > 0.7) khi chọn; khi train thêm bản rung của box nhãn | 600 box | 0 |
+| mẫu bên trong | lưới 8 dọc × 3 ngang trong khung xoay (hai hàng ngang ngay ngoài hai cạnh dài), đọc song tuyến f4 (128 kênh) và P3 (384) → Linear 128→192 + Linear 384→192 | 600 × 24 × 192 | 0.10M |
+| vòng ngữ cảnh | 18 điểm quanh box, cách khoảng một chiều dài (clamp(L, 32, 192) px), đọc P3 + P4 → hai Linear 384→192 | 600 × 18 × 192 | 0.15M |
+| vị trí + hình học | MLP vị trí mẫu (2→192→192); token hình học MLP (log L, log T, sin / cos 2θ, xác suất nền → 192 → 192) | | 0.08M |
+| transformer cục bộ | 2 lớp, pre-norm, 6 đầu, FFN 192→384→192, trên 43 token mỗi ứng viên → 1 token | 600 × 192 | 0.59M |
+| lớp quan hệ | 1 lớp attention giữa 600 ứng viên + bias hình học tương đối mỗi đầu: MLP (7 số của j trong khung i → 32 → 6), fp32 | 600 × 192 | 0.30M |
+| đầu ra | LayerNorm → Linear 192→7 (logit dư) và 192→5 (dịch hai đầu, log độ dày, lệch ngang, góc ±0.2 rad), khởi tạo 0 | 600 × (7 + 5) | 0.003M |
+
+Khi suy luận, delta logit của mỗi ứng viên được lan sang các điểm trùng nó (ProbIoU > 0.7) trong 4000 điểm tốt nhất, rồi mới NMS.
+
+### Tổng hợp
+
+| Phần | Tham số | Tỉ lệ | Nguồn |
+|---|---|---|---|
+| Thân HGNetv2-x | 33.23M | 49.8% | mượn (Apache-2.0) |
+| guard + spd | 0.26M | 0.4% | tự viết |
+| LSK | 8.54M | 12.8% | tự viết |
+| Encoder lai | 20.70M | 31.0% | mượn (Apache-2.0) |
+| Head 3 slot | 2.72M | 4.1% | tự viết |
+| Tầng suy luận quan hệ | 1.22M | 1.8% | tự viết |
+| **Tổng** | **66.67M** | | 19.1% tự viết |
+
+Suy luận: 33 600 điểm × 3 slot = 100 800 dự đoán → 600 ứng viên được tinh chỉnh → lan delta → Fast-NMS ProbIoU theo class → tối đa 1000 box.

@@ -35,6 +35,8 @@ Mốc: YOLO26x 0.746 / 0.499; v12 0.743 / 0.472 (15.3 ms); v14 0.713 / 0.469 (10
 
 ## 3. Kích thước (bản x, đường suy luận, một head)
 
+Sơ đồ khối và bảng từng lớp: mục 7 (phụ lục, cuối file).
+
 | | Tham số | GFLOPs | Đầu vào |
 |---|---|---|---|
 | v12-x | 68.0M | 682 | 960 × 1280 |
@@ -103,3 +105,105 @@ Tốc độ 14.5 ms / ảnh (batch 8, 2560, trung bình 1906 × 2560).
 Đọc: ở neck tự thiết kế, luồng gốc + P2 **không làm tăng** đúng ba class nó nhắm (wall, junction, wall_300 đứng yên trong ±0.01), còn toàn bộ
 phần mất nằm ở class ngữ nghĩa / hiếm (note −.245, double_door −.071, slide_door −.049), cùng kiểu đã thấy ở v14 (F60) nhưng nặng hơn.
 Lưu ý gây nhiễu: số v14 own là sau một vòng fine-tune thêm 20 epoch, không cùng lịch. Phán quyết cho cơ chế chờ cặp `neck=dfine` ở mục 5.
+
+## 7. Phụ lục: kiến trúc theo lớp (cỡ x)
+
+Ảnh vào **độ phân giải đầy đủ** 1 × 3 × 2560 × 2560 (`imgsz=1280` là cỡ của lõi; v15 tự nhân đôi), lõi v14 chạy trên ảnh thu nửa 1280².
+Wall_Color (7 class). Ký hiệu: `conv k×k sS a→b` = Conv + BN + kích hoạt, `dw` = depthwise. Stride ghi theo điểm ảnh đầu vào.
+
+### Luồng dữ liệu
+
+Xanh dương: mượn (pretrained, Apache-2.0). Xanh lá: tự viết (của v14). Cam: mới ở v15.
+
+```mermaid
+flowchart TB
+  IMG[/"Ảnh đầy đủ<br/>3 × 2560²"/]
+  HALF["thu nửa<br/>3 × 1280²"]
+
+  subgraph HR["Luồng độ phân giải gốc · 0.18M"]
+    direction TB
+    R1["conv s2 3→24 → s2 24→48<br/>+ 2 khối dw dư · /4"]
+    R2["conv s2 48→192<br/>+ 2 khối dw dư<br/>192 × 320² · /8"]
+    R1 --> R2
+  end
+
+  subgraph CORE["Lõi v14 · thân HGNetv2-x + neck RepConv"]
+    direction TB
+    TR["thân · 33.2M"]
+    NK["neck · 11.9M"]
+    P3["P3 384 × 160² · /16"]
+    P4["P4 384 × 80² · /32"]
+    P5["P5 384 × 40² · /64"]
+    TR --> NK --> P3
+    NK --> P4
+    NK --> P5
+  end
+
+  TOP3["to_p3 · conv 3×3 s2 192→512<br/>khởi tạo 0 · 0.89M"]
+  P2["P2 = lat(luồng gốc) + 1×1(P3) nâng ×2<br/>→ RepConv · 192 × 320² · /8"]
+
+  subgraph HD["Head kép"]
+    direction LR
+    HC["P3 / P4 / P5<br/>2 × 8.5M"]
+    HP2["P2<br/>2 × 0.29M"]
+  end
+
+  EDGE["tinh chỉnh cạnh · 0.60M<br/>đọc luồng gốc /8 + P3"]
+  NMS["NMS theo hiệu chỉnh"]
+  OUT[/"Box xoay + class + điểm"/]
+
+  IMG --> HALF --> TR
+  IMG --> R1
+  R2 --> TOP3 --> TR
+  R2 --> P2
+  P3 --> P2
+  P3 & P4 & P5 --> HC
+  P2 --> HP2
+  HC & HP2 --> EDGE --> NMS --> OUT
+  R2 -.-> EDGE
+
+  classDef borrowed fill:#dbeafe,stroke:#2563eb,color:#0f172a
+  classDef own fill:#dcfce7,stroke:#16a34a,color:#0f172a
+  classDef newv fill:#ffedd5,stroke:#ea580c,color:#0f172a
+  classDef io fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  class TR borrowed
+  class NK,P3,P4,P5,HC,NMS own
+  class R1,R2,TOP3,P2,HP2,EDGE,HALF newv
+  class IMG,OUT io
+```
+
+Lõi trên ảnh thu nửa giống hệt v14 (thân HGNetv2-x, guard, Neck14, head kép nặng P3–P5): bảng lớp ở thẻ [OPENOBB14](OPENOBB14.md),
+kích thước ở đó (ảnh 1280) là kích thước của lõi ở đây; stride theo ảnh đầy đủ gấp đôi. to_p3 cộng vào c3 của thân trước neck.
+
+### Phần mới của v15 (tự viết)
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| hires | conv 3×3 s2 3→24 → conv 3×3 s2 24→48 → 2 × DWRes(48) → conv 3×3 s2 48→192 → 2 × DWRes(192) | 192 × 320² (/8) | 0.18M |
+| to_p3 | conv 3×3 s2 192→512 + BN (khởi tạo 0) → cộng vào c3 của thân | 512 × 160² (/16) | 0.89M |
+| p2_lat | conv 1×1 192→192 + BN trên luồng gốc | 192 × 320² | 0.04M |
+| p2_down | conv 1×1 384→192 + BN trên P3, nâng ×2 (nearest), cộng với p2_lat | 192 × 320² | 0.07M |
+| p2_fuse | RepConv 3×3 192 | **P2** 192 × 320² (/8) | 0.37M |
+| p2_head | Head14 trên P2, rộng 80: class Tower 192→80 (RepConv, RepConv giãn 2) → 7; box Tower 192→80 → 5 | 102 400 điểm | 0.29M |
+| p2_head_o2o | như p2_head, trọng số riêng (một-một) | | 0.29M |
+| edge | tinh chỉnh cạnh của v14, nhưng chi tiết đọc từ luồng gốc (192 kênh, /8 theo ảnh đầy đủ = /4 theo lõi) thay cho f4 của thân | 1500 box | 0.60M |
+
+DWRes(c): x + conv 1×1 (BN khởi tạo 0) của dw 3×3(x).
+
+Bộ tinh chỉnh cạnh (EdgeRefiner, 0.60M): với mỗi box ứng viên, lấy mẫu song tuyến 24 điểm trong khung box (6 trên mỗi cạnh dài, 3 trên
+mỗi đầu, 6 trên đường tâm) trên luồng gốc (192 kênh) chiếu 1×1 → 64 kênh, và 6 điểm đường tâm trên P3 chiếu 1×1 384→64; nối với 4 số hình học
+(log dài, log dày, sin / cos 2θ) → MLP 1924→256→256→5 (dịch hai đầu, log độ dày, lệch ngang, góc 0.2·tanh). Lớp cuối khởi tạo 0.
+
+### Tổng hợp
+
+| Phần | Tham số | Tỉ lệ | Nguồn |
+|---|---|---|---|
+| Thân HGNetv2-x | 33.23M | 51.3% | mượn (Apache-2.0) |
+| Neck | 11.91M | 18.4% | tự viết |
+| Head kép P3–P5 | 16.97M | 26.2% | tự viết |
+| Luồng gốc + to_p3 + P2 | 1.55M | 2.4% | tự viết |
+| Head kép P2 | 0.58M | 0.9% | tự viết |
+| Tinh chỉnh cạnh | 0.60M | 0.9% | tự viết |
+| **Tổng** | **64.83M** | | 48.7% tự viết |
+
+Suy luận: 33 600 điểm (P3–P5) + 102 400 điểm (P2) của head đã chọn → top 1500 → tinh chỉnh cạnh → NMS theo hiệu chỉnh → tối đa 1000 box.

@@ -33,17 +33,8 @@ Khác v6 ở ba chỗ quyết định: (1) có pretrain, và pretrain **truyền
 
 ## 2. Thiết kế đề xuất (cỡ x, sẽ chỉnh độ rộng sau khi đo)
 
-```
-ảnh ─ Stem: conv 3×3 s2 → [conv 3×3 s2 ‖ max-pool] → 1×1                      stride 4
-   ─ S4: RepCSP (1 khối)                                                         stride 4
-   ─ Down(conv 3×3 s2 dày ‖ max-pool) ─ S8: RepCSP (4 khối, giãn 1,2,1,3)        stride 8
-   ─ Down ─ S16: RepCSP (4 khối, giãn 1,2,1,3)                                   stride 16
-   ─ Down ─ S32: RepCSP (2 khối) ─ SPPF (max-pool 5/9/13) ─ 1 lớp attention nhỏ  stride 32
-Neck: PAN 2 chiều bằng RepCSP; chi tiết stride 4 vào P3 bằng space-to-depth
-Head: GIỮ NGUYÊN của v8 (head dense theo hướng + ngữ cảnh trong tháp class + tầng suy luận quan hệ)
-RepCSP: chia đôi kênh; nửa kia qua các RepConv (train: 3×3 + 1×1 + đồng nhất, mỗi nhánh có BN;
-        suy luận: gộp thành MỘT conv 3×3); nối các đầu ra trung gian; 1×1
-```
+Sơ đồ khối và bảng từng lớp: mục 10 (phụ lục, cuối file).
+
 
 Pretrain (không cần nhãn), trước khi train detection:
 - **Thầy 1:** lõi D-FINE-X COCO (HGNetv2-B5 + encoder lai, Apache-2.0), chạy ở cùng độ phân giải với học trò. Đầu ra P3 / P4 / P5 của thầy làm đích cho P3 / P4 / P5 của neck học trò.
@@ -143,18 +134,8 @@ Chi phí ước tính dựa trên số đo F39 (17 ảnh/s cho v6-x ở 1280 tr�
 
 Mục 0–8 ở trên là lập luận, giữ nguyên. Mục này ghi những gì đã viết thành code và số đo được (CPU, weights ngẫu nhiên).
 
-```
-ảnh 1280 ─ Stem: conv 3×3 s2 (3→96) → [conv 3×3 s2 (96→192) ‖ max-pool 2] → 1×1 (288→192)          stride 4
-         ─ S4:  RepCSP 192, 1 RepConv                                                                   f4 (c4 = 192)
-         ─ Down [conv 3×3 s2 → 160 ‖ max-pool] → 1×1 → 320 ─ S8:  RepCSP 320, 4 RepConv, giãn 1,2,1,3     stride 8
-         ─ Down → 576 ─ S16: RepCSP 576, 4 RepConv, giãn 1,2,1,3                                        stride 16
-         ─ Down → 576 ─ S32: RepCSP 576, 2 RepConv ─ SPPF ─ 1 lớp attention (8 head)                    stride 32
-Neck: PAN 2 chiều bằng RepCSP (3 RepConv mỗi khối); f4 vào P3 bằng space-to-depth + 1×1; P3 / P4 / P5 đều 384 kênh (hid)
-Head: ContextOrientedHead của v7 + bộ tinh chỉnh quan hệ của v8 (K = 600), dùng nguyên bằng import
-RepConv (train): SiLU(BN(3×3 giãn d) + BN(1×1) + BN(đồng nhất, khi số kênh vào = ra))
-RepConv (suy luận, fuse()): SiLU(một conv 3×3 giãn d có bias). Gộp chính xác: 1×1 và đồng nhất nằm ở ô giữa của kernel 3×3
-RepCSP: 1×1 lên 2h → chia đôi → một nửa qua n RepConv → nối mọi đầu ra trung gian → 1×1
-```
+Sơ đồ khối và bảng từng lớp: mục 10 (phụ lục, cuối file).
+
 
 ### 9.1 Từng phần (cỡ x, ảnh 1280, 7 class)
 
@@ -275,3 +256,132 @@ Cách 2, khi đã có checkpoint của cả hai: chạy `openobb predict` cùng 
   Nhưng nếu forward của v8 cần thuộc tính mới thì v9 cũng phải có thuộc tính đó (test của v9 sẽ báo).
 - Train tốn bộ nhớ hơn suy luận: RepConv có 3 nhánh và 3 BN. Tốc độ train thật chỉ đo được ở T2 (epoch đầu).
 - Bộ đếm FLOPs trên CPU bỏ sót SDPA ở cả v8 lẫn v9 (v9 khoảng 8 G, v8 khoảng 6 G). Tỉ lệ 0.56 gần như không đổi.
+
+## 10. Phụ lục: kiến trúc theo lớp (cỡ x)
+
+Kích thước ghi cho ảnh vào 1 × 3 × 1280 × 1280, Wall_Color (7 class). Ký hiệu: `conv k×k sS a→b` = Conv + BN + SiLU,
+`dw` = depthwise, `/N` = stride N so với ảnh. Lõi (backbone + neck) tự viết, pretrain bằng chưng cất; head và tầng quan hệ lấy của v8.
+
+### Luồng dữ liệu
+
+Xanh lá: tự viết (đã có ở bản trước). Cam: mới ở v9.
+
+```mermaid
+flowchart TB
+  IMG[/"Ảnh<br/>3 × 1280²"/]
+
+  subgraph BB["Backbone RepConv · 16.2M"]
+    direction TB
+    STEM["stem · /4<br/>192 × 320²"]
+    F4["S4 · RepCSP 1<br/>f4 192 × 320²"]
+    F8["Down + S8 · RepCSP 4<br/>giãn 1 / 2 / 1 / 3<br/>f8 320 × 160²"]
+    F16["Down + S16 · RepCSP 4<br/>giãn 1 / 2 / 1 / 3<br/>f16 576 × 80²"]
+    F32["Down + S32 · RepCSP 2<br/>+ SPPF + attention<br/>f32 576 × 40²"]
+    STEM --> F4 --> F8 --> F16 --> F32
+  end
+
+  subgraph NK["Neck RepCSP · 9.4M · 384 kênh"]
+    direction TB
+    TD4["top-down<br/>80²"]
+    SPD["space-to-depth<br/>f4 → /8"]
+    P3["top-down<br/>P3 160²"]
+    P4["bottom-up<br/>P4 80²"]
+    P5["bottom-up<br/>P5 40²"]
+    TD4 --> P3 --> P4 --> P5
+    SPD --> P3
+  end
+
+  subgraph HD["Head oriented + StripMix · 2.6M"]
+    direction TB
+    H3["P3 · 160²"]
+    H4["P4 · 80²"]
+    H5["P5 · 40²"]
+  end
+
+  RF["Tầng suy luận quan hệ · 1.2M<br/>600 ứng viên"]
+  NMS["NMS ProbIoU"]
+  OUT[/"Box xoay + class + điểm"/]
+
+  IMG --> STEM
+  F32 --> TD4
+  F16 --> TD4
+  F8 --> P3
+  F4 --> SPD
+  P3 --> H3
+  P4 --> H4
+  P5 --> H5
+  H3 & H4 & H5 --> RF --> NMS --> OUT
+  F4 -.-> RF
+
+  classDef own fill:#dcfce7,stroke:#16a34a,color:#0f172a
+  classDef newv fill:#ffedd5,stroke:#ea580c,color:#0f172a
+  classDef io fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  class H3,H4,H5,RF,NMS own
+  class STEM,F4,F8,F16,F32,TD4,SPD,P3,P4,P5 newv
+  class IMG,OUT io
+```
+
+### Backbone RepConv (tự viết), 16.23M
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| stem | conv 3×3 s2 3→96; [conv 3×3 s2 96→192 ∥ max-pool 2]; nối 288 → conv 1×1 → 192 | 192 × 320² (/4) | 0.23M |
+| S4 | RepCSP(192, n = 1) | **f4** 192 × 320² | 0.19M |
+| d8 + S8 | Down 192→320; RepCSP(320, n = 4, giãn 1 / 2 / 1 / 3) | **f8** 320 × 160² (/8) | 1.83M |
+| d16 + S16 | Down 320→576; RepCSP(576, n = 4, giãn 1 / 2 / 1 / 3) | **f16** 576 × 80² (/16) | 5.84M |
+| d32 + S32 | Down 576→576; RepCSP(576, n = 2) | 576 × 40² (/32) | 4.65M |
+| SPPF | conv 1×1 576→288; ba max-pool 5×5 nối tiếp; nối 1152 → conv 1×1 → 576 | 576 × 40² | 0.83M |
+| attn | 1 lớp transformer trên 1600 token: vị trí dw 3×3; attention 8 đầu; FFN 576→1152→576 (GELU); cổng dư khởi tạo 0 | **f32** 576 × 40² | 2.67M |
+
+- **RepConv(c, d):** SiLU(BN(conv 3×3 giãn d) + BN(conv 1×1) + BN(x)); khi suy luận gộp đúng thành một conv 3×3.
+- **RepCSP(c, n):** conv 1×1 → tách hai nửa; nửa sau qua n RepConv nối tiếp; nối 2 nửa + n đầu ra → conv 1×1.
+- **Down(a→b):** [conv 3×3 s2 a→b/2 ∥ max-pool 2] → conv 1×1 → b.
+
+### Neck RepCSP (tự viết), 9.36M, 384 kênh
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| lat5 | conv 1×1 f32 576→384 → t5 | 384 × 40² | 0.22M |
+| td4 | nối [f16, upsample t5] 960 → RepCSP(n = 3) → n4 | 384 × 80² | 1.85M |
+| spd | f4 space-to-depth (192 × 320² → 768 × 160²) → conv 1×1 → 192 | 192 × 160² | 0.15M |
+| td3 | nối [f8, upsample n4, spd] 896 → RepCSP(n = 3) | **P3** 384 × 160² | 1.82M |
+| dn3 + bu4 | Down 384→384; nối n4 → RepCSP(n = 3) | **P4** 384 × 80² | 2.66M |
+| dn4 + bu5 | Down 384→384; nối t5 → RepCSP(n = 3) | **P5** 384 × 40² | 2.66M |
+
+### Head oriented có ngữ cảnh (tự viết, của v7), 2.63M
+
+| Nhánh | Lớp (một tầng) | Ra mỗi điểm | Tham số (3 tầng) |
+|---|---|---|---|
+| class | dw 3×3 384 → 1×1 384→192 → StripMix(192, k = 11) → dw 3×3 192 → 1×1 192→192 → 1×1 →7 (bias tiên nghiệm 0.01) | 7 logit | 0.82M |
+| box | conv 3×3 384→128 → conv 3×3 128→128 → 1×1 128→98 (chạy fp32) | 98 kênh | 1.81M |
+
+98 kênh box (một nhóm): góc θ, lệch ngang tâm (× stride), phân phối 32 bin khoảng cách tới đầu sau và 32 bin tới đầu trước dọc trục
+(bin = 1 stride), 32 bin độ dày (bin = 1/2 stride). Mỗi tầng một tháp riêng; điểm lưới = tâm ô.
+
+### Tầng suy luận quan hệ (tự viết), 1.23M
+
+K = 600 ứng viên mỗi ảnh, d = 192.
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| chọn ứng viên | 600 điểm tốt nhất, bỏ trùng (ProbIoU > 0.7) khi chọn; khi train thêm bản rung của box nhãn | 600 box | 0 |
+| mẫu bên trong | lưới 8 dọc × 3 ngang trong khung xoay (hai hàng ngang ngay ngoài hai cạnh dài), đọc song tuyến f4 (192 kênh) và P3 (384) → Linear 192→192 + Linear 384→192 | 600 × 24 × 192 | 0.11M |
+| vòng ngữ cảnh | 18 điểm quanh box, cách khoảng một chiều dài (clamp(L, 32, 192) px), đọc P3 + P4 → hai Linear 384→192 | 600 × 18 × 192 | 0.15M |
+| vị trí + hình học | MLP vị trí mẫu (2→192→192); token hình học MLP (log L, log T, sin / cos 2θ, xác suất nền → 192 → 192) | | 0.08M |
+| transformer cục bộ | 2 lớp, pre-norm, 6 đầu, FFN 192→384→192, trên 43 token mỗi ứng viên → 1 token | 600 × 192 | 0.59M |
+| lớp quan hệ | 1 lớp attention giữa 600 ứng viên + bias hình học tương đối mỗi đầu: MLP (7 số của j trong khung i → 32 → 6), fp32 | 600 × 192 | 0.30M |
+| đầu ra | LayerNorm → Linear 192→7 (logit dư) và 192→5 (dịch hai đầu, log độ dày, lệch ngang, góc ±0.2 rad), khởi tạo 0 | 600 × (7 + 5) | 0.003M |
+
+Khi suy luận, delta logit của mỗi ứng viên được lan sang các điểm trùng nó (ProbIoU > 0.7) trong 4000 điểm tốt nhất, rồi mới NMS.
+
+### Tổng hợp
+
+| Phần | Tham số | Tỉ lệ | Nguồn |
+|---|---|---|---|
+| Backbone | 16.23M | 55.1% | tự viết |
+| Neck | 9.36M | 31.8% | tự viết |
+| Head | 2.63M | 8.9% | tự viết |
+| Tầng suy luận quan hệ | 1.23M | 4.2% | tự viết |
+| **Tổng** | **29.45M** | | 100% tự viết (trọng số lõi từ chưng cất) |
+
+Suy luận: RepConv và BN gộp vào conv (`fuse()`); 33 600 điểm → 600 ứng viên được tinh chỉnh → Fast-NMS ProbIoU → tối đa 1000 box.

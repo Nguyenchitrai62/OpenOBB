@@ -418,6 +418,12 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 
 ## 9. Nhật ký
 
+- 2026-10-16: **Phụ lục "kiến trúc theo lớp" cho mọi thẻ `docs/OPENOBB1–23.md`** (theo user). Mỗi thẻ có mục cuối: biểu đồ Mermaid
+  (xanh dương mượn, xanh lá tự viết, cam mới ở version đó) + bảng từng khối (lớp, kênh, kernel, kích thước ra ở ảnh 1280, tham số) + tổng hợp
+  tỉ lệ tự viết. Sơ đồ ASCII cũ trong thân thẻ thay bằng dòng trỏ tới phụ lục. Số liệu đo bằng `research/analysis/arch_layers.py`
+  (dựng model, đếm tham số, shape từng khối; `OMP_NUM_THREADS=1 py -3.12 research/analysis/arch_layers.py v23 --depth 3`).
+  Thẻ version mới phải có mục này (ở cuối file). README GitHub / GitLab: bảng các kiến trúc đã train kèm kết quả.
+
 - 2026-10-15 (5): **OpenOBB22** (F91), YOLO26x đo cùng thước trên G4 (F89, cell so sánh), `Speed` tách NMS của v10+ (0.20.2).
   Notebook của user truyền `rotate_p=0.5` (mặc định code = 0, giống `degrees=0` của YOLO): nhắc user bỏ.
 

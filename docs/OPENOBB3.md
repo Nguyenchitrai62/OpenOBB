@@ -27,6 +27,8 @@ openobb train data=/content/data.yaml model=openobb3x epochs=100 imgsz=1280
 
 ## 2. Các phần của kiến trúc (bản x)
 
+Sơ đồ khối và bảng từng lớp: mục 8 (phụ lục, cuối file).
+
 Tổng **64.6M tham số**.
 
 | # | Phần | Làm gì | Tham số | Nguồn |
@@ -107,3 +109,125 @@ Epoch  GPU_mem  cls_loss  box_loss  dfl_loss  acr_loss  angle_loss  Instances  S
   - Head dense mới khởi tạo ngẫu nhiên, cần vài epoch đầu để bắt kịp.
   - Trên class hiếm, NMS kiểu YOLO có thể thua decoder DETR về ngữ cảnh (door/slide_door/double_door).
 - Cần gửi: bảng mAP theo class và dòng `Speed`.
+
+## 8. Phụ lục: kiến trúc theo lớp (cỡ x)
+
+Kích thước ghi cho ảnh vào 1 × 3 × 1280 × 1280, Wall_Color (7 class). Ký hiệu: `conv k×k sS a→b` = Conv + BN + kích hoạt,
+`dw` = depthwise, `/N` = stride N so với ảnh.
+
+### Luồng dữ liệu
+
+Xanh dương: mượn (pretrained, Apache-2.0). Xanh lá: tự viết.
+
+```mermaid
+flowchart TB
+  IMG[/"Ảnh<br/>3 × 1280²"/]
+
+  subgraph BB["Thân HGNetv2-x · 33.2M"]
+    direction TB
+    STEM["stem<br/>64 × 320²"]
+    S1["stage1 · /4<br/>128 × 320²"]
+    S2["stage2 · /8<br/>c3 512 × 160²"]
+    S3["stage3 · /16<br/>c4 1024 × 80²"]
+    S4["stage4 · /32<br/>c5 2048 × 40²"]
+    STEM --> S1 --> S2 --> S3 --> S4
+  end
+
+  subgraph LK["LSK · 8.5M"]
+    direction TB
+    L3["LSK c3"]
+    L4["LSK c4"]
+    L5["LSK c5"]
+  end
+
+  subgraph EN["Encoder lai D-FINE · 20.7M · 384 kênh"]
+    direction TB
+    AIFI["AIFI /32<br/>1600 token"]
+    FPN4["FPN<br/>80²"]
+    P3["FPN<br/>P3 160²"]
+    P4["PAN<br/>P4 80²"]
+    P5["PAN<br/>P5 40²"]
+    AIFI --> FPN4 --> P3 --> P4 --> P5
+  end
+
+  subgraph HD["Head oriented · 2.2M"]
+    direction TB
+    H3["P3 · 160²"]
+    H4["P4 · 80²"]
+    H5["P5 · 40²"]
+  end
+
+  NMS["NMS ProbIoU 0.7<br/>≤ 1000 box"]
+  OUT[/"Box xoay + class + điểm"/]
+
+  IMG --> STEM
+  S2 --> L3
+  S3 --> L4
+  S4 --> L5
+  L5 --> AIFI
+  L4 --> FPN4
+  L3 --> P3
+  P3 --> H3
+  P4 --> H4
+  P5 --> H5
+  H3 & H4 & H5 --> NMS --> OUT
+
+  classDef borrowed fill:#dbeafe,stroke:#2563eb,color:#0f172a
+  classDef own fill:#dcfce7,stroke:#16a34a,color:#0f172a
+  classDef io fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  class STEM,S1,S2,S3,S4,AIFI,FPN4,P3,P4,P5 borrowed
+  class L3,L4,L5,H3,H4,H5,NMS own
+  class IMG,OUT io
+```
+
+### Thân: HGNetv2-x (mượn, Apache-2.0, trọng số D-FINE COCO), 33.23M
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| stem | conv 3×3 s2 3→32; nhánh [conv 2×2 32→16 → conv 2×2 16→32] ∥ max-pool 2; nối 64 → conv 3×3 s2 64→32 → conv 1×1 32→64 | 64 × 320² (/4) | 0.03M |
+| stage1 | 1 khối HG: 6 × conv 3×3 64→64, nối 448 kênh → 1×1 →64 → 1×1 →128 | **f4** 128 × 320² | 0.26M |
+| stage2 | dw 3×3 s2; 2 khối HG: 6 × conv 3×3 128, nối → 1×1 → 512 | **c3** 512 × 160² (/8) | 3.03M |
+| stage3 | dw 3×3 s2; 5 khối HG nhẹ: 6 × (1×1 → dw 5×5) 256, nối → 1×1 512 → 1×1 1024 | **c4** 1024 × 80² (/16) | 11.93M |
+| stage4 | dw 3×3 s2; 2 khối HG nhẹ: 6 × (1×1 → dw 5×5) 512, nối → 1×1 → 2048 | **c5** 2048 × 40² (/32) | 17.99M |
+
+BN của thân bị đóng băng (FrozenBatchNorm), kích hoạt ReLU.
+
+### Adapter LSK (tự viết, ý tưởng LSKNet), 8.54M
+
+Trên c3 / c4 / c5, mỗi tầng một khối (c = 512 / 1024 / 2048 kênh; 0.43M / 1.65M / 6.45M):
+a = dw 5×5(x); b = dw 7×7 giãn 3(a) (trường nhìn khoảng 23 ô); a, b → conv 1×1 về c/2; cổng = conv 7×7 trên [trung bình, max theo kênh]
+của [a, b] → 2 kênh sigmoid; m = conv 1×1 c/2→c (khởi tạo 0) của (a·g₁ + b·g₂); ra **x + x·m**. Khởi tạo = đồng nhất.
+
+### Encoder lai D-FINE (mượn, Apache-2.0, trọng số COCO), 20.70M, 384 kênh
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| input_proj | ba conv 1×1 + BN: c3 512→384, c4 1024→384, c5 2048→384 | | 1.38M |
+| AIFI | 1 lớp transformer trên 1600 token của /32: attention 8 đầu, FFN 384→2048→384 (GELU), vị trí sin-cos 2-D | 384 × 40² | 2.17M |
+| FPN (2 bước) | lateral 1×1 384→384; upsample ×2; nối 768 → RepNCSPELAN4 → 384 | 384 × 80², **P3** 384 × 160² | 8.57M |
+| PAN (2 bước) | SCDown [1×1 384→384 → dw 3×3 s2]; nối 768 → RepNCSPELAN4 → 384 | **P4** 384 × 80², **P5** 384 × 40² | 8.58M |
+
+RepNCSPELAN4(768→384): conv 1×1 768→768, tách 2 nửa 384; nửa sau qua [CSP 384→192 (3 khối RepVGG 3×3 ∥ 1×1) → conv 3×3 192] rồi
+[CSP 192→192 (3 khối) → conv 3×3 192]; nối 384 + 384 + 192 + 192 → conv 1×1 → 384. Kích hoạt SiLU.
+
+### Head oriented dị hướng (tự viết), 2.17M
+
+| Nhánh | Lớp (một tầng) | Ra mỗi điểm | Tham số (3 tầng) |
+|---|---|---|---|
+| class | dw 3×3 384 → 1×1 384→192 → dw 3×3 192 → 1×1 192→192 → 1×1 →7 (bias tiên nghiệm 0.01) | 7 logit | 0.36M |
+| box | conv 3×3 384→128 → conv 3×3 128→128 → 1×1 128→98 (chạy fp32) | 98 kênh | 1.81M |
+
+98 kênh box (một nhóm): góc θ, lệch ngang tâm (× stride), phân phối 32 bin khoảng cách tới đầu sau và 32 bin tới đầu trước dọc trục
+(bin = 1 stride), 32 bin độ dày (bin = 1/2 stride). Mỗi tầng một tháp riêng; điểm lưới = tâm ô.
+
+### Tổng hợp
+
+| Phần | Tham số | Tỉ lệ | Nguồn |
+|---|---|---|---|
+| Thân HGNetv2-x | 33.23M | 51.4% | mượn (Apache-2.0) |
+| LSK | 8.54M | 13.2% | tự viết |
+| Encoder lai | 20.70M | 32.0% | mượn (Apache-2.0) |
+| Head | 2.17M | 3.4% | tự viết |
+| **Tổng** | **64.64M** | | 16.6% tự viết |
+
+Suy luận: 33 600 điểm (P3 25 600 + P4 6 400 + P5 1 600) → giải mã box → Fast-NMS ProbIoU theo class (0.7) → tối đa 1000 box.

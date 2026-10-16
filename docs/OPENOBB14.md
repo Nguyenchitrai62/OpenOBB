@@ -85,18 +85,8 @@ Bảng đầy đủ (16 backbone: HGNetv2 B4 / B5, YOLO26x / 11x / 12x / v8x, Co
 
 ## 3. Kiến trúc (bản x, ảnh 960×1280)
 
-```
-ảnh ─ HGNetv2-B5 (COCO, ScaleGuard) ─ f4 128ch /4 ─ c3 512 /8 ─ c4 1024 /16 ─ c5 2048 /32      320 G
-     ─ Neck14: proj 1×1 → 384 (3 tầng); attention 1 lớp zero-init ở /32                         13 + 1 G
-              top-down: lat5 → up → [proj4 ‖ up] RepCSP(3, giãn 1,2,1) → lat4 → up
-                        [proj3 ‖ up ‖ spd(f4) 192] RepCSP(3, giãn 1,2,1) → P3                     84 G
-              bottom-up: Down(conv 3×3 s2 ‖ max-pool) → RepCSP → P4; Down → RepCSP → P5             31 G
-     ─ Head14 (mỗi tầng, mỗi tháp): 1×1 384→256 → RepConv 3×3 → RepConv 3×3 (class: giãn 2) → 1×1   129 G
-              class C; box 5 (góc, lệch ngang, trái, phải, dày) = giải mã `openobb3.decode`
-              head_o2o: bản sao cùng thiết kế (train một-một; suy luận nếu hiệu chỉnh chọn)
-     ─ EdgeRefiner: top-1500 box → 24 điểm stride 4 (64ch) + 6 điểm P3 (64ch) + 4 số hình học → MLP → residual   4 G
-     ─ NMS (hoặc không, theo hiệu chỉnh)                                                          tổng 586 G
-```
+Sơ đồ khối và bảng từng lớp: mục 7 (phụ lục, cuối file).
+
 
 | Cỡ | hid neck | tháp head | RepConv / khối | Tham số |
 |---|---|---|---|---|
@@ -197,3 +187,133 @@ Fine-tune từ checkpoint khác: `weights=<best.pt của v12 / v7 / v3>` nạp t
 | c5 (P2 cho decoder) | −9.1 trên FPC | không tầng P2; chi tiết stride 4 vào P3 (spd) và vào bộ tinh chỉnh |
 | v13 (luồng độ phân giải gốc) | chưa có run hợp lệ | trực giao; ghép sau nếu F52 được xác nhận |
 | v12 (bản tốt nhất) | mAP50-95 −0.027 so YOLO, nằm trọn ở độ khít tường / nút / note (F59); 45% FLOPs sau thân là phần mượn | neck + head + tinh chỉnh tự thiết kế, trên cùng thân |
+
+## 7. Phụ lục: kiến trúc theo lớp (cỡ x)
+
+Kích thước ghi cho ảnh vào 1 × 3 × 1280 × 1280, Wall_Color (7 class). Ký hiệu: `conv k×k sS a→b` = Conv + BN + kích hoạt,
+`dw` = depthwise, `/N` = stride N so với ảnh. Mặc định `neck=own`, `box=direct`.
+
+### Luồng dữ liệu
+
+Xanh dương: mượn (pretrained, Apache-2.0). Cam: mới ở v14 (thay LSK + encoder lai + head của v12).
+
+```mermaid
+flowchart TB
+  IMG[/"Ảnh<br/>3 × 1280²"/]
+
+  subgraph BB["Thân HGNetv2-x · 33.2M"]
+    direction TB
+    STEM["stem<br/>64 × 320²"]
+    S1["stage1 · /4<br/>f4 128 × 320²"]
+    S2["stage2 · /8<br/>c3 512 × 160²"]
+    S3["stage3 · /16<br/>c4 1024 × 80²"]
+    S4["stage4 · /32<br/>c5 2048 × 40²"]
+    STEM --> S1 --> S2 --> S3 --> S4
+  end
+
+  subgraph NK["Neck RepConv · 11.9M · 384 kênh"]
+    direction TB
+    ATT["attention /32<br/>1600 token"]
+    TD4["top-down<br/>80²"]
+    SPD["space-to-depth<br/>f4 → /8"]
+    TD3["top-down<br/>P3 160²"]
+    BU4["bottom-up<br/>P4 80²"]
+    BU5["bottom-up<br/>P5 40²"]
+    ATT --> TD4 --> TD3 --> BU4 --> BU5
+    SPD --> TD3
+  end
+
+  subgraph HD["Head kép nặng · 2 × 8.5M"]
+    direction LR
+    O2M["một-nhiều<br/>class 7 + box 5"]
+    O2O["một-một<br/>class 7 + box 5"]
+  end
+
+  subgraph PP["Hậu xử lý"]
+    direction TB
+    TOP["top 1500 ứng viên"]
+    EDGE["tinh chỉnh cạnh · 0.59M<br/>đọc f4 + P3"]
+    NMS["NMS theo hiệu chỉnh"]
+    TOP --> EDGE --> NMS
+  end
+
+  OUT[/"Box xoay + class + điểm"/]
+
+  IMG --> STEM
+  S4 --> ATT
+  S3 --> TD4
+  S2 --> TD3
+  S1 --> SPD
+  TD3 & BU4 & BU5 --> HD
+  HD --> TOP
+  S1 -.-> EDGE
+  NMS --> OUT
+
+  classDef borrowed fill:#dbeafe,stroke:#2563eb,color:#0f172a
+  classDef newv fill:#ffedd5,stroke:#ea580c,color:#0f172a
+  classDef io fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  class STEM,S1,S2,S3,S4 borrowed
+  class ATT,TD4,SPD,TD3,BU4,BU5,O2M,O2O,TOP,EDGE,NMS newv
+  class IMG,OUT io
+```
+
+### Thân: HGNetv2-x (mượn, Apache-2.0, trọng số D-FINE COCO), 33.23M
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| stem | conv 3×3 s2 3→32; nhánh [conv 2×2 32→16 → conv 2×2 16→32] ∥ max-pool 2; nối 64 → conv 3×3 s2 64→32 → conv 1×1 32→64 | 64 × 320² (/4) | 0.03M |
+| stage1 | 1 khối HG: 6 × conv 3×3 64→64, nối 448 kênh → 1×1 →64 → 1×1 →128 | **f4** 128 × 320² | 0.26M |
+| stage2 | dw 3×3 s2; 2 khối HG: 6 × conv 3×3 128, nối → 1×1 → 512 | **c3** 512 × 160² (/8) | 3.03M |
+| stage3 | dw 3×3 s2; 5 khối HG nhẹ: 6 × (1×1 → dw 5×5) 256, nối → 1×1 512 → 1×1 1024 | **c4** 1024 × 80² (/16) | 11.93M |
+| stage4 | dw 3×3 s2; 2 khối HG nhẹ: 6 × (1×1 → dw 5×5) 512, nối → 1×1 → 2048 | **c5** 2048 × 40² (/32) | 17.99M |
+
+BN của thân bị đóng băng (FrozenBatchNorm), kích hoạt ReLU.
+
+Mỗi stage đi qua bộ chặn độ lớn (guard, không tham số) như v7.
+
+### Neck: Neck14 (tự viết, khởi tạo ngẫu nhiên; `neck=dfine` thay bằng encoder lai D-FINE 20.7M có trọng số COCO), 11.91M, 384 kênh
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| proj | ba conv 1×1 (không kích hoạt): c3 512→384, c4 1024→384, c5 2048→384 | | 1.38M |
+| attn | 1 lớp transformer trên 1600 token của /32: vị trí bằng dw 3×3; LayerNorm → attention 8 đầu; LayerNorm → FFN 384→768→384 (GELU). Hai nhánh dư nhân cổng khởi tạo 0 | 384 × 40² | 1.19M |
+| lat5 | conv 1×1 → **t5** | 384 × 40² | 0.15M |
+| td4 | nối [proj c4, upsample ×2 t5] 768 → RepCSP (3 RepConv, giãn 1 / 2 / 1) → n4 → lat4 1×1 → **t4** | 384 × 80² | 1.92M |
+| spd | f4 space-to-depth (128 × 320² → 512 × 160²) → conv 1×1 512→192: chi tiết /4 vào P3 | 192 × 160² | 0.10M |
+| td3 | nối [proj c3, upsample ×2 t4, spd] 960 → RepCSP | **P3** 384 × 160² | 1.85M |
+| dn3 + bu4 | Down [conv 3×3 s2 384→192 ∥ max-pool 2] → 1×1 576→384; nối t4 → RepCSP | **P4** 384 × 80² | 2.66M |
+| dn4 + bu5 | như trên, nối t5, RepCSP không giãn | **P5** 384 × 40² | 2.66M |
+
+RepCSP(a→384, n=3): conv 1×1 a→384, tách 2 nửa 192; nửa sau qua lần lượt 3 RepConv 192 (3×3 ∥ 1×1 ∥ BN đồng nhất, gộp thành một
+conv 3×3 khi suy luận); nối 2 nửa + 3 đầu ra (960) → conv 1×1 → 384.
+
+### Head kép nặng (tự viết), 2 × 8.49M
+
+Hai head cùng thiết kế, trọng số riêng: một-nhiều và một-một; bước hiệu chỉnh cuối train chọn head và NMS. Tháp riêng cho mỗi tầng.
+
+| Nhánh | Lớp (một tầng) | Ra mỗi điểm | Tham số (3 tầng) |
+|---|---|---|---|
+| class | Tower: conv 1×1 384→256 → RepConv 3×3 256 → RepConv 3×3 giãn 2 256 → 1×1 →7 (bias tiên nghiệm 0.01) | 7 logit | 4.24M |
+| box | Tower: conv 1×1 384→256 → RepConv 3×3 256 → RepConv 3×3 256 → 1×1 →5 (khởi tạo 0) | 5 giá trị (`box=direct`): góc, lệch ngang, khoảng cách tới hai đầu, độ dày | 4.24M |
+
+### Tinh chỉnh cạnh (tự viết), 0.59M
+
+Bộ tinh chỉnh cạnh (EdgeRefiner, 0.59M): với mỗi box ứng viên, lấy mẫu song tuyến 24 điểm trong khung box (6 trên mỗi cạnh dài, 3 trên
+mỗi đầu, 6 trên đường tâm) trên f4 của thân (128 kênh, /4) chiếu 1×1 → 64 kênh, và 6 điểm đường tâm trên P3 chiếu 1×1 384→64; nối với 4 số hình học
+(log dài, log dày, sin / cos 2θ) → MLP 1924→256→256→5 (dịch hai đầu, log độ dày, lệch ngang, góc 0.2·tanh). Lớp cuối khởi tạo 0.
+
+### Tổng hợp
+
+| Phần | Tham số | Tỉ lệ | Nguồn |
+|---|---|---|---|
+| Thân HGNetv2-x | 33.23M | 53.0% | mượn (Apache-2.0) |
+| Neck | 11.91M | 19.0% | tự viết |
+| Head một-nhiều | 8.49M | 13.5% | tự viết |
+| Head một-một | 8.49M | 13.5% | tự viết |
+| Tinh chỉnh cạnh | 0.59M | 0.9% | tự viết |
+| **Tổng** | **62.70M** | | 47.0% tự viết (54.2M chạy khi suy luận) |
+
+GFLOPs (ảnh 960 × 1280, một head): thân 320, neck 129 (proj + attention 14, top-down 84, bottom-up 31), head 129, tinh chỉnh 4,
+tổng 586.
+
+Suy luận: RepConv và BN gộp (`fuse()`); 33 600 điểm của head đã chọn → top 1500 → tinh chỉnh cạnh → NMS theo hiệu chỉnh → tối đa 1000 box.

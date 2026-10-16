@@ -26,6 +26,8 @@ OpenOBB2 bỏ hết cả bốn: dự đoán dày đặc ở **mọi điểm** c�
 
 ## 2. Các phần của kiến trúc (bản x)
 
+Sơ đồ khối và bảng từng lớp: mục 8 (phụ lục, cuối file).
+
 Tổng **55.6M tham số** (YOLO11x-OBB khoảng 58.8M).
 
 | # | Phần | Làm gì | Tham số x | Ý tưởng lấy từ | Code |
@@ -120,3 +122,112 @@ Epoch  GPU_mem  cls_loss  box_loss  end_loss  thick_loss  angle_loss  Instances 
   - Nếu train loss giảm mà val đứng yên: thêm augment. Đó là overfit.
 - **Bộ nhớ:** P2 ở 1024 px cho khoảng 87k điểm mỗi ảnh. Batch tự giảm khi OOM.
 - **Score của line dài** là điểm yếu còn lại (xem overfit). Log sẽ cho biết: AP của class line thấp hơn hẳn class khối là dấu hiệu cần sửa.
+
+## 8. Phụ lục: kiến trúc theo lớp (cỡ x)
+
+Kích thước ghi cho ảnh vào 1 × 3 × 1280 × 1280, Wall_Color (7 class). Ký hiệu: `conv k×k sS a→b` = Conv + BN + SiLU,
+`dw` = depthwise, `/N` = stride N so với ảnh. Toàn bộ tự viết, khởi tạo ngẫu nhiên (không pretrained).
+
+### Luồng dữ liệu
+
+Xanh lá: tự viết. Mỗi tầng P2–P5 có hai head: một-nhiều (class + box, để học) và một-một (chỉ class, dùng khi suy luận, đọc box của head một-nhiều).
+
+```mermaid
+flowchart TB
+  IMG[/"Ảnh<br/>3 × 1280²"/]
+
+  subgraph BB["Backbone CSP + strip · 23.6M"]
+    direction TB
+    STEM["stem · /2<br/>80 × 640²"]
+    C2["s2 · /4<br/>C2 160 × 320²"]
+    C3["s3 · /8 · strip 13<br/>C3 320 × 160²"]
+    C4["s4 · /16 · strip 13<br/>C4 640 × 80²"]
+    C5["s5 · /32 · strip 9<br/>+ SPPF + attention<br/>C5 640 × 40²"]
+    STEM --> C2 --> C3 --> C4 --> C5
+  end
+
+  subgraph NK["PAN P2–P5 · 29.7M"]
+    direction TB
+    TD4["top-down<br/>80²"]
+    TD3["top-down<br/>160²"]
+    P2["top-down<br/>P2 160 × 320²"]
+    P3["bottom-up<br/>P3 320 × 160²"]
+    P4["bottom-up<br/>P4 640 × 80²"]
+    P5["bottom-up<br/>P5 640 × 40²"]
+    TD4 --> TD3 --> P2 --> P3 --> P4 --> P5
+  end
+
+  subgraph HD["Segment head · P2 / P3 / P4 / P5"]
+    direction TB
+    O2M["một-nhiều · 1.9M<br/>class 7 + box 36"]
+    O2O["một-một · 0.4M<br/>class 7"]
+  end
+
+  OUT[/"136 000 điểm → top 1000<br/>không NMS"/]
+
+  IMG --> STEM
+  C5 --> TD4
+  C4 --> TD4
+  C3 --> TD3
+  C2 --> P2
+  P2 & P3 & P4 & P5 --> HD
+  O2O --> OUT
+  O2M -.->|box| OUT
+
+  classDef own fill:#dcfce7,stroke:#16a34a,color:#0f172a
+  classDef io fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  class STEM,C2,C3,C4,C5,TD4,TD3,P2,P3,P4,P5,O2M,O2O own
+  class IMG,OUT io
+```
+
+### Backbone CSP + strip (tự viết), 23.61M
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| stem | conv 3×3 s2 3→80 | 80 × 640² (/2) | 0.002M |
+| s2 | conv 3×3 s2 80→160; CSP(n = 3) | **C2** 160 × 320² (/4) | 0.55M |
+| s3 | conv 3×3 s2 160→320; CSP(n = 6, strip 13) | **C3** 320 × 160² (/8) | 2.55M |
+| s4 | conv 3×3 s2 320→640; CSP(n = 6, strip 13) | **C4** 640 × 80² (/16) | 10.13M |
+| s5 | conv 3×3 s2 640→640; CSP(n = 3, strip 9); SPPF; attention toàn cục | **C5** 640 × 40² (/32) | 10.38M |
+
+- CSP(a→b, n): conv 1×1 a→b, tách hai nửa; nửa sau qua n bottleneck nối tiếp; nối 2 nửa + n đầu ra → conv 1×1 → b.
+- Bottleneck: x + B(conv 3×3(x)). B = conv 3×3, hoặc **StripMix** khi có strip k: [dw 3×3 + dw 1×k + dw k×1] → conv 1×1.
+- SPPF: conv 1×1 640→320, ba max-pool 5×5 nối tiếp, nối 4 nhánh → conv 1×1 → 640.
+- Attention toàn cục (1.12M): conv 1×1 640→256; 1600 token, vị trí sin-cos 2-D; LayerNorm → attention 8 đầu; LayerNorm → FFN 256→1024→256 (GELU);
+  conv 1×1 256→640 khởi tạo 0, cộng dư vào C5.
+
+### PAN P2–P5 (tự viết), 29.67M
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| td4 | nối [upsample C5, C4] 1280 → CSP(n = 3) | 640 × 80² | 7.38M |
+| td3 | nối [upsample td4, C3] 960 → CSP(n = 3, strip 13) | 320 × 160² | 1.35M |
+| td2 | nối [upsample td3, C2] 480 → CSP(n = 3, strip 13) | **P2** 160 × 320² | 0.34M |
+| dn3 + bu3 | conv 3×3 s2 160→160; nối td3 → CSP(n = 3, strip 13) | **P3** 320 × 160² | 1.43M |
+| dn4 + bu4 | conv 3×3 s2 320→320; nối td4 → CSP(n = 3) | **P4** 640 × 80² | 8.10M |
+| dn5 + bu5 | conv 3×3 s2 640→640; nối C5 → CSP(n = 3) | **P5** 640 × 40² | 11.07M |
+
+### Segment head (tự viết)
+
+Mỗi tầng một tháp riêng; điểm lưới = tâm ô. Head một-một đọc đặc trưng đã tách gradient.
+
+| Head | Nhánh | Lớp (một tầng, c = kênh của tầng) | Ra mỗi điểm | Tham số |
+|---|---|---|---|---|
+| một-nhiều | class | dw 3×3 c → 1×1 c→160 → dw 3×3 160 → 1×1 160→160 → 1×1 →7 (bias tiên nghiệm 0.01) | 7 logit | 0.42M (4 tầng) |
+| một-nhiều | box | conv 3×3 c→80 → conv 3×3 80→80 → 1×1 →36 | góc θ, vị trí dọc đoạn, log chiều dài, lệch ngang, 32 bin độ dày | 1.51M (4 tầng) |
+| một-một | class | như class một-nhiều | 7 logit | 0.42M |
+
+Giải mã box: chiều dài = exp(raw) × stride; vị trí dọc = raw × dài / 2; lệch ngang = raw × stride; độ dày = kỳ vọng của 32 bin, bin = stride / 2.
+
+### Tổng hợp
+
+| Phần | Tham số | Tỉ lệ | Nguồn |
+|---|---|---|---|
+| Backbone | 23.61M | 42.4% | tự viết |
+| PAN | 29.67M | 53.3% | tự viết |
+| Head một-nhiều | 1.93M | 3.5% | tự viết |
+| Head một-một | 0.42M | 0.8% | tự viết |
+| **Tổng** | **55.63M** | | 100% tự viết, không pretrained |
+
+Suy luận: 136 000 điểm (P2 102 400 + P3 25 600 + P4 6 400 + P5 1 600) → điểm class của head một-một + box của head một-nhiều → top 1000,
+không NMS.

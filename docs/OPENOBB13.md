@@ -47,6 +47,8 @@ Kết luận:
 
 ## 3. Chi tiết từng phần và tỉ lệ tận dụng (bản x)
 
+Sơ đồ khối và bảng từng lớp: mục 6 (phụ lục, cuối file).
+
 | Phần | Tham số | Nguồn |
 |---|---|---|
 | HGNetv2 + LSK + hybrid encoder + `spd` | khoảng 62.7M | D-FINE (Apache-2.0) init COCO + phần sửa của v7 (tự viết) |
@@ -87,3 +89,92 @@ openobb train model=openobb13x data=/content/data.yaml imgsz=1280 epochs=100
 - Batch tự chọn theo VRAM, tự giảm nếu thiếu bộ nhớ.
 - Đi tiếp từ checkpoint v12 / v7 / v8 (`weights=`): lõi và head P3–P5 nạp thẳng. Luồng gốc và P2 khởi tạo mới; head một-một chép từ head một-nhiều.
 - Khi gửi log, nhờ kèm: bảng theo class, confusion matrix (ô wall_300 → junction), dòng `Duplicate boxes`, dòng `NMS calibrated`, tốc độ val.
+
+## 6. Phụ lục: kiến trúc theo lớp (cỡ x)
+
+Ảnh vào **độ phân giải đầy đủ** 1 × 3 × 2560 × 2560 (`imgsz=1280` là cỡ của lõi; v13 tự nhân đôi), lõi v12 chạy trên ảnh thu nửa 1280².
+Wall_Color (7 class). Ký hiệu: `conv k×k sS a→b` = Conv + BN + kích hoạt, `dw` = depthwise. Stride ghi theo điểm ảnh đầu vào.
+
+### Luồng dữ liệu
+
+Xanh dương: mượn (pretrained, Apache-2.0). Xanh lá: tự viết (của v12). Cam: mới ở v13. Các phần mới khởi tạo 0 trên đường của lõi.
+
+```mermaid
+flowchart TB
+  IMG[/"Ảnh đầy đủ<br/>3 × 2560²"/]
+  HALF["thu nửa<br/>3 × 1280²"]
+
+  subgraph HR["Luồng độ phân giải gốc · 0.18M"]
+    direction TB
+    R1["conv s2 3→24 → s2 24→48<br/>+ 2 khối dw dư · /4"]
+    R2["conv s2 48→192<br/>+ 2 khối dw dư<br/>192 × 320² · /8"]
+    R1 --> R2
+  end
+
+  subgraph CORE["Lõi v12 · thân + spd + LSK + encoder · 62.7M"]
+    direction TB
+    C3["c3 + spd + to_p3<br/>→ LSK → encoder"]
+    P3["P3 384 × 160² · /16"]
+    P4["P4 384 × 80² · /32"]
+    P5["P5 384 × 40² · /64"]
+    C3 --> P3 --> P4 --> P5
+  end
+
+  TOP3["to_p3 · conv 3×3 s2 192→512<br/>khởi tạo 0 · 0.89M"]
+  P2["P2 = lat(luồng gốc) + 1×1(P3) nâng ×2<br/>→ khối dw dư · 192 × 320² · /8"]
+
+  subgraph HD["Head dense kép"]
+    direction LR
+    HC["P3 / P4 / P5<br/>2 × 2.6M"]
+    HP2["P2<br/>2 × 0.45M"]
+  end
+
+  SEL["head + NMS chọn khi hiệu chỉnh"]
+  OUT[/"Box xoay + class + điểm"/]
+
+  IMG --> HALF --> C3
+  IMG --> R1
+  R2 --> TOP3 --> C3
+  R2 --> P2
+  P3 --> P2
+  P3 & P4 & P5 --> HC
+  P2 --> HP2
+  HC & HP2 --> SEL --> OUT
+
+  classDef borrowed fill:#dbeafe,stroke:#2563eb,color:#0f172a
+  classDef own fill:#dcfce7,stroke:#16a34a,color:#0f172a
+  classDef newv fill:#ffedd5,stroke:#ea580c,color:#0f172a
+  classDef io fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  class C3,P3,P4,P5 borrowed
+  class HC,SEL own
+  class R1,R2,TOP3,P2,HP2,HALF newv
+  class IMG,OUT io
+```
+
+Lõi trên ảnh thu nửa giống hệt v12 (thân HGNetv2-x, guard, spd, LSK, encoder lai, head kép P3–P5): bảng lớp ở thẻ
+[OPENOBB12](OPENOBB12.md), kích thước ở đó (ảnh 1280) là kích thước của lõi ở đây; stride theo ảnh đầy đủ gấp đôi.
+
+### Phần mới của v13 (tự viết), 2.12M
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| hires | conv 3×3 s2 3→24 → conv 3×3 s2 24→48 → 2 × DWRes(48) → conv 3×3 s2 48→192 → 2 × DWRes(192) | 192 × 320² (/8) | 0.18M |
+| to_p3 | conv 3×3 s2 192→512 + BN (khởi tạo 0) → cộng vào c3 của lõi trước LSK | 512 × 160² (/16) | 0.89M |
+| p2_lat | conv 1×1 192→192 + BN trên luồng gốc | 192 × 320² | 0.04M |
+| p2_down | conv 1×1 384→192 + BN trên P3 của encoder, nâng ×2 (nearest), cộng với p2_lat | 192 × 320² | 0.07M |
+| p2_fuse | DWRes(192) | **P2** 192 × 320² (/8) | 0.04M |
+| p2_head | head có ngữ cảnh trên P2: class dw 3×3 192 → 1×1 →96 → StripMix(96) → dw 3×3 → 1×1 → 7; box conv 3×3 192→128 → 3×3 → 1×1 →98 | 102 400 điểm | 0.45M |
+| p2_head_o2o | như p2_head, trọng số riêng (một-một) | | 0.45M |
+
+DWRes(c): x + conv 1×1 (BN khởi tạo 0) của dw 3×3(x).
+
+### Tổng hợp
+
+| Phần | Tham số | Tỉ lệ | Nguồn |
+|---|---|---|---|
+| Lõi v12 (thân + encoder mượn, LSK + spd + head kép tự viết) | 68.00M | 97.0% | như v12 |
+| Luồng gốc + to_p3 + P2 | 1.22M | 1.7% | tự viết |
+| Head P2 kép | 0.91M | 1.3% | tự viết |
+| **Tổng** | **70.12M** | | 23.1% tự viết |
+
+Suy luận: 33 600 điểm (P3–P5) + 102 400 điểm (P2) của head đã chọn → NMS theo ngưỡng đã hiệu chỉnh → tối đa 1000 box.

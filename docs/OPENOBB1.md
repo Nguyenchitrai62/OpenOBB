@@ -8,30 +8,8 @@ Chỉ nói về kiến trúc model: chỉ số, các lớp, phần dùng lại v
 
 ## 1. Sơ đồ
 
-```
-Ảnh trang (render) ─► (scale) ─► cắt tile 1024×1024, chồng 200 px
-                           │
-                           ▼
-              Backbone HGNetv2 (C3 s8, C4 s16, C5 s32)
-                           │
-                           ▼
-              Adapter LSK trên C3/C4/C5: kernel gần (dw 5×5) + kernel xa (dw 7×7 giãn 3, vùng nhìn khoảng 23 px)
-              trộn theo cổng không gian, nhân vào feature; khởi tạo = identity
-                           │
-                           ▼
-              Hybrid encoder: AIFI (attention trên C5) + CCFM (FPN + PAN)
-                           │
-                           ▼
-              Chọn query: top-K đề xuất từ encoder (300 khi train, 600–900 nếu tile dày object; 900 khi suy luận)
-                           │
-                           ▼
-              Decoder L lớp: self-attention giữa query → deformable attention xoay theo góc → FFN
-                             → phân phối 4 cạnh + góc, tinh chỉnh dần qua từng lớp
-                           │
-                           ▼
-              Box xoay (cx, cy, w, h, θ) + điểm từng class; không NMS trong tile;
-              ghép tile về trang bằng NMS đa giác IoU 0.1 theo class
-```
+Sơ đồ khối và bảng từng lớp: mục 6 (phụ lục, cuối file).
+
 
 ## 2. Chỉ số (val, 24 epoch, tile 1024, cùng điều kiện; mốc duy nhất: YOLO26x)
 
@@ -53,45 +31,7 @@ Chỉ nói về kiến trúc model: chỉ số, các lớp, phần dùng lại v
 
 ## 3. Các lớp
 
-### 3.1 Theo cỡ (tham số đếm trực tiếp từ code, 30 class, có LSK)
-
-| Khối | S | M | L | X |
-|---|---|---|---|---|
-| Backbone HGNetv2 | B0, 1.85M | B2, 6.03M | B4, 13.51M | B5, 33.23M |
-| Adapter LSK (C3/C4/C5) | 2.20M | 4.86M | 8.54M | 8.54M |
-| Hybrid encoder (rộng) | 4.02M (256) | 7.80M (256) | 9.34M (256) | 20.70M (384) |
-| Decoder (số lớp) | 4.41M (3) | 5.72M (4) | 8.34M (6) | 8.64M (6) |
-| **Tổng** | **12.5M** | **24.4M** | **39.7M** | **71.1M** |
-
-### 3.2 Chi tiết từng lớp (bản S; X ghi trong ngoặc)
-
-| # | Lớp | Cấu hình |
-|---|---|---|
-| 1 | Stem | conv 3×3 s2: 3→16→16 (3→32→64) |
-| 2 | Stage 1 (s4) | 1 HG block, 3 conv 3×3, ra 64 kênh (1 block, 6 conv, 128) |
-| 3 | Stage 2 (s8) → **C3** | 1 HG block, ra 256 (2 block, 512) |
-| 4 | Stage 3 (s16) → **C4** | 2 HG block nhẹ (depthwise 5×5), ra 512 (5 block, 1024) |
-| 5 | Stage 4 (s32) → **C5** | 1 HG block nhẹ, ra 1024 (2 block, 2048) |
-| 6 | **LSK** trên C3/C4/C5 | dw 5×5 → dw 7×7 giãn 3; mỗi nhánh conv 1×1 về c/2; cổng = conv 7×7 trên [mean, max] theo kênh → sigmoid → trộn 2 nhánh; conv 1×1 về c (khởi tạo 0); ra x + x·(…) |
-| 7 | Input proj | conv 1×1 + BN: C3/C4/C5 → 256 (384) |
-| 8 | AIFI | 1 lớp transformer encoder trên C5 (8 head, FFN 1024 (2048)) |
-| 9 | CCFM | FPN từ trên xuống + PAN từ dưới lên, khối RepNCSPELAN4 (độ sâu 0.34 (1.0)), SCDown |
-| 10 | Chọn query | linear + LN trên memory; head class + head box (4 delta + cos/sin 2θ); lấy top-K; vị trí query không chứa góc (GDQE) |
-| 11 | Decoder × 3 (× 6) | self-attention (8 head, d 256) → deformable cross-attention xoay theo góc box (8 head, 3 mức, điểm 3/6/3) → FFN 1024 |
-| 12 | Head mỗi lớp | class (linear); phân phối 5 × 33 bin (4 cạnh trong khung xoay + góc dư ±π/4); LQE (chất lượng định vị từ phân phối) |
-| 13 | Đầu ra | điểm sigmoid theo class + box (cx, cy, w, h, θ); top-K trên (query × class) |
-
-### 3.3 Chỉ dùng khi train (không tốn thời gian suy luận)
-
-- **Matching:** Hungarian (focal × IoU^0.5 + Chamfer góc + KLD).
-- **Nhóm query một-nhiều:** 900 query, mỗi object 6 query, bỏ khi suy luận.
-- **Denoising có hướng:** AQD (số nhóm thích ứng theo số object).
-- **Loss:**
-  - MAL với nhãn mềm là IoU xoay chính xác.
-  - L1 căn theo góc, KLD.
-  - Loss góc nhạy với box gần vuông.
-  - FGL/DDF trên phân phối cạnh và góc.
-- **Lấy mẫu:** repeat-factor sampling (t = 0.1) cho class hiếm.
+Sơ đồ khối và bảng từng lớp: mục 6 (phụ lục, cuối file).
 
 ## 4. Phần dùng lại: bao nhiêu và lấy từ đâu
 
@@ -119,3 +59,123 @@ Chỉ nói về kiến trúc model: chỉ số, các lớp, phần dùng lại v
 | Decoder OBB viết lại trên khung D-FINE | **Thấp** | Khung gốc Apache-2.0; phần box xoay là code riêng. |
 | Phần tự viết theo ý tưởng paper (kể cả paper có code NC/AGPL như RHINO, YOLO26, LSKNet) | **Thấp** | Bản quyền bảo vệ code, không bảo vệ ý tưởng; không chép code. Rủi ro còn lại là bằng sáng chế (hiếm với các kỹ thuật học thuật này). |
 | Weights benchmark train trên FloorPlanCAD / DOTA (CC BY-NC / học thuật) | **Trung bình nếu bán chính weights này** | Chỉ dùng để đo. Bản thương mại: fine-tune hoặc train lại trên dataset tự gắn nhãn, khởi tạo từ D-FINE COCO (Apache). |
+
+## 6. Phụ lục: kiến trúc theo lớp (bản chốt S + LSK)
+
+Kích thước ghi cho một tile 1 × 3 × 1024 × 1024, 7 class. Ký hiệu: `conv k×k sS a→b` = Conv + BN + kích hoạt, `dw` = depthwise,
+`/N` = stride N so với ảnh. Cỡ khác: bảng cuối mục.
+
+### Luồng dữ liệu
+
+Xanh dương: mượn (pretrained, Apache-2.0). Xanh lá: tự viết. Xám đậm: khung D-FINE, phần OBB viết lại.
+
+```mermaid
+flowchart TB
+  PAGE[/"Trang bản vẽ<br/>cắt tile 1024², chồng 200 px"/]
+
+  subgraph BB["Thân HGNetv2-B0 · 1.85M"]
+    direction TB
+    STEM["stem<br/>16 × 256²"]
+    S1["stage1 · /4<br/>64 × 256²"]
+    S2["stage2 · /8<br/>c3 256 × 128²"]
+    S3["stage3 · /16<br/>c4 512 × 64²"]
+    S4["stage4 · /32<br/>c5 1024 × 32²"]
+    STEM --> S1 --> S2 --> S3 --> S4
+  end
+
+  subgraph LK["LSK · 2.2M"]
+    direction TB
+    L3["LSK c3"]
+    L4["LSK c4"]
+    L5["LSK c5"]
+  end
+
+  subgraph EN["Encoder lai D-FINE · 4.0M · 256 kênh"]
+    direction TB
+    AIFI["AIFI /32<br/>1024 token"]
+    FPN4["FPN · 64²"]
+    P3["FPN · P3 128²"]
+    P4["PAN · P4 64²"]
+    P5["PAN · P5 32²"]
+    AIFI --> FPN4 --> P3 --> P4 --> P5
+  end
+
+  subgraph DC["Decoder DETR xoay · 4.4M"]
+    direction TB
+    QS["chọn query<br/>top-K trên 21 504 token"]
+    DL["3 lớp: self-attention<br/>→ deformable attention xoay<br/>→ FFN"]
+    QS --> DL
+  end
+
+  OUT[/"Box xoay + class + điểm<br/>ghép tile: NMS đa giác 0.1"/]
+
+  PAGE --> STEM
+  S2 --> L3
+  S3 --> L4
+  S4 --> L5
+  L5 --> AIFI
+  L4 --> FPN4
+  L3 --> P3
+  P3 & P4 & P5 --> QS
+  P3 & P4 & P5 -.-> DL
+  DL --> OUT
+
+  classDef borrowed fill:#dbeafe,stroke:#2563eb,color:#0f172a
+  classDef own fill:#dcfce7,stroke:#16a34a,color:#0f172a
+  classDef rewr fill:#e2e8f0,stroke:#475569,color:#0f172a
+  classDef io fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  class STEM,S1,S2,S3,S4,AIFI,FPN4,P3,P4,P5 borrowed
+  class L3,L4,L5 own
+  class QS,DL rewr
+  class PAGE,OUT io
+```
+
+### Thân: HGNetv2-B0 (mượn, Apache-2.0, trọng số D-FINE), 1.85M
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| stem | conv 3×3 s2 3→16; nhánh [conv 2×2 16→8 → conv 2×2 8→16] ∥ max-pool 2; nối 32 → conv 3×3 s2 → 16 → conv 1×1 → 16 | 16 × 256² (/4) | 0.006M |
+| stage1 | 1 khối HG: 3 × conv 3×3 16, nối → 1×1 → 64 | 64 × 256² | 0.01M |
+| stage2 | dw 3×3 s2; 1 khối HG: 3 × conv 3×3 32, nối → 1×1 → 256 | **c3** 256 × 128² (/8) | 0.09M |
+| stage3 | dw 3×3 s2; 2 khối HG nhẹ: 3 × (1×1 → dw 5×5) 64, nối → 1×1 → 512 | **c4** 512 × 64² (/16) | 0.64M |
+| stage4 | dw 3×3 s2; 1 khối HG nhẹ: 3 × (1×1 → dw 5×5) 128, nối → 1×1 → 1024 | **c5** 1024 × 32² (/32) | 1.10M |
+
+Kích hoạt ReLU, có LAB (affine học được sau kích hoạt) như bản B0 gốc.
+
+### Adapter LSK (tự viết, ý tưởng LSKNet), 2.21M
+
+Trên c3 / c4 / c5 (256 / 512 / 1024 kênh; 0.12M / 0.43M / 1.65M): a = dw 5×5(x); b = dw 7×7 giãn 3(a) (trường nhìn khoảng 23 ô); a, b → conv 1×1
+về c/2; cổng = conv 7×7 trên [trung bình, max theo kênh] của [a, b] → 2 kênh sigmoid; m = conv 1×1 c/2→c (khởi tạo 0) của (a·g₁ + b·g₂);
+ra **x + x·m**. Khởi tạo = đồng nhất.
+
+### Encoder lai D-FINE (mượn, Apache-2.0, trọng số COCO), 4.02M, 256 kênh
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| input_proj | ba conv 1×1 + BN: 256 / 512 / 1024 → 256 | | 0.46M |
+| AIFI | 1 lớp transformer trên 1024 token của /32: attention 8 đầu, FFN 256→1024→256 (GELU), vị trí sin-cos 2-D | 256 × 32² | 0.79M |
+| FPN (2 bước) | lateral 1×1; upsample ×2; nối 512 → RepNCSPELAN4 (độ sâu 1) → 256 | 256 × 64², **P3** 256 × 128² | 1.38M |
+| PAN (2 bước) | SCDown [1×1 → dw 3×3 s2]; nối 512 → RepNCSPELAN4 → 256 | **P4** 256 × 64², **P5** 256 × 32² | 1.39M |
+
+### Decoder DETR xoay (khung D-FINE, phần OBB viết lại), 4.38M
+
+| Khối | Lớp | Ra | Tham số |
+|---|---|---|---|
+| chọn query | Linear + LayerNorm trên 21 504 token của encoder → head class + head box (4 delta + cos / sin 2θ) → top-K (300 khi train, 900 khi suy luận); vị trí query không chứa góc; MLP vị trí 6→512→256 | K × 256 | 0.34M |
+| 3 lớp decoder | self-attention giữa query (8 đầu, d 256) → **deformable cross-attention xoay theo góc box** (8 đầu, 3 tầng, 3 / 6 / 3 điểm) → FFN 256→1024→256 | K × 256 | 3.38M |
+| head mỗi lớp | class: Linear 256→7; box: MLP 256→256→256→165 = phân phối 5 × 33 bin (4 cạnh trong khung xoay + góc dư ±π/4); LQE | K × (7 + 165) | 0.66M |
+
+Chỉ khi train: 900 query một-nhiều (mỗi object 6 query), denoising có hướng (AQD), ghép Hungarian (focal × IoU^0.5 + Chamfer góc + KLD).
+
+### Tổng hợp
+
+| Phần | S | Tỉ lệ (S) | M | L | X | Nguồn |
+|---|---|---|---|---|---|---|
+| Thân HGNetv2 | B0, 1.85M | 14.8% | B2, 6.03M | B4, 13.51M | B5, 33.23M | mượn (Apache-2.0) |
+| LSK | 2.21M | 17.7% | 4.86M | 8.54M | 8.54M | tự viết |
+| Encoder lai | 4.02M (256) | 32.3% | 7.80M (256) | 9.34M (256) | 20.70M (384) | mượn (Apache-2.0) |
+| Decoder | 4.38M (3 lớp) | 35.2% | 5.72M (4) | 8.34M (6) | 8.59M (6) | khung D-FINE, phần OBB viết lại |
+| **Tổng** | **12.46M** | | **24.4M** | **39.7M** | **71.1M** | |
+
+Suy luận: mỗi tile → 900 query → điểm sigmoid theo class + box (cx, cy, w, h, θ), không NMS trong tile → ghép tile về trang bằng NMS đa giác
+IoU 0.1 theo class.
