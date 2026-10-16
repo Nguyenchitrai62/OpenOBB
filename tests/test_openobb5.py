@@ -69,7 +69,8 @@ def test_cli_openobb5_flags(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(trainer, "main", lambda argv: calls.append(" ".join(argv)))
     data = _dataset(tmp_path / "ds")
-    kw = dict(epochs=10, batch=4, imgsz=512, project=str(tmp_path / "runs"), cache_dir=str(tmp_path / "c"), workers=1)
+    kw = dict(epochs=10, batch=4, imgsz=512, project=str(tmp_path / "runs"), cache_dir=str(tmp_path / "c"), workers=1,
+              optimizer="AdamW")   # the recipe defaults, without the optimizer=auto choices (F98)
     train(str(data), model="openobb5x", name="a", **kw)
     a = calls[-1] + " "
     for flag in ("--arch v5 ", "--size x ", "--backbone dinov2_b ", "--geo-cls ", "--relate ", "--rel-k 600 ",

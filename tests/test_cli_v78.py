@@ -12,7 +12,7 @@ def _calls(tmp_path, monkeypatch, model, **extra):
     monkeypatch.setattr(trainer, "main", lambda argv: calls.append(" ".join(argv) + " "))
     data = _dataset(tmp_path / "ds")
     train(str(data), model=model, name="a", epochs=10, batch=4, imgsz=512, project=str(tmp_path / "runs"),
-          cache_dir=str(tmp_path / "c"), workers=1, **extra)
+          cache_dir=str(tmp_path / "c"), workers=1, optimizer="AdamW", **extra)
     return calls[-1]
 
 

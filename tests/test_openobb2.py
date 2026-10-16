@@ -68,7 +68,8 @@ def test_cli_model_names(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(trainer, "main", lambda argv: calls.append(" ".join(argv)))
     data = _dataset(tmp_path / "ds")
-    kw = dict(epochs=10, batch=4, imgsz=512, project=str(tmp_path / "runs"), cache_dir=str(tmp_path / "c"), workers=1)
+    kw = dict(epochs=10, batch=4, imgsz=512, project=str(tmp_path / "runs"), cache_dir=str(tmp_path / "c"), workers=1,
+              optimizer="AdamW")   # the recipe defaults, without the optimizer=auto choices (F98)
     train(str(data), model="openobb2x", name="a", **kw)
     a = calls[-1] + " "
     for flag in ("--arch v2 ", "--size x ", "--lr 0.001 ", "--backbone-mult 1.0 ", "--clip 10.0 ", "--num-top 1000 ",
