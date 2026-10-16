@@ -49,7 +49,7 @@ openobb val model=runs/obb/train/weights/best.pt data=data.yaml
 ```
 
 - Cỡ model: `openobb23s`, `openobb23m`, `openobb23l`, `openobb23x`.
-- Khung training giống hệt YOLO (Ultralytics): AdamW với LR theo số class, warmup 3 epoch, LR giảm tuyến tính, EMA, nbs 64, mosaic / zoom / translate / lật ngang / HSV. Chỉ kiến trúc model là của OpenOBB. Thêm `rotate_p=0.5` để xoay góc bất kỳ khi bản vẽ có đối tượng nghiêng.
+- Khung training giống hệt YOLO (Ultralytics): AdamW với LR theo số class, warmup 3 epoch, EMA, nbs 64, mosaic / zoom / translate / lật ngang / HSV. Chỉ kiến trúc model là của OpenOBB; khác YOLO một điểm: LR giảm theo cosine (`cos_lr=False` để giảm tuyến tính như YOLO). Thêm `rotate_p=0.5` để xoay góc bất kỳ khi bản vẽ có đối tượng nghiêng.
 - `unlock_all=True`: không đóng băng phần nào của model (thân pretrained). Nên thử khi có data lớn.
 - Cuối train, head và NMS được hiệu chỉnh trên val và lưu vào `best.pt`.
 - Notebook Colab: [colab/OpenOBB_wall_color.ipynb](colab/OpenOBB_wall_color.ipynb). Hướng dẫn chi tiết: [docs/FINETUNE.md](docs/FINETUNE.md).

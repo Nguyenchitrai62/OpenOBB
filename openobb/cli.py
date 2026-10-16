@@ -27,7 +27,7 @@ the train images is held out. Prepared data is cached (~/.cache/openobb). Every 
 ({project}/{name}, then name2, name3...; exist_ok=True reuses it); resume=True continues a run from weights/last.pt.
 
 Training framework = the usual one-stage trainer's (Ultralytics 8.4), only the architecture is OpenOBB's: AdamW with
-lr0 = 0.002 * 5 / (4 + nc) (lr0= is used as given), linear decay to lr0 * lrf (lrf=0.01; cos_lr=True for cosine),
+lr0 = 0.002 * 5 / (4 + nc) (lr0= is used as given), cosine decay to lr0 * lrf (lrf=0.01; cos_lr=False for the linear one),
 warmup_epochs=3 (3 epochs of batches, every LR rising from 0, bias LR included), nbs=64 (gradient accumulation to a nominal
 batch of 64, weight decay 5e-4 scaled to it), EMA 0.9999 ramped over 2000 updates, mosaic=1.0 (close_mosaic=10),
 scale=0.5 (zoom 0.5-1.5), translate=0.1, fliplr=0.5, HSV 0.015 / 0.7 / 0.4, patience=100. Architecture switches stay
@@ -380,15 +380,16 @@ def check_keys(kv):
 
 
 # The TRAINING FRAMEWORK is the usual one-stage trainer's (Ultralytics 8.4 defaults, F99-F104): what any model is trained
-# with. What belongs to an architecture (its trunk LR factor, frozen layers -> unlock_all, losses, assigners, the low LR of
+# with. One deliberate difference: cosine LR decay by default (cos_lr=True, F108; the usual trainer decays linearly).
+# What belongs to an architecture (its trunk LR factor, frozen layers -> unlock_all, losses, assigners, the low LR of
 # the DETR-style OpenOBB1 / 4) stays with the architecture.
 FRAMEWORK = {"wd": 5e-4, "ema": 0.9999, "ema_warmups": 2000, "hsv_h": 0.015, "hsv_s": 0.7, "hsv_v": 0.4,
              "flipud": 0.0, "rot90": False, "rfs": 0.0, "nbs": 64}
 
 
 def _framework(extra):
-    """Training framework of the usual one-stage trainer: weight decay 5e-4 (scaled to the nominal batch 64), linear LR
-    decay, EMA decay 0.9999 ramped over 2000 updates, HSV 0.015 / 0.7 / 0.4, horizontal flip only (no vertical flip, no
+    """Training framework of the usual one-stage trainer: weight decay 5e-4 (scaled to the nominal batch 64), LR
+    decay (cosine by default, cos_lr in train()), EMA decay 0.9999 ramped over 2000 updates, HSV 0.015 / 0.7 / 0.4, horizontal flip only (no vertical flip, no
     90-degree rotation), no repeat-factor sampling; lr0 = 0.002 * 5 / (4 + nc) for the dense models (set once the
     classes are known). Anything passed explicitly wins. Mutates `extra`."""
     for k, v in FRAMEWORK.items():
@@ -457,7 +458,7 @@ def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_
 
 def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, project="runs/obb", name=None,
           exist_ok=False, resume=False, tile=False, tile_scale=None, gap=200, val_frac=0.15, cache="auto", cache_dir=None, workers=None,
-          device=None, recipe=True, warmup_epochs=3, patience=100, lrf=0.01, cos_lr=False, seed=0, optimizer="auto",
+          device=None, recipe=True, warmup_epochs=3, patience=100, lrf=0.01, cos_lr=True, seed=0, optimizer="auto",
           **extra):
     """Train (or fine-tune when `model` is a .pt path). Returns SimpleNamespace(save_dir, best, last, metrics).
     pretrain=coco|dota|<image folders> (new cores openobb6* / openobb9*): download, pretrain and cache the starting

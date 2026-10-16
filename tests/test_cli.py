@@ -113,7 +113,7 @@ def test_fit_mode_one_tile_per_image(tmp_path):
 
 def test_yolo_framework_reaches_the_trainer(tmp_path, monkeypatch):
     """The training framework is the usual one-stage trainer's (F104): AdamW lr0 = 0.002 * 5 / (4 + nc) for the dense
-    models, linear decay, wd 5e-4, EMA 0.9999 / 2000, nbs 64, HSV 0.7 / 0.4, no vertical flip / 90-degree rotation, no RFS;
+    models, cosine decay (F108; the one deliberate difference), wd 5e-4, EMA 0.9999 / 2000, nbs 64, HSV 0.7 / 0.4, no vertical flip / 90-degree rotation, no RFS;
     an explicit value wins; optimizer=AdamW keeps the architecture's own LR; trainer= (removed) is ignored."""
     import openobb.train as trainer
     from openobb.cli import train
@@ -122,13 +122,13 @@ def test_yolo_framework_reaches_the_trainer(tmp_path, monkeypatch):
     data = _dataset(tmp_path / "ds")                  # 2 classes -> lr0 0.002 * 5 / 6
     kw = dict(epochs=10, batch=8, imgsz=512, project=str(tmp_path / "runs"), cache_dir=str(tmp_path / "cache"), workers=1)
     train(str(data), model="openobb3s", name="a", **kw)
-    for flag in ("--lr 0.001667 ", "--backbone-mult 0.5 ", "--wd 0.0005 ", "--schedule linear ", "--ema 0.9999 ",
+    for flag in ("--lr 0.001667 ", "--backbone-mult 0.5 ", "--wd 0.0005 ", "--schedule cos ", "--ema 0.9999 ",
                  "--ema-warmups 2000 ", "--hsv 0.015 0.7 0.4 ", "--flipud 0.0 ", "--no-rot90 ", "--rfs 0.0 ", "--nbs 64 "):
         assert flag in calls[-1], flag
-    train(str(data), model="openobb3s", name="b", optimizer="AdamW", weight_decay=1e-4, cos_lr=True, rot90=True,
+    train(str(data), model="openobb3s", name="b", optimizer="AdamW", weight_decay=1e-4, cos_lr=False, rot90=True,
           trainer="yolo", **kw)
     b = calls[-1]
-    assert "--lr 0.0005 " in b and "--wd 0.0001 " in b and "--schedule cos " in b and "--no-rot90" not in b
+    assert "--lr 0.0005 " in b and "--wd 0.0001 " in b and "--schedule linear " in b and "--no-rot90" not in b
 
 
 def test_train_flags_and_oom_retry(tmp_path, monkeypatch):
@@ -149,7 +149,7 @@ def test_train_flags_and_oom_retry(tmp_path, monkeypatch):
     first, second = (" ".join(c) for c in calls)
     for flag in ("--fit", "--lsk", "--mosaic-p 1.0", "--mosaic-mode yolo", "--scale-jitter 0.5", "--translate 0.1",
                  "--mosaic-off 10", "--patience 100", "--warmup 3", "--eval-every 1", "--batch 8",
-                 "--aug-iof 0.25", "--merge-iou 0.7", "--ema 0.9999", "--ema-warmups 2000", "--schedule linear", "--min-lr-ratio 0.01",
+                 "--aug-iof 0.25", "--merge-iou 0.7", "--ema 0.9999", "--ema-warmups 2000", "--schedule cos", "--min-lr-ratio 0.01",
                  "--epoch-lr", "--warmup-bias-lr 0.0", "--nbs 64"):   # AdamW: no bias LR warmup (F98)
         assert flag in first, flag
     assert "--batch 4" in second                                             # halved after the OOM

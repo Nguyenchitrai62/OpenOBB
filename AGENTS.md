@@ -214,6 +214,8 @@ colab/                    ← (sẽ tạo) script chạy trên Colab
   model là của OpenOBB. Từ 0.23.0 khung mặc định duy nhất là của Ultralytics 8.4 (AdamW lr0 = 0.002·5/(4+nc), LR tuyến tính, wd 5e-4,
   EMA 0.9999/2000, nbs 64, HSV 0.7/0.4, không lật dọc / xoay 90°, không RFS); bỏ `trainer=` và các tự chỉnh riêng cũ. `lr0` truyền tay vẫn
   dùng đúng giá trị. **`unlock_all` giữ lại như tính năng riêng của kiến trúc** (mở khoá thân khi có data lớn). Căn cứ: F103–F104.
+  (bổ sung cùng ngày, 0.24.0) **Một điểm khác YOLO có chủ đích: LR giảm theo cosine là mặc định** (`cos_lr=True`; `cos_lr=False` = tuyến tính
+  như YOLO). Lý do của user: đầu run giữ LR cao để dò vùng lõm, nửa sau hạ nhanh để vào tâm. Chưa có phép thử tách riêng (F108).
 
 Câu hỏi còn mở:
 - Nộp kết quả DOTA test cần tài khoản trên server đánh giá DOTA (user tạo khi đến E4). Trước đó ablation chỉ dùng val.
@@ -425,6 +427,9 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 - `push_all.py` chỉ đồng bộ file đã commit; nó in danh sách file chưa commit, đọc để không bỏ sót.
 
 ## 9. Nhật ký
+
+- 2026-10-16 (6): **0.24.0: LR giảm theo cosine là mặc định** (theo user, F108). `cos_lr=False` để về lịch tuyến tính của YOLO.
+  Đề xuất cặp A/B tách riêng yếu tố này trên Wall_Color.
 
 - 2026-10-16 (5): **Log v23 fine-tune thêm 30 epoch (F107): 0.798 / 0.526**, mốc mới. README hai repo, `docs/OPENOBB23.md` (bảng các lần
   fine-tune) đã cập nhật. Bản GitLab có thêm thẻ v14–v23. App thử model: viewer toàn màn hình (`app/viewer/index.html`).

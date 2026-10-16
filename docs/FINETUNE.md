@@ -97,7 +97,7 @@ Có thể khởi tạo `openobb3x` từ một checkpoint `openobb1` bằng `weig
 | `iou` / `nms_iou` | `auto` | lọc trùng: `auto` = train xong tự thử trên val và lưu ngưỡng tốt nhất (v11 thử cả không NMS) vào `best.pt`, làm mặc định khi predict; hoặc một số cố định / `none`. Với v12 / v13, bước này chọn luôn head dùng khi suy luận (một-một không NMS, hoặc một-nhiều + NMS). Checkpoint đã train: `openobb calibrate model=best.pt data=data.yaml` |
 | `box` | `dfl` | v12 / v13: cách hồi quy box. `direct` = hồi quy trực tiếp độ dài, độ dày, lệch ngang (kiểu YOLO26, không DFL); box khít hơn với vật mảnh (F54) |
 | `pretrain` | không | chỉ `openobb9*` / `openobb6*`: `coco`, `dota` hoặc thư mục ảnh. Tự tải data, pretrain lõi (và train trên DOTA với `dota`), lưu cache rồi mới train. Xem [PRETRAIN.md](PRETRAIN.md) mục 0 |
-| `lrf` | 0.01 | learning rate giảm **tuyến tính** từ `lr0` về `lr0 × lrf` ở cuối run, như YOLO (`cos_lr=True`: giảm theo cosine) |
+| `lrf` | 0.01 | learning rate giảm theo **cosine** từ `lr0` về `lr0 × lrf` ở cuối run (`cos_lr=False`: giảm tuyến tính như YOLO) |
 | `cache` | auto | giải mã ảnh train một lần vào RAM nếu chiếm dưới 25% RAM (`cache=False` để tắt) |
 | `patience` | 100 | dừng nếu mAP50-95 val không tăng sau N epoch |
 | `optimizer` | auto | AdamW, `lr0 = 0.002 × 5 / (4 + số class)` như YOLO (model dense). `optimizer=AdamW`: LR riêng của kiến trúc (`lr0` theo cỡ model) |

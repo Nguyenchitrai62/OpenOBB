@@ -1684,6 +1684,15 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     So với YOLO26x: **+0.055 mAP50, +0.027 mAP50-95**; vẫn thua ở wall (−.025), junction (−.042), wall_300 (−.079) — đúng ba class độ khít
     box của vật mảnh / tí hon; thắng rõ ở class hiếm (slide_door, double_door) và note. Hướng box vật dài cải thiện thêm nhưng còn xa YOLO.
 
+- **F108. 0.24.0: LR giảm theo cosine là mặc định (`cos_lr=True`), điểm khác YOLO duy nhất của khung training (quyết định của user, 10-16).**
+  - Lập luận của user: đầu run cần giữ LR cao để dò được nhiều vùng lõm; nửa sau mới hạ nhanh để đi sâu vào tâm vùng đã chọn. Lịch tuyến tính
+    hạ quá đều: đầu run chưa dò hết, cuối run chưa kịp vào tâm thì đã dừng. Áp dụng cho cả fine-tune lẫn train mới.
+  - Hình dạng (lrf 0.01, `lf(epoch)` của YOLO): ở 25% / 50% / 75% / 90% run, cosine 0.855 / 0.505 / 0.155 / 0.034, tuyến tính 0.753 / 0.505 /
+    0.258 / 0.109. Trung bình và điểm cuối bằng nhau; cosine dồn LR lên nửa đầu và để khoảng 20% cuối ở < 10% lr0.
+  - Bằng chứng trước đó: chưa có phép thử tách riêng lịch LR. A (F104, có cosine) và B (F103, tuyến tính) khác nhau 8 yếu tố khung; mAP ngang.
+    Phép thử tách một yếu tố: cùng `weights=` và 0.24.0, A mặc định so với B `cos_lr=False`.
+  - Code: `openobb/cli.py` (`train(cos_lr=True)`), test `tests/test_cli.py`, `docs/FINETUNE.md`, README hai repo. `cos_lr=False` trả về lịch YOLO.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
