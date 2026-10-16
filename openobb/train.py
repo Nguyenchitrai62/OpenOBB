@@ -897,6 +897,9 @@ def main(argv=None):
     else:
         from openobb.models.openobb7 import fuse_model
         fuse_model(vm)
+    from openobb.predict import fast_layout
+    vm = fast_layout(vm, device)                     # channels_last on a GPU (after folding BN), as at inference (F97)
+
     def final_eval(nms):
         apply_nms(vm, nms)
         merge = merge_iou_for(nms, True) if a.fit else a.merge_iou

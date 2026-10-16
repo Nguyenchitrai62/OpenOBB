@@ -101,6 +101,28 @@ class OrientedHead(nn.Module):
         return cat(self.cls), reg
 
 
+NEAR_MARGIN = 1.5    # pairs farther apart than 1.5 x (sum of half-diagonals) are never compared (no overlap)
+
+
+@torch.no_grad()
+def nms_keep_near(b, lab, iou):
+    """Fast-NMS keep mask for boxes b (N, 5) px in descending score order, labels lab (N,): a box is dropped when a
+    higher-scored box of its class overlaps it with ProbIoU > iou. Only pairs whose centres are within NEAR_MARGIN x the
+    sum of their half-diagonals are scored: two boxes that far apart do not touch, so their ProbIoU is far below any
+    NMS threshold. The full N x N ProbIoU (~30 elementwise passes over N^2 values, 2.9 ms / image at N <= 4000 on a G4,
+    F97) becomes a distance test (a few passes) + ProbIoU on the near pairs only. Same result (test_nms_classwise)."""
+    n = b.shape[0]
+    r = 0.5 * torch.sqrt(b[:, 2] ** 2 + b[:, 3] ** 2)
+    d = torch.cdist(b[None, :, :2], b[None, :, :2])[0]
+    near = (d <= NEAR_MARGIN * (r[:, None] + r[None, :])) & (lab[:, None] == lab[None, :])
+    near = torch.triu(near, diagonal=1)                                       # j (higher score) < i
+    j, i = near.nonzero(as_tuple=True)
+    worst = torch.zeros(n, device=b.device, dtype=b.dtype)
+    if len(i):
+        worst.scatter_reduce_(0, i, probiou(b[j], b[i]).to(b.dtype), "amax", include_self=True)
+    return worst <= iou
+
+
 @torch.no_grad()
 def fast_nms(logits, boxes, max_det=1000, conf=0.001, iou=0.7, pre=4000, min_side=0.0):
     """Per image class-wise Fast-NMS on ProbIoU -> padded (B, max_det, C) logits and (B, max_det, 5) boxes px.
@@ -123,21 +145,7 @@ def fast_nms(logits, boxes, max_det=1000, conf=0.001, iou=0.7, pre=4000, min_sid
         if min_side > 0:
             bn = b.clone()
             bn[:, 2:4] = bn[:, 2:4].clamp(min=min_side)
-        # class-wise: only same-class pairs can suppress, so the overlap matrix is computed per class block (the
-        # candidates stay in score order inside a block): same result as the full N x N matrix masked by class,
-        # ~C times fewer pairs (F92: the NMS took 3.0 ms / image at batch 16, YOLO26's postprocess 0.7 ms)
-        # On a GPU the per-class loop costs more in launches / host syncs than it saves (3.42 vs 3.0 ms, F92): there
-        # the masked full matrix is kept (identical result).
-        if bn.is_cuda:
-            ov = probiou(bn[:, None, :], bn[None, :, :]) * (lab[:, None] == lab[None, :])
-            keep = torch.triu(ov, diagonal=1).amax(0) <= iou
-        else:
-            keep = torch.zeros_like(s, dtype=torch.bool)
-            for c in lab.unique():
-                j = (lab == c).nonzero(as_tuple=True)[0]
-                bj = bn[j]
-                ov = probiou(bj[:, None, :], bj[None, :, :])
-                keep[j] = torch.triu(ov, diagonal=1).amax(0) <= iou
+        keep = nms_keep_near(bn, lab, iou)               # near same-class pairs only (F97), same result
         s, lab, b = s[keep][:max_det], lab[keep][:max_det], b[keep][:max_det]
         n = len(s)
         out_l[i, torch.arange(n, device=s.device), lab] = torch.logit(s.clamp(1e-6, 1 - 1e-6))

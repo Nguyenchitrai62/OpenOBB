@@ -39,3 +39,17 @@ def test_classwise_nms_equals_the_full_matrix():
         a = fast_nms(logits, boxes, max_det=300, conf=0.05, iou=iou)
         r = _reference(logits, boxes, max_det=300, conf=0.05, iou=iou)
         assert torch.equal(a[0], r[0]) and torch.equal(a[1], r[1])
+
+
+def test_near_pair_nms_equals_the_full_matrix():
+    """The GPU path (nms_keep_near) scores only near pairs; its keep mask must equal the full masked matrix."""
+    from openobb.models.openobb3 import nms_keep_near
+    torch.manual_seed(1)
+    for n, spread in ((800, 300.0), (800, 60.0)):                 # sparse page and a dense cluster
+        b = torch.cat([torch.rand(n, 2) * spread, torch.rand(n, 1) * 120 + 2, torch.rand(n, 1) * 12 + 2,
+                       (torch.rand(n, 1) - 0.5) * 3.1], -1)
+        lab = torch.randint(0, 3, (n,))
+        for iou in (0.5, 0.7):
+            ov = probiou(b[:, None, :], b[None, :, :]) * (lab[:, None] == lab[None, :])
+            ref = torch.triu(ov, diagonal=1).amax(0) <= iou
+            assert torch.equal(nms_keep_near(b, lab, iou), ref)

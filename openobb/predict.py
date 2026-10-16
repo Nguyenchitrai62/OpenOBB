@@ -171,11 +171,22 @@ def merge_iou_for(v, fit):
     return 0.7 if v is None else (None if v == "none" else v)
 
 
+def fast_layout(m, device):
+    """Dense OpenOBB models (v12+) on a GPU: weights in channels_last (NHWC), the layout tensor cores read natively;
+    same outputs, trunk + neck 7.2 -> 5.7 ms / image on a G4 at batch 16 (F97). OPENOBB_CHANNELS_LAST=0 turns it off."""
+    import os
+    if (torch.device(device).type == "cuda" and hasattr(m, "run_head")
+            and os.environ.get("OPENOBB_CHANNELS_LAST", "1") != "0"):
+        m = m.to(memory_format=torch.channels_last)
+    return m
+
+
 def load_model(ckpt_path, device, queries=None, classes=None):
     if torch.device(device).type == "cpu":
         # flush denormals (identical detections; speed effect not reproducible on the dev machine, F57)
         torch.set_flush_denormal(True)
     m, names, a = _load_model(ckpt_path, device, queries, classes)
+    m = fast_layout(m, device)
     if a.get("infer_k") and getattr(m, "refiner", None) is not None:   # calibrated at training
         m.refiner.k = int(a["infer_k"])
     return apply_head(apply_nms(m, a.get("nms_iou")), a.get("infer_head")), names, a

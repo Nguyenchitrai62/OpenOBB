@@ -30,13 +30,7 @@ def profile_parts(model_path, imgsz=1280, batch=16, runs=20, warmup=5, h_ratio=0
         for name in ("backbone", "neck", "encoder", "field"):
             if getattr(net, name, None) is not None:
                 setattr(net, name, torch.compile(getattr(net, name)))
-        for hn in ("head", "head_o2o"):
-            h = getattr(net, hn, None)
-            for part in ("cls", "reg"):
-                mods = getattr(h, part, None) if h is not None else None
-                if mods is not None:
-                    for i in range(len(mods)):
-                        mods[i] = torch.compile(mods[i])
+        # the heads stay eager: OpenOBB21+ index their towers layer by layer (run_head)
         detail = False                               # compiled modules cannot be timed one by one
     times = {}
     events = []
@@ -105,7 +99,7 @@ def profile_parts(model_path, imgsz=1280, batch=16, runs=20, warmup=5, h_ratio=0
         for obj, attr, fn in patches:
             setattr(obj, attr, fn)
     nested = times.get("top-k + refiner + snapping", 0.0)
-    mode = ", ".join(n for n, on in (("channels_last", channels_last), ("compile", compile)) if on) or "default"
+    mode = ", ".join(n for n, on in (("channels_last", channels_last), ("compile", compile)) if on) or "default (channels_last on a GPU since 0.22.2)"
     print(f"{model_path}: input {batch} x 3 x {H} x {imgsz}, bf16, {mode}, per image (ms), {runs} runs after {warmup} warm-up")
     for k, v in times.items():
         print(f"  {k:30s} {v:7.2f}")

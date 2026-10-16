@@ -1550,6 +1550,18 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     đạt; tốc độ ≤ 13.0 ms đạt. Gây nhiễu: 50 ep / 187 cập nhật so với 30 ep / 112 của v21, và còn xoay ảnh → phần tăng mAP chưa tách được khỏi train dài
     hơn. Cần giá trị `snap.rot_gain` học được (tiêu chí thứ hai: < 0.2 → bác bỏ) và một v21 50 ep cùng điều kiện làm đối chứng.
 
+- **F97. Tốc độ suy luận không đổi trọng số (user G4 + CPU, 10-16): channels_last −1.4 ms; NMS chỉ chấm cặp gần (cùng kết quả, 4.8× trên CPU).**
+  `openobb profile` v23-x (best.pt F96), batch 16, 960 × 1280, bf16, ms / ảnh:
+  | | thân + neck | head | NMS | tổng |
+  |---|---|---|---|---|
+  | NCHW (cũ) | 7.23 | 0.99 | 2.91 | 12.10 |
+  | **channels_last** | **5.65** | 1.16 | 2.90 | **10.67** |
+  - Chi tiết NCHW: stem 0.67, stage 1 0.74, stage 2 1.05, **stage 3 1.68**, stage 4 0.39; neck `td3` **0.82**, các khối khác ≤ 0.16; khoảng 1.3 ms nằm giữa các
+    module (nội suy, nối, chép) → loại chi phí bộ nhớ channels_last / compile nhắm tới. `compile=True` lỗi ở 0.22.1 (đã sửa: không compile head).
+  - 0.22.2: `predict.fast_layout` (channels_last cho model dense trên GPU, `OPENOBB_CHANNELS_LAST=0` để tắt) ở `load_model` và ở bước val cuối train
+    (sau khi gộp BN). `openobb3.nms_keep_near`: chỉ chấm ProbIoU cho cặp cùng lớp có tâm cách ≤ 1.5 × tổng nửa đường chéo; giống hệt ma trận đầy đủ
+    (test), CPU 4000 box 657 → 137 ms; dùng cho cả CPU và GPU. Chờ số G4.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
