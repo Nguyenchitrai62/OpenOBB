@@ -103,7 +103,8 @@ def is_text(f):
 LEAK = re.compile(r"openobb|vrdet|nguyenchitrai|github\.com/nguyen|(?<!\w)research/|repo nghiên cứu|research repo", re.I)
 SCRUB = (("research/LEDGER.md", "internal benchmark notes"), ("research/ARCH_ANALYSIS.md", "internal analysis"),
          ("research/LESSONS_BY_LAYER.md", "internal notes"), ("repo nghiên cứu", "nhóm phát triển"),
-         ("research repository", "internal repository"), ("research repo", "internal repository"))
+         ("research repository", "internal repository"), ("research repo", "internal repository"),
+         ("LEDGER", "internal notes"))                                 # bare mentions of the research ledger
 
 
 def rebrand_text(s):
