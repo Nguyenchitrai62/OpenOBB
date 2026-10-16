@@ -1,167 +1,114 @@
-"""OpenOBB quick test: drag and drop a drawing image, see the oriented boxes.
+"""OpenOBB quick test: a full-window viewer for the oriented boxes of one drawing image.
 
     pip install streamlit
     streamlit run app/streamlit_app.py
 
-Put the downloaded best.pt at MODEL_PATH (or type another path in the sidebar). Works on CPU or GPU; pages of any
-size are tiled exactly as in training.
+The whole page is the viewer (app/viewer/index.html, a two-way Streamlit component): drop or pick an image, choose the
+model and the NMS threshold in its left panel. The model runs here exactly as in deployment (settings saved in best.pt:
+image size, head, NMS inside the network); a new NMS value re-runs it (cached per image and value). Everything else runs
+in the browser without re-running: zoom / pan, click a box for its full details, confidence threshold, show / hide
+classes or single boxes, labels, TXT export of the visible boxes. The confidence filter gives the same boxes as passing
+conf= to predict (a lower-scored box never removes a higher-scored one).
 """
-import json
-import os
+import base64
 import sys
 import time
 from pathlib import Path
 
 import cv2
 import numpy as np
-import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from openobb.torch_setup import ensure_torch  # noqa: E402
 
 TORCH_SETUP = ensure_torch()     # before torch is imported: CUDA PyTorch on a machine with an NVIDIA GPU, else CPU
-import torch  # noqa: E402
-from openobb.predict import (apply_head, apply_nms, conf_thresholds, load_model, merge_dets, parse_nms,  # noqa: E402
-                             predict_image, to_label_lines)
+from openobb import OpenOBB  # noqa: E402
+from openobb.predict import parse_nms  # noqa: E402
 
-MODEL_PATH = r"F:\Source_code\NEW_architecture\models\best_v1.pt"       # đường dẫn model: tuyệt đối, hoặc tương đối so với thư mục repo
+MODEL_PATH = r"F:\Downloads\openobb23x_new.pt"      # đường dẫn model: tuyệt đối, hoặc tương đối so với thư mục repo
 
-PALETTE = [(230, 25, 75), (60, 180, 75), (0, 130, 200), (245, 130, 48), (145, 30, 180), (70, 240, 240),
-           (240, 50, 230), (210, 245, 60), (250, 190, 212), (0, 128, 128), (170, 110, 40), (128, 0, 0),
-           (128, 128, 0), (0, 0, 128), (255, 225, 25), (128, 128, 128)]          # RGB, one per class
-
-
-@st.cache_resource(show_spinner="Loading model...")
-def get_model(path, queries):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if device.type == "cpu":
-        torch.set_num_threads(max(1, (os.cpu_count() or 2) // 2))   # physical cores: 2x faster than 4 threads on 8 cores
-    model, names, targs = load_model(path, device, queries)
-    return model, list(names), targs, device
+viewer = components.declare_component("obb_viewer", path=str(Path(__file__).with_name("viewer")))
+BROWSER_IMAGES = (".png", ".jpg", ".jpeg", ".webp", ".gif")
+HIDE_PAGE = """<style>
+header, [data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"],
+[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"] {display: none !important}
+[data-testid="stMainBlockContainer"], .block-container {padding: 0 !important; max-width: none !important}
+</style>"""
 
 
-def preview(img, max_side=1600):
-    """Downscaled copy for display only (detections stay at full resolution): a 3300 x 2300 page re-encoded on every
-    Streamlit rerun made the app slow."""
-    s = max_side / max(img.shape[:2])
-    return img if s >= 1 else cv2.resize(img, (round(img.shape[1] * s), round(img.shape[0] * s)), interpolation=cv2.INTER_AREA)
+def _np(x):
+    return x.cpu().numpy() if hasattr(x, "cpu") else np.asarray(x)
 
 
-def draw(img_rgb, dets, names, thickness, show_text):
-    out = img_rgb.copy()
-    for d in dets:
-        color = PALETTE[d["class_id"] % len(PALETTE)]
-        pts = np.array(d["poly"]).reshape(4, 2).round().astype(np.int32)
-        cv2.polylines(out, [pts], True, color, thickness, cv2.LINE_AA)
-        if show_text:
-            x, y = pts[np.argmin(pts[:, 1])]
-            cv2.putText(out, f"{d['class']} {d['score']:.2f}", (int(x), int(y) - 3), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.4 * thickness, color, max(1, thickness // 2), cv2.LINE_AA)
+@st.cache_resource(show_spinner=False)
+def get_model(path):
+    return OpenOBB(path)
+
+
+@st.cache_data(show_spinner=False, max_entries=16)
+def detect(path, data, iou):
+    """predict() as deployed; iou=None: the NMS calibrated in best.pt, else that threshold ("none": no NMS)."""
+    img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+    if img is None:
+        return None, None, 0.0
+    t = time.perf_counter()
+    r = get_model(path).predict(img, conf=0.05, iou=iou, max_det=1000, verbose=False)[0]
+    return img, r, (time.perf_counter() - t) * 1000
+
+
+def default_nms(args):
+    """The NMS calibrated at the end of training (saved in best.pt) as a slider value; 1.0 = no NMS."""
+    v = parse_nms(args.get("nms_iou"))
+    if v is None:
+        return 0.7
+    if v == "none":
+        return 1.0
+    if isinstance(v, str):                       # "peak+0.5" -> 0.5 (the local-peak filter is not reproduced here)
+        return float(v.split("+")[1]) if "+" in v else 1.0
+    return float(v)
+
+
+def result(name, img, r, ms):
+    """Every box with conf >= 0.05 for the viewer (it filters by confidence itself)."""
+    pts = _np(r.obb.xyxyxyxy).reshape(len(r), 8) if len(r) else np.zeros((0, 8))
+    objs = [{"c": int(c), "s": round(float(s), 6), "p": [round(float(v), 2) for v in p],
+             "r": [round(float(v), 4) for v in rb]}
+            for c, s, p, rb in zip(_np(r.obb.cls), _np(r.obb.conf), pts, _np(r.obb.xywhr))]
+    out = {"file": name, "w": img.shape[1], "h": img.shape[0], "ms": ms, "objs": objs,
+           "names": [r.names.get(i, str(i)) for i in range(max(r.names) + 1)] if r.names else []}
+    if not name.lower().endswith(BROWSER_IMAGES):   # BMP / TIFF: the browser cannot show them, send a PNG back
+        out["img"] = "data:image/png;base64," + base64.b64encode(cv2.imencode(".png", img)[1].tobytes()).decode()
     return out
 
 
 def main():
-    t_page = time.time()
-    st.set_page_config(page_title="OpenOBB OBB test", page_icon="📐", layout="wide")
-
-    with st.sidebar:
-        if TORCH_SETUP == "restart":
-            st.warning("Đã cài PyTorch bản GPU. Tắt và mở lại app để chạy bằng GPU (lần này vẫn chạy CPU).")
-        elif TORCH_SETUP == "failed":
-            st.warning("Không cài được PyTorch bản GPU tự động: xem log trong terminal.")
-        st.header("Model")
-        local = sorted((ROOT / "models").glob("*.pt"), key=lambda f: f.stat().st_mtime, reverse=True)
-        default = MODEL_PATH if (ROOT / MODEL_PATH).exists() or not local else str(local[0].relative_to(ROOT))
-        model_path = st.text_input("Model (.pt)", default, help="đường dẫn tuyệt đối, hoặc tương đối so với thư mục repo; "
-                                   "mặc định lấy file .pt mới nhất trong models/")
-        p = Path(model_path)
-        p = p if p.is_absolute() else ROOT / p
-        if not p.exists():
-            st.error(f"Không thấy model: {p}")
-            st.stop()
-        queries = st.select_slider("Queries", [300, 600, 900], value=900)
-        model, names, targs, device = get_model(str(p), queries)
-        st.caption(f"OpenOBB{targs.get('arch', 'v1')[1:]}-{targs.get('size', 's')} · {len(names)} class · tile {targs.get('img', 1024)} · {device}")
-
-        st.header("Ảnh")
-        up = st.file_uploader("Kéo thả ảnh", type=("jpg", "jpeg", "png", "bmp", "tif", "tiff", "webp"))
-        c1, c2 = st.columns(2)
-        auto = st.checkbox("Ngưỡng tự động theo class (F2 tốt nhất trên val)", value=False,
-                           disabled=not targs.get("conf_thr"))
-        conf = c1.slider("Confidence", 0.05, 1.0, 0.3, 0.05, disabled=auto)
-        cal = parse_nms(targs.get("nms_iou"))           # calibrated on val at the end of training
-        nms0 = 1.0 if cal == "none" else (cal if isinstance(cal, float) else 0.7)
-        iou = c2.slider("NMS IoU", 0.0, 1.0, nms0 if targs.get("fit", False) else 0.1, 0.05,
-                        help="lọc box trùng (mặc định = giá trị hiệu chỉnh lúc train; 1.0 = không NMS). Cả ảnh là 1 "
-                             "tile: áp cho NMS của model và lúc ghép; nhiều tile: 0.1 khi ghép")
-        head = None
-        if hasattr(model, "infer_head"):                 # OpenOBB12 / 13: one-to-many (+ NMS) or one-to-one head
-            heads = ["o2m", "o2o"]
-            head = st.radio("Head", heads, index=heads.index(targs.get("infer_head") or "o2m"), horizontal=True,
-                            help="o2m: head một-nhiều + NMS; o2o: head một-một (ít trùng, không cần NMS). "
-                                 "Mặc định = lựa chọn hiệu chỉnh lúc train")
-        with st.expander("Kích thước ảnh"):
-            size = st.number_input("imgsz", 256, 4096, int(targs.get("img", 1024)), 32,
-                                   help="cạnh dài ảnh đưa vào model (mặc định = lúc train)")
-            tile = st.checkbox("Cắt tile ở độ phân giải gốc", value=not targs.get("fit", False),
-                               help="cho trang rất lớn có object rất nhỏ; mặc định resize cả ảnh như lúc train")
-            scale = st.number_input("tile_scale", 0.1, 4.0, float(targs.get("scale", 1.0)), 0.05, disabled=not tile)
-            gap = st.number_input("Tile overlap (px)", 0, 512, 200, 8, disabled=not tile)
-        st.subheader("Class")
-        selected = [i for i, n in enumerate(names) if st.checkbox(n, value=True, key=f"cls_{i}")]
-        thickness = st.slider("Độ dày nét", 1, 8, 2)
-        show_text = st.checkbox("Hiện tên + điểm", value=False)
-        detect = st.button("Detect", type="primary")
-
-    if up is None:
-        st.info("Kéo thả một ảnh bản vẽ vào thanh bên trái.")
-        return
-    data = up.getvalue()
-    img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
-    if img is None:
-        st.error("Không đọc được ảnh.")
-        return
-    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-    run_scale = float(scale) if tile else int(size) / max(img.shape[:2])     # whole image: long side = imgsz
-    fit = not tile
-    key = (up.name, len(data), str(p), queries, int(size), run_scale, int(gap), head, iou if fit else None)
-    if detect:
-        apply_head(model, head)
-        apply_nms(model, ("none" if iou >= 1.0 else iou) if fit else targs.get("nms_iou"))
-        t = time.time()
-        with st.spinner("Detecting..."):
-            raw = predict_image(model, img, int(size), int(gap), 8, device, queries, scale=run_scale)
-        st.session_state.update(raw=raw, key=key, ms=(time.time() - t) * 1000)
-
-    left, right = st.columns(2)
-    left.image(preview(rgb), caption=f"{up.name} ({img.shape[1]}×{img.shape[0]})")
-    if st.session_state.get("key") != key:
-        right.info("Bấm **Detect**.")
-        return
-
-    thr = conf_thresholds(names, targs, "auto" if auto else conf)
-    raw = [d for d in st.session_state["raw"] if d[2] >= thr[d[1]]]
-    dets = [d for d in merge_dets(raw, names, 0.0, iou) if d["class_id"] in selected]
-    right.image(preview(draw(rgb, dets, names, thickness, show_text)), caption=f"{len(dets)} objects · model "
-                f"{st.session_state['ms']:.0f} ms ({device}, {torch.get_num_threads()} threads) · page update "
-                f"{(time.time() - t_page) * 1000:.0f} ms")
-
-    counts = pd.Series([d["class"] for d in dets], dtype=str).value_counts()
-    table = pd.DataFrame({"class": names, "count": [int(counts.get(n, 0)) for n in names]})
-    c1, c2 = st.columns([1, 2])
-    c1.dataframe(table[table["class"].isin([names[i] for i in selected])], hide_index=True)
-    with c2:
-        stem = Path(up.name).stem
-        lines = to_label_lines(dets, img.shape)
-        st.download_button("Tải nhãn TXT (class x1 y1 ... x4 y4)", "\n".join(lines) + ("\n" if lines else ""),
-                           file_name=f"{stem}.txt", mime="text/plain")
-        st.download_button("Tải JSON (toạ độ pixel + điểm)", json.dumps(dets, ensure_ascii=False, indent=1),
-                           file_name=f"{stem}.json", mime="application/json")
-        if lines:
-            st.code("\n".join(lines[:10]), language=None)
+    st.set_page_config(page_title="OpenOBB test", page_icon="📐", layout="wide", initial_sidebar_state="collapsed")
+    st.markdown(HIDE_PAGE, unsafe_allow_html=True)
+    req = st.session_state.get("viewer") or {}          # what the viewer asked for last: image, model, NMS
+    local = sorted((ROOT / "models").glob("*.pt"), key=lambda f: f.stat().st_mtime, reverse=True)
+    path = Path(req.get("model") or (MODEL_PATH if (ROOT / MODEL_PATH).exists() or not local else str(local[0])))
+    path = path if path.is_absolute() else ROOT / path
+    args = {"id": req.get("id", 0), "model": str(path)}
+    try:
+        if not path.exists():
+            raise FileNotFoundError(f"Không thấy model: {path}")
+        model = get_model(str(path))
+        nms0 = default_nms(model.args)
+        args.update(nms0=nms0, info=f"{model.device}" + (" · cài xong PyTorch GPU, mở lại app để dùng GPU"
+                                                          if TORCH_SETUP == "restart" else ""))
+        if req.get("data"):
+            iou = req.get("nms")
+            run_iou = None if iou is None or abs(iou - nms0) < 1e-9 else ("none" if iou >= 1.0 else float(iou))
+            img, r, ms = detect(str(path), base64.b64decode(req["data"]), run_iou)
+            if img is None:
+                raise ValueError(f"Không đọc được ảnh {req.get('file')}")
+            args["result"] = result(req.get("file") or "image", img, r, ms)
+    except Exception as e:                               # shown in the viewer's panel
+        args["error"] = str(e)
+    viewer(**args, key="viewer", default=None)
 
 
 if __name__ == "__main__":

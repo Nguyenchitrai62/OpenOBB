@@ -1,0 +1,336 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>OpenOBB viewer</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--line:#dfe3e8;--text:#1d2329;--muted:#6b7580;--accent:#1e6edc;--err:#c62828}
+*{box-sizing:border-box}html,body{margin:0;height:100%;font:13px/1.35 system-ui,sans-serif;color:var(--text);background:var(--bg);overflow:hidden}
+#app{display:flex;height:100vh}
+#side{width:280px;flex:none;display:flex;flex-direction:column;background:var(--panel);border-right:1px solid var(--line)}
+.sec{padding:8px 10px;border-bottom:1px solid var(--line)}
+.sec h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:6px}
+.row{display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer;user-select:none}
+.row:hover{background:#f0f4fa}
+.sw{width:11px;height:11px;border-radius:2px;flex:none}
+.cnt{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
+.off{opacity:.4}.muted{color:var(--muted)}.small{font-size:11px}
+button{white-space:nowrap;font:inherit;border:1px solid var(--line);background:#fff;border-radius:5px;padding:2px 7px;cursor:pointer}
+button:hover{border-color:var(--accent)}button.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+input[type=text],input[type=number]{font:inherit;padding:2px 5px;border:1px solid var(--line);border-radius:5px}
+input[type=number]{width:68px;text-align:right}input[type=range]{width:100%}
+#model{width:100%}
+#list{flex:1;overflow:auto;padding:4px 10px}
+#list .row{font-variant-numeric:tabular-nums}#list .row.sel{background:#dce9fb}
+#main{flex:1;position:relative;overflow:hidden;background:#e9ecef}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#tools{position:absolute;top:8px;right:8px;display:flex;gap:4px;align-items:center}
+#tools button,#chip{background:rgba(255,255,255,.95)}
+#chip{border:1px solid var(--line);border-radius:5px;padding:2px 7px;min-width:52px;text-align:center}
+#tip{position:absolute;pointer-events:none;background:rgba(20,24,28,.88);color:#fff;padding:2px 6px;border-radius:4px;font-size:12px;display:none;white-space:nowrap}
+#info{position:absolute;left:8px;bottom:8px;background:rgba(255,255,255,.97);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:230px;display:none;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+#info table{border-collapse:collapse;font-variant-numeric:tabular-nums}#info td{padding:1px 8px 1px 0;vertical-align:top}#info td:first-child{color:var(--muted)}
+#info .b{display:flex;gap:4px;margin-top:6px}
+#help{position:absolute;right:8px;bottom:8px;color:var(--muted);font-size:11px;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:4px}
+#empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-size:15px}
+#empty .big{font-size:22px;font-weight:600;color:var(--text)}
+#busy{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(20,24,28,.85);color:#fff;padding:4px 12px;border-radius:14px;display:none}
+#drop{position:fixed;inset:0;z-index:10;display:none;align-items:center;justify-content:center;font:600 40px sans-serif;color:#fff;
+  background:rgba(30,110,220,.35);border:4px dashed #fff;pointer-events:none}
+#err{color:var(--err);display:none;margin-top:4px;white-space:pre-wrap}
+</style></head>
+<body><div id="app">
+<div id="side">
+  <div class="sec"><h4>Ảnh <button id="open" class="pri">Chọn ảnh…</button></h4>
+    <div id="file" class="muted small">Chưa có ảnh: thả ảnh vào bất kỳ đâu</div>
+    <input id="picker" type="file" accept="image/*,.tif,.tiff,.bmp" hidden></div>
+  <div class="sec"><h4>Model</h4><input id="model" type="text" title="Đường dẫn .pt trên máy chạy app; Enter để nạp">
+    <div id="dev" class="muted small"></div><div id="err"></div></div>
+  <div class="sec"><h4>NMS IoU <input id="nmsn" type="number" min="0.05" max="1" step="0.05" title="1 = không NMS"></h4>
+    <input id="nms" type="range" min="0.05" max="1" step="0.05"><div id="nmsnote" class="muted small"></div></div>
+  <div class="sec"><h4>Confidence ≥ <input id="confn" type="number" min="0.05" max="1" step="0.01" title="Nhập ngưỡng bất kỳ"></h4>
+    <input id="conf" type="range" min="0.05" max="1" step="0.05"></div>
+  <div class="sec"><h4>Class <span><button id="all">Hiện hết</button> <button id="none">Ẩn hết</button></span></h4><div id="classes"></div>
+    <div id="hidden" style="display:none;margin-top:4px"><button id="unhide"></button></div></div>
+  <div class="sec"><h4>Object <select id="sort"><option value="d">conf giảm</option><option value="a">conf tăng</option></select></h4></div>
+  <div id="list"></div>
+  <div class="sec"><button id="txt">Tải nhãn TXT (object đang hiện)</button></div>
+</div>
+<div id="main">
+  <canvas id="cv"></canvas>
+  <div id="empty"><div class="big">Thả ảnh bản vẽ vào đây</div><div>hoặc</div><button id="open2" class="pri">Chọn ảnh…</button></div>
+  <div id="tools"><button id="zout" title="Thu nhỏ (-)">−</button><span id="chip">–</span><button id="zin" title="Phóng to (+)">+</button>
+    <button id="fit" title="Vừa khung (F)">Vừa khung</button><button id="lab" title="Nhãn (L)">Nhãn</button><button id="fill" title="Tô màu">Tô</button></div>
+  <div id="busy">Đang chạy model…</div>
+  <div id="tip"></div>
+  <div id="info"></div>
+  <div id="help">Lăn: zoom · Kéo: di chuyển · Bấm box: chi tiết · F vừa khung · L nhãn · H ẩn box · Esc bỏ chọn</div>
+</div></div>
+<div id="drop">Thả ảnh vào đây</div>
+<script>
+const PAL = ['#ff3838','#2c99a8','#ff9d97','#ff701f','#ffb21d','#cfd231','#48f90a','#92cc17','#3ddb86','#1a9334','#00d4bb',
+             '#00c2ff','#344593','#6473ff','#0018ec','#8438ff','#520085','#cb38ff','#ff95c8','#ff37c7'];
+const color = c => PAL[c % PAL.length];
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d'), main = $('main');
+
+// ---------------- Streamlit component protocol (no npm library needed) ----------------
+function post(type, extra) { window.parent.postMessage(Object.assign({isStreamlitMessage: true, type}, extra), '*'); }
+// The request the page answers: the image (base64), the model path and the NMS threshold (null = the one saved in best.pt).
+const req = {id: 0, file: null, data: null, model: null, nms: null};
+function send() { req.id++; $('busy').style.display = 'block'; post('streamlit:setComponentValue', {value: {...req}, dataType: 'json'}); }
+
+// ---------------- state ----------------
+let D = null, order = [];                                    // current result: names, w, h, objs
+const S = {conf: 0.3, labels: false, fill: true};
+let hideCls = new Set(), hideObj = new Set(), sel = -1, hover = -1;
+const view = {scale: 1, x: 0, y: 0}; let minScale = 1, haveView = false;
+let img = new Image(), imgURL = null, nms0 = 0.7, modelPath = null;
+
+function shown(o) { return o.s >= S.conf && !hideCls.has(o.c) && !hideObj.has(o.i); }
+function size() { return [main.clientWidth, main.clientHeight]; }
+function resize() { const r = devicePixelRatio || 1, [w, h] = size(); cv.width = w * r; cv.height = h * r; ctx.setTransform(r, 0, 0, r, 0, 0); }
+function fitScale() { if (!D) return; const [w, h] = size(); minScale = Math.min((w - 24) / D.w, (h - 24) / D.h); }
+function fit() {
+  if (!D) return; const [w, h] = size(); fitScale();
+  view.scale = minScale; view.x = (w - D.w * minScale) / 2; view.y = (h - D.h * minScale) / 2; chip();
+}
+function zoom(f, ax, ay) {
+  if (!D) return; const [w, h] = size(); if (ax === undefined) { ax = w / 2; ay = h / 2; }
+  const px = (ax - view.x) / view.scale, py = (ay - view.y) / view.scale;
+  const s = Math.min(80, Math.max(minScale, view.scale * f)); if (s === view.scale) return;
+  view.scale = s; view.x = ax - px * s; view.y = ay - py * s;
+  if (Math.abs(s - minScale) < 1e-9) fit();                 // zoomed all the way out = back to "fit"
+  chip(); draw();
+}
+function focus(o) {                                          // zoom to an object, at least ~120 px on screen
+  const [w, h] = size(), b = o.b, bw = Math.max(1, b[2] - b[0]), bh = Math.max(1, b[3] - b[1]);
+  const s = Math.min(20, Math.max(minScale, Math.min((w - 160) / bw, (h - 160) / bh), 120 / Math.max(bw, bh)));
+  view.scale = Math.min(Math.max(view.scale, s), 80);
+  view.x = w / 2 - (b[0] + b[2]) / 2 * view.scale; view.y = h / 2 - (b[1] + b[3]) / 2 * view.scale; chip(); draw();
+}
+function chip() { $('chip').textContent = D ? Math.round(view.scale * 100) + '%' : '–'; }
+
+function path(o) {
+  const p = o.p; ctx.beginPath(); ctx.moveTo(p[0] * view.scale + view.x, p[1] * view.scale + view.y);
+  for (let k = 1; k < 4; k++) ctx.lineTo(p[2*k] * view.scale + view.x, p[2*k+1] * view.scale + view.y); ctx.closePath();
+}
+function draw() {
+  const [w, h] = size(); ctx.clearRect(0, 0, w, h); if (!D) return;
+  ctx.imageSmoothingEnabled = view.scale < 2;
+  if (img.complete && img.naturalWidth) ctx.drawImage(img, view.x, view.y, D.w * view.scale, D.h * view.scale);
+  for (const o of order) {
+    if (!shown(o)) continue; path(o); const c = color(o.c);
+    if (S.fill) { ctx.globalAlpha = .14; ctx.fillStyle = c; ctx.fill(); ctx.globalAlpha = 1; }
+    ctx.strokeStyle = c; ctx.lineWidth = o.i === sel ? 3 : o.i === hover ? 2.5 : 1.5; ctx.stroke();
+  }
+  if (sel >= 0) { path(D.objs[sel]); ctx.setLineDash([5, 4]); ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]); }
+  if (S.labels) {
+    ctx.font = '11px system-ui,sans-serif'; ctx.textBaseline = 'bottom';
+    for (const o of order) {
+      if (!shown(o)) continue; const t = D.names[o.c] + ' ' + o.s.toFixed(2);
+      const x = o.b[0] * view.scale + view.x, y = o.b[1] * view.scale + view.y, tw = ctx.measureText(t).width;
+      ctx.fillStyle = color(o.c); ctx.fillRect(x, y - 14, tw + 6, 14); ctx.fillStyle = '#fff'; ctx.fillText(t, x + 3, y - 1);
+    }
+  }
+}
+
+function inPoly(p, x, y) {
+  let c = false; for (let k = 0, j = 3; k < 4; j = k++) {
+    const xi = p[2*k], yi = p[2*k+1], xj = p[2*j], yj = p[2*j+1];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+  } return c;
+}
+function segDist(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l));
+  return Math.hypot(px - ax - t * dx, py - ay - t * dy);
+}
+function pick(sx, sy) {                                      // smallest shown box under the cursor (4 px slack for thin walls)
+  if (!D) return -1;
+  const x = (sx - view.x) / view.scale, y = (sy - view.y) / view.scale, tol = 4 / view.scale;
+  for (let n = order.length - 1; n >= 0; n--) {
+    const o = order[n]; if (!shown(o)) continue; const b = o.b;
+    if (x < b[0] - tol || x > b[2] + tol || y < b[1] - tol || y > b[3] + tol) continue;
+    if (inPoly(o.p, x, y)) return o.i;
+    const p = o.p; for (let k = 0; k < 4; k++) { const j = (k + 1) % 4; if (segDist(x, y, p[2*k], p[2*k+1], p[2*j], p[2*j+1]) <= tol) return o.i; }
+  } return -1;
+}
+
+function select(i, zoomTo) {
+  sel = i; const box = $('info');
+  if (i < 0 || !D) { sel = -1; box.style.display = 'none'; } else {
+    const o = D.objs[i], r = o.r;
+    box.innerHTML = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span class="sw" style="background:${color(o.c)}"></span>
+      <b>${D.names[o.c]}</b><span style="margin-left:auto;color:var(--muted)">#${i}</span></div><table>
+      <tr><td>Confidence</td><td><b>${o.s.toFixed(4)}</b> (${(o.s * 100).toFixed(2)}%)</td></tr>
+      <tr><td>Tâm</td><td>${r[0].toFixed(1)}, ${r[1].toFixed(1)} px</td></tr>
+      <tr><td>Kích thước</td><td>${r[2].toFixed(1)} × ${r[3].toFixed(1)} px</td></tr>
+      <tr><td>Góc</td><td>${(r[4] * 180 / Math.PI).toFixed(2)}°</td></tr>
+      <tr><td>4 đỉnh</td><td>${[0,1,2,3].map(k => `(${o.p[2*k].toFixed(0)}, ${o.p[2*k+1].toFixed(0)})`).join(' ')}</td></tr></table>
+      <div class="b"><button id="ifocus">Zoom tới</button><button id="ihide">Ẩn box (H)</button><button id="iclose">Đóng</button></div>`;
+    box.style.display = 'block';
+    $('ifocus').onclick = () => focus(o); $('ihide').onclick = hideSel; $('iclose').onclick = () => select(-1);
+    if (zoomTo) focus(o);
+  }
+  draw(); list();
+}
+function hideSel() { if (sel >= 0) { hideObj.add(sel); select(-1); refresh(); } }
+function dropSelIfHidden() { if (sel >= 0 && !shown(D.objs[sel])) select(-1); }
+
+function classes() {
+  if (!D) { $('classes').innerHTML = ''; $('hidden').style.display = 'none'; return; }
+  const tot = new Array(D.names.length).fill(0), vis = new Array(D.names.length).fill(0);
+  D.objs.forEach(o => { if (o.s >= S.conf) { tot[o.c]++; if (shown(o)) vis[o.c]++; } });
+  $('classes').innerHTML = D.names.map((n, c) => tot[c] ? `<div class="row ${hideCls.has(c) ? 'off' : ''}" data-c="${c}" title="Bấm: bật/tắt · Bấm đúp: chỉ class này">
+    <span class="sw" style="background:${color(c)}"></span>${n}<span class="cnt">${vis[c]}/${tot[c]}</span></div>` : '').join('')
+    || '<div class="muted">Không có object nào ở ngưỡng này</div>';
+  const nh = hideObj.size; $('hidden').style.display = nh ? 'block' : 'none'; $('unhide').textContent = `Hiện lại ${nh} box đã ẩn`;
+}
+function list() {
+  if (!D) { $('list').innerHTML = ''; return; }
+  const rows = D.objs.filter(shown).sort((a, b) => $('sort').value === 'd' ? b.s - a.s : a.s - b.s);
+  $('list').innerHTML = rows.slice(0, 500).map(o => `<div class="row ${o.i === sel ? 'sel' : ''}" data-i="${o.i}">
+    <span class="sw" style="background:${color(o.c)}"></span>${D.names[o.c]}<span class="cnt">${o.s.toFixed(3)}</span></div>`).join('')
+    + (rows.length > 500 ? `<div class="muted">… còn ${rows.length - 500} object</div>` : '');
+  const r = $('list').querySelector('.sel'); if (r) r.scrollIntoView({block: 'nearest'});
+}
+function refresh() { classes(); list(); draw(); }
+
+// ---------------- new image / new result ----------------
+function b64(buf) {
+  const u = new Uint8Array(buf); let s = '';
+  for (let k = 0; k < u.length; k += 0x8000) s += String.fromCharCode.apply(null, u.subarray(k, k + 0x8000));
+  return btoa(s);
+}
+async function openFile(f) {
+  if (!f) return;
+  const buf = await f.arrayBuffer();
+  if (imgURL) URL.revokeObjectURL(imgURL); imgURL = URL.createObjectURL(f);
+  img = new Image(); img.onload = draw; img.src = imgURL;     // TIFF / BMP: the page sends back a PNG instead
+  req.file = f.name; req.data = b64(buf); haveView = false; hideObj = new Set();
+  $('file').textContent = f.name; send();
+}
+function setResult(r) {
+  const fresh = !D || D.file !== r.file || D.w !== r.w || D.h !== r.h;
+  D = r; D.objs.forEach((o, i) => {
+    const p = o.p; o.i = i; let a = 0;
+    for (let k = 0; k < 4; k++) { const j = (k + 1) % 4; a += p[2*k] * p[2*j+1] - p[2*j] * p[2*k+1]; }
+    o.area = Math.abs(a) / 2;
+    const xs = [p[0], p[2], p[4], p[6]], ys = [p[1], p[3], p[5], p[7]];
+    o.b = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  });
+  order = D.objs.slice().sort((a, b) => b.area - a.area);    // big first: small boxes stay on top and win the click
+  if (r.img) { img = new Image(); img.onload = draw; img.src = r.img; }
+  sel = -1; $('info').style.display = 'none';
+  if (fresh) hideObj = new Set();
+  $('empty').style.display = 'none';
+  $('file').textContent = `${r.file} · ${r.w}×${r.h} · ${r.objs.length} box (conf ≥ 0.05) · ${r.ms.toFixed(0)} ms`;
+  resize(); fitScale(); if (fresh || !haveView) { fit(); haveView = true; } else chip();
+  refresh();
+}
+
+// ---------------- messages from the page ----------------
+let lastResultId = -1;
+window.addEventListener('message', e => {
+  const m = e.data; if (!m || m.type !== 'streamlit:render') return;
+  const a = m.args || {};
+  if (a.model && a.model !== modelPath) {                   // first render or another model: its own calibrated NMS
+    modelPath = a.model; $('model').value = a.model; nms0 = a.nms0 ?? 0.7; req.nms = null; setNms(nms0, null, true);
+  }
+  $('dev').textContent = a.info || '';
+  $('err').style.display = a.error ? 'block' : 'none'; $('err').textContent = a.error || '';
+  if (a.id === req.id) $('busy').style.display = 'none';
+  if (a.result && a.id === req.id && a.id !== lastResultId) { lastResultId = a.id; setResult(a.result); }
+});
+
+// ---------------- controls ----------------
+function setNms(v, from, quiet) {
+  if (!isFinite(v)) return; v = Math.min(1, Math.max(0.05, v));
+  if (from !== 'n') $('nmsn').value = +v.toFixed(3); if (from !== 'r') $('nms').value = v;
+  $('nmsnote').textContent = Math.abs(v - nms0) < 1e-9 ? 'Mặc định của model (hiệu chỉnh lúc train)'
+    : (v >= 1 ? 'Không NMS' : `Mặc định của model: ${nms0}`);
+  if (quiet) return;
+  const want = Math.abs(v - nms0) < 1e-9 ? null : v;
+  if (want === req.nms) return; req.nms = want; if (req.data) send();
+}
+let nmsTimer = null;
+$('nms').oninput = e => { clearTimeout(nmsTimer); const v = +e.target.value; nmsTimer = setTimeout(() => setNms(v, 'r'), 250); setNms(v, 'r', true); };
+$('nmsn').onchange = e => setNms(e.target.value === '' ? (req.nms ?? nms0) : +e.target.value);
+$('model').onkeydown = e => { if (e.key === 'Enter') { req.model = e.target.value.trim(); req.nms = null; send(); } };
+function setConf(v, from) {
+  if (!isFinite(v)) return; S.conf = Math.min(1, Math.max(0.05, v));
+  if (from !== 'n') $('confn').value = +S.conf.toFixed(4); if (from !== 'r') $('conf').value = S.conf;
+  if (D) { dropSelIfHidden(); refresh(); }
+}
+setConf(S.conf);
+$('conf').oninput = e => setConf(+e.target.value, 'r');
+$('confn').oninput = e => { if (e.target.value !== '') setConf(+e.target.value, 'n'); };
+$('confn').onchange = e => setConf(e.target.value === '' ? S.conf : +e.target.value);
+$('classes').onclick = e => { const r = e.target.closest('[data-c]'); if (!r) return; const c = +r.dataset.c;
+  hideCls.has(c) ? hideCls.delete(c) : hideCls.add(c); dropSelIfHidden(); refresh(); };
+$('classes').ondblclick = e => { const r = e.target.closest('[data-c]'); if (!r) return; const c = +r.dataset.c;
+  hideCls.clear(); D.names.forEach((_, k) => { if (k !== c) hideCls.add(k); }); dropSelIfHidden(); refresh(); };
+$('all').onclick = () => { hideCls.clear(); refresh(); };
+$('none').onclick = () => { if (D) D.names.forEach((_, k) => hideCls.add(k)); select(-1); refresh(); };
+$('unhide').onclick = () => { hideObj = new Set(); refresh(); };
+$('sort').onchange = list;
+$('list').onclick = e => { const r = e.target.closest('[data-i]'); if (r) select(+r.dataset.i, true); };
+$('zin').onclick = () => zoom(1.5); $('zout').onclick = () => zoom(1 / 1.5);
+$('fit').onclick = () => { fit(); draw(); };
+$('lab').onclick = () => { S.labels = !S.labels; draw(); };
+$('fill').onclick = () => { S.fill = !S.fill; draw(); };
+$('open').onclick = $('open2').onclick = () => $('picker').click();
+$('picker').onchange = e => { openFile(e.target.files[0]); e.target.value = ''; };
+$('txt').onclick = () => {
+  if (!D) return;
+  const lines = D.objs.filter(shown).map(o => o.c + ' ' + o.p.map((v, k) => (v / (k % 2 ? D.h : D.w)).toFixed(6)).join(' '));
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([lines.join('\n') + (lines.length ? '\n' : '')], {type: 'text/plain'}));
+  a.download = D.file.replace(/\.[^.]+$/, '') + '.txt'; document.body.appendChild(a); a.click(); a.remove();
+};
+
+// ---------------- mouse / keyboard ----------------
+cv.addEventListener('wheel', e => { e.preventDefault(); const r = cv.getBoundingClientRect();
+  zoom(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top); }, {passive: false});
+let drag = null;
+cv.onmousedown = e => { if (D) drag = {x: e.clientX, y: e.clientY, moved: false}; };
+window.addEventListener('mousemove', e => {
+  const r = cv.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top, tip = $('tip');
+  if (drag) {
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (drag.moved || Math.hypot(dx, dy) > 3) { drag.moved = true; view.x += dx; view.y += dy; drag.x = e.clientX; drag.y = e.clientY;
+      cv.style.cursor = 'grabbing'; tip.style.display = 'none'; draw(); }
+    return;
+  }
+  if (e.target !== cv || !D) { if (hover >= 0) { hover = -1; draw(); } tip.style.display = 'none'; return; }
+  const i = pick(sx, sy); cv.style.cursor = i >= 0 ? 'pointer' : 'grab';
+  if (i !== hover) { hover = i; draw(); }
+  if (i >= 0) { const o = D.objs[i]; tip.textContent = D.names[o.c] + '  ' + o.s.toFixed(3); tip.style.display = 'block';
+    tip.style.left = Math.min(sx + 14, main.clientWidth - tip.offsetWidth - 4) + 'px'; tip.style.top = (sy + 14) + 'px'; }
+  else tip.style.display = 'none';
+});
+window.addEventListener('mouseup', e => {
+  if (!drag) return; const moved = drag.moved; drag = null; cv.style.cursor = 'grab';
+  if (!moved && e.target === cv) { const r = cv.getBoundingClientRect(); select(pick(e.clientX - r.left, e.clientY - r.top)); }
+});
+cv.ondblclick = () => { if (sel >= 0) focus(D.objs[sel]); };
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  const k = e.key.toLowerCase();
+  if (k === 'escape') select(-1); else if (k === 'f') { fit(); draw(); } else if (k === 'l') $('lab').click();
+  else if (k === 'h') hideSel(); else if (k === '+' || k === '=') zoom(1.5); else if (k === '-') zoom(1 / 1.5);
+});
+new ResizeObserver(() => {                                  // stay where the user is, unless the view was "fit"
+  const keep = D && view.scale > minScale + 1e-9; resize(); fitScale(); if (keep) chip(); else fit(); draw();
+}).observe(main);
+
+// Drop an image anywhere.
+let depth = 0;
+const hasFiles = e => e.dataTransfer && [...e.dataTransfer.types].includes('Files');
+document.addEventListener('dragenter', e => { if (hasFiles(e)) { depth++; $('drop').style.display = 'flex'; } });
+document.addEventListener('dragleave', e => { if (hasFiles(e) && --depth <= 0) { depth = 0; $('drop').style.display = 'none'; } });
+document.addEventListener('dragover', e => { if (hasFiles(e)) e.preventDefault(); });
+document.addEventListener('drop', e => { if (!hasFiles(e)) return; e.preventDefault(); depth = 0; $('drop').style.display = 'none';
+  openFile(e.dataTransfer.files[0]); });
+
+// The viewer is the whole page: the component frame covers the window (it is served from the same origin as the page).
+try { const fe = window.frameElement; if (fe) fe.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;border:0;z-index:999990;background:#f6f7f9'; } catch (e) {}
+post('streamlit:componentReady', {apiVersion: 1});
+post('streamlit:setFrameHeight', {height: 600});
+</script></body></html>
