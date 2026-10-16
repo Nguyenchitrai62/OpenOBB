@@ -1580,6 +1580,19 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - 0.22.6: warmup = round(min(warmup_epochs, epochs − 1) × số batch mỗi epoch), bỏ mức tối thiểu 100 iteration. Ultralytics hiện tại
     (8.4.174, `_get_warmup_iterations`) không còn mức này; bản cũ có. Với 77 ảnh / batch 16: warmup 15 iteration (3 epoch) thay vì 100.
 
+- **F99. Rà bộ khung train của Ultralytics 8.4.174 (mã nguồn bản cài local) so với OpenOBB; tách khung training và kiến trúc model (theo user).**
+  - Giống: warmup theo epoch (0.22.6), bias LR 0 với AdamW, tích luỹ gradient nbs 64 tăng dần trong warmup, weight decay nhân theo nbs, nhóm
+    tham số (decay chỉ weight conv / linear), `lf(epoch)`, clip 10, val mỗi epoch, best theo mAP50-95 (fitness của Ultralytics bản này chỉ
+    còn mAP50-95), OOM tự giảm batch, `close_mosaic` 10, mosaic / scale / translate / lật ngang.
+  - Khác ở **khung**: LR (`optimizer=auto` của YOLO luôn `0.002·5/(4+nc)` và bỏ qua lr0), weight decay 5e-4 so với 1e-4, lịch tuyến tính so với
+    cosine, EMA 0.9999 / τ 2000 (run ngắn gần như không trung bình) so với nửa đời 5% run, HSV 0.7 / 0.4 so với 0.5 / 0.3, lật dọc 0 so với 0.5,
+    xoay 90° tắt so với bật, không RFS, albumentations p 0.01, AMP fp16 so với bf16, `max_det` val 300 so với 1000. YOLO chọn MuSGD chỉ khi
+    `ceil(n / max(batch, 64)) × epochs > 10 000`, nên DOTA (khoảng 5 950) cũng là AdamW.
+  - Khác ở **kiến trúc** (không thuộc khung): thân cỡ l / x đóng băng stem + mọi BN (FrozenBatchNorm, theo D-FINE); LR thân ×0.1; trọng số
+    head một-nhiều / một-một (YOLO26: 0.8 / 0.2 → 0.1 / 0.9 theo epoch; OpenOBB 1 / 1); gán nhãn, loss góc, box tí hon.
+  - 0.22.7: `trainer=yolo` (chỉ khung, mặc định `openobb`) và `unlock_all=True` (kiến trúc: không đóng băng gì, BN bắt đầu đúng bằng giá trị
+    đang đóng băng). Chưa đo; cặp đề xuất trên Wall_Color: A mặc định, B `trainer=yolo`, C `unlock_all=True`, cùng `weights=`.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

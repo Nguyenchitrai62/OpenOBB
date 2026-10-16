@@ -142,7 +142,7 @@ SIZE_DEFAULTS9 = {s: dict(lr=5e-4, backbone_mult=0.2, wd=1e-4, batch=b, gb=g)
                   for s, b, g in (("s", 16, 1.0), ("m", 16, 1.4), ("l", 8, 2.0), ("x", 8, 2.8))}
 RECIPE9 = {"rfs": 0.1, "channels_last": True, "clip": 10.0, "num_top": 1000, "rel_k": 600}
 # architecture flags a fine-tune inherits from its source checkpoint (weights only load into the same shape)
-ARCH_KEYS = ("arch", "size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_queries", "denoising",
+ARCH_KEYS = ("unlock_all", "arch", "size", "p2", "lsk", "strip_k", "ortho_heads", "dense", "dense_queries", "denoising",
              "no_rotate_sampling", "context", "backbone", "dense_v3", "primary", "geo_cls", "relate", "rel_k",
              "v6_off", "v7_off", "v8_off", "v9_off", "v10_off", "box", "v14_off", "ref_k", "neck", "groups")
 PRETRAIN_KEYS = ("pretrain", "pretrain_epochs", "pretrain_det_epochs", "pretrain_dir", "pretrain_teacher")
@@ -378,6 +378,24 @@ def check_keys(kv):
             raise SystemExit(f"'{k}' is not a valid OpenOBB argument." + (f" Similar: {', '.join(near)}" if near else ""))
 
 
+# trainer=yolo: the TRAINING FRAMEWORK of the usual one-stage trainer (Ultralytics 8.4 defaults, F99 audit). Only what
+# any model would be trained with; what belongs to an architecture (the 0.1 LR factor of a pretrained trunk, frozen
+# layers -> unlock_all, losses, assigners) stays with the architecture.
+YOLO_TRAINER = {"wd": 5e-4, "ema": 0.9999, "ema_warmups": 2000, "hsv_h": 0.015, "hsv_s": 0.7, "hsv_v": 0.4,
+                "flipud": 0.0, "rot90": False, "rfs": 0.0, "nbs": 64}
+
+
+def _yolo_trainer(extra):
+    """trainer=yolo: weight decay 5e-4, linear LR decay (cos_lr=False), EMA decay 0.9999 ramped over 2000 updates,
+    HSV 0.015 / 0.7 / 0.4, no vertical flip, no 90-degree rotation, no repeat-factor sampling, nominal batch 64 always,
+    lr0 = 0.002 * 5 / (4 + nc) (set once the classes are known). The model is untouched. Anything passed explicitly
+    wins. Mutates `extra`."""
+    set_ = {k: v for k, v in YOLO_TRAINER.items() if k not in extra}
+    extra.update(set_)
+    print("[openobb] trainer=yolo (training framework of the usual one-stage trainer; the architecture is unchanged): "
+          + ", ".join(f"{k}={v}" for k, v in set_.items()) + ", cos_lr=False")
+
+
 def _auto_recipe(extra, data_classes, src_classes, n_train, batch, epochs, base_lr, nbs=64):
     """optimizer=auto (the default): settings the user did not pass, chosen from the data and the starting weights, as
     the usual trainer picks its optimizer / LR from the number of iterations and classes (F98).
@@ -442,8 +460,9 @@ def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_
             opts["warmup"] = max(round(w_ep * ipe), 1) if w_ep > 0 else -1
         else:                                        # older runs: warmup_epochs epochs (at most epochs - 1)
             opts["warmup"] = max(1, round(min(warmup_epochs, max(int(epochs) - 1, 0)) * ipe))
-        opts["ema_warmups"] = max(1, round(max(opts["warmup"], 1) / acc))
-        if not user_ema:                             # EMA half-life ~5% of the run (>= 1 epoch, >= 50 steps)
+        if "ema_warmups" not in user_ema:            # EMA ramp over the warmup (unless given, e.g. trainer=yolo: 2000)
+            opts["ema_warmups"] = max(1, round(max(opts["warmup"], 1) / acc))
+        if "ema" not in user_ema:                             # EMA half-life ~5% of the run (>= 1 epoch, >= 50 steps)
             opts["ema"] = round(min(0.9998, 0.5 ** (1 / max(steps_ep, total // 20, 50))), 6)
         argv = ["--data", str(prepared), "--out", str(save_dir)] + _to_argv(opts)
         args_file = save_dir / "openobb_args.json"
@@ -468,7 +487,7 @@ def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_
 
 def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, project="runs/obb", name=None,
           exist_ok=False, resume=False, tile=False, tile_scale=None, gap=200, val_frac=0.15, cache="auto", cache_dir=None, workers=None,
-          device=None, recipe=True, warmup_epochs=3, patience=100, lrf=0.01, cos_lr=True, seed=0, optimizer="auto",
+          device=None, recipe=True, warmup_epochs=3, patience=100, lrf=0.01, cos_lr=None, seed=0, optimizer="auto", trainer="openobb",
           **extra):
     """Train (or fine-tune when `model` is a .pt path). Returns SimpleNamespace(save_dir, best, last, metrics).
     pretrain=coco|dota|<image folders> (new cores openobb6* / openobb9*): download, pretrain and cache the starting
@@ -483,13 +502,19 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         elif k in IGNORED:
             extra.pop(k)
             print(f"[openobb] '{k}' is not used by OpenOBB (ignored)")
+    yolo_trainer = str(trainer).lower() == "yolo"
+    if str(trainer).lower() not in ("openobb", "yolo"):
+        raise SystemExit(f"trainer must be 'openobb' (default) or 'yolo', got {trainer!r}")
+    if yolo_trainer:
+        _yolo_trainer(extra)
+    cos_lr = (not yolo_trainer) if cos_lr is None else bool(cos_lr)
     if extra.pop("amp", True) is False:
         extra["no_amp"] = True
     if extra.pop("rot90", True) is False:
         extra["no_rot90"] = True
     if batch is not None and float(batch) <= 0:
         batch = None                                 # batch=-1: automatic
-    user_ema = "ema" in extra
+    user_ema = {k for k in ("ema", "ema_warmups") if k in extra}
 
     # ---- resume=True only (like the usual trainer): continue a run with its saved settings
     if resume:
@@ -513,7 +538,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         if workers is not None:
             opts["workers"] = int(workers)
         n_train = _n_lines(Path(prepared) / "meta" / "train.jsonl")
-        _run_trainer(save_dir, prepared, opts, n_train, opts["epochs"], warmup_epochs, user_ema=True)
+        _run_trainer(save_dir, prepared, opts, n_train, opts["epochs"], warmup_epochs, user_ema={"ema"})
         return _summary(save_dir)
     if data is None:
         raise SystemExit("openobb train needs data=<data.yaml or dataset folder>")
@@ -591,7 +616,11 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
     if cache == "auto":                              # decoded uint8 images in RAM when they take < 25% of it
         cache = n_train * imgsz * imgsz * 3 < 0.25 * _ram_bytes()
     batch = _batch_from(batch, sd, imgsz, n_train)
-    if str(optimizer).lower() == "auto" and dense_arch:   # DETR-style OpenOBB1 / 4: LR above ~2e-4 diverges
+    if yolo_trainer and "lr" not in extra and str(optimizer).lower() == "auto":
+        from openobb.data.dota import dataset_classes
+        extra["lr"] = round(0.002 * 5 / (4 + max(len(dataset_classes(prepared)), 1)), 6)
+        print(f"[openobb] trainer=yolo: lr0={extra['lr']:g} (AdamW fit 0.002 * 5 / (4 + nc) of the usual trainer)")
+    elif str(optimizer).lower() == "auto" and dense_arch:   # DETR-style OpenOBB1 / 4: LR above ~2e-4 diverges
         if src_classes is None and extra.get("weights") and Path(str(extra["weights"])).exists():
             src_classes = _ckpt_args(extra["weights"])[1]
         from openobb.data.dota import dataset_classes

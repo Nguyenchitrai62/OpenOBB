@@ -55,3 +55,33 @@ def freeze_batch_norm2d(module: nn.Module) -> nn.Module:
             if _child is not child:
                 setattr(module, name, _child)
     return module
+
+
+def unlock_all(model, momentum=0.03):
+    """Freeze nothing anywhere in `model` (as the usual one-stage trainer trains every layer): each FrozenBatchNorm2d
+    becomes a BatchNorm2d with the same weight / bias / running statistics / eps (identical eval output; train mode then
+    normalises with batch statistics and the running ones move with `momentum`), and every parameter gets requires_grad
+    (e.g. the trunk stem frozen by freeze_at). Call before loading weights or resuming: the loaders fill the new layers by
+    name. -> (number of converted norm layers, number of tensors made trainable)."""
+    count = [0]
+
+    def convert(m):
+        for name, child in m.named_children():
+            if isinstance(child, FrozenBatchNorm2d):
+                bn = nn.BatchNorm2d(child.num_features, eps=child.eps, momentum=momentum).to(child.weight.device)
+                with torch.no_grad():
+                    bn.weight.copy_(child.weight)
+                    bn.bias.copy_(child.bias)
+                    bn.running_mean.copy_(child.running_mean)
+                    bn.running_var.copy_(child.running_var)
+                setattr(m, name, bn)
+                count[0] += 1
+            else:
+                convert(child)
+    convert(model)
+    thawed = 0
+    for p in model.parameters():
+        if not p.requires_grad:
+            p.requires_grad_(True)
+            thawed += 1
+    return count[0], thawed

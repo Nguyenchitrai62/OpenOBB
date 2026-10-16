@@ -418,6 +418,10 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 
 ## 9. Nhật ký
 
+- 2026-10-16 (3): **Tách khung training và kiến trúc model** (F99, theo user). Rà Ultralytics 8.4.174; thêm `trainer=yolo` (chỉ khung:
+  LR theo số class, wd 5e-4, LR tuyến tính, EMA 0.9999/2000, augment, không RFS, nbs 64) và `unlock_all=True` (kiến trúc: không đóng băng gì).
+  Mặc định không đổi; chờ log A/B/C của user trên Wall_Color.
+
 - 2026-10-16 (2): **Bộ khung train khớp lại YOLO hiện tại + tự chọn công thức** (F98, log fine-tune bộ tivi 77 ảnh của user).
   0.22.4: `warmup_bias_lr=0` (YOLO đặt 0 khi dùng AdamW; 0.1 làm fine-tune tụt). 0.22.5: `optimizer=auto` tự đặt `nbs=0` khi < 2000 bước
   và `lr0 = max(mặc định, 0.002·5/(4+nc))` khi có class mới / không có weights. 0.22.6: warmup thuần theo epoch, bỏ mức tối thiểu

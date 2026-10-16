@@ -101,6 +101,8 @@ Có thể khởi tạo `openobb3x` từ một checkpoint `openobb1` bằng `weig
 | `cache` | auto | giải mã ảnh train một lần vào RAM nếu chiếm dưới 25% RAM (`cache=False` để tắt) |
 | `patience` | 100 | dừng nếu mAP50-95 val không tăng sau N epoch |
 | `optimizer` | auto | AdamW. `auto` (từ 0.22.5, model dense v2+) tự chọn khi bạn không truyền: `nbs=0` nếu data nhỏ; `lr0 = max(mặc định, 0.002 × 5 / (4 + số class))` khi data có class mà weights khởi đầu chưa biết (không có weights, hoặc checkpoint của class khác), như YOLO chọn LR cho AdamW. Train tiếp cùng class: LR mặc định. Log in dòng `[openobb] auto: ...`. `optimizer=AdamW` để tắt |
+| `trainer` | openobb | **Khung training** (chung mọi model). `yolo` (0.22.7): như Ultralytics 8.4: `lr0 = 0.002 × 5 / (4 + số class)`, weight decay 5e-4, LR giảm tuyến tính, EMA 0.9999 tăng dần trong 2000 bước, HSV 0.015 / 0.7 / 0.4, không lật dọc, không xoay 90°, không RFS, nbs 64. Không đổi kiến trúc (hệ số LR của thân, lớp đóng băng giữ theo model). Tham số truyền tay vẫn thắng |
+| `unlock_all` | False | **Kiến trúc model.** `True`: không đóng băng gì: mọi BN đóng băng (thân cỡ l / x) thành BN train được, bắt đầu đúng bằng giá trị đang đóng băng; stem được train. Fine-tune từ checkpoint đã mở khoá thì tự giữ mở khoá |
 | `lr0` | theo cỡ model | truyền vào là dùng đúng giá trị đó (có cảnh báo nếu > 3 lần mặc định); kiểu DETR thường diverge ở mức 1e-3 của YOLO |
 | `fliplr`, `flipud` | 0.5, 0.5 | xác suất lật ngang / dọc; `rot90=False` để tắt xoay 90° (symbol có chiều) |
 | `freeze` | – | `backbone`, `encoder` (chỉ train decoder) hoặc số stage backbone; hợp với data rất ít |

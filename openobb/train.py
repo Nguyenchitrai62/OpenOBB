@@ -121,6 +121,10 @@ def build_parser():
     ap.add_argument("--fliplr", type=float, default=0.5, help="horizontal flip probability")
     ap.add_argument("--flipud", type=float, default=0.5, help="vertical flip probability")
     ap.add_argument("--no-rot90", action="store_true", help="no random 90-degree rotations")
+    ap.add_argument("--unlock-all", action="store_true",
+                    help="freeze nothing: every frozen BatchNorm (the pretrained trunk of sizes l / x) becomes a trainable "
+                         "BatchNorm2d starting from its frozen statistics, and every frozen parameter (the trunk stem) "
+                         "trains (default: frozen as in D-FINE)")
     ap.add_argument("--freeze", default="", help="fine-tuning: N (stem + first N backbone stages), 'backbone', or "
                                                  "'encoder' (backbone + adapters + encoder: train the decoder only)")
     ap.add_argument("--time", type=float, default=0.0,
@@ -360,6 +364,13 @@ def main(argv=None):
                       dense_queries=a.dense_queries, vectors=a.vectors, vec_dim=a.vec_dim, vec_layers=a.vec_layers,
                       o2m_queries=a.o2m_queries, lsk=a.lsk, vec_lfe=a.vec_lfe, vec_ground=a.vec_ground > 0, p2=a.p2,
                       backbone=a.backbone, dense_v3=a.dense_v3)
+    if a.unlock_all:                            # before any loading: the loaders fill the new BatchNorm layers by name
+        if a.freeze:
+            raise SystemExit("unlock_all=True and freeze= contradict each other: pass one of them")
+        from openobb.models.common import unlock_all
+        n_bn, n_thaw = unlock_all(model)
+        log(f"[init] unlock_all: {n_bn} frozen BatchNorm layers -> trainable BatchNorm2d (start = the frozen statistics, "
+            f"momentum 0.03), {n_thaw} frozen tensors made trainable", console=True)
     last = wdir / "last.pt"
     if not last.exists() and a.weights:
         # shape-tolerant copy of a OpenOBB checkpoint; class rows are matched by name (new classes start fresh)
