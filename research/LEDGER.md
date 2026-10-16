@@ -1560,7 +1560,10 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     module (nội suy, nối, chép) → loại chi phí bộ nhớ channels_last / compile nhắm tới. `compile=True` lỗi ở 0.22.1 (đã sửa: không compile head).
   - 0.22.2: `predict.fast_layout` (channels_last cho model dense trên GPU, `OPENOBB_CHANNELS_LAST=0` để tắt) ở `load_model` và ở bước val cuối train
     (sau khi gộp BN). `openobb3.nms_keep_near`: chỉ chấm ProbIoU cho cặp cùng lớp có tâm cách ≤ 1.5 × tổng nửa đường chéo; giống hệt ma trận đầy đủ
-    (test), CPU 4000 box 657 → 137 ms; dùng cho cả CPU và GPU. Chờ số G4.
+    (test), CPU 4000 box 657 → 137 ms; dùng cho cả CPU và GPU.
+  - **G4 với 0.22.2 (user):** channels_last + NMS cặp gần: thân + neck 5.75, head 1.21, **NMS 1.21** (từ 2.91), tổng **9.13 ms**; thêm `compile`:
+    thân + neck 5.01, trường 0.22, tổng **8.04 ms** (YOLO26x 7.3 → 1.10×). Trọng số không đổi → độ chính xác như F96 (0.800 / 0.512).
+    0.22.3: `OPENOBB_COMPILE=1` bật compile (thân, neck, trường; `dynamic=True` để ảnh chữ nhật khác cỡ không biên dịch lại) khi nạp model.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 

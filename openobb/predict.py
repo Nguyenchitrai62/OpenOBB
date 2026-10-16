@@ -178,6 +178,13 @@ def fast_layout(m, device):
     if (torch.device(device).type == "cuda" and hasattr(m, "run_head")
             and os.environ.get("OPENOBB_CHANNELS_LAST", "1") != "0"):
         m = m.to(memory_format=torch.channels_last)
+    if (torch.device(device).type == "cuda" and hasattr(m, "run_head")
+            and os.environ.get("OPENOBB_COMPILE", "0") == "1"):
+        # opt-in: torch.compile of the static parts (trunk, neck, boundary field), dynamic shapes so rectangular pages of
+        # different sizes reuse one graph; 9.1 -> 8.0 ms / image on a G4 (F97), 1-3 min of compilation on the first call
+        for name in ("backbone", "neck", "encoder", "field"):
+            if getattr(m, name, None) is not None:
+                setattr(m, name, torch.compile(getattr(m, name), dynamic=True))
     return m
 
 
