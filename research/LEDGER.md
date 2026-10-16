@@ -1574,6 +1574,9 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     mọi bias (BN, bias tiên nghiệm class, lớp ra box) khoảng 0.1, gấp 200 lần LR 5e-4: phá trọng số đã học, nhất là khi warmup kéo dài
     gần hết run như ở data nhỏ. Wall_Color (16 batch / epoch, warmup khoảng 6 / 100–150 epoch) bị nhẹ hơn nhiều.
   - Sửa (0.22.4): mặc định `warmup_bias_lr=0` (như YOLO với AdamW); trainer vốn mặc định 0. Data nhỏ nên thêm `nbs=0` (mỗi batch một bước).
+  - 0.22.5 (theo user: cần cơ chế tự động): `optimizer=auto` (mặc định, model dense) tự đặt những gì user không truyền:
+    `nbs=0` khi tích luỹ gradient để lại < 2000 bước; `lr0 = max(mặc định, 0.002 · 5 / (4 + nc))` (công thức AdamW của YOLO) khi data có
+    class mà weights khởi đầu chưa biết. Log `[openobb] auto: ...`; `optimizer=AdamW` hoặc truyền `lr0=` / `nbs=` để tắt. Chưa đo trên GPU.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 

@@ -111,6 +111,40 @@ def test_fit_mode_one_tile_per_image(tmp_path):
     assert np.allclose(merged[0][2][0], [100, 100, 260, 100, 260, 140, 100, 140], atol=0.7)
 
 
+def test_auto_recipe_rules():
+    """optimizer=auto (F98): nbs=0 when accumulation leaves < MIN_STEPS steps; lr0 = the AdamW fit of the usual trainer
+    when the data has classes the starting weights do not know; nothing the user passed is changed."""
+    from openobb.cli import MIN_STEPS, _auto_recipe
+    e = {}                                            # 77 images, batch 16, 30 epochs, no weights, 1 class
+    msgs = _auto_recipe(e, ["tivi"], None, 77, 16, 30, 5e-4)
+    assert e == {"nbs": 0, "lr": 0.002} and len(msgs) == 2
+    e = {}                                            # Wall_Color checkpoint -> tivi: new class
+    _auto_recipe(e, ["tivi"], ["wall", "junction"], 77, 16, 30, 5e-4)
+    assert e["lr"] == 0.002
+    e = {}                                            # continuing on the same classes: default LR
+    _auto_recipe(e, ["tivi"], ["tivi"], 77, 16, 30, 5e-4)
+    assert "lr" not in e and e["nbs"] == 0
+    e = {"nbs": 64, "lr": 1e-3}                       # given by the user: untouched
+    assert _auto_recipe(e, ["tivi"], None, 77, 16, 30, 5e-4) == [] and e == {"nbs": 64, "lr": 1e-3}
+    e = {}                                            # big dataset, many classes: nothing to change
+    _auto_recipe(e, [f"c{i}" for i in range(30)], None, 16 * MIN_STEPS, 16, 100, 5e-4)
+    assert e == {}
+
+
+def test_auto_recipe_reaches_the_trainer(tmp_path, monkeypatch):
+    import openobb.train as trainer
+    from openobb.cli import train
+    calls = []
+    monkeypatch.setattr(trainer, "main", lambda argv: calls.append(" ".join(argv)))
+    data = _dataset(tmp_path / "ds")
+    train(str(data), model="openobb3s", epochs=10, batch=8, imgsz=512, project=str(tmp_path / "runs"), name="a",
+          cache_dir=str(tmp_path / "cache"), workers=1)
+    assert "--nbs 0" in calls[-1] and "--lr 0.001667" in calls[-1]       # 2 classes: 0.002 * 5 / 6
+    train(str(data), model="openobb3s", epochs=10, batch=8, imgsz=512, project=str(tmp_path / "runs"), name="b",
+          cache_dir=str(tmp_path / "cache"), workers=1, optimizer="AdamW")
+    assert "--nbs 64" in calls[-1] and "--lr 0.0005" in calls[-1]        # explicit optimizer: no automatic choice
+
+
 def test_train_flags_and_oom_retry(tmp_path, monkeypatch):
     import openobb.train as trainer
     from openobb.cli import train

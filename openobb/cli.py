@@ -378,6 +378,35 @@ def check_keys(kv):
             raise SystemExit(f"'{k}' is not a valid OpenOBB argument." + (f" Similar: {', '.join(near)}" if near else ""))
 
 
+def _auto_recipe(extra, data_classes, src_classes, n_train, batch, epochs, base_lr, nbs=64):
+    """optimizer=auto (the default): settings the user did not pass, chosen from the data and the starting weights, as
+    the usual trainer picks its optimizer / LR from the number of iterations and classes (F98).
+      lr   classes the starting weights do not know (no weights, or a checkpoint of other classes): their output rows
+           start from scratch -> lr0 = max(default, 0.002 * 5 / (4 + nc)), the AdamW fit of the usual trainer
+           (1 class: 2e-3, 7: 9.1e-4, 15: 5.3e-4). Same classes (continuing a run): the default.
+      nbs  fewer than MIN_STEPS optimizer steps with gradient accumulation to a nominal batch of 64 -> nbs=0 (one step
+           per batch: 4x the steps at batch 16 on a small dataset).
+    Mutates `extra`; returns one message per change."""
+    msgs = []
+    if "nbs" not in extra:
+        acc = max(round(nbs / batch), 1)
+        steps = max(1, n_train // batch) * epochs // acc
+        if acc > 1 and steps < MIN_STEPS:
+            extra["nbs"] = 0
+            msgs.append(f"nbs=0 (small dataset: {steps * acc} optimizer steps instead of {steps}; pass nbs=64 to keep "
+                        f"the nominal batch)")
+    if "lr" not in extra:
+        known = set(src_classes or [])
+        new = [c for c in data_classes if c not in known]
+        fit = round(0.002 * 5 / (4 + max(len(data_classes), 1)), 6)
+        if new and fit > base_lr:
+            extra["lr"] = fit
+            what = "no starting weights" if src_classes is None else f"new classes {new[:5]}{'...' if len(new) > 5 else ''}"
+            msgs.append(f"lr0={fit:g} ({what}: output rows start from scratch; default {base_lr:g} for the same classes; "
+                        f"pass lr0= or optimizer=AdamW to keep the default)")
+    return msgs
+
+
 def _batch_from(batch, sd, imgsz, n_train):
     """batch=None/-1: default fitted to the GPU and to the dataset size; 0 < batch < 1: that fraction of VRAM."""
     frac = float(batch) if batch is not None and 0 < float(batch) < 1 else None
@@ -494,14 +523,14 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
 
     aug = {k: extra.pop(k, v) for k, v in AUGMENT.items()}
     hsv = [extra.pop(k, d) for k, d in (("hsv_h", 0.015), ("hsv_s", 0.5), ("hsv_v", 0.3))]
-    weights = None
+    weights, src_classes = None, None
     m = str(model)
     if m.lower() in MODELS:
         arch, size = MODELS[m.lower()]
         inherited = {"arch": arch} if arch != "v1" else {}
     elif m.endswith(".pt") and Path(m).exists():
         weights = m
-        src_args, _ = _ckpt_args(m)
+        src_args, src_classes = _ckpt_args(m)
         inherited = {k: src_args[k] for k in ARCH_KEYS if k in src_args}
         size = inherited.pop("size", "s")
         imgsz = imgsz or extra.pop("img", None) or src_args.get("img", 1024)
@@ -560,6 +589,13 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
     if cache == "auto":                              # decoded uint8 images in RAM when they take < 25% of it
         cache = n_train * imgsz * imgsz * 3 < 0.25 * _ram_bytes()
     batch = _batch_from(batch, sd, imgsz, n_train)
+    if str(optimizer).lower() == "auto" and dense_arch:   # DETR-style OpenOBB1 / 4: LR above ~2e-4 diverges
+        if src_classes is None and extra.get("weights") and Path(str(extra["weights"])).exists():
+            src_classes = _ckpt_args(extra["weights"])[1]
+        from openobb.data.dota import dataset_classes
+        for msg in _auto_recipe(extra, dataset_classes(prepared), src_classes, n_train, int(batch), int(epochs),
+                                sd["lr"]):
+            print(f"[openobb] auto: {msg}")
 
     nbs_ = int(extra.get("nbs", 64) or 0)
     acc_ = max(round(nbs_ / int(batch)), 1) if nbs_ > 0 else 1        # gradient accumulation (nominal batch)
