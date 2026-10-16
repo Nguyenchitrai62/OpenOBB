@@ -1640,6 +1640,17 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     của 53 ảnh val nhưng tăng ở 5 / 7 class và hướng box tốt hơn rõ. Chưa có bản A (khung mặc định cùng 30 epoch từ best v23) nên chưa tách
     được phần do "train thêm 30 epoch". Đường val còn lên ở cuối → thử dài hơn.
 
+- **F104. Run A: khung mặc định 0.22.7 (thân đóng băng), cùng điều kiện với B (F103) (log user 10-16): 0.805 / 0.518. A và B ngang về mAP; B hơn ở hướng box.**
+  - Điều kiện: `openobb23x.pt`, 30 epoch, LR 5e-4 cosine, wd 1e-4, auto `nbs=0` (450 bước), EMA nửa đời ~5%, lật dọc 0.5, xoay 90°, HSV 0.5 / 0.3,
+    RFS 0.1, `rotate_p=0.5`. Đường val tăng từ ep11, đỉnh ep20 0.802 / 0.518, đi ngang tới ep30.
+  - A / B: mAP50 **0.805** / 0.791, mAP50-95 0.518 / **0.523**, trùng 2.0% / 2.0%; box dài lệch trục 9.5% / **7.2%**, vật dài lệch > 1° 5.8% / **4.9%**.
+  - Theo class (mAP50-95, A / B): wall .588 / .599, note .509 / .529, door .818 / .821, slide_door **.340** / .274, double_door .481 / **.544**,
+    wall_300 .346 / .348, junction .544 / .543.
+  - Đọc: chênh mAP (−0.014 / +0.005) nằm trong nhiễu (F102: ±0.006 / ±0.002 giữa hai run giống hệt; val ±0.024). Chênh hướng box (2.3 điểm)
+    lớn hơn dao động giữa hai run giống hệt (1.3 điểm, F102) → nhiều khả năng thật. Cả A và B đều vượt trần v23 (0.512) ở mAP50-95: phần lớn
+    mức tăng là do train thêm 30 epoch với khung đã sửa lỗi (0.22.4–0.22.6), không riêng do `trainer=yolo`. Ứng viên gây khác biệt hướng box:
+    tắt xoay 90° / lật dọc, EMA, wd, LR — chưa tách.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
