@@ -1535,6 +1535,21 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     (bắt đầu đúng bằng v21). + lọc đỉnh. Kỳ vọng ghi trước (100 ep từ best.pt v21, không xoay): box dài lệch ≤ 3%, mAP50 ≥ 0.765, mAP50-95 ≥ 0.495,
     trùng ≤ 2.5%, tổng ≤ 10.2 ms. Bác bỏ bám xoay nếu lệch ≥ 10% hoặc hệ số học được < 0.2; bác bỏ lọc đỉnh nếu trùng > 4%.
 
+- **F96. OpenOBB23-x (user, 10-16): 0.800 / 0.512 (o2m 0.5), trùng 1.9%, 9.8 + 3.0 ms; box dài lệch trục 10.3%. Bản tốt nhất từ trước tới nay.**
+  0.22.0, `weights=openobb21x.pt` (1 tensor mới = `snap.rot_gain`), 50 ep, `nbs 64` (187 cập nhật), lr 0.001, `rotate any angle 0.5`, G4. Best ep 46,
+  còn nhích. Hiệu chỉnh: o2m 0.7 .5410 (trùng 4.9%) / **o2m 0.5 .5403 (1.9%, chọn)** / o2o 0.5 .5280; mọi cấu hình lệch 9.5–10.9% (luật độ nghiêng không đổi
+  lựa chọn); lọc đỉnh: o2m peak+0.5 .5264 (trùng 1.2%), o2o peak .5186.
+  - Theo class (v23 | v21 F90 | YOLO26x F89), mAP50 / 50-95: wall **.911 / .576** | .863 / .545 | .919 / .624; junction .912 / .545 | .900 / .538 |
+    .910 / .584; wall_300 .751 / .331 | .730 / .310 | .824 / .441; note .770 / .494 | .775 / .487 | .764 / .517; door .978 / .811 | .975 / .810 |
+    .965 / .811; slide_door .646 / .317 | .601 / .320 | .345 / .123; double_door .631 / .505 | .537 / .435 | .494 / .392.
+    Lỗi: wall → nền 6% (v21 9%), junction → nền 6%, wall_300 → junction 11% (v21 15%).
+  - `Box geometry`: góc > 1° 18.7% (v21 27.1%), > 2° 4.6%; vật dài góc > 1° **6.6%** (v21 11.3%), đầu lệch 0.6%; box dài lệch trục **10.3%** (v21 14.4%).
+  - So YOLO26x: mAP50 **+0.057**, mAP50-95 **+0.013**, trùng +0.3 điểm, chậm 1.75× (12.8 / 7.3 ms), lệch 10.3% / 0.3%. Vượt YOLO ở 2 chỉ số mAP lần đầu
+    với khoảng cách mAP50 ngoài nhiễu (±0.025); mAP50-95 trong nhiễu. Còn thua: wall / junction / wall_300 50-95, hướng box, tốc độ.
+  - Đối chiếu OPENOBB23 mục 4: lệch ≤ 3% không đạt (10.3%), **chạm ngưỡng bác bỏ bám xoay (≥ 10%)**; mAP50 ≥ 0.765 đạt; mAP50-95 ≥ 0.495 đạt; trùng ≤ 2.5%
+    đạt; tốc độ ≤ 13.0 ms đạt. Gây nhiễu: 50 ep / 187 cập nhật so với 30 ep / 112 của v21, và còn xoay ảnh → phần tăng mAP chưa tách được khỏi train dài
+    hơn. Cần giá trị `snap.rot_gain` học được (tiêu chí thứ hai: < 0.2 → bác bỏ) và một v21 50 ep cùng điều kiện làm đối chứng.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

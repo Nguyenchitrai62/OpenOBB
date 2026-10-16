@@ -55,4 +55,16 @@ Log cần thấy: dòng `model` có "rotational boundary snapping"; `[init]` bá
 
 ## 6. Kết quả thật
 
-(chưa train)
+**Lần 1 (F96):** 0.22.0, từ `openobb21x.pt`, 50 ep (187 cập nhật), còn `rotate_p=0.5`. **0.800 / 0.512**, trùng 1.9%, 9.8 + 3.0 ms.
+
+| | Kỳ vọng | Kết quả |
+|---|---|---|
+| Box dài lệch trục > 1° | ≤ 3% | 10.3% (v21 14.4%), không đạt; chạm ngưỡng bác bỏ ≥ 10% |
+| Vật dài lệch góc > 1° | ≤ 3% | 6.6% (v21 11.3%), không đạt |
+| mAP50 / mAP50-95 | ≥ 0.765 / ≥ 0.495 | 0.800 / 0.512, đạt (YOLO26x 0.743 / 0.499) |
+| Box trùng | ≤ 2.5% | 1.9%, đạt |
+| Tốc độ | ≤ 13.0 ms | 12.8 ms, đạt |
+
+Theo class (mAP50-95, v23 / YOLO26x): wall .576 / .624, junction .545 / .584, wall_300 .331 / .441, note .494 / .517, door .811 / .811,
+slide_door .317 / .123, double_door .505 / .392. Chưa tách được phần tăng do bám xoay khỏi phần do train dài hơn (50 so với 30 ep);
+cần `snap.rot_gain` của best.pt và một v21 50 ep cùng điều kiện.
