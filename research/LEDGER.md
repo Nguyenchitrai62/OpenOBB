@@ -1593,6 +1593,18 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - 0.22.7: `trainer=yolo` (chỉ khung, mặc định `openobb`) và `unlock_all=True` (kiến trúc: không đóng băng gì, BN bắt đầu đúng bằng giá trị
     đang đóng băng). Chưa đo; cặp đề xuất trên Wall_Color: A mặc định, B `trainer=yolo`, C `unlock_all=True`, cùng `weights=`.
 
+- **F100. Run C `unlock_all=True` (log user 10-16): không vượt trần v23; epoch 1 sụp vì thống kê BN đổi ngay khi mở khoá.**
+  - Điều kiện: 0.22.7, `openobb23x.pt` (best v23, F96), 30 epoch, batch 16, imgsz 1280, `rotate_p=0.5`, LR 5e-4, auto `nbs=0` (450 bước),
+    warmup 45 it, G4. `[init] unlock_all: 130 BN, 5 tensor stem`; 130 "new tensors" là bộ đếm `num_batches_tracked`.
+  - Đường val: ep1 **0.712 / 0.436** (xuất phát là best v23 0.800 / 0.512) → hồi dần, đỉnh ep23 0.775 / 0.497. Cuối (o2m 0.5): **0.771 / 0.494**,
+    trùng 1.9%, box dài lệch trục 9.8% (v23: 10.3%), 7.9 + 1.3 ms.
+  - Theo class so với v23 (mAP50-95): wall .580 / .576, note .500 / .494, door .811 / .811 (ngang); junction .535 / .545, wall_300 .299 / .331,
+    slide_door .258 / .317, double_door .476 / .505 (tụt).
+  - Đọc: mở khoá làm BN chuyển sang thống kê theo batch (ảnh mosaic / xoay) và running stats trôi ~37% sau 15 bước đầu (momentum 0.03) → đặc
+    trưng thân đổi thang đo, neck / head đã học với thống kê cũ bị lệch → sụp ngay epoch 1, 30 epoch không hồi về trần. Không có bằng chứng
+    đóng băng đang "giữ trọng số tệ" ở mức trần hiện tại. Chưa có bản A (cùng 30 epoch, không mở khoá) nên không tách được phần tụt do
+    train lại với `rotate_p` / LR. Biến thể chưa thử: chỉ mở affine của BN (giữ thống kê), hoặc mở khoá với BN eval vài epoch đầu.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
