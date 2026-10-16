@@ -1565,6 +1565,16 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     thân + neck 5.01, trường 0.22, tổng **8.04 ms** (YOLO26x 7.3 → 1.10×). Trọng số không đổi → độ chính xác như F96 (0.800 / 0.512).
     0.22.3: `OPENOBB_COMPILE=1` bật compile (thân, neck, trường; `dynamic=True` để ảnh chữ nhật khác cỡ không biên dịch lại) khi nạp model.
 
+- **F98. Lỗi mặc định `warmup_bias_lr=0.1` với AdamW (log user 10-16): fine-tune tụt rồi hồi đúng theo lịch warmup.**
+  - Data riêng của user: 1 class (tivi), 77 ảnh train / 19 ảnh val (65 object), v23-x fine-tune từ `best.pt` của chính bộ đó, 30 epoch,
+    batch 16, nbs 64 (tích 4 batch → 30 bước tối ưu), warmup max(3 epoch, 100) = 100 iteration = 25 / 30 epoch, `rotate_p=0.5`.
+  - Đường val: ep1 0.635 / 0.391 (≈ điểm xuất phát) → ep17 0.518 / 0.301 → hồi dần khi warmup sắp hết, ep30 0.596 / 0.353; best = ep2.
+  - Nguyên nhân: CLI (từ 0.16.0, "khớp YOLO") đặt LR bias khởi đầu 0.1, giảm dần về lr trong warmup. Con số này của YOLO là cho SGD;
+    Ultralytics đặt `warmup_bias_lr = 0.0` mỗi khi `optimizer=auto` chọn AdamW (mọi data < 10k iteration). Với AdamW, mỗi bước dịch
+    mọi bias (BN, bias tiên nghiệm class, lớp ra box) khoảng 0.1, gấp 200 lần LR 5e-4: phá trọng số đã học, nhất là khi warmup kéo dài
+    gần hết run như ở data nhỏ. Wall_Color (16 batch / epoch, warmup khoảng 6 / 100–150 epoch) bị nhẹ hơn nhiều.
+  - Sửa (0.22.4): mặc định `warmup_bias_lr=0` (như YOLO với AdamW); trainer vốn mặc định 0. Data nhỏ nên thêm `nbs=0` (mỗi batch một bước).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

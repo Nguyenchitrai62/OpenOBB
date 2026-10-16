@@ -27,7 +27,8 @@ the train images is held out. Prepared data is cached (~/.cache/openobb). Every 
 ({project}/{name}, then name2, name3...; exist_ok=True reuses it); resume=True continues a run from weights/last.pt.
 
 Training defaults follow the usual one-stage recipe: mosaic=1.0, scale=0.5 (random zoom 0.5-1.5), translate=0.1,
-close_mosaic=10, warmup_epochs=3 (max(3 epochs, 100) batches; bias LR falls from warmup_bias_lr=0.1, the others rise from 0),
+close_mosaic=10, warmup_epochs=3 (max(3 epochs, 100) batches, every LR rises from 0; warmup_bias_lr=0 as the usual
+trainer sets it for AdamW: a bias LR of 0.1 under Adam moves every bias by ~0.1 per step and wrecks a fine-tune),
 LR factor per epoch, cosine to lr0 * lrf (lrf=0.01; cos_lr=False for linear, the YOLO default), nbs=64 (gradient
 accumulation to a nominal batch of 64, weight decay scaled to it), patience=100,
 cache=auto (decoded images in RAM when they fit), batch fitted to the GPU / dataset and halved on out-of-memory.
@@ -575,9 +576,11 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
             "lr": sd["lr"], "backbone_mult": sd["backbone_mult"], "wd": sd["wd"], "hsv": hsv,
             "eval_every": _eval_every(prepared, int(epochs)), "eval_images": 10**9, "patience": int(patience or 0),
             "seed": seed,
-            # usual one-stage trainer: LR factor per epoch, warmup over max(3 epochs, 100) batches with the bias LR
-            # falling from 0.1, nominal batch 64 (gradient accumulation + weight decay scaled to it)
-            "epoch_lr": True, "warmup_bias_lr": 0.1, "nbs": 64}
+            # usual one-stage trainer: LR factor per epoch, warmup over max(3 epochs, 100) batches, nominal batch 64
+            # (gradient accumulation + weight decay scaled to it). Bias LR warmup off: the usual trainer zeroes
+            # warmup_bias_lr whenever it picks AdamW (0.1 is for SGD); under AdamW it moved every bias by ~0.1 per step
+            # and dragged fine-tunes down until the warmup ended (F98)
+            "epoch_lr": True, "warmup_bias_lr": 0.0, "nbs": 64}
     q = _queries_for(prepared)
     if q > 300 and not dense_arch:
         opts.update(queries=q, num_top=q)

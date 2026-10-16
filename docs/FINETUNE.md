@@ -90,8 +90,8 @@ Có thể khởi tạo `openobb3x` từ một checkpoint `openobb1` bằng `weig
 | `scale` | 0.5 | zoom ngẫu nhiên 0.5–1.5 |
 | `translate` | 0.1 | dịch ngẫu nhiên ±10% |
 | `hsv_h`, `hsv_s`, `hsv_v` | 0.015, 0.5, 0.3 | đổi màu |
-| `warmup_epochs` | 3 | khởi động learning rate, như YOLO (từ 0.16.0): `max(round(warmup_epochs × số batch mỗi epoch), 100)` iteration; LR bias giảm từ `warmup_bias_lr` về LR, các nhóm khác tăng từ 0 lên `lr0 × lf(epoch)` |
-| `warmup_bias_lr` | 0.1 | LR ban đầu của nhóm bias trong warmup (`0` = tắt nhóm riêng) |
+| `warmup_epochs` | 3 | khởi động learning rate, như YOLO (từ 0.16.0): `max(round(warmup_epochs × số batch mỗi epoch), 100)` iteration; mọi nhóm LR tăng từ 0 lên `lr0 × lf(epoch)` |
+| `warmup_bias_lr` | 0 | LR ban đầu của nhóm bias trong warmup. Để 0 với AdamW (YOLO cũng đặt 0 khi tự chọn AdamW); 0.1 chỉ hợp với SGD |
 | `nbs` | 64 | batch danh nghĩa như YOLO: cộng dồn gradient `round(nbs / batch)` batch mỗi bước (tăng dần từ 1 trong warmup), weight decay nhân `batch × accumulate / nbs`; `nbs=0` = một bước mỗi batch (công thức cũ) |
 | `epoch_lr` | True | hệ số LR `lf(epoch)` đổi theo từng epoch như YOLO; `False` = cosine theo iteration (công thức trước 0.16.0) |
 | `iou` / `nms_iou` | `auto` | lọc trùng: `auto` = train xong tự thử trên val và lưu ngưỡng tốt nhất (v11 thử cả không NMS) vào `best.pt`, làm mặc định khi predict; hoặc một số cố định / `none`. Với v12 / v13, bước này chọn luôn head dùng khi suy luận (một-một không NMS, hoặc một-nhiều + NMS). Checkpoint đã train: `openobb calibrate model=best.pt data=data.yaml` |
