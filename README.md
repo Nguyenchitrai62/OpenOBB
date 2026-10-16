@@ -10,13 +10,14 @@ Tốc độ đo cùng một GPU (RTX PRO 6000), batch 16, trang 960 × 1280, ms 
 
 | Model | Tham số | mAP50 | mAP50-95 | Box trùng | Tốc độ | Tốc độ + `compile` |
 |---|---|---|---|---|---|---|
-| **OpenOBB23-x** | 51.3M | **0.800** | **0.512** | 1.9% | 9.1 ms | 8.0 ms |
+| **OpenOBB23-x** | 51.3M | **0.798** | **0.526** | 1.8% | 9.1 ms | 8.0 ms |
 | YOLO26x-obb | 57.6M | 0.743 | 0.499 | 1.6% | 7.3 ms | — |
 
-YOLO26x-obb train 150 epoch từ trọng số chính thức; OpenOBB23-x fine-tune từ các checkpoint OpenOBB trước trên cùng data.
+YOLO26x-obb train 150 epoch từ trọng số chính thức; OpenOBB23-x fine-tune từ các checkpoint OpenOBB trước trên cùng data
+(lần cuối: 30 epoch với khung training YOLO, thân đóng băng).
 
-mAP50-95 theo class (OpenOBB23-x / YOLO26x): wall .576 / .624, junction .545 / .584, wall_300 .331 / .441, note .494 / .517,
-door .811 / .811, slide_door .317 / .123, double_door .505 / .392.
+mAP50-95 theo class (OpenOBB23-x / YOLO26x): wall .599 / .624, junction .542 / .584, wall_300 .362 / .441, note .532 / .517,
+door .819 / .811, slide_door .265 / .123, double_door .564 / .392.
 
 ## Cài đặt
 
@@ -92,7 +93,7 @@ Kết quả tốt nhất của mỗi kiến trúc trên Wall_Color val (cỡ x, 
 
 | `model=` | Kiến trúc | Tham số | mAP50 | mAP50-95 | Tài liệu |
 |---|---|---|---|---|---|
-| **`openobb23x`** | v21 + bám ranh giới có xoay (dịch và xoay box theo mép) | 51.3M | **0.800** | **0.512** | [OPENOBB23](docs/OPENOBB23.md) |
+| **`openobb23x`** | v21 + bám ranh giới có xoay (dịch và xoay box theo mép) | 51.3M | **0.798** | **0.526** | [OPENOBB23](docs/OPENOBB23.md) |
 | `openobb21x` | v20 + sửa góc trong không gian góc kép | 51.3M | 0.769 | 0.492 | [OPENOBB21](docs/OPENOBB21.md) |
 | `openobb20x` | v19 + bộ tinh chỉnh cạnh đọc chi tiết stride 4 của thân | 51.3M | 0.764 | 0.482 | [OPENOBB20](docs/OPENOBB20.md) |
 | `openobb17x` | v12 + trường ranh giới + bám ranh giới, nhóm class | 68.3M | 0.751 | 0.481 | [OPENOBB17](docs/OPENOBB17.md) |

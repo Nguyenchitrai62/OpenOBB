@@ -71,6 +71,21 @@ Theo class (mAP50-95, v23 / YOLO26x): wall .576 / .624, junction .545 / .584, wa
 slide_door .317 / .123, double_door .505 / .392. Chưa tách được phần tăng do bám xoay khỏi phần do train dài hơn (50 so với 30 ep);
 cần `snap.rot_gain` của best.pt và một v21 50 ep cùng điều kiện.
 
+**Fine-tune tiếp, thân đóng băng (F103, F107):** cùng kiến trúc, train thêm trên Wall_Color với khung training YOLO
+(LR 9.09e-4 tuyến tính, wd 5e-4, nbs 64, EMA 0.9999), mỗi lần 30 epoch, nối tiếp nhau.
+
+| Lần | Xuất phát | mAP50 / mAP50-95 | Box trùng | Vật dài lệch > 1° | Box dài lệch trục |
+|---|---|---|---|---|---|
+| 1 (F96) | v21 | 0.800 / 0.512 | 1.9% | 6.6% | 10.3% |
+| 2 (F103, 0.22.7 `trainer=yolo`) | lần 1 | 0.791 / 0.523 | 2.0% | 4.9% | 7.2% |
+| **3 (F107, 0.23.0)** | lần 2 | **0.798 / 0.526** | **1.8%** | **3.8%** | **6.0%** |
+| YOLO26x | | 0.743 / 0.499 | 1.6% | 0.0% | 0.3% |
+
+Theo class lần 3 (mAP50-95, v23 / YOLO26x): wall .599 / .624, junction .542 / .584, wall_300 .362 / .441, note .532 / .517,
+door .819 / .811, slide_door .265 / .123, double_door .564 / .392. Lần 3 hơn lần 2 trong mức dao động giữa hai run giống hệt
+(±0.006 / ±0.002, F102): train tiếp gần bão hoà trên 250 ảnh. Còn thua YOLO26x ở wall, junction, wall_300 (độ khít box vật mảnh / tí hon)
+và hướng box vật dài. Tốc độ 7.9 + 1.3 ms / ảnh (G4, batch 16, bf16).
+
 ## 7. Phụ lục: kiến trúc theo lớp (cỡ x)
 
 Kích thước ghi cho ảnh vào 1 × 3 × 1280 × 1280, Wall_Color (7 class, 3 nhóm class). Ký hiệu: `conv k×k sS a→b` = Conv + BN + kích hoạt,

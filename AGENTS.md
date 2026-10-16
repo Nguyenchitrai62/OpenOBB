@@ -326,6 +326,9 @@ Câu hỏi còn mở:
   là điểm neo kề nhau, nhưng lọc đỉnh mất 0.035 mAP50 (không mặc định); head một-một nghiêng ít hơn (5.5% / 15.4%) → hiệu chỉnh chọn theo độ nghiêng.
   **OpenOBB23 (0.22.0):** v21 + bám ranh giới có xoay. [docs/OPENOBB23.md](docs/OPENOBB23.md). Lệnh: `model=openobb23x weights=<best.pt v21> epochs=100`.
   Không đề xuất đổi thầy nữa (v19 qua ba kiểu thầy, tổng không đổi; user phản biện). Vòng sau chưa chốt.
+- [x] **Mốc hiện tại (F107, 10-16): OpenOBB23-x 0.798 / 0.526, trùng 1.8%, 7.9 + 1.3 ms** (fine-tune nối tiếp F96 → F103 → F107, thân đóng
+  băng, khung YOLO 0.23.0) so với YOLO26x 0.743 / 0.499. Còn thua ở wall / junction / wall_300 (độ khít box) và hướng box vật dài
+  (6.0% box dài lệch trục so với 0.3%). Train tiếp gần bão hoà trên 250 ảnh (F102–F107). Mở khoá thân thua đóng băng (F100–F106).
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.
@@ -422,6 +425,9 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 - `push_all.py` chỉ đồng bộ file đã commit; nó in danh sách file chưa commit, đọc để không bỏ sót.
 
 ## 9. Nhật ký
+
+- 2026-10-16 (5): **Log v23 fine-tune thêm 30 epoch (F107): 0.798 / 0.526**, mốc mới. README hai repo, `docs/OPENOBB23.md` (bảng các lần
+  fine-tune) đã cập nhật. Bản GitLab có thêm thẻ v14–v23. App thử model: viewer toàn màn hình (`app/viewer/index.html`).
 
 - 2026-10-16 (4): **0.23.0: khung training YOLO là mặc định duy nhất** (theo user, F104). Bỏ `trainer=` (truyền vào thì bỏ qua) và
   `_auto_recipe`; `FRAMEWORK` trong `openobb/cli.py`. `unlock_all` giữ như tính năng kiến trúc. Test, FINETUNE, README hai repo đã sửa.

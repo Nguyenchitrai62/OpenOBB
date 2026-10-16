@@ -1667,6 +1667,23 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Kết luận (cùng F100–F102): trên data vài trăm ảnh, mở khoá thân thua đóng băng khoảng 0.02–0.03 mAP50-95 và không hồi lại khi train
     dài hơn; đường val đã bằng phẳng từ khoảng epoch 20. Giữ đóng băng làm mặc định; `unlock_all` chỉ đáng thử với data lớn (chưa đo).
 
+- **F107. v23-x fine-tune thêm 30 epoch bằng khung YOLO 0.23.0, nối tiếp B (log user 10-16): 0.798 / 0.526, trùng 1.8% — kết quả tốt nhất,
+  thành mốc mới của README.**
+  - Điều kiện: 0.23.0 (khung YOLO duy nhất), `weights=openobb23x_new.pt` trên Drive (đường val epoch 1 0.787 / 0.509 khớp best của B, F103;
+    `[init] 1443 full, 12 partial, 0 new`, thân đóng băng), 30 epoch, batch 16, LR 9.09e-4 tuyến tính, wd 5e-4, nbs 64 (112 bước, log cảnh báo
+    ít bước), warmup 45 it, EMA 0.9999 / 2000, `rotate_p=0.5`, G4. Chuỗi: v21 → v23 50 ep (F96) → B 30 ep (F103) → run này 30 ep.
+  - Đường val: dao động 0.47–0.51 tới ep13, tăng từ ep19, đỉnh **ep27 0.795 / 0.529**, ep30 0.783 / 0.521. Cuối (best ep27, o2m 0.5):
+    **0.798 / 0.526**, P 0.772, R 0.798, F2 0.742. Hiệu chỉnh: o2m 0.7 fitness 0.5554 nhưng trùng 4.7% → chọn o2m 0.5 (0.5531, trùng 1.8%).
+  - Theo class (mAP50-95; v23 F96 / B F103 / run này / YOLO26x): wall .576 / .599 / .599 / .624, junction .545 / .543 / .542 / .584,
+    wall_300 .331 / .348 / **.362** / .441, note .494 / .529 / **.532** / .517, door .811 / .821 / .819 / .811, slide_door .317 / .274 / .265 / .123,
+    double_door .505 / .544 / **.564** / .392.
+  - Lỗi hay gặp: junction → nền 114 (6%), wall → nền 80 (8%), wall_300 ↔ junction 14 / 16. Box trùng 78 (1.8%).
+  - Hướng box: vật dài lệch > 1° **3.8%** (B 4.9%, v23 6.6%), box dài lệch trục **6.0%** (B 7.2%, v23 10.3%; YOLO 0.3%), mọi box lệch > 1° 15.1%.
+  - Tốc độ: 7.9 + 1.3 ms / ảnh (fused, bf16, batch 16), như F97.
+  - Đọc: so với B +0.007 / +0.003, trong dao động giữa hai run giống hệt (F102: ±0.006 / ±0.002) → train tiếp đã gần bão hoà trên 250 ảnh.
+    So với YOLO26x: **+0.055 mAP50, +0.027 mAP50-95**; vẫn thua ở wall (−.025), junction (−.042), wall_300 (−.079) — đúng ba class độ khít
+    box của vật mảnh / tí hon; thắng rõ ở class hiếm (slide_door, double_door) và note. Hướng box vật dài cải thiện thêm nhưng còn xa YOLO.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
