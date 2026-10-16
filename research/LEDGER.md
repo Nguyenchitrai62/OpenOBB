@@ -1656,6 +1656,17 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   xoay 90°, không RFS, nbs 64, LR tuyến tính; model dense: lr0 = 0.002·5/(4+nc). DETR v1 / v4 giữ LR riêng (kiến trúc). `unlock_all` giữ.
   Mọi run từ 0.23.0 khác công thức với run trước đó (so sánh phải ghi chú).
 
+- **F106. Run D: `trainer=yolo` + `unlock_all`, 50 epoch, từ best v23 gốc (log user 10-16, 0.22.7): 0.780 / 0.495 — mở khoá không bắt kịp
+  đóng băng trên 250 ảnh dù train dài hơn.**
+  - Điều kiện: như B (F103) nhưng `unlock_all=True` và 50 epoch (187 bước tối ưu, nbs 64).
+  - Đường val: ep1 0.724 / 0.437, đáy ep3 0.646 / 0.379 (cú sụp khi BN đổi thang đo), hồi tới ep19 0.762 / 0.490, rồi đi ngang 0.48–0.50,
+    ep36–50 dao động 0.494–0.504. Cuối (o2o 0.5): **0.780 / 0.495**, trùng 1.6%.
+  - So với cùng khung, thân đóng băng (B, 30 epoch): 0.791 / **0.523**. Theo class (D / B): wall .577 / .599, note .476 / .529,
+    double_door .444 / .544, junction .546 / .543, wall_300 .347 / .348, slide_door .264 / .274, door .812 / .821.
+  - Hướng box: vật dài lệch > 1° 6.3% (B 4.9%), box dài lệch trục 8.4% (B 7.2%).
+  - Kết luận (cùng F100–F102): trên data vài trăm ảnh, mở khoá thân thua đóng băng khoảng 0.02–0.03 mAP50-95 và không hồi lại khi train
+    dài hơn; đường val đã bằng phẳng từ khoảng epoch 20. Giữ đóng băng làm mặc định; `unlock_all` chỉ đáng thử với data lớn (chưa đo).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
