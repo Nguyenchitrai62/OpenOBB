@@ -1,43 +1,55 @@
 # OpenOBB
 
-Thư viện phát hiện đối tượng xoay (OBB) cho ảnh bản vẽ CAD và ảnh chụp từ trên cao. Các kiến trúc **OpenOBB** là tài sản
-riêng, dùng thương mại được: chỉ dùng thành phần Apache-2.0 / BSD / MIT, không phụ thuộc Ultralytics (AGPL).
-Giao diện predict / kết quả giống YOLO-OBB.
+Phát hiện đối tượng xoay (OBB) cho ảnh bản vẽ CAD: tường, cửa, nút giao, ghi chú... Các kiến trúc **OpenOBB** là tài sản riêng, dùng
+thương mại được: chỉ dùng thành phần Apache-2.0 / BSD / MIT, không phụ thuộc Ultralytics (AGPL). Giao diện predict / kết quả giống YOLO-OBB.
+Kiến trúc mới nhất: **OpenOBB23**.
+
+## Kết quả
+
+Wall_Color (250 ảnh train, 53 ảnh val, 7 class), ảnh cạnh dài 1280, mAP chấm theo cách của Ultralytics.
+Tốc độ đo cùng một GPU (RTX PRO 6000), batch 16, trang 960 × 1280, ms / ảnh (mạng + NMS).
+
+| Model | Tham số | mAP50 | mAP50-95 | Box trùng | Tốc độ | Tốc độ + `compile` |
+|---|---|---|---|---|---|---|
+| **OpenOBB23-x** | 51.3M | **0.800** | **0.512** | 1.9% | 9.1 ms | 8.0 ms |
+| YOLO26x-obb | 57.6M | 0.743 | 0.499 | 1.6% | 7.3 ms | — |
+
+YOLO26x-obb train 150 epoch từ trọng số chính thức; OpenOBB23-x fine-tune từ các checkpoint OpenOBB trước trên cùng data.
 
 ## Cài đặt
 
-### Bước 1: cài PyTorch (chọn một)
+**Máy có GPU NVIDIA:**
+
+```bash
+pip install -U torch --index-url https://download.pytorch.org/whl/cu126
+pip install -U "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git"
+```
+
+**Máy chỉ có CPU:**
+
+```bash
+pip install -U torch --index-url https://download.pytorch.org/whl/cpu
+pip install -U "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git"
+```
+
+**Cài từ file wheel** (không cần quyền truy cập repo; file mới nhất nằm trong thư mục `wheels/` của repo sản phẩm,
+hoặc là file được bàn giao). Đặt file `.whl` vào thư mục đang đứng rồi chạy; `X.Y.Z` là phiên bản ghi trong tên file.
 
 Máy có GPU NVIDIA:
 
 ```bash
 pip install -U torch --index-url https://download.pytorch.org/whl/cu126
+pip install -U ./openobb-X.Y.Z-py3-none-any.whl
 ```
 
 Máy chỉ có CPU:
 
 ```bash
 pip install -U torch --index-url https://download.pytorch.org/whl/cpu
-```
-
-GPU RTX 50xx: đổi `cu126` thành `cu130`.
-
-### Bước 2: cài code (chọn một)
-
-Từ repo:
-
-```bash
-pip install -U "openobb @ git+https://git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git"
-```
-
-Từ file wheel (không cần quyền truy cập repo; file mới nhất nằm trong thư mục `wheels/` của repo sản phẩm, hoặc là file
-được bàn giao; `X.Y.Z` là phiên bản ghi trong tên file):
-
-```bash
 pip install -U ./openobb-X.Y.Z-py3-none-any.whl
 ```
 
-- Bước 2 giữ nguyên PyTorch đã cài ở bước 1. Cập nhật: chạy lại bước 2.
+- Luôn cài bản mới nhất; chạy lại đúng lệnh để cập nhật. GPU RTX 50xx: đổi `cu126` thành `cu130`.
 - Khi suy luận, model tự chạy trên GPU nếu có. Nếu máy có GPU NVIDIA mà PyTorch là bản CPU, lần dùng đầu tiên sẽ tự cài
   bản GPU rồi báo chạy lại (tắt bằng biến môi trường `OPENOBB_AUTO_TORCH=0`).
 - Kiểm tra phiên bản: `python -c "import openobb; print(openobb.__version__)"`.
@@ -51,37 +63,53 @@ for r in model.predict("page.png", conf=0.25):
     print(r.obb.xyxyxyxy, r.obb.conf, r.obb.cls, r.names)
 ```
 
+`best.pt` dùng thẳng được, không cần export: khi nạp, model tự gộp Conv + BatchNorm, chạy bf16 và `channels_last` trên GPU.
 Bảng đối chiếu đầy đủ với Ultralytics: [docs/DEPLOY.md](docs/DEPLOY.md).
+
+**Nhanh hơn với `compile`** (GPU, tiến trình chạy lâu như server): đặt biến môi trường **trước** khi nạp model. Lần gọi đầu mất 1–3 phút
+biên dịch, các lần sau nhanh hơn khoảng 12%.
+
+```python
+import os
+os.environ["OPENOBB_COMPILE"] = "1"
+from openobb import OpenOBB
+model = OpenOBB("best.pt")
+```
+
+- File giao đi gọn hơn (fp16, bỏ tham số train; tốc độ không đổi): `openobb strip model=best.pt half=True`.
+- Đo thời gian từng khối trên GPU: `openobb profile model=best.pt detail=True`.
 
 ## Train / fine-tune
 
 ```bash
-openobb train data=data.yaml model=openobb5x epochs=100 imgsz=1280      # runs/obb/train, weights/best.pt
+openobb train model=openobb23x weights=openobb23x.pt data=data.yaml epochs=100 imgsz=1280 batch=16   # runs/obb/train/weights/best.pt
 openobb val model=runs/obb/train/weights/best.pt data=data.yaml
-openobb predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.3
+openobb predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.25
 ```
 
-`data.yaml` theo định dạng YOLO-OBB. mAP in ra theo cách chấm của Ultralytics để so trực tiếp với YOLO; kèm thêm thước
-DOTA và các lỗi nhầm class thường gặp. Hướng dẫn: [docs/FINETUNE.md](docs/FINETUNE.md).
+`data.yaml` theo định dạng YOLO-OBB. mAP in ra theo cách chấm của Ultralytics để so trực tiếp với YOLO; kèm box trùng, độ lệch hướng box
+và các lỗi nhầm class thường gặp. Thêm `rotate_p=0.5` để xoay ảnh góc bất kỳ khi bản vẽ có đối tượng nghiêng.
+Hướng dẫn: [docs/FINETUNE.md](docs/FINETUNE.md).
 
-## Kiến trúc
+## Các kiến trúc
 
-| `model=` | Mô tả | Tài liệu |
-|---|---|---|
-| `openobb11s/m/l/x` | mới: đề xuất dense + tầng quan hệ train một-một (khử trùng tự học, không NMS); nạp được checkpoint v8 / v10 | [docs/OPENOBB11.md](docs/OPENOBB11.md) |
-| `openobb12s/m/l/x` | mới: lõi OpenOBB7 + head dense kép (một-nhiều để học, một-một để suy luận), không NMS, không tầng quan hệ | [docs/OPENOBB12.md](docs/OPENOBB12.md) |
-| `openobb13s/m/l/x` | mới, nhắm độ chính xác: v12 + luồng độ phân giải gốc + lưới P2 cho vật tí hon (`imgsz` = độ phân giải đầy đủ, ví dụ 2560; lõi chạy ở một nửa) | [docs/OPENOBB13.md](docs/OPENOBB13.md) |
-| `openobb14s/m/l/x` | mới, nhắm cả độ chính xác lẫn tốc độ: thân HGNetv2 pretrained + neck conv dày tái tham số hoá tự thiết kế (thay LSK + encoder lai) + head kép nặng hồi quy box trực tiếp + bộ tinh chỉnh box đọc nét ở stride 4 (`box=direct` mặc định, `ref_k`) | [docs/OPENOBB14.md](docs/OPENOBB14.md) |
-| `openobb15s/m/l/x` | mới, nhắm độ chính xác: v14 + luồng độ phân giải gốc + lưới P2, bộ tinh chỉnh box đọc nét ở độ phân giải gốc (`imgsz` = cỡ lõi, ảnh vào 2×; `neck=dfine` cho vòng này) | [docs/OPENOBB15.md](docs/OPENOBB15.md) |
-| `openobb16s/m/l/x` | mới, nhắm mAP50-95: v15 + tinh chỉnh box theo tầng (cascade 3 bước, ngưỡng 0.5 / 0.6 / 0.7) + chấm điểm theo độ khít (điểm × fit^0.5 trước NMS); +8 GFLOPs | [docs/OPENOBB16.md](docs/OPENOBB16.md) |
-| `openobb10s/m/l/x` | mới, chưa train: v8 + head 3 slot / điểm (vật nhỏ chồng nhau như wall_300 cạnh junction), gán nhãn theo tầm với (box lớn), cân bằng class hiếm; nạp được checkpoint v8 | [docs/OPENOBB10.md](docs/OPENOBB10.md) |
-| `openobb9s/m/l/x` | mới, chưa train: lõi tự thiết kế (conv 3×3 dày tái tham số hoá) + head v8; pretrain bằng chưng cất 2 thầy | [docs/OPENOBB9.md](docs/OPENOBB9.md) |
-| `openobb8s/m/l/x` | bản tốt nhất: v3 sửa lỗi + tầng suy luận quan hệ theo hướng (bắt đầu y hệt v3) | [docs/OPENOBB8.md](docs/OPENOBB8.md) |
-| `openobb6n/s/m/l/x` | kiến trúc tự thiết kế từ phân tích (backbone + neck + head riêng), pretrain bằng chưng cất DINOv2 (`openobb pretrain`) | [docs/OPENOBB6.md](docs/OPENOBB6.md) |
-| `openobb5x` | head dense + DINOv2 + phân loại theo hình học + chấm lại theo quan hệ | [docs/OPENOBB5.md](docs/OPENOBB5.md) |
-| `openobb4x` | DINOv2 + DETR + nhánh dense | [docs/OPENOBB4.md](docs/OPENOBB4.md) |
-| `openobb3x` | encoder COCO + head dense oriented dị hướng (nhanh) | [docs/OPENOBB3.md](docs/OPENOBB3.md) |
-| `openobb1x` | D-FINE-OBB (DETR) | [docs/OPENOBB1.md](docs/OPENOBB1.md) |
+Kết quả tốt nhất của mỗi kiến trúc trên Wall_Color val (cỡ x, ảnh 1280, thước Ultralytics), xếp theo mAP50-95.
+
+| `model=` | Kiến trúc | Tham số | mAP50 | mAP50-95 |
+|---|---|---|---|---|
+| **`openobb23x`** | v21 + bám ranh giới có xoay (dịch và xoay box theo mép) | 51.3M | **0.800** | **0.512** |
+| `openobb21x` | v20 + sửa góc trong không gian góc kép | 51.3M | 0.769 | 0.492 |
+| `openobb20x` | v19 + bộ tinh chỉnh cạnh đọc chi tiết stride 4 của thân | 51.3M | 0.764 | 0.482 |
+| `openobb17x` | v12 + trường ranh giới + bám ranh giới, nhóm class | 68.3M | 0.751 | 0.481 |
+| `openobb22x` | v21 + góc sigmoid + hồi quy box trực tiếp | 51.1M | 0.760 | 0.479 |
+| `openobb12x` | lõi encoder lai + head dense kép (một-nhiều, một-một) | 67.1M | 0.743 | 0.472 |
+| `openobb14x` | neck tái tham số hoá + head tự viết, hồi quy box trực tiếp | 62.7M | 0.713 | 0.469 |
+| `openobb3x` | encoder COCO + head dense oriented | 64.6M | 0.712 | 0.467 |
+| `openobb19x` | neck nhanh tự viết + một box mỗi nhóm class | 50.7M | 0.755 | 0.462 |
+| `openobb4x` | DINOv2 + DETR + nhánh dense | 134.8M | 0.663 | 0.457 |
+| YOLO26x-obb (tham chiếu) | Ultralytics | 57.6M | 0.743 | 0.499 |
+
+Số epoch và điểm khởi tạo khác nhau giữa các lần train. Cỡ s / m / l có cho mọi kiến trúc trên (`openobb23s`...).
 
 ## License
 
