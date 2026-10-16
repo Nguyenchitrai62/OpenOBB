@@ -5,14 +5,15 @@ OpenOBB22-x 523 GFLOPs vs YOLO26x 605, F92).
 Stages: trunk + neck (encode), head (run_head), boundary field, candidate decode + top-k, edge refiner + boundary
 snapping (refine_stages on the top ref_k candidates), NMS, rest of forward.
 
-usage:  openobb profile model=best.pt [imgsz=1280] [batch=16] [runs=20] [detail=True]
+usage:  openobb profile model=best.pt [imgsz=1280] [batch=16] [runs=20] [detail=True] [channels_last=True] [compile=True]
 """
 import time
 
 import torch
 
 
-def profile_parts(model_path, imgsz=1280, batch=16, runs=20, warmup=5, h_ratio=0.75, device=None, detail=False):
+def profile_parts(model_path, imgsz=1280, batch=16, runs=20, warmup=5, h_ratio=0.75, device=None, detail=False,
+                  channels_last=False, compile=False):
     from openobb.predict import load_model
     from openobb.models import openobb3, openobb17
     dev = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
@@ -20,6 +21,23 @@ def profile_parts(model_path, imgsz=1280, batch=16, runs=20, warmup=5, h_ratio=0
     net = load_model(model_path, dev)[0].eval()
     H = int(round(imgsz * h_ratio / 32) * 32)
     x = torch.rand(batch, 3, H, imgsz, device=dev)
+    if cuda:
+        torch.backends.cudnn.benchmark = True        # fixed input shape: let cuDNN pick its fastest kernels
+    if channels_last:                                # NHWC: what tensor cores read natively (no NCHW <-> NHWC per conv)
+        net = net.to(memory_format=torch.channels_last)
+        x = x.contiguous(memory_format=torch.channels_last)
+    if compile:                                      # fuse the elementwise ops of the static-shape parts (trunk, neck, heads)
+        for name in ("backbone", "neck", "encoder", "field"):
+            if getattr(net, name, None) is not None:
+                setattr(net, name, torch.compile(getattr(net, name)))
+        for hn in ("head", "head_o2o"):
+            h = getattr(net, hn, None)
+            for part in ("cls", "reg"):
+                mods = getattr(h, part, None) if h is not None else None
+                if mods is not None:
+                    for i in range(len(mods)):
+                        mods[i] = torch.compile(mods[i])
+        detail = False                               # compiled modules cannot be timed one by one
     times = {}
     events = []
 
@@ -87,7 +105,8 @@ def profile_parts(model_path, imgsz=1280, batch=16, runs=20, warmup=5, h_ratio=0
         for obj, attr, fn in patches:
             setattr(obj, attr, fn)
     nested = times.get("top-k + refiner + snapping", 0.0)
-    print(f"{model_path}: input {batch} x 3 x {H} x {imgsz}, bf16, per image (ms), {runs} runs after {warmup} warm-up")
+    mode = ", ".join(n for n, on in (("channels_last", channels_last), ("compile", compile)) if on) or "default"
+    print(f"{model_path}: input {batch} x 3 x {H} x {imgsz}, bf16, {mode}, per image (ms), {runs} runs after {warmup} warm-up")
     for k, v in times.items():
         print(f"  {k:30s} {v:7.2f}")
     print(f"  {'TOTAL forward (wall)':30s} {total:7.2f}")
