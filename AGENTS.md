@@ -418,6 +418,11 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 
 ## 9. Nhật ký
 
+- 2026-10-16 (2): **Bộ khung train khớp lại YOLO hiện tại + tự chọn công thức** (F98, log fine-tune bộ tivi 77 ảnh của user).
+  0.22.4: `warmup_bias_lr=0` (YOLO đặt 0 khi dùng AdamW; 0.1 làm fine-tune tụt). 0.22.5: `optimizer=auto` tự đặt `nbs=0` khi < 2000 bước
+  và `lr0 = max(mặc định, 0.002·5/(4+nc))` khi có class mới / không có weights. 0.22.6: warmup thuần theo epoch, bỏ mức tối thiểu
+  100 iteration (Ultralytics 8.4 đã bỏ). Chưa đo trên GPU; chờ log user.
+
 - 2026-10-16: **Phụ lục "kiến trúc theo lớp" cho mọi thẻ `docs/OPENOBB1–23.md`** (theo user). Mỗi thẻ có mục cuối: biểu đồ Mermaid
   (xanh dương mượn, xanh lá tự viết, cam mới ở version đó) + bảng từng khối (lớp, kênh, kernel, kích thước ra ở ảnh 1280, tham số) + tổng hợp
   tỉ lệ tự viết. Sơ đồ ASCII cũ trong thân thẻ thay bằng dòng trỏ tới phụ lục. Số liệu đo bằng `research/analysis/arch_layers.py`

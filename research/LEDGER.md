@@ -1577,6 +1577,8 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - 0.22.5 (theo user: cần cơ chế tự động): `optimizer=auto` (mặc định, model dense) tự đặt những gì user không truyền:
     `nbs=0` khi tích luỹ gradient để lại < 2000 bước; `lr0 = max(mặc định, 0.002 · 5 / (4 + nc))` (công thức AdamW của YOLO) khi data có
     class mà weights khởi đầu chưa biết. Log `[openobb] auto: ...`; `optimizer=AdamW` hoặc truyền `lr0=` / `nbs=` để tắt. Chưa đo trên GPU.
+  - 0.22.6: warmup = round(min(warmup_epochs, epochs − 1) × số batch mỗi epoch), bỏ mức tối thiểu 100 iteration. Ultralytics hiện tại
+    (8.4.174, `_get_warmup_iterations`) không còn mức này; bản cũ có. Với 77 ảnh / batch 16: warmup 15 iteration (3 epoch) thay vì 100.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 

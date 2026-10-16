@@ -162,7 +162,7 @@ def test_train_flags_and_oom_retry(tmp_path, monkeypatch):
     assert len(calls) == 2
     first, second = (" ".join(c) for c in calls)
     for flag in ("--fit", "--lsk", "--mosaic-p 1.0", "--mosaic-mode yolo", "--scale-jitter 0.5", "--translate 0.1",
-                 "--mosaic-off 10", "--patience 100", "--warmup 100", "--eval-every 1", "--batch 8",
+                 "--mosaic-off 10", "--patience 100", "--warmup 3", "--eval-every 1", "--batch 8",
                  "--aug-iof 0.25", "--merge-iou 0.7", "--ema 0.986", "--schedule cos", "--min-lr-ratio 0.01",
                  "--epoch-lr", "--warmup-bias-lr 0.0", "--nbs 64"):   # AdamW: no bias LR warmup (F98)
         assert flag in first, flag

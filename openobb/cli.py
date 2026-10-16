@@ -27,7 +27,7 @@ the train images is held out. Prepared data is cached (~/.cache/openobb). Every 
 ({project}/{name}, then name2, name3...; exist_ok=True reuses it); resume=True continues a run from weights/last.pt.
 
 Training defaults follow the usual one-stage recipe: mosaic=1.0, scale=0.5 (random zoom 0.5-1.5), translate=0.1,
-close_mosaic=10, warmup_epochs=3 (max(3 epochs, 100) batches, every LR rises from 0; warmup_bias_lr=0 as the usual
+close_mosaic=10, warmup_epochs=3 (3 epochs of batches, at most epochs - 1, every LR rises from 0; warmup_bias_lr=0 as the usual
 trainer sets it for AdamW: a bias LR of 0.1 under Adam moves every bias by ~0.1 per step and wrecks a fine-tune),
 LR factor per epoch, cosine to lr0 * lrf (lrf=0.01; cos_lr=False for linear, the YOLO default), nbs=64 (gradient
 accumulation to a nominal batch of 64, weight decay scaled to it), patience=100,
@@ -436,8 +436,10 @@ def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_
         acc = max(round(nbs / int(opts["batch"])), 1) if nbs > 0 else 1
         steps_ep = max(1, ipe // acc)                # optimizer steps per epoch
         total = steps_ep * int(epochs)
-        if opts.get("epoch_lr"):                     # usual one-stage trainer: max(round(warmup_epochs x batches), 100)
-            opts["warmup"] = max(round(warmup_epochs * ipe), 100) if warmup_epochs > 0 else -1
+        if opts.get("epoch_lr"):                     # usual one-stage trainer (current): round(min(warmup_epochs, epochs - 1)
+            # x batches), no 100-batch floor any more (the floor stretched the warmup over most of a small run, F98)
+            w_ep = min(warmup_epochs, max(int(epochs) - 1, 0))
+            opts["warmup"] = max(round(w_ep * ipe), 1) if w_ep > 0 else -1
         else:                                        # older runs: warmup_epochs epochs (at most epochs - 1)
             opts["warmup"] = max(1, round(min(warmup_epochs, max(int(epochs) - 1, 0)) * ipe))
         opts["ema_warmups"] = max(1, round(max(opts["warmup"], 1) / acc))
@@ -612,7 +614,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
             "lr": sd["lr"], "backbone_mult": sd["backbone_mult"], "wd": sd["wd"], "hsv": hsv,
             "eval_every": _eval_every(prepared, int(epochs)), "eval_images": 10**9, "patience": int(patience or 0),
             "seed": seed,
-            # usual one-stage trainer: LR factor per epoch, warmup over max(3 epochs, 100) batches, nominal batch 64
+            # usual one-stage trainer: LR factor per epoch, warmup over 3 epochs of batches, nominal batch 64
             # (gradient accumulation + weight decay scaled to it). Bias LR warmup off: the usual trainer zeroes
             # warmup_bias_lr whenever it picks AdamW (0.1 is for SGD); under AdamW it moved every bias by ~0.1 per step
             # and dragged fine-tunes down until the warmup ended (F98)
