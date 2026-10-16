@@ -1,0 +1,28 @@
+wall_val_0005 {'o2o': (329, 103), 'o2m': (882, 529)}
+wall_val_0006 {'o2o': (474, 155), 'o2m': (1219, 741)}
+wall_val_0007 {'o2o': (724, 214), 'o2m': (1770, 1019)}
+wall_val_0008 {'o2o': (1024, 295), 'o2m': (2210, 1211)}
+wall_val_0009 {'o2o': (1177, 332), 'o2m': (2587, 1406)}
+wall_val_0010 {'o2o': (1274, 366), 'o2m': (2780, 1497)}
+
+o2o: 1274 confident candidates, 366 duplicates (28.7%) on 285 labels
+  dup: anchors <= 1.5 stride apart      94.5%
+  dup: anchors > 1.5 stride apart        5.5%
+  dup: label long (>= 10x)              25.1%
+  dup: label short                      74.9%
+  dup: other level                       8.2%
+  dup: same group                      100.0%
+  dup: same level                       91.8%
+  dup: score ratio < 0.5                11.5%
+  dup: score ratio >= 0.5               88.5%
+
+o2m: 2780 confident candidates, 1497 duplicates (53.8%) on 489 labels
+  dup: anchors <= 1.5 stride apart      68.8%
+  dup: anchors > 1.5 stride apart       31.2%
+  dup: label long (>= 10x)              29.5%
+  dup: label short                      70.5%
+  dup: other level                      21.0%
+  dup: same group                      100.0%
+  dup: same level                       79.0%
+  dup: score ratio < 0.5                18.9%
+  dup: score ratio >= 0.5               81.1%

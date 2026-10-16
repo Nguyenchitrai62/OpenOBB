@@ -28,7 +28,8 @@ import torch.nn as nn
 
 from .openobb3 import fp32_out
 from .openobb14 import SCALES14, Neck14
-from .openobb17 import OpenOBB17
+from .openobb17 import FIELD_STRIDE, GAIN_SCALE, BoundarySnap, OpenOBB17
+from .openobb8 import _sample
 
 
 class OpenOBB18(OpenOBB17):
@@ -220,3 +221,63 @@ class OpenOBB22(OpenOBB21):
         src = ck["ema"]["module"] if isinstance(ck.get("ema"), dict) and "module" in ck["ema"] else ck.get("model", ck)
         self.reset_box_outputs(src)
         return True
+
+
+N_ROT = 7                # positions along a long box where the rotational snapping reads the field
+N_W = 49                 # samples of each profile across the box
+
+
+class BoundarySnapRot(BoundarySnap):
+    """OpenOBB17's boundary snapping (moves ends / sides) + a ROTATION read from the field: along a long box
+    (L >= 4 T), N_ROT positions u in [-0.4, 0.4] L; at each, a profile across the whole box (both long-side ridges,
+    channel 1) whose soft centroid is the centre line -> lateral offset t(u), confidence = peak probability; the
+    weighted least-squares slope of t against u is the box's tilt, applied about the centre. A tilted box of length L has offsets u * tan(delta) growing along the side, so the
+    estimate gets MORE precise with length (the head's angle error grows with length, F83 / F84). Gain zero at init:
+    the identity (OpenOBB23 starts as OpenOBB21)."""
+
+    def __init__(self):
+        super().__init__()
+        self.rot_gain = nn.Parameter(torch.zeros(()))
+        self.register_buffer("q", torch.linspace(-0.4, 0.4, N_ROT), persistent=False)
+
+    def rotation(self, field, b):
+        """-> (B, K) tilt (rad) of the boxes b (B, K, 5) px against the long-side ridges of the field."""
+        bd = b.detach().float()
+        B, K = bd.shape[:2]
+        c, L, T, th = bd[..., :2], bd[..., 2].abs().clamp(min=0.5), bd[..., 3].abs().clamp(min=0.5), bd[..., 4]
+        ax = torch.stack([th.cos(), th.sin()], -1)
+        nx = torch.stack([-th.sin(), th.cos()], -1)
+        tau = self.log_tau.exp()
+        # one profile ACROSS the whole box at each position u: both long-side ridges lie on it; their soft centroid is
+        # the centre line, which a tilt shifts by u tan(delta) (both ridges move together). A per-side search with a
+        # radius wider than the thickness would catch the opposite ridge and pull the estimate towards 0.
+        r = torch.maximum(0.5 * T, 0.03 * L).clamp(2.0, 12.0)
+        half = T / 2 + r                                                            # (B, K)
+        v = torch.linspace(-1.0, 1.0, N_W, device=bd.device) * half[..., None]       # (B, K, N_W)
+        u = self.q * L[..., None]                                                   # (B, K, N_ROT)
+        pos = (c[:, :, None, None, :] + u[..., None, None] * ax[:, :, None, None, :]
+               + v[:, :, None, :, None] * nx[:, :, None, None, :])                    # (B, K, N_ROT, N_W, 2)
+        s = _sample(field, pos.reshape(B, -1, 2), FIELD_STRIDE).reshape(B, K, N_ROT, N_W, 2)
+        logit = s[..., 1]                                                           # long sides: channel 1
+        w = torch.softmax(logit / tau, -1)
+        off = (w * v[:, :, None, :]).sum(-1)                                        # (B, K, N_ROT) centre-line offset
+        wt = logit.amax(-1).sigmoid()                                                # confidence of each profile
+        slope = (wt * u * off).sum(-1) / (wt * u * u).sum(-1).clamp(min=1e-6)
+        return torch.atan(slope) * (L >= 4 * T).float()
+
+    def forward(self, field, b):
+        out = super().forward(field, b)
+        d = GAIN_SCALE * self.rot_gain * self.rotation(field, b)
+        return torch.cat([out[..., :4], (out[..., 4] + d.to(out.dtype))[..., None]], -1)
+
+
+class OpenOBB23(OpenOBB21):
+    """OpenOBB21 (best measured accuracy, F90) + rotational boundary snapping (BoundarySnapRot) + the local-peak
+    filter as an inference option instead of pairwise NMS (openobb17.peak_mask, F95). docs/OPENOBB23.md.
+    Starts exactly as OpenOBB21 (rotation gain 0); the post-processing is chosen by the end-of-training calibration."""
+    arch = "v23"
+
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        if self.snap is not None:
+            self.snap = BoundarySnapRot()

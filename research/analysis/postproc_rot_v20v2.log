@@ -1,0 +1,5 @@
+rotational snapping on, gain 1
+
+o2m:0.5: mAP50 0.760  mAP50-95 0.483  | post-processing CPU 185 ms / image
+  Duplicate boxes (same class on an already detected object, conf 0.25): 108 (2.3% of detections): wall 36, junction 31, wall_300 20, slide_door 8, double_door 7, door 6
+  Box geometry (conf 0.25, 3212 found objects): angle error > 1 deg 9.4%, > 2 deg 2.3%, an end off the object (> 0.5 thickness) 0.8% | long objects (length >= 10 x thickness, 501): angle > 1 deg 7.8%, end off 1.8% | long detections > 1 deg off the axes 13.5% of 594 (labels 0.2%)

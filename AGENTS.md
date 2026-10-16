@@ -317,6 +317,9 @@ Câu hỏi còn mở:
 - [x] **YOLO26x cùng thước (F89–F90):** v21 .769 / .492, trùng 1.8%, 12.7 ms so với YOLO .743 / .499, 1.6%, 7.3 ms (máy nóng); hướng box
   14.4% so với 0.3%. **OpenOBB22 (F91, 0.21.0):** v21 + góc sigmoid 45° + hồi quy box thẳng. [docs/OPENOBB22.md](docs/OPENOBB22.md).
   Cặp đang chờ: A = v21 không `rotate_p` (user đang chạy), B = `openobb22x epochs=150` từ best.pt v21.
+- [x] **v22 thất bại (F93):** hồi quy thẳng làm wall sụp (.466). **Profile G4 (F94):** thân + neck 7.5 ms, NMS ~3 ms. **F95:** trùng của head một-một
+  là điểm neo kề nhau, nhưng lọc đỉnh mất 0.035 mAP50 (không mặc định); head một-một nghiêng ít hơn (5.5% / 15.4%) → hiệu chỉnh chọn theo độ nghiêng.
+  **OpenOBB23 (0.22.0):** v21 + bám ranh giới có xoay. [docs/OPENOBB23.md](docs/OPENOBB23.md). Lệnh: `model=openobb23x weights=<best.pt v21> epochs=100`.
   Không đề xuất đổi thầy nữa (v19 qua ba kiểu thầy, tổng không đổi; user phản biện). Vòng sau chưa chốt.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.

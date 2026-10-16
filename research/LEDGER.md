@@ -1511,6 +1511,30 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - NMS theo từng lớp chậm hơn trên GPU (3.42 so với 3.0 ms, F90): vòng lặp lớp + `unique()` thêm đồng bộ và kernel nhỏ. 0.21.2: GPU dùng lại ma
     trận đầy đủ, CPU giữ theo lớp. Cách dứt điểm: bỏ NMS (head một-một sạch như YOLO26; hiện o2o không NMS còn 31% trùng).
 
+- **F95. Box trùng của head một-một = điểm neo kề nhau → lọc đỉnh 3×3 thay NMS; OpenOBB23 = v21 + bám ranh giới có xoay + lọc đỉnh. (10-15, CPU)**
+  Script `research/analysis/o2o_dup_probe.py` (log `o2o_dup_v20v2.log`), `openobb20x_v2.pt`, 10 ảnh val, ứng viên tự tin (≥ 0.25) trước tinh chỉnh / NMS:
+  - head một-một: 1274 ứng viên, 366 trùng (28.7%); **94.5% cặp trùng có điểm neo cách ≤ 1.5 stride**, 91.8% cùng tầng, 100% cùng nhóm class,
+    88.5% điểm số ≥ 0.5 × điểm cao nhất; 75% trên vật ngắn. head một-nhiều: 53.8% trùng, 68.8% kề nhau, 31% xa hơn.
+  - → `openobb17.peak_mask`: giữ ứng viên có điểm cao nhất trong ô 3×3 của tầng + nhóm (một max-pool / tầng, không so cặp). Lựa chọn `peak` trong
+    hiệu chỉnh cuối train (`o2o peak`, `o2o peak+0.5`, `o2m peak+0.5`) và trong `nms_iou=`.
+  - Đo trên val (53 ảnh, `openobb20x_v2.pt`, `research/analysis/postproc_compare.py`, log `postproc_compare*_v20v2.log`):
+    | hậu xử lý | mAP50 / 50-95 | trùng | box dài lệch | hậu xử lý CPU |
+    |---|---|---|---|---|
+    | o2m + NMS 0.5 (hiện tại) | .759 / .483 | 2.2% | 15.4% | 184 ms |
+    | o2o + lọc đỉnh | .722 / .461 | 5.3% | 5.8% | 8 ms |
+    | o2o không gì | .693 / .452 | 32.3% | 8.7% | 0 |
+    | o2m + lọc đỉnh | .687 / .447 | 24.5% | 12.9% | 7 ms |
+    | o2m + lọc đỉnh + NMS 0.5 | .725 / .464 | 1.5% | 12.7% | 120 ms |
+    | o2o + lọc đỉnh + NMS 0.5 | .724 / .459 | 1.2% | 5.5% | 121 ms |
+    → **lọc đỉnh xoá cả object thật kề nhau (−0.035 mAP50): bác bỏ làm mặc định** (giữ làm lựa chọn, hiệu chỉnh tự loại). Phát hiện phụ:
+    **head một-một cho box ít nghiêng hơn hẳn** (5.5% so với 15.4%); trong các lần train, o2o + NMS 0.5 có fitness ngang o2m + NMS 0.5
+    (chênh < 0.002) → `choose_postprocess` (0.22.0): khi độ chính xác và trùng ngang nhau, chọn cấu hình nghiêng ít hơn ≥ 2 điểm (`TILT_GAIN`).
+  - Oracle bám xoay (chưa train, hệ số 1, trường của v20): box dài lệch 15.4% → 13.5%, đầu lệch 3.2% → 1.8%, mAP không đổi (`postproc_rot_v20v2.log`).
+  - **OpenOBB23** ([docs/OPENOBB23.md](../docs/OPENOBB23.md)): nền v21 (bỏ hướng v22, F93) + `BoundarySnapRot`: trên 2 cạnh dài của box dài
+    (L ≥ 4T), 7 điểm dọc cạnh, lệch ngang của mép (soft-argmax trên trường ranh giới) → độ dốc bình phương tối thiểu = góc lệch; hệ số khởi tạo 0
+    (bắt đầu đúng bằng v21). + lọc đỉnh. Kỳ vọng ghi trước (100 ep từ best.pt v21, không xoay): box dài lệch ≤ 3%, mAP50 ≥ 0.765, mAP50-95 ≥ 0.495,
+    trùng ≤ 2.5%, tổng ≤ 10.2 ms. Bác bỏ bám xoay nếu lệch ≥ 10% hoặc hệ số học được < 0.2; bác bỏ lọc đỉnh nếu trùng > 4%.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

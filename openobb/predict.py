@@ -44,7 +44,7 @@ def windows(length, size, gap):
 
 # architecture labels this package can rebuild (args["arch"] written at training; identical in every build of the
 # package whatever its name, so a model trained with one build loads in another of the same or a newer version)
-KNOWN_ARCHS = ("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22")
+KNOWN_ARCHS = ("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23")
 
 
 def _ver(v):
@@ -76,6 +76,8 @@ def parse_nms(v):
         return None
     if str(v).lower() in ("none", "off", "false"):
         return "none"
+    if str(v).lower().startswith("peak"):            # local-peak filter (OpenOBB17+), "peak+0.5": then NMS 0.5 (F95)
+        return str(v).lower()
     return float(v)
 
 
@@ -88,6 +90,8 @@ def apply_nms(model, v):
         return model
     if hasattr(model, "final_nms"):
         model.final_nms = None if v == "none" else v
+    elif str(v).startswith("peak"):
+        return model
     else:
         model.nms_iou = 1.01 if v == "none" else v
     return model
@@ -103,7 +107,8 @@ def apply_head(model, h):
 def postprocess_options(model):
     """(inference head, NMS) settings the end-of-training calibration tries for this model."""
     if hasattr(model, "infer_head"):
-        return [("o2o", "none"), ("o2o", 0.7), ("o2o", 0.5), ("o2m", 0.7), ("o2m", 0.5)]
+        peak = [("o2o", "peak"), ("o2o", "peak+0.5"), ("o2m", "peak+0.5")] if hasattr(model, "snap_topk") else []  # F95
+        return [("o2o", "none"), ("o2o", 0.7), ("o2o", 0.5), ("o2m", 0.7), ("o2m", 0.5)] + peak
     if hasattr(model, "final_nms"):
         return [(None, "none"), (None, 0.7), (None, 0.5)]
     return [(None, 0.7), (None, 0.6), (None, 0.5)]
@@ -132,7 +137,27 @@ def choose_postprocess(tried, tol=DUP_TOL):
         return max(near, key=lambda t: t[0])
     # duplicate rates within DUP_EQ of the lowest count as equal: among those, the most accurate setting
     low = [t for t in near if t[1] is not None and t[1] <= min(dups) + DUP_EQ]
-    return max(low, key=lambda t: t[0])
+    pick = max(low, key=lambda t: t[0])
+    # ...unless an equally accurate / duplicate-free setting tilts its long boxes clearly less (F95: the one-to-one head
+    # + NMS 0.5 tilted 5.5% of the long detections vs 15.4% for one-to-many + NMS 0.5, at the same fitness)
+    tilt = lambda t: _long_tilt(t[3]) if len(t) > 3 else None  # noqa: E731
+    tp = tilt(pick)
+    if tp is not None:
+        better = [t for t in low if tilt(t) is not None and tilt(t) <= tp - TILT_GAIN]
+        if better:
+            pick = min(better, key=lambda t: (tilt(t), -t[0]))
+    return pick
+
+
+TILT_GAIN = 0.02  # a calibration setting is preferred for its geometry when it tilts >= 2 points fewer long boxes (F95)
+
+
+def _long_tilt(r):
+    """Share of long detections > 1 deg off the axes in an eval result (openobb.eval.ultra.geometry), or None."""
+    if not isinstance(r, dict):
+        return None
+    g = (r.get("ultra") or r).get("geometry") or {}
+    return g.get("long_dets_tilted") if g.get("long_dets") else None
 
 
 def merge_iou_for(v, fit):
@@ -141,6 +166,8 @@ def merge_iou_for(v, fit):
     v = parse_nms(v)
     if not fit:
         return 0.1
+    if isinstance(v, str) and v.startswith("peak"):
+        return float(v.split("+")[1]) if "+" in v else None
     return 0.7 if v is None else (None if v == "none" else v)
 
 
@@ -183,14 +210,14 @@ def _load_model(ckpt_path, device, queries=None, classes=None):
                       box=a.get("box") or "direct", ref_k=int(a.get("ref_k", 1500)), neck=a.get("neck") or "own")
         m.load_state_dict(ck["ema"]["module"] if "ema" in ck else ck["model"])
         return m.to(device).eval().fuse(), list(names), dict(a, conf_thr=ck.get("conf_thr"))
-    if a.get("arch") in ("v7", "v8", "v10", "v11", "v12", "v13", "v17", "v18", "v19", "v20", "v21", "v22"):
+    if a.get("arch") in ("v7", "v8", "v10", "v11", "v12", "v13", "v17", "v18", "v19", "v20", "v21", "v22", "v23"):
         common = dict(num_classes=len(names), img_size=a.get("img", 1024), lsk=a.get("lsk", True),
                       max_det=max(int(a.get("num_top", 1000)), int(queries or 0)))
-        if a["arch"] in ("v17", "v18", "v19", "v20", "v21", "v22"):
+        if a["arch"] in ("v17", "v18", "v19", "v20", "v21", "v22", "v23"):
             from openobb.models.openobb17 import OpenOBB17
-            from openobb.models.openobb18 import OpenOBB18, OpenOBB19, OpenOBB20, OpenOBB21, OpenOBB22
+            from openobb.models.openobb18 import OpenOBB18, OpenOBB19, OpenOBB20, OpenOBB21, OpenOBB22, OpenOBB23
             m = {"v17": OpenOBB17, "v18": OpenOBB18, "v19": OpenOBB19, "v20": OpenOBB20, "v21": OpenOBB21,
-                 "v22": OpenOBB22}[a["arch"]](
+                 "v22": OpenOBB22, "v23": OpenOBB23}[a["arch"]](
                 a.get("size", "x"), off=a.get("v7_off") or None, box=a.get("box") or "dfl",
                 ref_k=int(a.get("ref_k", 1500)), groups=a.get("groups") or None, **common)
         elif a["arch"] in ("v12", "v13"):

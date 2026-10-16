@@ -1,0 +1,8 @@
+
+o2m:peak+0.5: mAP50 0.725  mAP50-95 0.464  | post-processing CPU 120 ms / image
+  Duplicate boxes (same class on an already detected object, conf 0.25): 62 (1.5% of detections): wall 20, junction 17, wall_300 11, slide_door 8, door 4, double_door 2
+  Box geometry (conf 0.25, 3063 found objects): angle error > 1 deg 7.9%, > 2 deg 2.2%, an end off the object (> 0.5 thickness) 0.9% | long objects (length >= 10 x thickness, 496): angle > 1 deg 6.7%, end off 3.0% | long detections > 1 deg off the axes 12.7% of 597 (labels 0.2%)
+
+o2o:peak+0.5: mAP50 0.724  mAP50-95 0.459  | post-processing CPU 121 ms / image
+  Duplicate boxes (same class on an already detected object, conf 0.25): 49 (1.2% of detections): junction 20, wall 10, double_door 6, wall_300 5, door 4, slide_door 3, note 1
+  Box geometry (conf 0.25, 3095 found objects): angle error > 1 deg 5.4%, > 2 deg 1.0%, an end off the object (> 0.5 thickness) 0.4% | long objects (length >= 10 x thickness, 511): angle > 1 deg 3.7%, end off 1.0% | long detections > 1 deg off the axes 5.5% of 577 (labels 0.2%)

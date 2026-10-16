@@ -127,6 +127,26 @@ class BoundarySnap(nn.Module):
                           b[..., 4:5]], -1)
 
 
+def peak_mask(cls, sizes, groups=1):
+    """cls (B, G*A, C) logits of the candidates (group-major, anchors level by level as in the pyramid `sizes`
+    [(H, W), ...]) -> (B, G*A) bool: a candidate is kept only if its best class score is the maximum of its 3 x 3
+    neighbourhood on its level, within its class group. F95: 94.5% of the one-to-one head's duplicates are two
+    anchors <= 1.5 stride apart on the same level and group; this removes them with one max-pool per level
+    (~0.1 ms) instead of an N x N pairwise NMS (~3 ms / image at batch 16 on a G4)."""
+    B, N, _ = cls.shape
+    A = N // groups
+    s = cls.detach().float().amax(-1)                                       # (B, G*A) logits (monotone in score)
+    out = torch.zeros_like(s, dtype=torch.bool)
+    for g in range(groups):
+        o = g * A
+        for h, w in sizes:
+            n = int(h) * int(w)
+            m = s[:, o:o + n].view(B, 1, int(h), int(w))
+            out[:, o:o + n] = (m >= F.max_pool2d(m, 3, 1, 1)).view(B, n)
+            o += n
+    return out
+
+
 class OpenOBB17(OpenOBB12):
     """OpenOBB12 (pretrained HGNetv2 + bounded LSK + hybrid encoder, dual dense head, calibrated head / NMS) + the
     boundary field (stride-4 trunk map + P3) + boundary snapping of the `ref_k` best candidates before NMS."""
@@ -225,6 +245,10 @@ class OpenOBB17(OpenOBB12):
             boxes, _ = self.snap_topk(field, cls, boxes, self.ref_k, f4, feats[0])
         conf = getattr(self, "nms_conf", 0.001)
         nms = self.final_nms if o2o or self.final_nms is not None else self.nms_iou   # one-to-many: always NMS
+        if isinstance(nms, str) and nms.startswith("peak"):     # local-peak filter, then optional NMS on what is left
+            keep = peak_mask(cls, [f.shape[-2:] for f in feats], self.n_groups)
+            cls = cls.masked_fill(~keep[..., None], -30.0)
+            nms = float(nms.split("+")[1]) if "+" in nms else None
         if nms is not None:
             logits, boxes = fast_nms(cls, boxes, self.max_det, conf=conf, iou=float(nms))
         else:

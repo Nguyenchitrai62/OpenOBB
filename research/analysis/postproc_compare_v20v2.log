@@ -1,0 +1,16 @@
+
+o2m:0.5: mAP50 0.759  mAP50-95 0.483  | post-processing CPU 184 ms / image
+  Duplicate boxes (same class on an already detected object, conf 0.25): 106 (2.2% of detections): wall 34, junction 31, wall_300 20, slide_door 8, double_door 7, door 6
+  Box geometry (conf 0.25, 3209 found objects): angle error > 1 deg 8.3%, > 2 deg 2.4%, an end off the object (> 0.5 thickness) 1.1% | long objects (length >= 10 x thickness, 500): angle > 1 deg 6.8%, end off 3.2% | long detections > 1 deg off the axes 15.4% of 612 (labels 0.2%)
+
+o2o:peak: mAP50 0.722  mAP50-95 0.461  | post-processing CPU 8 ms / image
+  Duplicate boxes (same class on an already detected object, conf 0.25): 232 (5.3% of detections): junction 96, wall 90, note 19, wall_300 10, slide_door 7, double_door 6, door 4
+  Box geometry (conf 0.25, 3100 found objects): angle error > 1 deg 5.8%, > 2 deg 1.2%, an end off the object (> 0.5 thickness) 0.4% | long objects (length >= 10 x thickness, 512): angle > 1 deg 3.1%, end off 1.0% | long detections > 1 deg off the axes 5.8% of 650 (labels 0.2%)
+
+o2o:none: mAP50 0.693  mAP50-95 0.452  | post-processing CPU 0 ms / image
+  Duplicate boxes (same class on an already detected object, conf 0.25): 2398 (32.3% of detections): wall 1023, junction 958, door 126, wall_300 108, note 105, slide_door 54, double_door 24
+  Box geometry (conf 0.25, 3266 found objects): angle error > 1 deg 6.4%, > 2 deg 1.3%, an end off the object (> 0.5 thickness) 0.3% | long objects (length >= 10 x thickness, 517): angle > 1 deg 1.7%, end off 0.0% | long detections > 1 deg off the axes 8.7% of 1354 (labels 0.2%)
+
+o2m:peak: mAP50 0.687  mAP50-95 0.447  | post-processing CPU 7 ms / image
+  Duplicate boxes (same class on an already detected object, conf 0.25): 1418 (24.5% of detections): junction 936, wall 376, note 48, wall_300 34, slide_door 17, door 5, double_door 2
+  Box geometry (conf 0.25, 3073 found objects): angle error > 1 deg 10.6%, > 2 deg 2.4%, an end off the object (> 0.5 thickness) 0.7% | long objects (length >= 10 x thickness, 497): angle > 1 deg 5.0%, end off 2.2% | long detections > 1 deg off the axes 12.9% of 1006 (labels 0.2%)
