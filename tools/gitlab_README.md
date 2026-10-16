@@ -97,21 +97,29 @@ Hướng dẫn: [docs/FINETUNE.md](docs/FINETUNE.md).
 
 Kết quả tốt nhất của mỗi kiến trúc trên Wall_Color val (cỡ x, ảnh 1280, thước Ultralytics), xếp theo mAP50-95.
 
-| `model=` | Kiến trúc | Tham số | mAP50 | mAP50-95 |
-|---|---|---|---|---|
-| **`openobb23x`** | v21 + bám ranh giới có xoay (dịch và xoay box theo mép) | 51.3M | **0.800** | **0.512** |
-| `openobb21x` | v20 + sửa góc trong không gian góc kép | 51.3M | 0.769 | 0.492 |
-| `openobb20x` | v19 + bộ tinh chỉnh cạnh đọc chi tiết stride 4 của thân | 51.3M | 0.764 | 0.482 |
-| `openobb17x` | v12 + trường ranh giới + bám ranh giới, nhóm class | 68.3M | 0.751 | 0.481 |
-| `openobb22x` | v21 + góc sigmoid + hồi quy box trực tiếp | 51.1M | 0.760 | 0.479 |
-| `openobb12x` | lõi encoder lai + head dense kép (một-nhiều, một-một) | 67.1M | 0.743 | 0.472 |
-| `openobb14x` | neck tái tham số hoá + head tự viết, hồi quy box trực tiếp | 62.7M | 0.713 | 0.469 |
-| `openobb3x` | encoder COCO + head dense oriented | 64.6M | 0.712 | 0.467 |
-| `openobb19x` | neck nhanh tự viết + một box mỗi nhóm class | 50.7M | 0.755 | 0.462 |
-| `openobb4x` | DINOv2 + DETR + nhánh dense | 134.8M | 0.663 | 0.457 |
-| YOLO26x-obb (tham chiếu) | Ultralytics | 57.6M | 0.743 | 0.499 |
+| `model=` | Kiến trúc | Tham số | mAP50 | mAP50-95 | Tài liệu |
+|---|---|---|---|---|---|
+| **`openobb23x`** | v21 + bám ranh giới có xoay (dịch và xoay box theo mép) | 51.3M | **0.800** | **0.512** | [OPENOBB23](docs/OPENOBB23.md) |
+| `openobb21x` | v20 + sửa góc trong không gian góc kép | 51.3M | 0.769 | 0.492 | [OPENOBB21](docs/OPENOBB21.md) |
+| `openobb20x` | v19 + bộ tinh chỉnh cạnh đọc chi tiết stride 4 của thân | 51.3M | 0.764 | 0.482 | [OPENOBB20](docs/OPENOBB20.md) |
+| `openobb17x` | v12 + trường ranh giới + bám ranh giới, nhóm class | 68.3M | 0.751 | 0.481 | [OPENOBB17](docs/OPENOBB17.md) |
+| `openobb22x` | v21 + góc sigmoid + hồi quy box trực tiếp | 51.1M | 0.760 | 0.479 | [OPENOBB22](docs/OPENOBB22.md) |
+| `openobb12x` | lõi encoder lai + head dense kép (một-nhiều, một-một) | 67.1M | 0.743 | 0.472 | [OPENOBB12](docs/OPENOBB12.md) |
+| `openobb14x` | neck tái tham số hoá + head tự viết, hồi quy box trực tiếp | 62.7M | 0.713 | 0.469 | [OPENOBB14](docs/OPENOBB14.md) |
+| `openobb3x` | encoder COCO + head dense oriented | 64.6M | 0.712 | 0.467 | [OPENOBB3](docs/OPENOBB3.md) |
+| `openobb19x` | neck nhanh tự viết + một box mỗi nhóm class | 50.7M | 0.755 | 0.462 | [OPENOBB19](docs/OPENOBB19.md) |
+| `openobb4x` | DINOv2 + DETR + nhánh dense | 134.8M | 0.663 | 0.457 | [OPENOBB4](docs/OPENOBB4.md) |
+| YOLO26x-obb (tham chiếu) | Ultralytics | 57.6M | 0.743 | 0.499 | |
 
-Số epoch và điểm khởi tạo khác nhau giữa các lần train. Cỡ s / m / l có cho mọi kiến trúc trên (`openobb23s`...).
+Số epoch và điểm khởi tạo khác nhau giữa các lần train. Cỡ s / m / l có cho mọi kiến trúc trên (`openobb23s`...). Các kiến trúc thử nghiệm
+khác (v1, v2, v5–v11, v13, v15, v16, v18) chưa có kết quả đủ điều kiện trên Wall_Color; tài liệu ở `docs/`. Mỗi thẻ có lập luận
+thiết kế, kỳ vọng ghi trước khi train, kết quả thật và phụ lục kiến trúc theo lớp.
+
+## Kiến trúc OpenOBB23
+
+Thân HGNetv2 pretrained (Apache-2.0) → neck tái tham số hoá tự viết → head dense kép (một-nhiều để học, một-một), mỗi điểm lưới
+một box cho mỗi nhóm class → bộ tinh chỉnh cạnh đọc chi tiết stride 4 → bám ranh giới (dịch và xoay box theo mép trên trường ranh giới
+stride 2) → NMS hiệu chỉnh. Chi tiết: [docs/OPENOBB23.md](docs/OPENOBB23.md).
 
 ## License
 

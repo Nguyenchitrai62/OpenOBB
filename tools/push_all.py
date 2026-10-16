@@ -32,7 +32,8 @@ GITLAB_PIP = "git.anybim.vn/CxDP/service/hicasai/openanything/hicasobb.git"
 CHECKOUT = ROOT / ".gitlab_export"                     # persistent working clone of GitLab (gitignored)
 ALLOW = ["openobb", "tests", "docs/DEPLOY.md", "docs/FINETUNE.md", "docs/OPENOBB2.md", "docs/OPENOBB3.md",
          "docs/OPENOBB4.md", "docs/OPENOBB5.md", "docs/OPENOBB6.md", "docs/OPENOBB7.md",
-         "docs/OPENOBB8.md", "docs/OPENOBB9.md", "docs/OPENOBB10.md", "docs/OPENOBB11.md", "docs/OPENOBB12.md", "docs/OPENOBB13.md", "docs/PRETRAIN.md", "docs/OPENOBB1.md", "app/streamlit_app.py", "app/viewer/index.html",
+         "docs/OPENOBB8.md", "docs/OPENOBB9.md", "docs/OPENOBB10.md", "docs/OPENOBB11.md", "docs/OPENOBB12.md", "docs/OPENOBB13.md",
+         *[f"docs/OPENOBB{n}.md" for n in range(14, 24)], "docs/PRETRAIN.md", "docs/OPENOBB1.md", "app/streamlit_app.py", "app/viewer/index.html",
          "run_app.bat",
          "LICENSE", "LICENSES", "THIRD_PARTY_NOTICES.md", "pyproject.toml", "requirements.txt"]
 # files from older layouts removed from GitLab when present (renamed in the research repo)
@@ -69,6 +70,15 @@ TRANSFORMS = [
     ("docs/PRETRAIN.md", r"(?m)^!git clone -q https://github\.com/Nguyenchitrai62/OpenOBB\.git.*\n", "", True),
     ("docs/PRETRAIN.md", "!python /content/OpenOBB/colab/data/get_dota.py --root /content/datasets --splits train",
      "!python -c \"from openobb.data.download import dota; dota('/content/datasets', splits=('train',))\"", False),
+    ("docs/OPENOBB14.md", r"`python colab/speed_gpu\.py [^`]*`",
+     "script đo tốc độ GPU nội bộ (YOLO26x, v12, v14 cùng phiên)", True),
+    ("docs/OPENOBB14.md", "`colab/speed_gpu.py`", "script đo tốc độ GPU nội bộ", False),
+    ("docs/OPENOBB14.md", "python colab/data/floorplancad.py --root /content/datasets",
+     "# FloorPlanCAD: chuyển về nhãn OBB bằng script nội bộ (không nằm trong repo này) -> /content/datasets/floorplancad_1024", False),
+    ("docs/OPENOBB18.md",
+     r"git clone -q https://github\.com/Nguyenchitrai62/OpenOBB /content/OpenOBB\n"
+     r"python /content/OpenOBB/colab/data/floorplancad\.py --root /content/datasets",
+     "# FloorPlanCAD: chuyển về nhãn OBB bằng script nội bộ (không nằm trong repo này) -> /content/datasets/floorplancad_1024", True),
     ("docs/OPENOBB6.md", r"\[research/ARCH_ANALYSIS\.md\]\(\.\./research/ARCH_ANALYSIS\.md\)",
      "báo cáo phân tích nội bộ (không nằm trong repo này)", True),
 ]
