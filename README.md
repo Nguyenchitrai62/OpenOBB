@@ -56,6 +56,46 @@ for r in model.predict("page.png", conf=0.25):
 Bảng đối chiếu với Ultralytics: [docs/DEPLOY.md](docs/DEPLOY.md).
 Test model bằng giao diện kéo-thả: `run_app.bat` (Streamlit).
 
+### Tốc độ suy luận
+
+`best.pt` dùng thẳng được, không cần bước export. Khi nạp model, các tối ưu sau **tự bật**, áp dụng cho cả checkpoint đã train trước đây (chỉ cần
+`openobb` ≥ 0.22.2):
+
+| Tối ưu | Tự động | Ghi chú |
+|---|---|---|
+| Gộp Conv + BatchNorm, gộp nhánh RepConv (`fuse`) | có | như `fuse` của YOLO |
+| bf16 trên GPU | có | |
+| `channels_last` (NHWC) cho model dense v12+ trên GPU | có | tắt bằng `OPENOBB_CHANNELS_LAST=0` |
+| Head / NMS hiệu chỉnh lúc train (lưu trong `best.pt`) | có | |
+| NMS chỉ so cặp box gần nhau, lọc `conf` trước NMS | có | kết quả giống hệt NMS đầy đủ |
+| `torch.compile` (thân, neck, trường ranh giới) | **không, tự bật** | `OPENOBB_COMPILE=1`, chỉ GPU |
+
+Bật `compile` (đặt **trước** khi nạp model). Lần gọi đầu mất 1–3 phút biên dịch, các lần sau nhanh hơn; chỉ đáng bật cho tiến trình chạy lâu
+(server, xử lý nhiều ảnh):
+
+```python
+import os
+os.environ["OPENOBB_COMPILE"] = "1"
+from openobb import OpenOBB
+model = OpenOBB("best.pt")
+```
+
+```bash
+OPENOBB_COMPILE=1 openobb predict model=best.pt source=pages/
+```
+
+File giao đi gọn hơn (fp16, bỏ tham số train; tốc độ suy luận không đổi): `openobb strip model=best.pt half=True`.
+Đo thời gian từng khối trên GPU: `openobb profile model=best.pt [detail=True] [compile=True]`.
+
+Đo trên G4 (RTX PRO 6000), batch 16, trang 960 × 1280, OpenOBB23-x, ms / ảnh:
+
+| | Mạng | NMS | Tổng |
+|---|---|---|---|
+| ≤ 0.22.1 | 9.2 | 2.9 | 12.1 |
+| ≥ 0.22.2 (mặc định) | 7.9 | 1.2 | 9.1 |
+| ≥ 0.22.3 + `OPENOBB_COMPILE=1` | 6.8 | 1.2 | 8.0 |
+| YOLO26x-obb (Ultralytics, PyTorch) | 6.6 | 0.7 | 7.3 |
+
 ## Kiến trúc
 
 | `model=` | Mô tả | Tài liệu |
