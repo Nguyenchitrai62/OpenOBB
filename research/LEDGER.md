@@ -1627,6 +1627,19 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     dao động ±5 điểm giữa hai run giống hệt → không dùng để kết luận. Bài học: checkpoint đã mở khoá truyền `unlock_all` cho fine-tune sau;
     run B sạch phải xuất phát từ best v23 gốc.
 
+- **F103. Run B sạch: `trainer=yolo` (thân đóng băng), từ best v23 gốc (log user 10-16): 0.791 / 0.523, mAP50-95 cao nhất từ trước tới nay.**
+  - Điều kiện: 0.22.7, `openobb23x.pt` (F96), `[init] 1443 full, 12 partial, 0 new` (không mở khoá), 30 epoch, LR 9.09e-4 tuyến tính,
+    wd 5e-4, EMA 0.9999 / 2000, nbs 64 (112 bước), không lật dọc / xoay 90°, HSV 0.7 / 0.4, không RFS, `rotate_p=0.5`, G4.
+  - Đường val: ep1 0.777 / 0.497, dao động tới ep12, rồi tăng đều: ep14 0.800 / 0.517, ep27 0.797 / **0.530**, ep30 0.791 / 0.523 (còn đang lên).
+    Cuối (o2m 0.5): **0.791 / 0.523**, trùng 2.0%, 7.9 + 1.3 ms. (o2m 0.7: fitness 0.555, trùng 4.8%.)
+  - Theo class (mAP50-95; v23 F96 / B / YOLO26x): wall .576 / **.599** / .624, junction .545 / .543 / .584, wall_300 .331 / **.348** / .441,
+    note .494 / **.529** / .517, door .811 / .821 / .811, slide_door .317 / .274 / .123, double_door .505 / **.544** / .392.
+  - Hướng box: vật dài lệch > 1° **4.9%** (bằng hai run mở khoá F101–F102), box dài lệch trục **7.2%** (v23 10.3%).
+  - Đọc: (1) cải thiện hướng box đến từ **khung training**, không phải từ mở khoá; (2) cùng 30 epoch, đóng băng (B, .523) hơn mở khoá
+    (F101–F102, .496–.498) → mở khoá có hại ở ngân sách này; (3) so với trần v23: +0.011 mAP50-95, −0.009 mAP50, nằm trong nhiễu ±0.024
+    của 53 ảnh val nhưng tăng ở 5 / 7 class và hướng box tốt hơn rõ. Chưa có bản A (khung mặc định cùng 30 epoch từ best v23) nên chưa tách
+    được phần do "train thêm 30 epoch". Đường val còn lên ở cuối → thử dài hơn.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
