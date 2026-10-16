@@ -59,7 +59,7 @@ pip install -U ./openobb-X.Y.Z-py3-none-any.whl
 ```python
 from openobb import OpenOBB
 model = OpenOBB("best.pt")
-for r in model.predict("page.png", conf=0.25):
+for r in model.predict("page.png", conf=0.3):
     print(r.obb.xyxyxyxy, r.obb.conf, r.obb.cls, r.names)
 ```
 
@@ -84,7 +84,7 @@ model = OpenOBB("best.pt")
 ```bash
 openobb train model=openobb23x weights=openobb23x.pt data=data.yaml epochs=100 imgsz=1280 batch=16   # runs/obb/train/weights/best.pt
 openobb val model=runs/obb/train/weights/best.pt data=data.yaml
-openobb predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.25
+openobb predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.3
 ```
 
 `data.yaml` theo định dạng YOLO-OBB. mAP in ra theo cách chấm của Ultralytics để so trực tiếp với YOLO; kèm box trùng, độ lệch hướng box

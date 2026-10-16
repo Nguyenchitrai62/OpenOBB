@@ -58,12 +58,12 @@ openobb val model=runs/obb/train/weights/best.pt data=data.yaml
 ```python
 from openobb import OpenOBB
 model = OpenOBB("best.pt")
-for r in model.predict("page.png", conf=0.25):
+for r in model.predict("page.png", conf=0.3):
     print(r.obb.xyxyxyxy, r.obb.conf, r.obb.cls, r.names)
 ```
 
 ```bash
-openobb predict model=best.pt source=pages/ conf=0.25
+openobb predict model=best.pt source=pages/ conf=0.3
 ```
 
 `best.pt` dùng thẳng được, không cần export: khi nạp, model tự gộp Conv + BatchNorm, chạy bf16 và `channels_last` trên GPU.
