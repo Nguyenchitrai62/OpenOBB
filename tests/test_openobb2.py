@@ -73,7 +73,7 @@ def test_cli_model_names(tmp_path, monkeypatch):
     train(str(data), model="openobb2x", name="a", **kw)
     a = calls[-1] + " "
     for flag in ("--arch v2 ", "--size x ", "--lr 0.001 ", "--backbone-mult 1.0 ", "--clip 10.0 ", "--num-top 1000 ",
-                 "--rfs 0.1 ", "--mosaic-p 1.0 "):
+                 "--rfs 0.0 ", "--mosaic-p 1.0 "):
         assert flag in a, flag
     for flag in ("--lsk", "--o2m-queries", "--aqd", "--eval-queries"):
         assert flag not in a, flag

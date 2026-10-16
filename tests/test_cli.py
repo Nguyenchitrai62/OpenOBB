@@ -111,38 +111,24 @@ def test_fit_mode_one_tile_per_image(tmp_path):
     assert np.allclose(merged[0][2][0], [100, 100, 260, 100, 260, 140, 100, 140], atol=0.7)
 
 
-def test_auto_recipe_rules():
-    """optimizer=auto (F98): nbs=0 when accumulation leaves < MIN_STEPS steps; lr0 = the AdamW fit of the usual trainer
-    when the data has classes the starting weights do not know; nothing the user passed is changed."""
-    from openobb.cli import MIN_STEPS, _auto_recipe
-    e = {}                                            # 77 images, batch 16, 30 epochs, no weights, 1 class
-    msgs = _auto_recipe(e, ["tivi"], None, 77, 16, 30, 5e-4)
-    assert e == {"nbs": 0, "lr": 0.002} and len(msgs) == 2
-    e = {}                                            # Wall_Color checkpoint -> tivi: new class
-    _auto_recipe(e, ["tivi"], ["wall", "junction"], 77, 16, 30, 5e-4)
-    assert e["lr"] == 0.002
-    e = {}                                            # continuing on the same classes: default LR
-    _auto_recipe(e, ["tivi"], ["tivi"], 77, 16, 30, 5e-4)
-    assert "lr" not in e and e["nbs"] == 0
-    e = {"nbs": 64, "lr": 1e-3}                       # given by the user: untouched
-    assert _auto_recipe(e, ["tivi"], None, 77, 16, 30, 5e-4) == [] and e == {"nbs": 64, "lr": 1e-3}
-    e = {}                                            # big dataset, many classes: nothing to change
-    _auto_recipe(e, [f"c{i}" for i in range(30)], None, 16 * MIN_STEPS, 16, 100, 5e-4)
-    assert e == {}
-
-
-def test_auto_recipe_reaches_the_trainer(tmp_path, monkeypatch):
+def test_yolo_framework_reaches_the_trainer(tmp_path, monkeypatch):
+    """The training framework is the usual one-stage trainer's (F104): AdamW lr0 = 0.002 * 5 / (4 + nc) for the dense
+    models, linear decay, wd 5e-4, EMA 0.9999 / 2000, nbs 64, HSV 0.7 / 0.4, no vertical flip / 90-degree rotation, no RFS;
+    an explicit value wins; optimizer=AdamW keeps the architecture's own LR; trainer= (removed) is ignored."""
     import openobb.train as trainer
     from openobb.cli import train
     calls = []
-    monkeypatch.setattr(trainer, "main", lambda argv: calls.append(" ".join(argv)))
-    data = _dataset(tmp_path / "ds")
-    train(str(data), model="openobb3s", epochs=10, batch=8, imgsz=512, project=str(tmp_path / "runs"), name="a",
-          cache_dir=str(tmp_path / "cache"), workers=1)
-    assert "--nbs 0" in calls[-1] and "--lr 0.001667" in calls[-1]       # 2 classes: 0.002 * 5 / 6
-    train(str(data), model="openobb3s", epochs=10, batch=8, imgsz=512, project=str(tmp_path / "runs"), name="b",
-          cache_dir=str(tmp_path / "cache"), workers=1, optimizer="AdamW")
-    assert "--nbs 64" in calls[-1] and "--lr 0.0005" in calls[-1]        # explicit optimizer: no automatic choice
+    monkeypatch.setattr(trainer, "main", lambda argv: calls.append(" ".join(argv) + " "))
+    data = _dataset(tmp_path / "ds")                  # 2 classes -> lr0 0.002 * 5 / 6
+    kw = dict(epochs=10, batch=8, imgsz=512, project=str(tmp_path / "runs"), cache_dir=str(tmp_path / "cache"), workers=1)
+    train(str(data), model="openobb3s", name="a", **kw)
+    for flag in ("--lr 0.001667 ", "--backbone-mult 0.5 ", "--wd 0.0005 ", "--schedule linear ", "--ema 0.9999 ",
+                 "--ema-warmups 2000 ", "--hsv 0.015 0.7 0.4 ", "--flipud 0.0 ", "--no-rot90 ", "--rfs 0.0 ", "--nbs 64 "):
+        assert flag in calls[-1], flag
+    train(str(data), model="openobb3s", name="b", optimizer="AdamW", weight_decay=1e-4, cos_lr=True, rot90=True,
+          trainer="yolo", **kw)
+    b = calls[-1]
+    assert "--lr 0.0005 " in b and "--wd 0.0001 " in b and "--schedule cos " in b and "--no-rot90" not in b
 
 
 def test_train_flags_and_oom_retry(tmp_path, monkeypatch):
@@ -163,7 +149,7 @@ def test_train_flags_and_oom_retry(tmp_path, monkeypatch):
     first, second = (" ".join(c) for c in calls)
     for flag in ("--fit", "--lsk", "--mosaic-p 1.0", "--mosaic-mode yolo", "--scale-jitter 0.5", "--translate 0.1",
                  "--mosaic-off 10", "--patience 100", "--warmup 3", "--eval-every 1", "--batch 8",
-                 "--aug-iof 0.25", "--merge-iou 0.7", "--ema 0.986", "--schedule cos", "--min-lr-ratio 0.01",
+                 "--aug-iof 0.25", "--merge-iou 0.7", "--ema 0.9999", "--ema-warmups 2000", "--schedule linear", "--min-lr-ratio 0.01",
                  "--epoch-lr", "--warmup-bias-lr 0.0", "--nbs 64"):   # AdamW: no bias LR warmup (F98)
         assert flag in first, flag
     assert "--batch 4" in second                                             # halved after the OOM

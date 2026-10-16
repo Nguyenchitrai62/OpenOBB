@@ -89,28 +89,27 @@ Có thể khởi tạo `openobb3x` từ một checkpoint `openobb1` bằng `weig
 | `mosaic` | 1.0 | ghép 4 ảnh, tắt ở `close_mosaic`=10 epoch cuối |
 | `scale` | 0.5 | zoom ngẫu nhiên 0.5–1.5 |
 | `translate` | 0.1 | dịch ngẫu nhiên ±10% |
-| `hsv_h`, `hsv_s`, `hsv_v` | 0.015, 0.5, 0.3 | đổi màu |
+| `hsv_h`, `hsv_s`, `hsv_v` | 0.015, 0.7, 0.4 | đổi màu (như YOLO) |
 | `warmup_epochs` | 3 | khởi động learning rate, như YOLO (từ 0.16.0): `round(min(warmup_epochs, epochs − 1) × số batch mỗi epoch)` iteration (từ 0.22.6 bỏ mức tối thiểu 100, như Ultralytics hiện tại); mọi nhóm LR tăng từ 0 lên `lr0 × lf(epoch)` |
 | `warmup_bias_lr` | 0 | LR ban đầu của nhóm bias trong warmup. Để 0 với AdamW (YOLO cũng đặt 0 khi tự chọn AdamW); 0.1 chỉ hợp với SGD |
-| `nbs` | 64 | batch danh nghĩa như YOLO: cộng dồn gradient `round(nbs / batch)` batch mỗi bước (tăng dần từ 1 trong warmup), weight decay nhân `batch × accumulate / nbs`; `nbs=0` = một bước mỗi batch (công thức cũ). Với `optimizer=auto`, data nhỏ (< 2000 bước tối ưu) tự chuyển `nbs=0` |
+| `nbs` | 64 | batch danh nghĩa như YOLO: cộng dồn gradient `round(nbs / batch)` batch mỗi bước (tăng dần từ 1 trong warmup), weight decay nhân `batch × accumulate / nbs`; `nbs=0` = một bước mỗi batch |
 | `epoch_lr` | True | hệ số LR `lf(epoch)` đổi theo từng epoch như YOLO; `False` = cosine theo iteration (công thức trước 0.16.0) |
 | `iou` / `nms_iou` | `auto` | lọc trùng: `auto` = train xong tự thử trên val và lưu ngưỡng tốt nhất (v11 thử cả không NMS) vào `best.pt`, làm mặc định khi predict; hoặc một số cố định / `none`. Với v12 / v13, bước này chọn luôn head dùng khi suy luận (một-một không NMS, hoặc một-nhiều + NMS). Checkpoint đã train: `openobb calibrate model=best.pt data=data.yaml` |
 | `box` | `dfl` | v12 / v13: cách hồi quy box. `direct` = hồi quy trực tiếp độ dài, độ dày, lệch ngang (kiểu YOLO26, không DFL); box khít hơn với vật mảnh (F54) |
 | `pretrain` | không | chỉ `openobb9*` / `openobb6*`: `coco`, `dota` hoặc thư mục ảnh. Tự tải data, pretrain lõi (và train trên DOTA với `dota`), lưu cache rồi mới train. Xem [PRETRAIN.md](PRETRAIN.md) mục 0 |
-| `lrf` | 0.01 | learning rate giảm theo **cosine** (mặc định từ 0.7.1) từ `lr0` về `lr0 × lrf` ở cuối run (`cos_lr=False`: giảm tuyến tính như mặc định của YOLO) |
+| `lrf` | 0.01 | learning rate giảm **tuyến tính** từ `lr0` về `lr0 × lrf` ở cuối run, như YOLO (`cos_lr=True`: giảm theo cosine) |
 | `cache` | auto | giải mã ảnh train một lần vào RAM nếu chiếm dưới 25% RAM (`cache=False` để tắt) |
 | `patience` | 100 | dừng nếu mAP50-95 val không tăng sau N epoch |
-| `optimizer` | auto | AdamW. `auto` (từ 0.22.5, model dense v2+) tự chọn khi bạn không truyền: `nbs=0` nếu data nhỏ; `lr0 = max(mặc định, 0.002 × 5 / (4 + số class))` khi data có class mà weights khởi đầu chưa biết (không có weights, hoặc checkpoint của class khác), như YOLO chọn LR cho AdamW. Train tiếp cùng class: LR mặc định. Log in dòng `[openobb] auto: ...`. `optimizer=AdamW` để tắt |
-| `trainer` | openobb | **Khung training** (chung mọi model). `yolo` (0.22.7): như Ultralytics 8.4: `lr0 = 0.002 × 5 / (4 + số class)`, weight decay 5e-4, LR giảm tuyến tính, EMA 0.9999 tăng dần trong 2000 bước, HSV 0.015 / 0.7 / 0.4, không lật dọc, không xoay 90°, không RFS, nbs 64. Không đổi kiến trúc (hệ số LR của thân, lớp đóng băng giữ theo model). Tham số truyền tay vẫn thắng |
-| `unlock_all` | False | **Kiến trúc model.** `True`: không đóng băng gì: mọi BN đóng băng (thân cỡ l / x) thành BN train được, bắt đầu đúng bằng giá trị đang đóng băng; stem được train. Fine-tune từ checkpoint đã mở khoá thì tự giữ mở khoá |
-| `lr0` | theo cỡ model | truyền vào là dùng đúng giá trị đó (có cảnh báo nếu > 3 lần mặc định); kiểu DETR thường diverge ở mức 1e-3 của YOLO |
-| `fliplr`, `flipud` | 0.5, 0.5 | xác suất lật ngang / dọc; `rot90=False` để tắt xoay 90° (symbol có chiều) |
+| `optimizer` | auto | AdamW, `lr0 = 0.002 × 5 / (4 + số class)` như YOLO (model dense). `optimizer=AdamW`: LR riêng của kiến trúc (`lr0` theo cỡ model) |
+| `unlock_all` | False | **Tính năng của kiến trúc OpenOBB** (không thuộc khung training): `True` = không đóng băng gì: mọi BN đóng băng (thân cỡ l / x) thành BN train được, bắt đầu đúng bằng giá trị đang đóng băng; stem được train. Nên thử khi data lớn (hàng nghìn ảnh trở lên); với vài trăm ảnh, đóng băng tốt hơn (F100–F103). Fine-tune từ checkpoint đã mở khoá thì tự giữ mở khoá |
+| `lr0` | tự tính | truyền vào là dùng đúng giá trị đó (có cảnh báo nếu quá cao với kiểu DETR v1 / v4) |
+| `fliplr`, `flipud` | 0.5, 0 | xác suất lật ngang / dọc, như YOLO; xoay 90° tắt (`rot90=True` để bật); xoay góc bất kỳ: `rotate_p` |
 | `freeze` | – | `backbone`, `encoder` (chỉ train decoder) hoặc số stage backbone; hợp với data rất ít |
 | `time` | – | ngân sách giờ train; số epoch tự tính lại sau mỗi epoch để LR vẫn giảm hết |
 
 - Val chạy mỗi epoch khi tập val nhỏ (≤ 2000 ảnh/tile).
 - Số query tự tăng (600–900) khi ảnh dày object.
-- Kiến trúc mặc định là bản chốt (c6): adapter LSK, RFS, nhóm query một-nhiều, AQD, loss góc, IoU-cost.
+- Kiến trúc mặc định là bản chốt (c6): adapter LSK, nhóm query một-nhiều, AQD, loss góc, IoU-cost (RFS bỏ từ 0.23.0: khung training như YOLO).
   - `recipe=False` để tắt.
   - Mọi flag của `python -m openobb.train` truyền được dạng `key=value`.
 - **Thư mục kết quả như YOLO:** mặc định `runs/obb/train`, lần sau `train2`, `train3`... (`project=`, `name=` để đổi; `exist_ok=True` ghi đè thư mục cũ). Weights ở `weights/best.pt` và `weights/last.pt`.

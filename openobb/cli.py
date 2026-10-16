@@ -26,11 +26,12 @@ resolution (tile_scale= to resize first), for very large pages with tiny objects
 the train images is held out. Prepared data is cached (~/.cache/openobb). Every train call starts a new run folder
 ({project}/{name}, then name2, name3...; exist_ok=True reuses it); resume=True continues a run from weights/last.pt.
 
-Training defaults follow the usual one-stage recipe: mosaic=1.0, scale=0.5 (random zoom 0.5-1.5), translate=0.1,
-close_mosaic=10, warmup_epochs=3 (3 epochs of batches, at most epochs - 1, every LR rises from 0; warmup_bias_lr=0 as the usual
-trainer sets it for AdamW: a bias LR of 0.1 under Adam moves every bias by ~0.1 per step and wrecks a fine-tune),
-LR factor per epoch, cosine to lr0 * lrf (lrf=0.01; cos_lr=False for linear, the YOLO default), nbs=64 (gradient
-accumulation to a nominal batch of 64, weight decay scaled to it), patience=100,
+Training framework = the usual one-stage trainer's (Ultralytics 8.4), only the architecture is OpenOBB's: AdamW with
+lr0 = 0.002 * 5 / (4 + nc) (lr0= is used as given), linear decay to lr0 * lrf (lrf=0.01; cos_lr=True for cosine),
+warmup_epochs=3 (3 epochs of batches, every LR rising from 0, bias LR included), nbs=64 (gradient accumulation to a nominal
+batch of 64, weight decay 5e-4 scaled to it), EMA 0.9999 ramped over 2000 updates, mosaic=1.0 (close_mosaic=10),
+scale=0.5 (zoom 0.5-1.5), translate=0.1, fliplr=0.5, HSV 0.015 / 0.7 / 0.4, patience=100. Architecture switches stay
+with the architecture: unlock_all=True trains every frozen layer (the pretrained trunk of sizes l / x).
 cache=auto (decoded images in RAM when they fit), batch fitted to the GPU / dataset and halved on out-of-memory.
 """
 import gc
@@ -149,7 +150,7 @@ PRETRAIN_KEYS = ("pretrain", "pretrain_epochs", "pretrain_det_epochs", "pretrain
 MIN_STEPS, MIN_STEPS_EPOCH = 2000, 25           # optimizer steps for a run / per epoch on small datasets
 ALIASES = {"lr0": "lr", "imgsz": "img", "weight_decay": "wd", "val_period": "eval_every", "lrf": "min_lr_ratio",
            "iou": "nms_iou"}      # train: iou= (YOLO's val NMS IoU) = nms_iou, auto by default
-IGNORED = ("save_period", "plots", "momentum", "degrees", "shear", "perspective", "mixup", "cutmix",
+IGNORED = ("trainer", "save_period", "plots", "momentum", "degrees", "shear", "perspective", "mixup", "cutmix",
            "copy_paste", "rect", "multi_scale", "warmup_momentum", "dropout", "cls_pw")
 
 
@@ -378,51 +379,20 @@ def check_keys(kv):
             raise SystemExit(f"'{k}' is not a valid OpenOBB argument." + (f" Similar: {', '.join(near)}" if near else ""))
 
 
-# trainer=yolo: the TRAINING FRAMEWORK of the usual one-stage trainer (Ultralytics 8.4 defaults, F99 audit). Only what
-# any model would be trained with; what belongs to an architecture (the 0.1 LR factor of a pretrained trunk, frozen
-# layers -> unlock_all, losses, assigners) stays with the architecture.
-YOLO_TRAINER = {"wd": 5e-4, "ema": 0.9999, "ema_warmups": 2000, "hsv_h": 0.015, "hsv_s": 0.7, "hsv_v": 0.4,
-                "flipud": 0.0, "rot90": False, "rfs": 0.0, "nbs": 64}
+# The TRAINING FRAMEWORK is the usual one-stage trainer's (Ultralytics 8.4 defaults, F99-F104): what any model is trained
+# with. What belongs to an architecture (its trunk LR factor, frozen layers -> unlock_all, losses, assigners, the low LR of
+# the DETR-style OpenOBB1 / 4) stays with the architecture.
+FRAMEWORK = {"wd": 5e-4, "ema": 0.9999, "ema_warmups": 2000, "hsv_h": 0.015, "hsv_s": 0.7, "hsv_v": 0.4,
+             "flipud": 0.0, "rot90": False, "rfs": 0.0, "nbs": 64}
 
 
-def _yolo_trainer(extra):
-    """trainer=yolo: weight decay 5e-4, linear LR decay (cos_lr=False), EMA decay 0.9999 ramped over 2000 updates,
-    HSV 0.015 / 0.7 / 0.4, no vertical flip, no 90-degree rotation, no repeat-factor sampling, nominal batch 64 always,
-    lr0 = 0.002 * 5 / (4 + nc) (set once the classes are known). The model is untouched. Anything passed explicitly
-    wins. Mutates `extra`."""
-    set_ = {k: v for k, v in YOLO_TRAINER.items() if k not in extra}
-    extra.update(set_)
-    print("[openobb] trainer=yolo (training framework of the usual one-stage trainer; the architecture is unchanged): "
-          + ", ".join(f"{k}={v}" for k, v in set_.items()) + ", cos_lr=False")
-
-
-def _auto_recipe(extra, data_classes, src_classes, n_train, batch, epochs, base_lr, nbs=64):
-    """optimizer=auto (the default): settings the user did not pass, chosen from the data and the starting weights, as
-    the usual trainer picks its optimizer / LR from the number of iterations and classes (F98).
-      lr   classes the starting weights do not know (no weights, or a checkpoint of other classes): their output rows
-           start from scratch -> lr0 = max(default, 0.002 * 5 / (4 + nc)), the AdamW fit of the usual trainer
-           (1 class: 2e-3, 7: 9.1e-4, 15: 5.3e-4). Same classes (continuing a run): the default.
-      nbs  fewer than MIN_STEPS optimizer steps with gradient accumulation to a nominal batch of 64 -> nbs=0 (one step
-           per batch: 4x the steps at batch 16 on a small dataset).
-    Mutates `extra`; returns one message per change."""
-    msgs = []
-    if "nbs" not in extra:
-        acc = max(round(nbs / batch), 1)
-        steps = max(1, n_train // batch) * epochs // acc
-        if acc > 1 and steps < MIN_STEPS:
-            extra["nbs"] = 0
-            msgs.append(f"nbs=0 (small dataset: {steps * acc} optimizer steps instead of {steps}; pass nbs=64 to keep "
-                        f"the nominal batch)")
-    if "lr" not in extra:
-        known = set(src_classes or [])
-        new = [c for c in data_classes if c not in known]
-        fit = round(0.002 * 5 / (4 + max(len(data_classes), 1)), 6)
-        if new and fit > base_lr:
-            extra["lr"] = fit
-            what = "no starting weights" if src_classes is None else f"new classes {new[:5]}{'...' if len(new) > 5 else ''}"
-            msgs.append(f"lr0={fit:g} ({what}: output rows start from scratch; default {base_lr:g} for the same classes; "
-                        f"pass lr0= or optimizer=AdamW to keep the default)")
-    return msgs
+def _framework(extra):
+    """Training framework of the usual one-stage trainer: weight decay 5e-4 (scaled to the nominal batch 64), linear LR
+    decay, EMA decay 0.9999 ramped over 2000 updates, HSV 0.015 / 0.7 / 0.4, horizontal flip only (no vertical flip, no
+    90-degree rotation), no repeat-factor sampling; lr0 = 0.002 * 5 / (4 + nc) for the dense models (set once the
+    classes are known). Anything passed explicitly wins. Mutates `extra`."""
+    for k, v in FRAMEWORK.items():
+        extra.setdefault(k, v)
 
 
 def _batch_from(batch, sd, imgsz, n_train):
@@ -460,7 +430,7 @@ def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_
             opts["warmup"] = max(round(w_ep * ipe), 1) if w_ep > 0 else -1
         else:                                        # older runs: warmup_epochs epochs (at most epochs - 1)
             opts["warmup"] = max(1, round(min(warmup_epochs, max(int(epochs) - 1, 0)) * ipe))
-        if "ema_warmups" not in user_ema:            # EMA ramp over the warmup (unless given, e.g. trainer=yolo: 2000)
+        if "ema_warmups" not in user_ema:            # EMA ramp over the warmup (unless given: 2000 by default)
             opts["ema_warmups"] = max(1, round(max(opts["warmup"], 1) / acc))
         if "ema" not in user_ema:                             # EMA half-life ~5% of the run (>= 1 epoch, >= 50 steps)
             opts["ema"] = round(min(0.9998, 0.5 ** (1 / max(steps_ep, total // 20, 50))), 6)
@@ -487,7 +457,7 @@ def _run_trainer(save_dir, prepared, opts, n_train, epochs, warmup_epochs, user_
 
 def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, project="runs/obb", name=None,
           exist_ok=False, resume=False, tile=False, tile_scale=None, gap=200, val_frac=0.15, cache="auto", cache_dir=None, workers=None,
-          device=None, recipe=True, warmup_epochs=3, patience=100, lrf=0.01, cos_lr=None, seed=0, optimizer="auto", trainer="openobb",
+          device=None, recipe=True, warmup_epochs=3, patience=100, lrf=0.01, cos_lr=False, seed=0, optimizer="auto",
           **extra):
     """Train (or fine-tune when `model` is a .pt path). Returns SimpleNamespace(save_dir, best, last, metrics).
     pretrain=coco|dota|<image folders> (new cores openobb6* / openobb9*): download, pretrain and cache the starting
@@ -502,12 +472,7 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
         elif k in IGNORED:
             extra.pop(k)
             print(f"[openobb] '{k}' is not used by OpenOBB (ignored)")
-    yolo_trainer = str(trainer).lower() == "yolo"
-    if str(trainer).lower() not in ("openobb", "yolo"):
-        raise SystemExit(f"trainer must be 'openobb' (default) or 'yolo', got {trainer!r}")
-    if yolo_trainer:
-        _yolo_trainer(extra)
-    cos_lr = (not yolo_trainer) if cos_lr is None else bool(cos_lr)
+    _framework(extra)
     if extra.pop("amp", True) is False:
         extra["no_amp"] = True
     if extra.pop("rot90", True) is False:
@@ -616,17 +581,10 @@ def train(data=None, model="openobb1s", epochs=100, batch=None, imgsz=None, proj
     if cache == "auto":                              # decoded uint8 images in RAM when they take < 25% of it
         cache = n_train * imgsz * imgsz * 3 < 0.25 * _ram_bytes()
     batch = _batch_from(batch, sd, imgsz, n_train)
-    if yolo_trainer and "lr" not in extra and str(optimizer).lower() == "auto":
+    if "lr" not in extra and str(optimizer).lower() == "auto" and dense_arch:   # DETR-style OpenOBB1 / 4 keep their low LR
         from openobb.data.dota import dataset_classes
         extra["lr"] = round(0.002 * 5 / (4 + max(len(dataset_classes(prepared)), 1)), 6)
-        print(f"[openobb] trainer=yolo: lr0={extra['lr']:g} (AdamW fit 0.002 * 5 / (4 + nc) of the usual trainer)")
-    elif str(optimizer).lower() == "auto" and dense_arch:   # DETR-style OpenOBB1 / 4: LR above ~2e-4 diverges
-        if src_classes is None and extra.get("weights") and Path(str(extra["weights"])).exists():
-            src_classes = _ckpt_args(extra["weights"])[1]
-        from openobb.data.dota import dataset_classes
-        for msg in _auto_recipe(extra, dataset_classes(prepared), src_classes, n_train, int(batch), int(epochs),
-                                sd["lr"]):
-            print(f"[openobb] auto: {msg}")
+        print(f"[openobb] optimizer: AdamW lr0={extra['lr']:g} (0.002 * 5 / (4 + nc), as the usual one-stage trainer)")
 
     nbs_ = int(extra.get("nbs", 64) or 0)
     acc_ = max(round(nbs_ / int(batch)), 1) if nbs_ > 0 else 1        # gradient accumulation (nominal batch)

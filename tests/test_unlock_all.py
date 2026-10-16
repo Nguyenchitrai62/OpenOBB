@@ -1,5 +1,4 @@
-"""unlock_all: nothing stays frozen (the HGNetv2 trunk of sizes l / x), starting exactly at the frozen values;
-trainer=yolo: the training framework of the usual one-stage trainer."""
+"""unlock_all: nothing stays frozen (the HGNetv2 trunk of sizes l / x), starting exactly at the frozen values."""
 import copy
 
 import torch
@@ -95,24 +94,3 @@ def test_cli_passes_and_inherits_the_flag(tmp_path, monkeypatch):
     train(str(data), model="openobb3s", name="b", **kw)
     assert "--unlock-all" not in calls[-1]
 
-
-def test_trainer_yolo_recipe(tmp_path, monkeypatch):
-    """trainer=yolo: the usual trainer's framework settings, the architecture's own (trunk LR factor) untouched; an
-    explicit value wins; the default stays OpenOBB's."""
-    import openobb.train as trainer
-    from openobb.cli import train
-    from tests.test_cli import _dataset
-    calls = []
-    monkeypatch.setattr(trainer, "main", lambda argv: calls.append(" ".join(argv) + " "))
-    data = _dataset(tmp_path / "ds")                # 2 classes -> lr0 0.002 * 5 / 6
-    kw = dict(epochs=10, batch=4, imgsz=512, project=str(tmp_path / "runs"), cache_dir=str(tmp_path / "c"), workers=1)
-    train(str(data), model="openobb3s", name="y", trainer="yolo", **kw)
-    y = calls[-1]
-    for flag in ("--lr 0.001667 ", "--backbone-mult 0.5 ", "--wd 0.0005 ", "--schedule linear ", "--ema 0.9999 ",
-                 "--ema-warmups 2000 ", "--hsv 0.015 0.7 0.4 ", "--flipud 0.0 ", "--no-rot90 ", "--rfs 0.0 ", "--nbs 64 "):
-        assert flag in y, flag
-    train(str(data), model="openobb3s", name="w", trainer="yolo", weight_decay=1e-4, cos_lr=True, **kw)
-    assert "--wd 0.0001 " in calls[-1] and "--schedule cos " in calls[-1]
-    train(str(data), model="openobb3s", name="d", **kw)
-    d = calls[-1]
-    assert "--schedule cos " in d and "--ema-warmups 2000 " not in d and "--no-rot90" not in d

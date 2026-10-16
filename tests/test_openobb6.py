@@ -82,7 +82,7 @@ def test_cli_openobb6_flags(tmp_path, monkeypatch):
               optimizer="AdamW")   # the recipe defaults, without the optimizer=auto choices (F98)
     train(str(data), model="openobb6x", name="a", **kw)
     a = calls[-1] + " "
-    for flag in ("--arch v6 ", "--size x ", "--lr 0.001 ", "--backbone-mult 1.0 ", "--wd 0.05 ", "--num-top 1000 "):
+    for flag in ("--arch v6 ", "--size x ", "--lr 0.001 ", "--backbone-mult 1.0 ", "--wd 0.0005 ", "--num-top 1000 "):
         assert flag in a, flag
     assert "--lsk" not in a
 

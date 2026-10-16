@@ -106,7 +106,7 @@ def test_cli_openobb3_flags(tmp_path, monkeypatch):
     train(str(data), model="openobb3x", name="a", **kw)
     a = calls[-1] + " "
     for flag in ("--arch v3 ", "--size x ", "--lr 0.0005 ", "--backbone-mult 0.1 ", "--lsk ", "--clip 10.0 ",
-                 "--num-top 1000 ", "--rfs 0.1 "):
+                 "--num-top 1000 ", "--rfs 0.0 "):
         assert flag in a, flag
     for flag in ("--o2m-queries", "--aqd", "--eval-queries", "--no-pretrained"):
         assert flag not in a, flag

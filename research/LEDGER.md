@@ -1651,6 +1651,11 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     mức tăng là do train thêm 30 epoch với khung đã sửa lỗi (0.22.4–0.22.6), không riêng do `trainer=yolo`. Ứng viên gây khác biệt hướng box:
     tắt xoay 90° / lật dọc, EMA, wd, LR — chưa tách.
 
+- **F105. 0.23.0: khung training YOLO là mặc định duy nhất (quyết định của user sau F103–F104).** `trainer=` bỏ (truyền vào thì bỏ qua),
+  bỏ tự chỉnh riêng (`nbs=0` cho data nhỏ, LR max). `FRAMEWORK` (`openobb/cli.py`): wd 5e-4, EMA 0.9999 / 2000, HSV 0.7 / 0.4, không lật dọc /
+  xoay 90°, không RFS, nbs 64, LR tuyến tính; model dense: lr0 = 0.002·5/(4+nc). DETR v1 / v4 giữ LR riêng (kiến trúc). `unlock_all` giữ.
+  Mọi run từ 0.23.0 khác công thức với run trước đó (so sánh phải ghi chú).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

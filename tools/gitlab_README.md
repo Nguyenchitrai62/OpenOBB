@@ -88,7 +88,9 @@ openobb predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.25
 ```
 
 `data.yaml` theo định dạng YOLO-OBB. mAP in ra theo cách chấm của Ultralytics để so trực tiếp với YOLO; kèm box trùng, độ lệch hướng box
-và các lỗi nhầm class thường gặp. Thêm `rotate_p=0.5` để xoay ảnh góc bất kỳ khi bản vẽ có đối tượng nghiêng.
+và các lỗi nhầm class thường gặp. Khung training giống hệt YOLO (AdamW với LR theo số class, warmup, LR tuyến tính, EMA, nbs 64,
+augment); chỉ kiến trúc model là riêng. Thêm `rotate_p=0.5` để xoay ảnh góc bất kỳ khi bản vẽ có đối tượng nghiêng; `unlock_all=True`
+để không đóng băng phần nào của model (nên thử khi có data lớn).
 Hướng dẫn: [docs/FINETUNE.md](docs/FINETUNE.md).
 
 ## Các kiến trúc
