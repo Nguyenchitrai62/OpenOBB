@@ -1605,6 +1605,20 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     đóng băng đang "giữ trọng số tệ" ở mức trần hiện tại. Chưa có bản A (cùng 30 epoch, không mở khoá) nên không tách được phần tụt do
     train lại với `rotate_p` / LR. Biến thể chưa thử: chỉ mở affine của BN (giữ thống kê), hoặc mở khoá với BN eval vài epoch đầu.
 
+- **F101. Run `trainer=yolo` + `unlock_all` nối tiếp từ best của run C (log user 10-16): 0.774 / 0.496, chưa vượt trần; hướng box tốt hơn rõ.**
+  - Điều kiện: 0.22.7, `weights` = best của F100 (đã mở khoá: `[init] 1573 full, 0 new`), 30 epoch, LR 9.09e-4 (công thức 7 class), wd 5e-4,
+    LR tuyến tính, EMA 0.9999 / 2000 (112 bước → EMA gần như bằng trọng số đang train), nbs 64 (112 bước), không lật dọc, không xoay 90°,
+    HSV 0.7 / 0.4, không RFS, `rotate_p=0.5`.
+  - Đường val: ep1 0.766 / 0.488 (không sụp: BN đã mở khoá từ C), tụt nhẹ ep3–13, đỉnh ep29 0.779 / 0.505. Cuối (o2m 0.5): **0.774 / 0.496**,
+    trùng 1.9%, 7.9 + 1.3 ms. (o2m 0.7: fitness 0.5276 nhưng trùng 4.7% → hiệu chỉnh chọn 0.5.)
+  - Theo class (mAP50-95; v23 F96 / C F100 / run này): wall .576 / .580 / **.601**, junction .545 / .535 / .541, wall_300 .331 / .299 / .329,
+    note .494 / .500 / .462, door .811 / .811 / .819, slide_door .317 / .258 / .235, double_door .505 / .476 / .487.
+  - **Hướng box (Box geometry):** góc lệch > 1° 16.5% (C) → **12.3%**; vật dài lệch > 1° 7.2% → **4.9%**; box dài lệch trục 9.8% → **7.0%**
+    (v23: 10.3%; YOLO 0.3%). Tốt nhất từ trước tới nay trên thước này. Chưa tách được nguyên nhân (bỏ xoay 90° / lật dọc, EMA gần như tắt, LR
+    cao hơn, wd cao hơn, hay chỉ do train thêm 30 epoch).
+  - Đọc: không vượt trần mAP (0.800 / 0.512); chênh với điểm xuất phát C (+0.003 / +0.002) nằm trong nhiễu ±0.024. Run B sạch (`trainer=yolo`
+    một mình, từ best v23 gốc) mới trả lời được câu hỏi khung training.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
