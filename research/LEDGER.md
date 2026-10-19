@@ -1727,7 +1727,9 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - **OpenOBB24 (0.25.0):** v23 + `LocQuality` (MLP 0.068M dự đoán ProbIoU của box cuối từ lớp ẩn bộ tinh chỉnh, trường ranh giới trên
     4 cạnh, DFL, độ dịch, hình học; đầu vào detach; học bằng loss fit có sẵn trên ứng viên dày đặc) + NMS theo điểm × q^β (xuất điểm class
     hoặc trộn α) + bỏ bám mép theo nhóm; β, α, nhóm chọn trên val cuối train ((0, 0, không) = v23). [docs/OPENOBB24.md](../docs/OPENOBB24.md).
-    Kỳ vọng ghi trước (0.25.0, LR cosine mặc định F108; 60 ep từ best F107, đối chứng v23 cùng phiên): mAP50-95 ≥ A + 0.010; bác bỏ nếu < A + 0.005 hoặc hiệu chỉnh chọn q^0.
+    Kỳ vọng ghi trước (0.25.x, LR cosine mặc định F108; 50 ep, lr 0.001 từ best F107; user 10-19: mốc là chính F107, không chạy đối chứng
+    v23 riêng vì F103 → F107 chỉ +0.003): mAP50-95 ≥ 0.536; bác bỏ nếu < 0.531 hoặc hiệu chỉnh chọn q^0. Phần do cơ chế tách được bằng
+    fitness base (q^0) và fitness đã chọn trong dòng `Localisation quality calibrated` của cùng checkpoint.
   - Sửa kèm: `openobb strip` bỏ mất `groups` / `ref_k` / `neck` (checkpoint v19+ đã strip không dựng lại được head nhóm) → thêm vào
     `DEPLOY_KEYS`.
 

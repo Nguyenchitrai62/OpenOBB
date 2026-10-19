@@ -334,7 +334,7 @@ Câu hỏi còn mở:
 - [x] **OpenOBB24 (F109, 0.25.0, chưa train):** chẩn đoán trên checkpoint F107: recall đã ngang YOLO, khoảng hụt là độ khít box; điểm class
   không biết độ khít, trong cụm NMS có box khít hơn (+0.052), tín hiệu trường ranh giới thô chọn box trong cụm đã +0.015 không cần train.
   v24 = v23 + `LocQuality` (dự đoán ProbIoU của box cuối) + NMS theo điểm × q^β + bỏ bám mép theo nhóm, chọn trên val.
-  [docs/OPENOBB24.md](docs/OPENOBB24.md). Vòng này: A `openobb23x` vs B `openobb24x`, cùng `weights=` best F107, 60 epoch.
+  [docs/OPENOBB24.md](docs/OPENOBB24.md). Mốc so là F107 (user 10-19: không chạy đối chứng v23 riêng); user đang train `openobb24x` 50 ep, lr 0.001, từ `openobb23x_new.pt`.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.

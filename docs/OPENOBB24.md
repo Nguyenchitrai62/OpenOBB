@@ -51,29 +51,31 @@ Sơ đồ và bảng từng lớp: mục 7 (cuối file).
 
 ## 4. Chỉ số kỳ vọng (ghi TRƯỚC khi train)
 
-Hai hạt giống, cùng phiên G4, cùng điểm xuất phát `best.pt` của F107, cùng công thức (0.25.0: khung YOLO, LR cosine mặc định F108; 60 epoch, batch 16, imgsz 1280,
-`rotate_p=0.5` như các run trước), khác đúng một yếu tố là kiến trúc:
+Mốc so sánh: **F107** (`openobb23x_new.pt` = v23 đã fine-tune nối tiếp F96 → F103 → F107, 0.798 / 0.526). Theo user (10-19) không chạy
+đối chứng v23 riêng: lần fine-tune gần nhất chỉ thêm +0.003 mAP50-95 (F103 → F107), nằm trong dao động giữa hai run giống hệt
+(±0.006 / ±0.002, F102), nên phần tăng do "train thêm" được coi là ≤ 0.005. Run của user: `openobb24x` từ chính file F107, 50 epoch,
+`lr=0.001`, `rotate_p=0.5`, LR cosine mặc định (F108).
 
-| | A: `openobb23x` (đối chứng) | **B: `openobb24x`** | Bác bỏ nếu |
+| | Mốc F107 (v23) | **v24** | Bác bỏ nếu |
 |---|---|---|---|
-| mAP50-95 | khoảng 0.526 ± 0.006 (train thêm gần bão hoà, F107) | **≥ A + 0.010** (mục tiêu 0.535–0.545) | < A + 0.005 |
-| mAP50 | khoảng 0.798 | ≥ A − 0.005 | < A − 0.010 |
-| wall / junction / wall_300 mAP50-95 | .60 / .54 / .36 | mỗi class ≥ A + 0.008 | cả ba < A + 0.003 |
+| mAP50-95 | 0.526 | **≥ 0.536** (mục tiêu 0.535–0.545) | < 0.531 |
+| mAP50 | 0.798 | ≥ 0.793 | < 0.788 |
+| wall / junction / wall_300 mAP50-95 | .599 / .542 / .362 | mỗi class ≥ mốc + 0.008 | cả ba < mốc + 0.003 |
 | Dòng `Localisation quality calibrated` | — | chọn β > 0 | chọn q^0 (đầu độ khít không giúp) |
-| Box trùng | khoảng 1.8% | ≤ A + 0.5 điểm | |
-| Tốc độ (inference + postprocess) | 7.9 + 1.3 ms | ≤ A + 0.3 ms | |
+| Box trùng | 1.8% | ≤ 2.3% | |
+| Tốc độ (inference + postprocess) | 7.9 + 1.3 ms | ≤ 9.5 ms | |
 
-Nếu B chỉ hơn A khoảng +0.015 (đúng bằng tín hiệu trường thô chưa học), phần học được không thêm gì; ghi nhận và cân nhắc dùng thẳng
-tín hiệu trường (không cần train) làm công tắc.
+Đọc kết quả: phần tăng do cơ chế = fitness (0.1·mAP50 + 0.9·mAP50-95) của v24 với β, α đã hiệu chỉnh − fitness của cùng checkpoint ở
+q^0 (số "base" in ngay trong dòng `Localisation quality calibrated`). So sánh này cùng trọng số, nên tách được hẳn khỏi phần do train thêm 50 epoch. Nếu phần tăng chỉ khoảng +0.015
+(bằng tín hiệu trường thô chưa học, F109), phần học được không thêm gì; khi đó cân nhắc dùng thẳng tín hiệu trường làm công tắc.
 
 ## 5. Lệnh (Colab, G4)
 
 ```bash
-# A: đối chứng v23, train tiếp từ best.pt của F107
-openobb train data=/content/data.yaml model=openobb23x weights=/content/openobb23x_new.pt epochs=60 imgsz=1280 batch=16 rotate_p=0.5
-# B: v24 từ cùng điểm xuất phát (dòng [init] phải báo 8 tensor mới = quality.*)
-openobb train data=/content/data.yaml model=openobb24x weights=/content/openobb23x_new.pt epochs=60 imgsz=1280 batch=16 rotate_p=0.5
+openobb train data=/content/data.yaml model=openobb24x epochs=50 imgsz=1280 batch=16 rotate_p=0.5 lr=0.001 weights=/content/drive/MyDrive/Train/tu_ph/Wall_Color/model/openobb23x_new.pt
 ```
+
+Dòng `[init]` phải báo 8 tensor mới (`quality.*`).
 
 Gửi lại: bảng theo class, dòng `NMS calibrated`, dòng **`Localisation quality calibrated`**, `Duplicate boxes`, `Box geometry`, `Speed`.
 
