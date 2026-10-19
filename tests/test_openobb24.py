@@ -134,3 +134,21 @@ def test_v24_registry_strip_and_reload(tmp_path):
     x = torch.rand(1, 3, 128, 128)
     with torch.no_grad():
         assert torch.allclose(m(x)["pred_boxes"], m2(x)["pred_boxes"], atol=1e-5)
+
+
+def test_unrefined_candidates_do_not_outrank_refined_ones():
+    """Constant low q on the refined candidates: with the outside fill at the image's lowest refined q the NMS order is
+    the class score's (= q^0); a fixed 0.6 for the candidates outside the refined top-K (0.25.1) could let unrefined
+    boxes win their clusters (F111)."""
+    _, b = _pair()
+    b.ref_k = 8                                                      # few refined candidates: many outside the top-K
+    with torch.no_grad():
+        b.quality.mlp[-1].bias.fill_(math.log(0.2 / 0.8))            # q = 0.2 everywhere it is computed
+    x = torch.rand(1, 3, 128, 128)
+    with torch.no_grad():
+        b.q_beta = 0.0
+        o0 = b(x)
+        b.q_beta, b.q_outside = 2.0, "min"
+        o1 = b(x)
+    assert torch.allclose(o0["pred_boxes"], o1["pred_boxes"], atol=1e-5)
+    assert torch.allclose(o0["pred_logits"].sigmoid(), o1["pred_logits"].sigmoid(), atol=1e-5)

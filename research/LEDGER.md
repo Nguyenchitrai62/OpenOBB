@@ -1755,6 +1755,30 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     note −.026 nằm trong nhiễu của class này (±0.058, F64). (3) Bước tiếp rẻ nhất: chạy `quality_probe.py` trên `best.pt` này (CPU) để đo
     tương quan của q học được so với tín hiệu trường; nếu tín hiệu trường vẫn +0.015, đưa nó thành lựa chọn không cần train trong hiệu chỉnh.
 
+- **F111. Vì sao hiệu chỉnh bác bỏ q của v24 (CPU, `F:\Downloads\openobb24x.pt` = best F110, 53 ảnh val): hai lỗi ở đường suy luận,
+  sửa xong q có ích nhưng nhỏ (+0.002–0.003 fitness).**
+  - `quality_probe.py` (chỉ xét 1500 ứng viên đã tinh chỉnh, một class mỗi box, conf ≥ 0.05): Spearman với ProbIoU (box đúng, conf ≥ 0.25),
+    q / điểm class: wall 0.255 / 0.205, junction 0.212 / 0.197, door 0.266 / 0.328, wall_300 0.243 / 0.361. Chọn box trong cụm NMS bằng
+    q^2: **+0.020** mAP50-95 (base 0.533), bằng trường thô fm^2: +0.027. Mâu thuẫn với hiệu chỉnh trên GPU (mọi q^β kém q^0, F110).
+  - `quality_deployed.py` (đúng `forward` đã triển khai, đã gộp BN, NMS o2m 0.5, bỏ bám mép nhóm 0): q^0 fitness 0.5523 (mAP 0.8004 /
+    0.5248); q^2 với ứng viên ngoài top 1500 nhận q = 0.6 (code 0.25.1) **0.5491 (−0.003)**, tái hiện kết quả hiệu chỉnh trên GPU.
+  - **Lỗi 1:** ứng viên ngoài top 1500 (box chưa tinh chỉnh, chưa bám mép) nhận q cố định 0.6, cao hơn q học được của phần lớn ứng viên
+    đã tinh chỉnh → với β > 0 box chưa tinh chỉnh thắng cụm. Sửa (0.25.2): nhận q nhỏ nhất của ảnh (`q_outside="min"`, mặc định); q^2
+    **0.5546 (+0.0023;** mAP50 0.7974, mAP50-95 0.5276), q^4 0.5530. Bỏ hẳn ứng viên chưa tinh chỉnh (`q_outside="drop"`): q^0 0.5536,
+    q^2 0.5554.
+  - **Lỗi 2 (test bắt được):** `fast_nms(out_logits=)` lọc ngưỡng conf trên điểm xếp hạng (điểm × q^β) thay vì điểm xuất ra → box điểm
+    thấp bị xoá hẳn. Sửa: ngưỡng áp lên điểm xuất ra (mọi số trên đã có bản sửa này).
+  - Một class mỗi box (bỏ class phụ của cùng box): ±0.001, không giải thích chênh base probe 0.533 / đường thật 0.525. Phần chênh còn lại
+    giữa probe (+0.020) và đường thật (+0.003) chưa tách; probe chấm trên tập con (một class, conf ≥ 0.05, chỉ ứng viên đã tinh chỉnh).
+    Số CPU fp32 khác GPU bf16 (0.525 so với 0.531 mAP50-95): chỉ so cặp trong cùng một nơi.
+  - Kết luận: cơ chế q học được có thật nhưng nhỏ (+0.003 mAP50-95 trên cùng trọng số), dưới xa kỳ vọng ghi trước (≥ +0.010) → bác bỏ ở
+    vai trò "đột phá" vẫn đúng. Lối hướng box khít (F109) cần cơ chế khác, không phải chọn lại box trong cụm NMS. Checkpoint F110 hiệu
+    chỉnh lại bằng 0.25.2 (`openobb calibrate`) sẽ được khoảng +0.002 fitness.
+  - Nguồn số (code = commit cb9f118 + sửa F111 chưa commit lúc đo; cả ba lượt đều đã có bản sửa `fast_nms`, 12:09):
+    `OMP_NUM_THREADS=2 py -3.12 research/analysis/quality_deployed.py F:/Downloads/openobb24x.pt` → 6 cấu hình × 53 ảnh, 1398 s,
+    `research/analysis/quality_deployed_v24f110.log`; thêm `QD_TOP1=1 QD_SHORT=1` → `quality_deployed_top1_v24f110.log` (354 s);
+    `QD_SHORT=drop` → `quality_deployed_drop_v24f110.log` (342 s); probe: `quality_v24f110.log`. Test: `pytest_f111.log` (318 pass, 10 skip).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

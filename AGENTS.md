@@ -337,6 +337,8 @@ Câu hỏi còn mở:
   [docs/OPENOBB24.md](docs/OPENOBB24.md). Mốc so là F107 (user 10-19: không chạy đối chứng v23 riêng); user đang train `openobb24x` 50 ep, lr 0.001, từ `openobb23x_new.pt`.
   **Kết quả (F110): 0.802 / 0.531, đầu độ khít học được bị bác bỏ** (mọi q^β kém base 0.5564, hiệu chỉnh chọn q^0); bỏ bám mép nhóm
   note + junction được giữ (junction .559, +.017). Bước tiếp: `quality_probe.py` trên best.pt v24, thử tín hiệu trường thô làm lựa chọn.
+  **F111:** q bị bác bỏ do hai lỗi đường suy luận (ứng viên chưa tinh chỉnh nhận q = 0.6; ngưỡng conf trên điểm × q^β), sửa ở 0.25.2;
+  sửa xong q chỉ +0.002–0.003 fitness → chọn lại box trong cụm NMS không phải lối ra cho độ khít box.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.
@@ -433,6 +435,12 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 - `push_all.py` chỉ đồng bộ file đã commit; nó in danh sách file chưa commit, đọc để không bỏ sót.
 
 ## 9. Nhật ký
+
+- 2026-10-19 (3): Đóng việc dở của `docs/HANDOFF_OPENOBB_F111_2026-10-19.md`: lượt 53 ảnh / 6 cấu hình đã xong trước khi phiên cũ dừng
+  (`research/analysis/quality_deployed_v24f110.log`), số khớp F111; nguồn số ghi thêm vào F111. Test v24 + strip chạy lại: pass.
+
+- 2026-10-19 (2): **F111: hai lỗi đường suy luận của v24 (0.25.2).** `q_outside="min"` (mặc định) / `"drop"`; `fast_nms` lọc conf theo
+  điểm xuất ra. Script `research/analysis/quality_deployed.py` (đường suy luận thật), `quality_probe.py` đọc q học được.
 
 - 2026-10-19: **Log OpenOBB24-x (F110): 0.802 / 0.531.** Đầu độ khít học được không giúp (hiệu chỉnh chọn q^0); bỏ bám mép cho
   note + junction giữ lại. Kết quả ghi ở `docs/OPENOBB24.md` mục 6.

@@ -97,6 +97,11 @@ bỏ bám mép nhóm note + junction (0.5578) được chọn.
 Kết luận: cơ chế "đầu độ khít học được" bị bác bỏ ở lần train này; phần giữ lại là bỏ bám mép cho junction (+.017 junction, đúng như
 đo trước ở F109). Tín hiệu trường ranh giới thô (không học) đã cho +0.015 trên F107 vẫn chưa được thử như một lựa chọn: xem F110.
 
+**Phân tích sau (F111):** hiệu chỉnh bác bỏ q vì hai lỗi ở đường suy luận 0.25.1: ứng viên ngoài top 1500 (chưa tinh chỉnh) nhận q cố
+định 0.6 nên thắng cụm NMS khi β > 0, và ngưỡng conf của NMS áp lên điểm × q^β nên xoá box điểm thấp. Sửa ở 0.25.2 (`q_outside="min"`,
+ngưỡng theo điểm xuất ra). Đo lại trên chính `best.pt` này (CPU, đường suy luận thật): q^0 0.5523, **q^2 0.5546 (+0.0023)**: q học được có
+ích nhưng nhỏ, vẫn dưới kỳ vọng ≥ +0.010.
+
 ## 7. Phụ lục: kiến trúc theo lớp (cỡ x)
 
 Kích thước ghi cho ảnh vào 1 × 3 × 1280 × 1280, Wall_Color (7 class, 3 nhóm class). Thân, neck, head, trường ranh giới, bộ tinh chỉnh,

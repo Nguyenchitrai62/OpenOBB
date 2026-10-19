@@ -140,6 +140,10 @@ class OpenOBB24(OpenOBB23):
                         if has_edge and "quality" not in self.off24 else None)
         # inference settings, calibrated on val at the end of training (0, 0, () = OpenOBB23)
         self.q_beta, self.q_alpha, self.snap_skip = 0.0, 0.0, ()
+        # q of the candidates outside the refined top ref_k (not refined, not snapped): the lowest q of the image's
+        # refined candidates ("min"). The constant Q_PRIOR ("prior", 0.25.x) let unrefined boxes win NMS clusters over
+        # refined ones whose learnt q was below it (F111); "drop": candidates outside the refined top ref_k are removed
+        self.q_outside = "min"
 
     # ---- refinement with the hidden layer, optional snapping skip per class group
     def edge_snap(self, f4, p3, field, cand, grp=None):
@@ -192,10 +196,14 @@ class OpenOBB24(OpenOBB23):
             boxes = boxes.scatter(1, idx[..., None].expand(-1, -1, 5), stages[-1][1].to(boxes.dtype))
             if self.quality is not None and (self.q_beta or self.q_alpha):
                 q = self.quality_logits(h, field, stages, self.head_rows(reg, idx)).sigmoid()
+        if idx is not None and self.q_outside == "drop":       # only the refined candidates can become detections
+            inside = torch.zeros(cls.shape[:2], dtype=torch.bool, device=cls.device).scatter(1, idx, True)
+            cls = cls.masked_fill(~inside[..., None], -30.0)
         rank, out_l = cls, None
         if q is not None:
-            qa = torch.full(cls.shape[:2], Q_PRIOR, device=cls.device, dtype=torch.float32)
-            qa = qa.scatter(1, idx, q.float()).clamp(1e-4, 1.0).log()[..., None]
+            q = q.float()
+            fill = q.amin(1, keepdim=True) if self.q_outside == "min" else torch.full_like(q[:, :1], Q_PRIOR)
+            qa = fill.expand(-1, cls.shape[1]).clone().scatter(1, idx, q).clamp(1e-4, 1.0).log()[..., None]
             ls = F.logsigmoid(cls.float())
             rank = torch.logit((ls + self.q_beta * qa).exp().clamp(1e-6, 1 - 1e-6))
             out_l = torch.logit(((1 - self.q_alpha) * ls + self.q_alpha * qa).exp().clamp(1e-6, 1 - 1e-6))

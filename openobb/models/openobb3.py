@@ -138,7 +138,9 @@ def fast_nms(logits, boxes, max_det=1000, conf=0.001, iou=0.7, pre=4000, min_sid
     for i in range(B):
         sc = logits[i].sigmoid().flatten()
         s, idx = sc.topk(min(pre, sc.numel()))
-        keep = s > conf
+        # the confidence floor applies to the score that is returned: with out_logits the ranking score (class score x
+        # q^beta, OpenOBB24) is lower and would drop low-score boxes outright (F111)
+        keep = (s if out_logits is None else out_logits[i].sigmoid().flatten()[idx]) > conf
         s, idx = s[keep], idx[keep]
         if not len(s):
             continue

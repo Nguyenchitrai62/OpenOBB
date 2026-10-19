@@ -98,7 +98,17 @@ else:
             field = net.field(f4, feats[0])
             cls, reg = net.run_head(feats, False)                                  # one-to-many head
             cc, boxes = net.candidates(cls, reg, pts, st)
-            boxes, idx = net.snap_topk(field, cc, boxes, net.ref_k, f4, feats[0])
+            qv = None
+            if getattr(net, "quality", None) is not None:          # OpenOBB24: deployed path (snap_skip) + its learnt q
+                k_ = min(int(net.ref_k), cc.shape[1])
+                idx = cc.sigmoid().amax(-1).topk(k_, dim=1).indices
+                cand = boxes.gather(1, idx[..., None].expand(-1, -1, 5))
+                grp = idx // reg.shape[1] if net.n_groups > 1 else torch.zeros_like(idx)
+                stages, hid = net.edge_snap(f4, feats[0], field, cand, grp)
+                qv = net.quality_logits(hid, field, stages, net.head_rows(reg, idx)).sigmoid()[0]
+                boxes = boxes.scatter(1, idx[..., None].expand(-1, -1, 5), stages[-1][1].to(boxes.dtype))
+            else:
+                boxes, idx = net.snap_topk(field, cc, boxes, net.ref_k, f4, feats[0])
             idx = idx[0]
             A = reg.shape[1]
             G = net.n_groups
@@ -117,7 +127,8 @@ else:
                 g.append((np.array(v[1:9], float) * np.tile([w0 * s, h0 * s], 4), NAMES[int(v[0])], 0))
         keep = sc > 0.05
         data[p.stem] = {"sc": sc[keep].numpy(), "cl": cl[keep].numpy(), "b": b[keep].numpy(), "fm": fm[keep].numpy(),
-                        "fmin": fmin[keep].numpy(), "dq": dq[keep].numpy(), "gt": g}
+                        "fmin": fmin[keep].numpy(), "dq": dq[keep].numpy(), "gt": g,
+                        **({} if qv is None else {"q": qv[keep].numpy()})}
         print(f"{k + 1}/{len(imgs)} {time.time() - t0:.0f}s", end="\r", flush=True)
     np.savez(CACHE, **data)
 
@@ -143,13 +154,14 @@ def nms_keep(score, cl, b, rank):
     return np.array(out, int)
 
 
+CUES = ("fm", "fmin", "dq") + (("q",) if all("q" in d for d in data.values()) else ())
 variants = {"base": ("score", None)}
-for cue in ("fm", "fmin", "dq"):
+for cue in CUES:
     for beta in BETAS:
         variants[f"{cue}^{beta}"] = ("score", (cue, beta))
         variants[f"nms {cue}^{beta}"] = ("nms", (cue, beta))
 dets = {v: {c: ([], [], []) for c in NAMES} for v in variants}
-corr = {c: {"s": [], "fm": [], "fmin": [], "dq": [], "iou": []} for c in NAMES}
+corr = {c: {k: [] for k in ("s",) + CUES + ("iou",)} for c in NAMES}
 gts = {}
 for stem, d in sorted(data.items()):
     gts[stem] = [(np.asarray(p, np.float64), n, 0) for p, n, _ in d["gt"]]
@@ -170,19 +182,20 @@ for stem, d in sorted(data.items()):
                 mm = iou[:, t] * (gc == cl[j])
                 if mm.max() >= 0.5 and sc[j] >= 0.25:
                     r = corr[NAMES[cl[j]]]
-                    r["s"].append(sc[j]), r["fm"].append(d["fm"][j]), r["fmin"].append(d["fmin"][j])
-                    r["dq"].append(d["dq"][j]), r["iou"].append(mm.max())
+                    r["s"].append(sc[j]), r["iou"].append(mm.max())
+                    for k_ in CUES:
+                        r[k_].append(d[k_][j])
 
 res = {v: evaluate_ultra({c: (i, np.asarray(s), np.asarray(p).reshape(-1, 8)) for c, (i, s, p) in dets[v].items()},
                          gts, NAMES, max_det=3000) for v in variants}
 print(f"\n{Path(ck).name}: Spearman with ProbIoU (matched >= 0.5, score >= 0.25)")
-print(f"{'class':12s} {'n':>5s} {'score':>7s} {'field':>7s} {'fmin':>7s} {'dfl':>7s}")
+print(f"{'class':12s} {'n':>5s} {'score':>7s} {'field':>7s} {'fmin':>7s} {'dfl':>7s}" + (f" {'q':>7s}" if "q" in CUES else ""))
 for c in NAMES:
     r = corr[c]
     if len(r["iou"]) < 5:
         continue
     print(f"{c:12s} {len(r['iou']):5d} " + " ".join(f"{spearman(np.array(r[k]), np.array(r['iou'])):+7.3f}"
-                                                  for k in ("s", "fm", "fmin", "dq")))
+                                                  for k in ("s",) + CUES))
 names = list(variants)
 print(f"\nmAP50-95 delta vs base (o2m + refine + snap + NMS {NMS_IOU}); 'nms x' = cue only chooses the kept box")
 print(f"{'class':12s} " + " ".join(f"{n:>11s}" for n in names))
