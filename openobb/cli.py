@@ -768,7 +768,7 @@ def calibrate(model, data=None, out=None, imgsz=None, batch=8, workers=8, cache_
     f, _, h, c = choose_postprocess(tried)            # best fitness; within DUP_TOL, the fewest duplicates
     q_args = {}
     if hasattr(net, "q_beta"):                        # OpenOBB24: localisation quality in NMS / score, snapping skip
-        from openobb.predict import apply_quality, quality_options, snap_skip_options
+        from openobb.predict import apply_quality, outside_options, quality_options, snap_skip_options
         apply_head(net, h)
         apply_nms(net, c)
 
@@ -791,9 +791,17 @@ def calibrate(model, data=None, out=None, imgsz=None, batch=8, workers=8, cache_
             print(f"[calibrate] no snapping for group {','.join(map(str, sk))}: fitness {fq:.4f}", flush=True)
             if fq > best[0]:
                 best = (fq, best[1], sk)
+        qo = "min"
+        for o in outside_options(net)[1:]:
+            apply_quality(net, *best[1], best[2], o)
+            fq = fitness_now()
+            print(f"[calibrate] unrefined candidates {o}: fitness {fq:.4f}", flush=True)
+            if fq > best[0]:
+                best, qo = (fq, best[1], best[2]), o
         f, (qb, qa), sk = best
-        q_args = dict(q_beta=qb, q_alpha=qa, snap_skip=",".join(map(str, sk)))
-        print(f"[calibrate] -> q^{qb:g} in NMS, score^{1 - qa:g} q^{qa:g}, no snapping for groups [{q_args['snap_skip']}]")
+        q_args = dict(q_beta=qb, q_alpha=qa, snap_skip=",".join(map(str, sk)), q_outside=qo)
+        print(f"[calibrate] -> q^{qb:g} in NMS, score^{1 - qa:g} q^{qa:g}, no snapping for groups [{q_args['snap_skip']}], "
+              f"unrefined candidates {qo}")
     ck = torch.load(model, map_location="cpu", weights_only=False)
     ck["args"] = dict(ck.get("args", {}), nms_iou=c, **({"infer_head": h} if h else {}), **q_args)
     dst = Path(out or model)

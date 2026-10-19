@@ -436,6 +436,9 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 
 ## 9. Nhật ký
 
+- 2026-10-19 (4): Hiệu chỉnh v24 thử thêm `q_outside` `min` / `drop` và lưu vào `best.pt` (0.25.2). Lệnh giao user: hiệu chỉnh lại
+  best.pt F110 + train lại v24 không `rotate_p` (hướng box F110 xấu hơn F107: box dài lệch trục 8.5% so với 6.0%).
+
 - 2026-10-19 (3): Đóng việc dở của `docs/HANDOFF_OPENOBB_F111_2026-10-19.md`: lượt 53 ảnh / 6 cấu hình đã xong trước khi phiên cũ dừng
   (`research/analysis/quality_deployed_v24f110.log`), số khớp F111; nguồn số ghi thêm vào F111. Test v24 + strip chạy lại: pass.
 

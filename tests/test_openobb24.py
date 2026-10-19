@@ -122,15 +122,16 @@ def test_v24_registry_strip_and_reload(tmp_path):
     assert MODELS["openobb24x"] == ("v24", "x") and "v24" in KNOWN_ARCHS
     _, b = _pair()
     args = {"arch": "v24", "size": "s", "img": 128, "num_top": 50, "groups": "0,1,1", "nms_iou": 0.5,
-            "infer_head": "o2m", "q_beta": 2.0, "q_alpha": 0.0, "snap_skip": "1"}
+            "infer_head": "o2m", "q_beta": 2.0, "q_alpha": 0.0, "snap_skip": "1", "q_outside": "drop"}
     ck = tmp_path / "v24.pt"
     torch.save({"model": b.state_dict(), "args": args, "classes": ["a", "b", "c"]}, ck)
     m, names, a = load_model(str(ck), "cpu")
     assert m.q_beta == 2.0 and m.snap_skip == (1,) and m.infer_head == "o2m" and names == ["a", "b", "c"]
+    assert m.q_outside == "drop"
     out = tmp_path / "v24_strip.pt"
     strip(str(ck), str(out))
     m2, _, a2 = load_model(str(out), "cpu")
-    assert m2.q_beta == 2.0 and m2.snap_skip == (1,) and a2.get("groups") == "0,1,1"
+    assert m2.q_beta == 2.0 and m2.snap_skip == (1,) and a2.get("groups") == "0,1,1" and m2.q_outside == "drop"
     x = torch.rand(1, 3, 128, 128)
     with torch.no_grad():
         assert torch.allclose(m(x)["pred_boxes"], m2(x)["pred_boxes"], atol=1e-5)
@@ -152,3 +153,20 @@ def test_unrefined_candidates_do_not_outrank_refined_ones():
         o1 = b(x)
     assert torch.allclose(o0["pred_boxes"], o1["pred_boxes"], atol=1e-5)
     assert torch.allclose(o0["pred_logits"].sigmoid(), o1["pred_logits"].sigmoid(), atol=1e-5)
+
+
+def test_outside_options_and_old_checkpoints():
+    """The calibration tries "min" then "drop" for the candidates outside the refined top-K; a checkpoint calibrated
+    before q_outside existed (0.25.1) loads with "min"."""
+    from openobb.predict import apply_quality, outside_options
+    _, b = _pair()
+    assert outside_options(b) == ["min", "drop"]
+    apply_quality(b, 0.0, 0.0, (), None)
+    assert b.q_outside == "min"
+    apply_quality(b, None, None, None, "drop")
+    assert b.q_outside == "drop"
+    b.ref_k = 8
+    x = torch.rand(1, 3, 128, 128)
+    with torch.no_grad():
+        out = b(x)
+    assert torch.isfinite(out["pred_boxes"]).all()

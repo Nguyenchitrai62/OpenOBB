@@ -953,11 +953,11 @@ def main(argv=None):
         res, dets = final_eval(a.nms_iou)
         u = res.get("ultra") or res
         fit_best = 0.1 * u["mAP50"] + 0.9 * u["mAP50_95"]
-    a.q_beta = a.q_alpha = a.snap_skip = None
+    a.q_beta = a.q_alpha = a.snap_skip = a.q_outside = None
     if hasattr(vm, "q_beta") and not a.eval_only:
         # OpenOBB24: how the learnt localisation quality is used (quality-guided NMS / score) and which class groups skip
         # the boundary snapping, chosen on val after the NMS like it; (0, 0, none) = OpenOBB23 (docs/OPENOBB24.md)
-        from openobb.predict import apply_quality, quality_options, snap_skip_options
+        from openobb.predict import apply_quality, outside_options, quality_options, snap_skip_options
         u0 = res.get("ultra") or res
         best = (0.1 * u0["mAP50"] + 0.9 * u0["mAP50_95"], (0.0, 0.0), (), res, dets)
         rows = []
@@ -977,12 +977,21 @@ def main(argv=None):
             rows.append(f"no snapping for group {','.join(map(str, sk))}: {f:.4f}")
             if f > best[0]:
                 best = (f, best[1], sk, r, d)
+        a.q_outside = "min"
+        for qo in outside_options(vm)[1:]:
+            apply_quality(vm, *best[1], best[2], qo)
+            r, d = final_eval(a.nms_iou)
+            u = r.get("ultra") or r
+            f = 0.1 * u["mAP50"] + 0.9 * u["mAP50_95"]
+            rows.append(f"unrefined candidates {qo}: {f:.4f}")
+            if f > best[0]:
+                best, a.q_outside = (f, best[1], best[2], r, d), qo
         fit_best, (a.q_beta, a.q_alpha), sk, res, dets = best
         a.snap_skip = ",".join(map(str, sk))
-        apply_quality(vm, a.q_beta, a.q_alpha, sk)
+        apply_quality(vm, a.q_beta, a.q_alpha, sk, a.q_outside)
         say(f"Localisation quality calibrated on val (saved in best.pt; fitness, base {0.1 * u0['mAP50'] + 0.9 * u0['mAP50_95']:.4f}): "
             + " | ".join(rows) + f" -> q^{a.q_beta:g} in NMS, score^{1 - a.q_alpha:g} q^{a.q_alpha:g}, "
-            f"no snapping for groups [{a.snap_skip}]")
+            f"no snapping for groups [{a.snap_skip}], unrefined candidates {a.q_outside}")
     a.infer_k = None
     ref = getattr(vm, "refiner", None)
     if ref is not None and not a.eval_only:
@@ -1049,7 +1058,7 @@ def main(argv=None):
         if a.infer_k:
             ck["args"]["infer_k"] = a.infer_k
         if a.q_beta is not None:
-            ck["args"].update(q_beta=a.q_beta, q_alpha=a.q_alpha, snap_skip=a.snap_skip)
+            ck["args"].update(q_beta=a.q_beta, q_alpha=a.q_alpha, snap_skip=a.snap_skip, q_outside=a.q_outside)
         ck["conf_f1"] = final.get("conf_f1")
         torch.save(ck, wdir / "best.tmp")
         os.replace(wdir / "best.tmp", wdir / "best.pt")
@@ -1073,7 +1082,8 @@ def main(argv=None):
     if not a.eval_only and last.exists():   # finished: drop the optimiser state from last.pt (like best.pt)
         ck = torch.load(last, map_location="cpu", weights_only=False)
         if "opt" in ck:
-            q_args = {} if a.q_beta is None else dict(q_beta=a.q_beta, q_alpha=a.q_alpha, snap_skip=a.snap_skip)
+            q_args = {} if a.q_beta is None else dict(q_beta=a.q_beta, q_alpha=a.q_alpha, snap_skip=a.snap_skip,
+                                                         q_outside=a.q_outside)
             torch.save({"model": ck["ema"]["module"], "epoch": ck["epoch"], "args": dict(ck["args"], nms_iou=a.nms_iou,
                                                                        **({"infer_head": a.infer_head}
                                                                           if getattr(a, "infer_head", None) else {}),

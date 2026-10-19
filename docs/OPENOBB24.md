@@ -41,8 +41,8 @@ Script trong `research/analysis/`; log `*_v23f107*.log`.
   −1 / 0 / +1 px × 5 điểm × 2 kênh) + DFL 6 + hình học 4 + độ dịch tinh chỉnh 5 + độ dịch bám mép 5 → LayerNorm → 128 → 128 → 1.
   Học bằng loss `fit` có sẵn (BCE với ProbIoU ≥ 0.5, còn lại 0) trên 256 ứng viên dày đặc mỗi ảnh (không trên box nhãn bị rung).
 - **Mới ở suy luận:** `fast_nms(out_logits=)` xếp hạng theo điểm × q^β nhưng xuất điểm class; `snap_skip` theo nhóm.
-- Hiệu chỉnh cuối train (sau NMS): thử (β, α) ∈ {(0, 0), (1, 0), (2, 0), (4, 0), (1, 0.5), (2, 0.5)}, rồi bỏ bám mép từng nhóm; lưu `q_beta`,
-  `q_alpha`, `snap_skip` vào `best.pt`; `openobb calibrate` làm lại được trên checkpoint.
+- Hiệu chỉnh cuối train (sau NMS): thử (β, α) ∈ {(0, 0), (1, 0), (2, 0), (4, 0), (1, 0.5), (2, 0.5)}, rồi bỏ bám mép từng nhóm,
+  rồi (từ 0.25.2) ứng viên ngoài top `ref_k` giữ (`min`) hay bỏ (`drop`); lưu `q_beta`, `q_alpha`, `snap_skip`, `q_outside` vào `best.pt`; `openobb calibrate` làm lại được trên checkpoint.
 - Tận dụng phần có sẵn: 99.9% tham số là của v23 (thân mượn 64.7%, phần tự viết của v23 35.2%); v24 thêm 0.1%.
 - Chi phí: một MLP trên 1500 ứng viên, khoảng 0.1 ms (G4); không đổi khi β = α = 0.
 - Công tắc: `v24_off=quality` (không có đầu độ khít; còn `snap_skip`).
@@ -100,7 +100,8 @@ Kết luận: cơ chế "đầu độ khít học được" bị bác bỏ ở l
 **Phân tích sau (F111):** hiệu chỉnh bác bỏ q vì hai lỗi ở đường suy luận 0.25.1: ứng viên ngoài top 1500 (chưa tinh chỉnh) nhận q cố
 định 0.6 nên thắng cụm NMS khi β > 0, và ngưỡng conf của NMS áp lên điểm × q^β nên xoá box điểm thấp. Sửa ở 0.25.2 (`q_outside="min"`,
 ngưỡng theo điểm xuất ra). Đo lại trên chính `best.pt` này (CPU, đường suy luận thật): q^0 0.5523, **q^2 0.5546 (+0.0023)**: q học được có
-ích nhưng nhỏ, vẫn dưới kỳ vọng ≥ +0.010.
+ích nhưng nhỏ, vẫn dưới kỳ vọng ≥ +0.010. Bỏ hẳn ứng viên chưa tinh chỉnh (`q_outside="drop"`) cho q^0 0.5536, q^2 0.5554, nên từ
+0.25.2 hiệu chỉnh thử thêm `min` / `drop` và lưu `q_outside`. Checkpoint F110 cần `openobb calibrate` lại bằng 0.25.2 trên GPU.
 
 ## 7. Phụ lục: kiến trúc theo lớp (cỡ x)
 

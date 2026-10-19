@@ -114,10 +114,12 @@ def postprocess_options(model):
     return [(None, 0.7), (None, 0.6), (None, 0.5)]
 
 
-def apply_quality(model, beta=None, alpha=None, skip=None):
+def apply_quality(model, beta=None, alpha=None, skip=None, outside=None):
     """OpenOBB24: how the learnt localisation quality q is used (calibrated at training, args q_beta / q_alpha /
-    snap_skip): the NMS visits boxes by score x q^beta, the output score is score^(1 - alpha) x q^alpha, the class
-    groups in `skip` keep the refiner's box (no boundary snapping). None leaves the model's current value."""
+    snap_skip / q_outside): the NMS visits boxes by score x q^beta, the output score is score^(1 - alpha) x q^alpha, the
+    class groups in `skip` keep the refiner's box (no boundary snapping), `outside` is what happens to the candidates
+    outside the refined top ref_k ("min": q = lowest refined q of the image, "drop": removed). None leaves the model's
+    current value."""
     if not hasattr(model, "q_beta"):
         return model
     if beta is not None:
@@ -126,7 +128,18 @@ def apply_quality(model, beta=None, alpha=None, skip=None):
         model.q_alpha = float(alpha)
     if skip is not None:
         model.snap_skip = tuple(int(g) for g in (str(skip).split(",") if isinstance(skip, str) else skip) if str(g) != "")
+    if outside is not None and hasattr(model, "q_outside"):
+        model.q_outside = str(outside)
     return model
+
+
+def outside_options(model):
+    """What happens to the candidates outside the refined top ref_k, tried last by the calibration (OpenOBB24): "min"
+    (kept, q = lowest refined q of the image), then "drop" (only refined candidates become detections; F111: +0.001
+    fitness at q^0 on the F110 checkpoint, CPU)."""
+    if not hasattr(model, "q_outside") or int(getattr(model, "ref_k", 0) or 0) <= 0:
+        return ["min"]
+    return ["min", "drop"]
 
 
 def quality_options(model):
@@ -226,7 +239,7 @@ def load_model(ckpt_path, device, queries=None, classes=None):
     m = fast_layout(m, device)
     if a.get("infer_k") and getattr(m, "refiner", None) is not None:   # calibrated at training
         m.refiner.k = int(a["infer_k"])
-    apply_quality(m, a.get("q_beta"), a.get("q_alpha"), a.get("snap_skip"))
+    apply_quality(m, a.get("q_beta"), a.get("q_alpha"), a.get("snap_skip"), a.get("q_outside"))
     return apply_head(apply_nms(m, a.get("nms_iou")), a.get("infer_head")), names, a
 
 

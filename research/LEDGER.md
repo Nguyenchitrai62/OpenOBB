@@ -1778,6 +1778,8 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     `OMP_NUM_THREADS=2 py -3.12 research/analysis/quality_deployed.py F:/Downloads/openobb24x.pt` → 6 cấu hình × 53 ảnh, 1398 s,
     `research/analysis/quality_deployed_v24f110.log`; thêm `QD_TOP1=1 QD_SHORT=1` → `quality_deployed_top1_v24f110.log` (354 s);
     `QD_SHORT=drop` → `quality_deployed_drop_v24f110.log` (342 s); probe: `quality_v24f110.log`. Test: `pytest_f111.log` (318 pass, 10 skip).
+  - 0.25.2 thêm bước hiệu chỉnh cuối: ứng viên ngoài top `ref_k` `min` / `drop` (`predict.outside_options`), lưu `q_outside` vào `best.pt`
+    (train, `openobb calibrate`, `strip` giữ lại; checkpoint cũ nạp với `min`). Chờ user hiệu chỉnh lại F110 trên GPU để có số cùng thước.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
