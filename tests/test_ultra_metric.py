@@ -54,3 +54,36 @@ def test_confusion_matrix_counts_class_mixups():
     lines = top_confusions(u["confusion"])
     assert any(l.startswith("wall_300 -> wall: 1") for l in lines) and any(l.startswith("door -> background: 1")
                                                                             for l in lines)
+
+
+def test_yolo_only_validation_matches_full(monkeypatch):
+    """Per-epoch validation (metric='yolo', dota=False, extras=False) reports the same YOLO-ruler numbers as the full
+    pass (F115), with the image / instance counts of the table and no F2 column."""
+    from openobb import engine
+    from openobb.eval.dota import summary_table
+    rng = np.random.default_rng(0)
+    classes = ["wall", "door"]
+    gts, preds = {}, {"dec": []}
+    for k in range(6):
+        name = f"im{k}"
+        g = [(_poly(rng.uniform(50, 400), rng.uniform(50, 400), rng.uniform(20, 200), 3), classes[i % 2], False)
+             for i in range(8)]
+        gts[name] = [(p.tolist(), c, d) for p, c, d in g]
+        for p, c, _ in g:
+            q = p + rng.normal(0, 0.7, 8)
+            preds["dec"].append((f"{name}__1.0__0___0", classes.index(c), float(rng.uniform(0.1, 1)), q))
+    class NoPatches(list):
+        items = []
+    monkeypatch.setattr(engine, "DotaPatches", lambda *a, **k: NoPatches())
+    monkeypatch.setattr(engine, "predict_patches", lambda *a, **k: {"dec": list(preds["dec"]), "_speed": None})
+    monkeypatch.setattr(engine, "prepared_fit", lambda root: False)
+    monkeypatch.setattr(engine, "dataset_classes", lambda root: classes)
+    monkeypatch.setattr(engine, "load_gt_dir", lambda d, keep=None: gts)
+    full, _ = engine.eval_dota(None, "x", "cpu", metric="yolo", merge_workers=1, log=lambda *a: None)
+    fast, _ = engine.eval_dota(None, "x", "cpu", metric="yolo", dota=False, extras=False, merge_workers=1,
+                               log=lambda *a: None)
+    for k in ("mAP50", "mAP50_95", "P", "R"):
+        assert abs(full[k] - fast[k]) < 1e-12, k
+    assert fast["n_instances"] == 48 and fast["n_images"] == 6
+    assert "F2" not in summary_table(fast, classes) and "F2" in summary_table(full, classes)
+    assert "confusion" not in fast["ultra"] and "confusion" in full["ultra"]

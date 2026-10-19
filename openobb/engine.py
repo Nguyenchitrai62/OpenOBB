@@ -300,11 +300,14 @@ def prepared_fit(data_root):
 
 def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num_top=300, img_size=1024,
               merge_workers=16, log=print, fusion=False, variants=None, save_preds_to=None, context=False,
-              vectors=False, post="flat", merge_iou=0.1, primary="dec", ultra=False, metric="dota", rect=None):
+              vectors=False, post="flat", merge_iou=0.1, primary="dec", ultra=False, metric="dota", rect=None,
+              dota=True, extras=True):
     """DOTA-protocol eval of the decoder output (primary). With fusion=True and a dense head, also scores
     the dense-only / union / size-routed variants (res["fusion"]).
     rect (None = auto: data prepared with fit=True): whole-image tiles go through the network padded only to
-    multiples of 32, in shape-sorted batches (YOLO rect validation); context / vector inputs stay square."""
+    multiples of 32, in shape-sorted batches (YOLO rect validation); context / vector inputs stay square.
+    metric="yolo" with dota=False: only the YOLO ruler (no DOTA-protocol pass, no F2 / per-class conf_f2), and
+    extras=False also skips the confusion matrix / box geometry: per-epoch validation (F115)."""
     t0 = time.time()
     if rect is None:
         rect = prepared_fit(data_root)
@@ -330,16 +333,34 @@ def eval_dota(model, data_root, device, image_ids=None, batch=32, workers=8, num
     if variants:
         sets = {k: v for k, v in sets.items() if k in variants}
     results, primary_dets = {}, None
+    yolo_only = metric == "yolo" and not dota
     for name, pd in sets.items():
+        if yolo_only and name != (primary if primary in sets else "dec"):
+            continue                            # only the primary output is scored
         merged = merge_parallel(pd, merge_iou, merge_workers)
         dets = {classes[c]: v for c, v in merged.items()}
-        results[name] = evaluate(dets, gts, classes)
         if name == (primary if primary in sets else "dec"):
             primary_dets = dets
+        if not yolo_only:
+            results[name] = evaluate(dets, gts, classes)
+    if yolo_only:
+        from openobb.eval.ultra import evaluate_ultra
+        u = evaluate_ultra(primary_dets, gts, classes, extras=extras)
+        res = {"ultra": u, "metric": "yolo", "mAP50": u["mAP50"], "mAP50_95": u["mAP50_95"], "P": u["P"], "R": u["R"],
+               "classes": {}, "n_images": len(gts)}
+        for c in classes:
+            n = sum(1 for objs in gts.values() for o in objs if o[1] == c)
+            im = sum(1 for objs in gts.values() if any(o[1] == c for o in objs))
+            res["classes"][c] = dict(u["classes"].get(c, {"AP50": 0.0, "AP75": 0.0, "AP50_95": 0.0}), npos=n, images=im)
+        res["n_instances"] = sum(r["npos"] for r in res["classes"].values())
+        log(f"[eval] {len(ds)} patches / {len(gts)} images: predict {t1 - t0:.0f}s, merge+eval {time.time() - t1:.0f}s, "
+            f"YOLO ruler mAP50 {100 * res['mAP50']:.2f}")
+        res["speed"] = speed
+        return res, primary_dets
     res = results[primary if primary in results else "dec"]
     if ultra or metric == "yolo":               # Ultralytics-validator conventions, comparable with YOLO's mAP
         from openobb.eval.ultra import evaluate_ultra
-        res["ultra"] = evaluate_ultra(primary_dets, gts, classes)
+        res["ultra"] = evaluate_ultra(primary_dets, gts, classes, extras=extras)
     if metric == "yolo":                        # report (and select best.pt) on the YOLO-comparable numbers
         u = res["ultra"]
         res["dota"] = {"mAP50": res["mAP50"], "mAP50_95": res["mAP50_95"], "P": res.get("P"), "R": res.get("R"),

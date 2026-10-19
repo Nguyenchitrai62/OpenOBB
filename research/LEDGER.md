@@ -1834,6 +1834,22 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Quyết định (đã hứa ở F113 nếu đạt): **`compile=True` mặc định cho v18–v24** (`RECIPE18["compile"]`, kế thừa sang v19–v24);
     `compile=False` để tắt; họ cũ giữ tuỳ chọn. Test `test_compile_is_default_for_v18_family`.
 
+- **F115. Val mỗi epoch 44 s so với YOLO26x 11 s (log user 10-19: data lớn 16157 / 851 ảnh, 129431 nhãn val, 152 nhãn / ảnh, G4,
+  0.25.4 + compile; epoch train 7:29 lần đầu (cả biên dịch) rồi 5:38; YOLO26x 9:04–9:46). Val giờ chỉ thước YOLO, model gộp BN (0.25.6).
+  Chưa đo trên GPU.**
+  - Quyết định user: val chỉ cần thước YOLO; warmup giữ 3 epoch như YOLO (`warmup_epochs: 3.0` trong `default.yaml` của Ultralytics
+    8.4; 1512 it = 3 × 504 đúng như YOLO; `warmup_epochs=1` vẫn đặt được).
+  - Đo trên CPU, detection thật của v23 (53 ảnh Wall_Color, 65 nhãn / ảnh, 348 box / ảnh sau NMS model): NMS lúc gộp 16.7 ms / ảnh
+    (song song, **không bỏ box nào**: 348 → 348), thước DOTA 10.0 ms, thước YOLO 8.1 ms (trong đó confusion + hình học box 53%). Data user
+    gấp đôi số nhãn → phần CPU chạy tuần tự khoảng 30 s / 851 ảnh, là phần lớn của 44 s.
+  - Sửa: val mỗi epoch `eval_dota(dota=False, extras=False)`: chỉ thước YOLO (bỏ lượt DOTA, F2, confusion, hình học box; mAP / P / R
+    giống hệt bản đầy đủ, test `test_yolo_only_validation_matches_full`), chỉ chấm đầu ra chính; model val là bản sao EMA đã gộp BN /
+    RepConv + channels_last (`train.fused_copy`, như val cuối và suy luận). Val cuối giữ đủ (F2, `conf_thr` theo class, confusion,
+    hình học box). Bảng val mỗi epoch không còn cột F2 (như YOLO).
+  - Kỳ vọng ghi trước: val mỗi epoch ≤ 20 s trên cùng data / GPU; mAP mỗi epoch không đổi so với 0.25.5 cùng checkpoint. Bác bỏ nếu > 30 s.
+  - Lần tối ưu kế tiếp nếu chưa đạt: NMS lúc gộp không bỏ box nào với data ảnh nguyên (fit) → có thể bỏ khi ảnh chỉ có một mảnh, nhưng
+    phải đo trước để chắc nó không đổi số (thước hiện tại có lượt này).
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

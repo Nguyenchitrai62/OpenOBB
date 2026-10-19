@@ -244,17 +244,20 @@ def evaluate(dets, gts, classes=DOTA1_CLASSES, iou_thrs=None):
 
 def summary_table(res, classes=DOTA1_CLASSES, per_class=True):
     """Console table: Class / Images / Instances / P / R (one shared conf, max mean F1) / mAP50 (VOC07) / mAP50-95 /
-    F2 (per-class best conf)."""
+    F2 (per-class best conf; only when the DOTA-protocol pass ran: per-epoch YOLO-ruler validation has none)."""
+    f2 = "F2" in res
     head = (f"{'Class':>22}{'Images':>11}{'Instances':>11}{'P':>11}{'R':>11}{'mAP50':>11}{'mAP50-95':>11}"
-            f"{'F2':>11}")
+            + (f"{'F2':>11}" if f2 else ""))
     rows = [head, f"{'all':>22}{res.get('n_images', 0):>11}{res.get('n_instances', 0):>11}{res.get('P', 0):>11.3f}"
-                  f"{res.get('R', 0):>11.3f}{res['mAP50']:>11.3f}{res['mAP50_95']:>11.3f}{res.get('F2', 0):>11.3f}"]
+                  f"{res.get('R', 0):>11.3f}{res['mAP50']:>11.3f}{res['mAP50_95']:>11.3f}"
+                  + (f"{res.get('F2', 0):>11.3f}" if f2 else "")]
     if per_class:
         for c in classes:
             r = res["classes"][c]
             if r["npos"]:
                 rows.append(f"{c[:22]:>22}{r.get('images', 0):>11}{r['npos']:>11}{r.get('P', 0):>11.3f}"
-                            f"{r.get('R', 0):>11.3f}{r['AP50']:>11.3f}{r['AP50_95']:>11.3f}{r.get('F2', 0):>11.3f}")
+                            f"{r.get('R', 0):>11.3f}{r['AP50']:>11.3f}{r['AP50_95']:>11.3f}"
+                            + (f"{r.get('F2', 0):>11.3f}" if f2 else ""))
     return "\n".join(rows)
 
 

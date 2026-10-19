@@ -436,6 +436,9 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 
 ## 9. Nhật ký
 
+- 2026-10-19 (8): **F115 (0.25.6):** val mỗi epoch chỉ thước YOLO (theo user) + model gộp BN (`train.fused_copy`); val cuối giữ
+  đủ. Warmup giữ 3 epoch như YOLO (user chốt). Chờ: thời gian val mỗi epoch mới (YOLO 11 s, 0.25.4 44 s).
+
 - 2026-10-19 (7): **F114 (0.25.5):** user đo `compile=True` trên 0.25.4: 18.6 → 12.6 → 9.5 s / epoch (dataset nhỏ; tổng −49%).
   `compile=True` thành mặc định cho v18–v24 (`compile=False` để tắt). Chờ: mAP có compile so với không.
 

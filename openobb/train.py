@@ -29,6 +29,18 @@ from openobb.models.dense_head import DenseCriterion
 from openobb.models.openobb1 import OpenOBB1, build_criterion, load_dfine_coco
 
 
+def fused_copy(module, device):
+    """Copy of the EMA model for validation with BatchNorm / RepConv folded and channels_last, as the final validation
+    and inference run it (same outputs to float rounding; per-epoch validation used the unfolded training graph, F115).
+    Models without fuse() are returned as they are."""
+    if not hasattr(module, "fuse") or not hasattr(module, "run_head"):
+        return module
+    vm = copy.deepcopy(module).eval()
+    vm.fuse()
+    from openobb.predict import fast_layout
+    return fast_layout(vm, device)
+
+
 def compile_training(model):
     """torch.compile of what a dense OpenOBB (v18-v24) runs in training: encode (trunk stages + neck; v18+ call the
     trunk's stages directly, so compiling backbone.forward compiled nothing, F112), the boundary field and the heads.
@@ -928,10 +940,13 @@ def main(argv=None):
         if val_subset and ((epoch + 1) % a.eval_every == 0 or epoch + 1 == a.epochs) and (epoch + 1 < a.epochs or full_val):
             t_val = time.time()
             ema.repair(model, log=lambda m: log(m, console=not warned_ema) or warned.add("ema"))
-            res, _ = eval_dota(ema.module, a.data, device, val_subset, batch=a.batch, workers=a.workers,
+            vm_ep = fused_copy(ema.module, device)
+            res, _ = eval_dota(vm_ep, a.data, device, val_subset, batch=a.batch, workers=a.workers,
                                num_top=a.num_top, img_size=a.img, log=log, context=a.context, vectors=a.vectors,
                                post=a.post, merge_iou=a.merge_iou, fusion=a.primary != "dec",
-                               variants=["dec", a.primary], primary=a.primary, metric=a.metric)
+                               variants=["dec", a.primary], primary=a.primary, metric=a.metric,
+                               dota=a.metric != "yolo", extras=False)
+            del vm_ep
             if not a.verbose:
                 val_rows(res, time.time() - t_val)
             rec["sub_mAP50"] = round(res["mAP50"], 4)

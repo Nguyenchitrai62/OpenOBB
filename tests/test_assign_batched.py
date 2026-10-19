@@ -174,3 +174,17 @@ def test_compile_is_default_for_v18_family(tmp_path, monkeypatch):
     assert "--compile " not in b
     c = _calls(tmp_path / "c", monkeypatch, "openobb12x")
     assert "--compile " not in c                               # older families keep the opt-in
+
+
+def test_fused_copy_for_validation_keeps_outputs():
+    from openobb.models.openobb24 import OpenOBB24
+    from openobb.train import fused_copy
+    torch.manual_seed(0)
+    m = OpenOBB24("s", num_classes=3, img_size=128, max_det=50, groups=[0, 1, 1]).eval()
+    vm = fused_copy(m, "cpu")
+    assert vm is not m
+    x = torch.rand(1, 3, 128, 128)
+    with torch.no_grad():
+        a, b = m(x), vm(x)
+    assert torch.allclose(a["pred_boxes"], b["pred_boxes"], atol=1e-3)
+    assert any(type(mod).__name__ == "RepConv" for mod in m.modules())   # the EMA model itself stays unfolded

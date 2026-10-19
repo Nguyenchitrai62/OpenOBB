@@ -58,10 +58,11 @@ def _ap(rec, prec):
     return float(np.sum((y[1:] + y[:-1]) * np.diff(x) / 2))
 
 
-def evaluate_ultra(dets, gts, classes, conf=0.001, max_det=300, iou_thrs=None):
+def evaluate_ultra(dets, gts, classes, conf=0.001, max_det=300, iou_thrs=None, extras=True):
     """dets {class_name: (image_ids, scores, polys)}, gts {image_id: [(poly, cls, difficult)]} (as openobb.eval.dota)
     -> {"mAP50", "mAP75", "mAP50_95", "P", "R", "classes": {name: {"AP50", "AP75", "AP50_95", "P", "R"}}}.
-    P / R are taken at the confidence of the best mean F1 (IoU 0.5). Difficult objects count as normal GT."""
+    P / R are taken at the confidence of the best mean F1 (IoU 0.5). Difficult objects count as normal GT.
+    extras=False skips the confusion matrix and the box-geometry check (same mAP / P / R; per-epoch validation)."""
     thrs = np.round(np.arange(0.5, 0.96, 0.05), 2) if iou_thrs is None else np.asarray(iou_thrs)
     per_img = {}
     for ci, c in enumerate(classes):
@@ -123,8 +124,9 @@ def evaluate_ultra(dets, gts, classes, conf=0.001, max_det=300, iou_thrs=None):
         for c, pc, rc in zip(res["classes"], p_[:, i], r_[:, i]):
             res["classes"][c]["P"], res["classes"][c]["R"] = float(pc), float(rc)
         res["conf_best_f1"] = float(grid[i])
-    res["confusion"] = confusion(per_img, gts, classes)
-    res["geometry"] = geometry(per_img, gts, classes)
+    if extras:
+        res["confusion"] = confusion(per_img, gts, classes)
+        res["geometry"] = geometry(per_img, gts, classes)
     vals = list(res["classes"].values())
     res["mAP50"] = float(np.mean([v["AP50"] for v in vals])) if vals else 0.0
     res["mAP75"] = float(np.mean([v["AP75"] for v in vals])) if vals else 0.0
