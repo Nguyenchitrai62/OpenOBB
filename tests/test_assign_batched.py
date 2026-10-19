@@ -116,3 +116,49 @@ def test_profile_train_runs(tmp_path, capsys):
         assert real > 0 and "loss field targets" in parts and "loss   assignment o2m" in parts
     assert L10.ASSIGN == "batched"
     assert "step without syncs" in capsys.readouterr().out
+
+
+def test_async_saver_snapshots_and_reports_errors(tmp_path):
+    from openobb.train import AsyncSaver
+    w = torch.zeros(3)
+    s = AsyncSaver()
+    s.save({"w": w, "opt": {"state": {0: {"m": w}}}, "n": 1}, tmp_path / "a.tmp", tmp_path / "a.pt")
+    w += 5                                                 # the live tensor changes while the file is written
+    s.wait()
+    ck = torch.load(tmp_path / "a.pt")
+    assert torch.equal(ck["w"], torch.zeros(3)) and torch.equal(ck["opt"]["state"][0]["m"], torch.zeros(3))
+    assert not (tmp_path / "a.tmp").exists()
+    s.save({"w": w}, tmp_path / "missing" / "b.tmp", tmp_path / "missing" / "b.pt")
+    with pytest.raises(Exception):
+        s.wait()
+
+
+def test_frozen_bn_kernel_matches_expression():
+    from openobb.models import common as CM
+    bn = CM.FrozenBatchNorm2d(8)
+    g = torch.Generator().manual_seed(0)
+    for name in ("weight", "bias", "running_mean"):
+        getattr(bn, name).copy_(torch.randn(8, generator=g))
+    bn.running_var.copy_(torch.rand(8, generator=g) + 0.1)
+    x = torch.randn(2, 8, 5, 5, generator=g, requires_grad=True)
+    CM.FROZEN_BN_KERNEL = False
+    try:
+        ref = bn(x)
+        (gr,) = torch.autograd.grad(ref.sum(), x)
+    finally:
+        CM.FROZEN_BN_KERNEL = True
+    out = bn(x)
+    (go,) = torch.autograd.grad(out.sum(), x)
+    assert torch.allclose(out, ref, atol=1e-5) and torch.allclose(go, gr, atol=1e-5)
+    assert bn(x.bfloat16()).dtype == torch.bfloat16       # no promotion to fp32 (F112)
+
+
+def test_compile_training_wraps_what_v24_runs():
+    from openobb.models.openobb24 import OpenOBB24
+    from openobb.train import compile_training
+    torch.manual_seed(0)
+    m = OpenOBB24("s", num_classes=3, img_size=128, max_det=50, groups=[0, 1, 1]).train()
+    msg = compile_training(m)
+    assert "trunk + neck" in msg and "heads" in msg and "boundary field" in msg
+    assert "encode" in vars(m) and "run_head" in vars(m)  # instance attributes: the class (and EMA copies) untouched
+    assert "encode" not in vars(OpenOBB24)

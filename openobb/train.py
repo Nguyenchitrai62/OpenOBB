@@ -10,6 +10,7 @@ import json
 import math
 import os
 import random
+import threading
 import time
 from pathlib import Path
 
@@ -26,6 +27,66 @@ from openobb.report import append_results, plot_labels, plot_results, plot_train
 from openobb.eval.dota import DOTA1_CLASSES, format_table, summary_table, write_task1
 from openobb.models.dense_head import DenseCriterion
 from openobb.models.openobb1 import OpenOBB1, build_criterion, load_dfine_coco
+
+
+def compile_training(model):
+    """torch.compile of what a dense OpenOBB (v18-v24) runs in training: encode (trunk stages + neck; v18+ call the
+    trunk's stages directly, so compiling backbone.forward compiled nothing, F112), the boundary field and the heads.
+    Static shapes (square training inputs). A graph that fails to compile falls back to eager instead of stopping
+    the run. Call after the EMA copy (the EMA / validation model stays eager)."""
+    import torch._dynamo
+    torch._dynamo.config.suppress_errors = True
+    done = []
+    model.encode = torch.compile(model.encode, dynamic=False)
+    done.append("trunk + neck")
+    if getattr(model, "field", None) is not None:
+        model.field.forward = torch.compile(model.field.forward, dynamic=False)
+        done.append("boundary field")
+    model.run_head = torch.compile(model.run_head, dynamic=False)
+    done.append("heads")
+    return ", ".join(done) + " (training model only; first steps compile, a few minutes)"
+
+
+def _to_cpu(obj):
+    """Snapshot of a checkpoint: every tensor copied to the CPU (the live ones keep changing while it is written)."""
+    if torch.is_tensor(obj):
+        t = obj.detach()
+        return t.clone() if t.device.type == "cpu" else t.to("cpu")
+    if isinstance(obj, dict):
+        return {k: _to_cpu(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return type(obj)(_to_cpu(v) for v in obj)
+    return obj
+
+
+class AsyncSaver:
+    """torch.save in a background thread (F112): the training loop only waits for the copy to the CPU, not for the
+    write (last.pt of size x is ~0.8 GB: model + EMA + optimiser; tens of seconds on a Drive folder). One saver per
+    file; wait() before reading the file back."""
+
+    def __init__(self):
+        self.thread, self.error = None, None
+
+    def save(self, obj, tmp, dst):
+        self.wait()
+        snap = _to_cpu(obj)
+
+        def run():
+            try:
+                torch.save(snap, tmp)
+                os.replace(tmp, dst)
+            except Exception as e:  # noqa: BLE001 - re-raised by wait()
+                self.error = e
+        self.thread = threading.Thread(target=run, name=f"save-{Path(dst).name}")
+        self.thread.start()
+
+    def wait(self):
+        if self.thread is not None:
+            self.thread.join()
+            self.thread = None
+        if self.error is not None:
+            e, self.error = self.error, None
+            raise e
 
 
 def _has_keys(path, prefix):
@@ -541,12 +602,15 @@ def main(argv=None):
     # identical train losses, ~7 points lower EMA eval).
     if a.compile and device.type == "cuda" and not a.eval_only:
         try:
-            model.backbone.forward = torch.compile(model.backbone.forward)
-            if v2 or v6 or v9 or v18:
-                model.neck.forward = torch.compile(model.neck.forward, dynamic=False)
+            if v18:
+                log("torch.compile: " + compile_training(model), console=True)
             else:
-                model.encoder.forward = torch.compile(model.encoder.forward, dynamic=False)
-            log("torch.compile enabled for backbone + encoder (training model only)")
+                model.backbone.forward = torch.compile(model.backbone.forward)
+                if v2 or v6 or v9:
+                    model.neck.forward = torch.compile(model.neck.forward, dynamic=False)
+                else:
+                    model.encoder.forward = torch.compile(model.encoder.forward, dynamic=False)
+                log("torch.compile enabled for backbone + encoder (training model only)")
         except Exception as e:  # noqa: BLE001
             log(f"torch.compile unavailable, eager mode: {e}", console=True)
     if a.eval_only:
@@ -680,11 +744,13 @@ def main(argv=None):
         if start_epoch == 0:
             plot_labels(out, ds.items, classes, a.img)
 
+    best_saver, last_saver = AsyncSaver(), AsyncSaver()
+
     def save_best(score, epoch):
-        # compact deployable checkpoint: EMA weights + args + classes (no optimiser state)
-        torch.save({"model": ema.module.state_dict(), "epoch": epoch, "args": vars(a), "classes": list(classes),
-                    "val_mAP50_95": score, "version": __version__}, wdir / "best.tmp")
-        os.replace(wdir / "best.tmp", wdir / "best.pt")
+        # compact deployable checkpoint: EMA weights + args + classes (no optimiser state); written in the background
+        best_saver.save({"model": ema.module.state_dict(), "epoch": epoch, "args": dict(vars(a)),
+                         "classes": list(classes), "val_mAP50_95": score, "version": __version__},
+                        wdir / "best.tmp", wdir / "best.pt")
         log(f"best.pt <- epoch {epoch} (val mAP50:95 {score:.4f})")
 
     t_train = time.time()
@@ -836,6 +902,7 @@ def main(argv=None):
             if recoveries >= 3 or not last.exists():
                 raise SystemExit(f"training diverged ({bad} non-finite steps in epoch {epoch + 1}) and cannot recover"
                                  f"{' after 3 retries' if recoveries >= 3 else ''}: lower the learning rate (lr0)")
+            last_saver.wait()
             ck = torch.load(last, map_location="cpu", weights_only=False)
             model.load_state_dict(ck["model"])
             ema.load_state_dict(ck["ema"])
@@ -872,11 +939,10 @@ def main(argv=None):
             if full_val and res["mAP50_95"] > best_score:
                 best_score, best_epoch = res["mAP50_95"], epoch
                 save_best(best_score, epoch)
-        torch.save({"model": model.state_dict(), "ema": ema.state_dict(), "opt": opt.state_dict(), "epoch": epoch,
+        last_saver.save({"model": model.state_dict(), "ema": ema.state_dict(), "opt": opt.state_dict(), "epoch": epoch,
                     "iter": it, "args": vars(a), "classes": list(classes), "best_score": best_score,
                     "best_epoch": best_epoch, "recoveries": recoveries, "lr_scale": lr_scale,
-                    "version": __version__}, wdir / "last.tmp")
-        os.replace(wdir / "last.tmp", last)
+                    "version": __version__}, wdir / "last.tmp", last)
         jlog(rec)
         append_results(out, rec, res)
         plot_results(out)
@@ -897,9 +963,12 @@ def main(argv=None):
             break
         log(f"epoch {epoch} done in {dt / 60:.1f} min: " + json.dumps(rec))
 
+    best_saver.wait()                           # the files below are read back / rewritten
+    last_saver.wait()
     if a.skip_final_eval:
         if not (wdir / "best.pt").exists():
             save_best(-1.0, a.epochs - 1)
+            best_saver.wait()
         return
     weights = "ema_last"
     if full_val and best_score >= 0 and (wdir / "best.pt").exists() and not a.eval_only:

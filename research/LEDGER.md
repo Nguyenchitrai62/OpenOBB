@@ -1803,6 +1803,29 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Kỳ vọng ghi trước (G4, batch 32, 960, v24-x): bước thật `assign=batched` nhanh hơn `assign=legacy` ≥ 15%; dòng `loss` ≤ 15% bước.
     Bác bỏ "loss Python là nguyên nhân chính" nếu nhanh hơn < 5%; khi đó nhìn `forward` / `backward` (tính toán model) và `data_s_per_it`.
 
+- **F113. Tốc độ train sau F112 (log user 10-19): 14.5 → 9.5 phút / epoch (−34%; YOLO26x 8.5, còn 1.12×) → F112 đạt kỳ vọng
+  (≥ 15%). Phần còn lại không phải số phép tính mà là hiệu suất GPU của thân: sửa BatchNorm đóng băng và `compile=True` (0.25.4).
+  Chưa đo trên GPU.**
+  - Điều kiện user: data lớn, batch 32, imgsz 960, cùng GPU với YOLO; profile `train=True` chưa gửi.
+  - FLOPs một ảnh 960, chế độ train (`research/analysis/train_flops.py`, bộ đếm của torch): forward OpenOBB24-x **428 GFLOPs** so với
+    YOLO26x-obb **507** (mình ít hơn 16%). Chia forward: thân HGNetv2 239 (56%: stage 1 87, stage 2 86, stage 3 32, stage 0 30), neck 105
+    (25%), hai head 34 + 34 (16%), trường ranh giới 12 (3%), bộ tinh chỉnh 2. Backward đếm được 1588 so với 1260 nhưng không dùng: bộ đếm
+    tính grad trọng số của conv nhóm / depthwise mà không chia số nhóm (đếm thừa, thân HGNetv2 nhiều depthwise).
+  - Kết luận: chậm hơn YOLO dù ít FLOPs hơn → do loại phép tính (depthwise + BatchNorm đóng băng = giới hạn băng thông), khớp F94
+    (thân + neck 7.5 ms bằng cả YOLO26x 7.3 ms ở suy luận).
+  - Hai lỗi hiệu suất tìm thấy: (1) `FrozenBatchNorm2d` tính `x * scale + bias` = nhiều lượt elementwise, và bf16 × buffer fp32 ra **fp32**:
+    mọi lớp thân ghi / đọc gấp đôi bộ nhớ ở forward lẫn backward, conv sau phải ép lại bf16. Sửa: `F.batch_norm(training=False)` (một kernel
+    cuDNN, giữ bf16; `common.FROZEN_BN_KERNEL = False` để về cũ; test bằng nhau 1e-5, cả gradient). (2) `compile=True` chỉ compile
+    `backbone.forward`, mà v18–v24 gọi thẳng từng stage → **không compile gì** ở thân. Sửa: `train.compile_training` compile `encode`
+    (thân + neck), trường ranh giới, các head; graph lỗi thì tự về eager (`suppress_errors`). Vẫn là tuỳ chọn (`compile=True`).
+  - Ghi checkpoint ở luồng nền (`train.AsyncSaver`): `last.pt` cỡ x khoảng 0.8 GB mỗi epoch (model + EMA + optimizer), `best.pt` 0.2 GB;
+    vòng train chỉ chờ bước chép sang CPU. Nội dung file không đổi (test).
+  - Đo val trên CPU (giả lập 1000 box / ảnh, 200 nhãn): NMS đa giác lúc gộp 151 ms, thước DOTA 38 ms, thước YOLO 25 ms mỗi ảnh. Giữ nguyên
+    (đổi sẽ đổi thước); với val lớn đây là chi phí CPU mỗi lần val, xem dòng `[eval] ... merge+eval` trong log.
+  - Công cụ: `openobb profile ... train=True legacy=True` (mọi đường trước F112–F113) / `compile=True`.
+  - Kỳ vọng ghi trước (G4 hoặc A100, batch 32, 960): bước thật mặc định 0.25.4 nhanh hơn `legacy=True` ≥ 25% (F112 + BN); `compile=True`
+    nhanh thêm ≥ 10%; mAP không đổi (cùng phép tính, khác làm tròn). Bác bỏ phần BN nếu 0.25.4 so với 0.25.3 nhanh < 3%.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

@@ -1,6 +1,10 @@
 """FrozenBatchNorm2d copied from RT-DETR / DEIM (Apache-2.0), originally from DETR (Apache-2.0)."""
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+
+FROZEN_BN_KERNEL = True   # False: the pre-F112 elementwise expression (reference / A-B)
 
 
 class FrozenBatchNorm2d(nn.Module):
@@ -31,6 +35,11 @@ class FrozenBatchNorm2d(nn.Module):
             missing_keys, unexpected_keys, error_msgs)
 
     def forward(self, x):
+        if FROZEN_BN_KERNEL:
+            # one fused inference-BN kernel (cuDNN on a GPU), output in the input's dtype: the expression below makes
+            # 3+ elementwise passes and turns bf16 activations into fp32 (bf16 x fp32 buffer), which the next conv
+            # casts back; that doubled the trunk's memory traffic in training (F112). Same values to float rounding.
+            return F.batch_norm(x, self.running_mean, self.running_var, self.weight, self.bias, False, 0.0, self.eps)
         # move reshapes to the beginning
         # to make it fuser-friendly
         w = self.weight.reshape(1, -1, 1, 1)

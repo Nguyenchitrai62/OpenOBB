@@ -129,16 +129,20 @@ def _synthetic_targets(batch, objects, nc, img, device, seed=0):
 
 
 def profile_train(model_path, imgsz=960, batch=32, runs=10, warmup=3, objects=150, assign="batched", device=None,
-                  channels_last=True):
+                  channels_last=True, legacy=False, compile=False):
     """Time of one training step of a dense OpenOBB (v17-v24) on random images with drawing-like labels, split into
     forward parts, loss parts (assignment, refiner, boundary field), backward and optimizer + EMA. Wall clock with
     a device sync around every part (a Python-bound part shows its real cost; GPU work cannot overlap across parts,
-    so the parts add up to slightly more than an unsynchronised step). assign=legacy: the pre-F112 per-image loops.
+    so the parts add up to slightly more than an unsynchronised step). legacy=True: every pre-F112 path (per-image
+    assignment loops, full-grid field targets, elementwise frozen BatchNorm); assign=legacy: the loss paths only.
+    compile=True: torch.compile as in training (compile=True); the forward is then timed as one part.
 
-    usage:  openobb profile model=best.pt train=True [imgsz=960] [batch=32] [objects=150] [runs=10] [assign=legacy]"""
+    usage:  openobb profile model=best.pt train=True [imgsz=960] [batch=32] [objects=150] [runs=10] [legacy=True]
+            [compile=True]"""
     import collections
 
     from openobb.engine import ModelEMA
+    from openobb.models import common as CM
     from openobb.models import openobb10_loss as L10
     from openobb.models import openobb17_loss as L17
     from openobb.models.openobb18 import OpenOBB17, OpenOBB18, OpenOBB19, OpenOBB20, OpenOBB21, OpenOBB22, OpenOBB23
@@ -202,9 +206,13 @@ def profile_train(model_path, imgsz=960, batch=32, runs=10, warmup=3, objects=15
         if obj is not None and hasattr(obj, attr):
             patches.append((obj, attr, getattr(obj, attr)))
             setattr(obj, attr, timed(name, getattr(obj, attr)))
-    patch(model, "encode", "fwd  trunk + neck")
-    patch(model, "run_head", "fwd  heads (o2m + o2o)")
-    patch(getattr(model, "field", None), "forward", "fwd  boundary field")
+    if compile:
+        from openobb.train import compile_training
+        print("torch.compile: " + compile_training(model), flush=True)
+    else:
+        patch(model, "encode", "fwd  trunk + neck")
+        patch(model, "run_head", "fwd  heads (o2m + o2o)")
+        patch(getattr(model, "field", None), "forward", "fwd  boundary field")
     patch(model, "edge_snap" if hasattr(model, "edge_snap") else "refine_stages", "fwd  edge refiner + snapping")
     patch(model, "quality_logits", "fwd  quality head")
     patch(crit, "dense_losses", "loss dense o2m (incl. assignment)")
@@ -215,8 +223,9 @@ def profile_train(model_path, imgsz=960, batch=32, runs=10, warmup=3, objects=15
     patch(crit, "fit_loss", "loss quality")
     patch(L17, "field_targets", "loss field targets")
     patch(L17, "field_loss", "loss field")
-    old_assign, old_win = L10.ASSIGN, L17.WINDOWED
-    L10.ASSIGN, L17.WINDOWED = ("legacy", False) if assign == "legacy" else ("batched", True)
+    old_assign, old_win, old_bn = L10.ASSIGN, L17.WINDOWED, CM.FROZEN_BN_KERNEL
+    L10.ASSIGN, L17.WINDOWED = ("legacy", False) if (assign == "legacy" or legacy) else ("batched", True)
+    CM.FROZEN_BN_KERNEL = not legacy
     amp_dtype = torch.bfloat16 if (not cuda or torch.cuda.is_bf16_supported()) else torch.float16
     steps = collections.defaultdict(float)
 
@@ -261,10 +270,11 @@ def profile_train(model_path, imgsz=960, batch=32, runs=10, warmup=3, objects=15
     finally:
         for obj, attr, fn in reversed(patches):
             setattr(obj, attr, fn)
-        L10.ASSIGN, L17.WINDOWED = old_assign, old_win
+        L10.ASSIGN, L17.WINDOWED, CM.FROZEN_BN_KERNEL = old_assign, old_win, old_bn
     gpu = torch.cuda.get_device_name(dev) if cuda else "CPU"
     print(f"{model_path} ({arch}, {len(names)} classes, groups {a.get('groups')}): train step, batch {batch} x 3 x "
-          f"{imgsz} x {imgsz}, {objects} labels / image, {amp_dtype}, assign={assign}, {gpu}, {runs} steps after "
+          f"{imgsz} x {imgsz}, {objects} labels / image, {amp_dtype}, {'legacy (pre-F112)' if legacy else f'assign={assign}'}"
+          f"{', compiled' if compile else ''}, {gpu}, {runs} steps after "
           f"{warmup} warm-up; ms per step")
     for k, v in steps.items():
         print(f"  {k:38s} {1000 * v / runs:8.1f}")

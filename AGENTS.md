@@ -436,6 +436,11 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 
 ## 9. Nhật ký
 
+- 2026-10-19 (6): **F113 (0.25.4):** user đo 14.5 → 9.5 phút / epoch sau F112 (YOLO26x 8.5). FLOPs forward thấp hơn YOLO
+  (428 so với 507, `research/analysis/train_flops.py`); phần chậm còn lại là hiệu suất thân: `FrozenBatchNorm2d` dùng kernel
+  `F.batch_norm` (giữ bf16), `compile=True` giờ compile thân + neck + field + head (`train.compile_training`), checkpoint ghi nền
+  (`AsyncSaver`). Profile: `openobb profile model=... train=True [legacy=True] [compile=True]`.
+
 - 2026-10-19 (5): **Tốc độ train (F112, 0.25.3):** gán nhãn dày dạng batch (`assign_batched`), đích trường vẽ theo cửa sổ, loss bộ
   tinh chỉnh không lặp ảnh; kết quả giữ nguyên (test). `openobb profile model=... train=True` đo từng phần một bước train trên GPU.
   Chờ user: log profile `assign=batched` / `assign=legacy` + thời gian epoch mới.
