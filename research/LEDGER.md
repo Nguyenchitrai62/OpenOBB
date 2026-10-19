@@ -1780,6 +1780,9 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     `QD_SHORT=drop` → `quality_deployed_drop_v24f110.log` (342 s); probe: `quality_v24f110.log`. Test: `pytest_f111.log` (318 pass, 10 skip).
   - 0.25.2 thêm bước hiệu chỉnh cuối: ứng viên ngoài top `ref_k` `min` / `drop` (`predict.outside_options`), lưu `q_outside` vào `best.pt`
     (train, `openobb calibrate`, `strip` giữ lại; checkpoint cũ nạp với `min`). Chờ user hiệu chỉnh lại F110 trên GPU để có số cùng thước.
+  - Kỳ vọng ghi trước cho vòng giao user (0.25.2): (A) `openobb calibrate` lại best.pt F110: fitness ≥ 0.5578 (không thể kém vì q^0 / min
+    vẫn trong danh sách), tăng +0.001–0.003; bác bỏ "q có ích trên GPU" nếu chọn lại q^0. (B) train lại như F110 nhưng bỏ `rotate_p=0.5`:
+    box dài lệch trục ≤ 6.0% (mức F107, F110 8.5%), mAP50-95 ≥ 0.531; bác bỏ "rotate_p làm box nghiêng" nếu lệch trục vẫn ≥ 8%.
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
