@@ -1733,6 +1733,28 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Sửa kèm: `openobb strip` bỏ mất `groups` / `ref_k` / `neck` (checkpoint v19+ đã strip không dựng lại được head nhóm) → thêm vào
     `DEPLOY_KEYS`.
 
+- **F110. OpenOBB24-x (log user 10-19): 0.802 / 0.531, trùng 1.9% — đầu độ khít học được BỊ BÁC BỎ (mọi cách dùng q đều kém base);
+  bỏ bám mép cho nhóm note + junction được giữ (junction .559, +.017 so với F107).**
+  - Điều kiện: 0.25.1, `weights=openobb23x_new.pt` (best F107; `[init] 1443 full, 12 partial, 8 new` = `quality.*`), 50 epoch, batch 16,
+    `lr=0.001` cosine → 1e-5, nbs 64 (187 bước), warmup 45 it, `rotate_p=0.5`, G4. Best epoch 23 (0.800 / 0.533 lúc val epoch, q^0).
+  - Đường val (q^0, như v23): 0.47–0.51 tới ep21, đỉnh ep23 0.800 / 0.533, rồi 0.517–0.527 tới ep50 → train thêm từ F107 vẫn bão hoà.
+  - Hiệu chỉnh NMS: o2m 0.5 (fitness 0.5564, trùng 1.8%) như F107 (0.5531). **Hiệu chỉnh độ khít** (fitness, base q^0 = 0.5564): q^1 0.5494,
+    q^2 0.5526, q^4 0.5498, q^1 + điểm^0.5 q^0.5 0.5499, q^2 + điểm^0.5 q^0.5 0.5507 → chọn q^0; bỏ bám mép nhóm 0 (note, junction) 0.5578
+    (+0.0014, chọn), nhóm 1 (wall, wall_300) 0.5570, nhóm 2 (các loại cửa) 0.5546.
+  - Theo class (mAP50-95; F107 / v24): wall .599 / .591, junction .542 / **.559**, wall_300 .362 / .346, note .532 / .506, door .819 / .815,
+    slide_door .265 / .293, double_door .564 / .605. Lỗi: junction → nền 7%, wall → nền 7%, wall_300 → nền 9%, wall_300 → junction 9%.
+  - Hướng box: mọi box lệch > 1° 13.5% (F107 15.1%), vật dài lệch > 1° 4.0% (3.8%), box dài lệch trục 8.5% (6.0%).
+    Tốc độ 9.2 ms (inference gồm hậu xử lý) so với 7.9 + 1.3.
+  - Đối chiếu OPENOBB24 mục 4: mAP50-95 ≥ 0.536 **không đạt** (0.531, vừa chạm ngưỡng bác bỏ < 0.531); mAP50 ≥ 0.793 đạt (0.802);
+    wall / junction / wall_300 mỗi class ≥ mốc + 0.008 không đạt (−.008 / +.017 / −.016); hiệu chỉnh chọn β > 0 **bác bỏ** (chọn q^0);
+    trùng ≤ 2.3% đạt; tốc độ ≤ 9.5 ms đạt.
+  - Đọc: (1) đầu độ khít học được còn kém cả điểm class trong việc chọn box giữ lại (−0.004 đến −0.007 fitness), trong khi tín hiệu trường
+    thô chưa học đã cho +0.015 trên F107 (F109). Ứng viên nguyên nhân, chưa tách: mục tiêu BCE (0 khi ProbIoU < 0.5) dạy phân biệt đúng / sai
+    hơn là xếp hạng các ứng viên IoU 0.6–0.9 trong cùng cụm; 187 bước tối ưu cho một MLP mới; ứng viên lúc train là ảnh mosaic / xoay.
+    (2) Phần tăng tổng (+0.004 / +0.005 so với F107) nằm trong dao động; junction +.017 khớp số đo F109 (bám mép làm hại junction −0.015),
+    note −.026 nằm trong nhiễu của class này (±0.058, F64). (3) Bước tiếp rẻ nhất: chạy `quality_probe.py` trên `best.pt` này (CPU) để đo
+    tương quan của q học được so với tín hiệu trường; nếu tín hiệu trường vẫn +0.015, đưa nó thành lựa chọn không cần train trong hiệu chỉnh.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

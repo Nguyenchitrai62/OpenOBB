@@ -81,7 +81,21 @@ Gửi lại: bảng theo class, dòng `NMS calibrated`, dòng **`Localisation qu
 
 ## 6. Kết quả thật
 
-(chưa train)
+**Lần 1 (F110, log user 10-19):** 0.25.1, từ `openobb23x_new.pt` (F107), 50 epoch, `lr=0.001` cosine, nbs 64 (187 bước), `rotate_p=0.5`.
+**0.802 / 0.531**, trùng 1.9%, 9.2 ms. Hiệu chỉnh: mọi cách dùng q kém base (q^0 0.5564; q^2 0.5526, q^1 0.5494) → chọn q^0;
+bỏ bám mép nhóm note + junction (0.5578) được chọn.
+
+| | Kỳ vọng | Kết quả |
+|---|---|---|
+| mAP50-95 | ≥ 0.536 (bác bỏ < 0.531) | 0.531, **không đạt** (chạm ngưỡng bác bỏ) |
+| mAP50 | ≥ 0.793 | 0.802, đạt |
+| wall / junction / wall_300 | mỗi class ≥ mốc + 0.008 | .591 / .559 / .346 (−.008 / +.017 / −.016), không đạt |
+| Hiệu chỉnh chọn β > 0 | có | chọn q^0, **bác bỏ: đầu độ khít học được không giúp** |
+| Box trùng | ≤ 2.3% | 1.9%, đạt |
+| Tốc độ | ≤ 9.5 ms | 9.2 ms, đạt |
+
+Kết luận: cơ chế "đầu độ khít học được" bị bác bỏ ở lần train này; phần giữ lại là bỏ bám mép cho junction (+.017 junction, đúng như
+đo trước ở F109). Tín hiệu trường ranh giới thô (không học) đã cho +0.015 trên F107 vẫn chưa được thử như một lựa chọn: xem F110.
 
 ## 7. Phụ lục: kiến trúc theo lớp (cỡ x)
 

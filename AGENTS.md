@@ -335,6 +335,8 @@ Câu hỏi còn mở:
   không biết độ khít, trong cụm NMS có box khít hơn (+0.052), tín hiệu trường ranh giới thô chọn box trong cụm đã +0.015 không cần train.
   v24 = v23 + `LocQuality` (dự đoán ProbIoU của box cuối) + NMS theo điểm × q^β + bỏ bám mép theo nhóm, chọn trên val.
   [docs/OPENOBB24.md](docs/OPENOBB24.md). Mốc so là F107 (user 10-19: không chạy đối chứng v23 riêng); user đang train `openobb24x` 50 ep, lr 0.001, từ `openobb23x_new.pt`.
+  **Kết quả (F110): 0.802 / 0.531, đầu độ khít học được bị bác bỏ** (mọi q^β kém base 0.5564, hiệu chỉnh chọn q^0); bỏ bám mép nhóm
+  note + junction được giữ (junction .559, +.017). Bước tiếp: `quality_probe.py` trên best.pt v24, thử tín hiệu trường thô làm lựa chọn.
 - [ ] **Bước tiếp (đã soạn, chưa chạy):**
   - `e10-dota-mosaic-s`, `e10-fpc-vec-mosaic-s`: H8 mosaic, gỡ yếu tố gây nhiễu là YOLO có mosaic còn VRDet thì không.
   - Sau đó: train với 600 query; eval X với 600 query; sửa head dense.
@@ -431,6 +433,9 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 - `push_all.py` chỉ đồng bộ file đã commit; nó in danh sách file chưa commit, đọc để không bỏ sót.
 
 ## 9. Nhật ký
+
+- 2026-10-19: **Log OpenOBB24-x (F110): 0.802 / 0.531.** Đầu độ khít học được không giúp (hiệu chỉnh chọn q^0); bỏ bám mép cho
+  note + junction giữ lại. Kết quả ghi ở `docs/OPENOBB24.md` mục 6.
 
 - 2026-10-16 (7): **OpenOBB24 + chẩn đoán F109** (theo user: tìm phần còn nhiều không gian tối ưu nhất).
   Script đo mới: `rank_vote_oracle.py`, `score_iou_corr.py`, `consensus_probe.py`, `band_width_probe.py`, `quality_probe.py`;
