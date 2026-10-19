@@ -1835,7 +1835,9 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     `compile=False` để tắt; họ cũ giữ tuỳ chọn. Test `test_compile_is_default_for_v18_family`.
 
 - **F115. Val mỗi epoch 44 s so với YOLO26x 11 s (log user 10-19: data lớn 16157 / 851 ảnh, 129431 nhãn val, 152 nhãn / ảnh, G4,
-  0.25.4 + compile; epoch train 7:29 lần đầu (cả biên dịch) rồi 5:38; YOLO26x 9:04–9:46). Val giờ chỉ thước YOLO, model gộp BN (0.25.6).
+  0.25.4 + compile, model **OpenOBB23-x** fine-tune từ best.pt (không phải v24); epoch train 7:29 lần đầu (cả biên dịch)
+  rồi 5:38; YOLO26x 9:04–9:46). Số FLOPs của F113 đo trên v24-x = v23-x + đầu độ khít 0.07M tham số / 0.1 GFLOPs: dùng
+  được cho v23. Val giờ chỉ thước YOLO, model gộp BN (0.25.6).
   Chưa đo trên GPU.**
   - Quyết định user: val chỉ cần thước YOLO; warmup giữ 3 epoch như YOLO (`warmup_epochs: 3.0` trong `default.yaml` của Ultralytics
     8.4; 1512 it = 3 × 504 đúng như YOLO; `warmup_epochs=1` vẫn đặt được).
