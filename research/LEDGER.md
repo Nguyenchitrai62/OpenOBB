@@ -1826,6 +1826,14 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Kỳ vọng ghi trước (G4 hoặc A100, batch 32, 960): bước thật mặc định 0.25.4 nhanh hơn `legacy=True` ≥ 25% (F112 + BN); `compile=True`
     nhanh thêm ≥ 10%; mAP không đổi (cùng phép tính, khác làm tròn). Bác bỏ phần BN nếu 0.25.4 so với 0.25.3 nhanh < 3%.
 
+- **F114. `compile=True` trên 0.25.4 (log user 10-19, dataset nhỏ hơn data lớn của F113, cùng GPU / lệnh): chưa tối ưu 18.6 s /
+  epoch → đã tối ưu, không compile 12.6 s (−32%) → + `compile=True` **9.5 s** (−25% so với không compile; −49% tổng, 1.96× nhanh hơn).
+  Epoch đầu lâu hơn (biên dịch).** Quy ra data lớn theo tỉ lệ (chưa đo): 14.5 × 0.51 ≈ 7.4 phút / epoch so với YOLO26x 8.5.
+  - Đối chiếu F113: `compile=True` nhanh thêm ≥ 10% **đạt** (25%). Bước tối ưu "không compile" ứng với 9.5 phút / epoch ở data lớn
+    (14.5 → 9.5, −34%; ở data nhỏ −32%), khớp nhau. mAP với compile: user chưa báo; cần so `best.pt` cùng lệnh.
+  - Quyết định (đã hứa ở F113 nếu đạt): **`compile=True` mặc định cho v18–v24** (`RECIPE18["compile"]`, kế thừa sang v19–v24);
+    `compile=False` để tắt; họ cũ giữ tuỳ chọn. Test `test_compile_is_default_for_v18_family`.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

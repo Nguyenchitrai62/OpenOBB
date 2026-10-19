@@ -436,6 +436,9 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 
 ## 9. Nhật ký
 
+- 2026-10-19 (7): **F114 (0.25.5):** user đo `compile=True` trên 0.25.4: 18.6 → 12.6 → 9.5 s / epoch (dataset nhỏ; tổng −49%).
+  `compile=True` thành mặc định cho v18–v24 (`compile=False` để tắt). Chờ: mAP có compile so với không.
+
 - 2026-10-19 (6): **F113 (0.25.4):** user đo 14.5 → 9.5 phút / epoch sau F112 (YOLO26x 8.5). FLOPs forward thấp hơn YOLO
   (428 so với 507, `research/analysis/train_flops.py`); phần chậm còn lại là hiệu suất thân: `FrozenBatchNorm2d` dùng kernel
   `F.batch_norm` (giữ bf16), `compile=True` giờ compile thân + neck + field + head (`train.compile_training`), checkpoint ghi nền

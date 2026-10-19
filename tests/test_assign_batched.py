@@ -162,3 +162,15 @@ def test_compile_training_wraps_what_v24_runs():
     assert "trunk + neck" in msg and "heads" in msg and "boundary field" in msg
     assert "encode" in vars(m) and "run_head" in vars(m)  # instance attributes: the class (and EMA copies) untouched
     assert "encode" not in vars(OpenOBB24)
+
+
+def test_compile_is_default_for_v18_family(tmp_path, monkeypatch):
+    import sys
+    sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
+    from test_cli_v78 import _calls
+    a = _calls(tmp_path / "a", monkeypatch, "openobb24x")
+    assert "--compile " in a                                   # F114: on by default for v18-v24
+    b = _calls(tmp_path / "b", monkeypatch, "openobb24x", compile=False)
+    assert "--compile " not in b
+    c = _calls(tmp_path / "c", monkeypatch, "openobb12x")
+    assert "--compile " not in c                               # older families keep the opt-in

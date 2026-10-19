@@ -129,6 +129,9 @@ RECIPE15 = dict(RECIPE14)                        # OpenOBB15: v14 + full-resolut
 RECIPE16 = dict(RECIPE15)                        # OpenOBB16: v15 + 3-stage cascade of refiners + fit-aware scores
 RECIPE17 = dict(RECIPE12)                        # OpenOBB17: v12 + boundary field + boundary snapping
 RECIPE18 = dict(RECIPE12)                        # OpenOBB18: v17 + own neck distilled from a trained encoder (teacher=)
+# v18-v24 compile the trunk + neck, field and heads by default (F114: 12.6 -> 9.5 s / epoch on G4, same run otherwise;
+# the first epoch is longer while it compiles); compile=False turns it off
+RECIPE18["compile"] = True
 RECIPE19 = dict(RECIPE18, groups="auto")         # OpenOBB19: v18 + one box per contention-aware class group
 RECIPE20 = dict(RECIPE19)                        # OpenOBB20: v19 + edge refiner reading the trunk's stride-4 map
 RECIPE23 = dict(RECIPE20)                        # OpenOBB23: v21 + rotational snapping + local-peak filter
