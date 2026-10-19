@@ -1784,6 +1784,25 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     vẫn trong danh sách), tăng +0.001–0.003; bác bỏ "q có ích trên GPU" nếu chọn lại q^0. (B) train lại như F110 nhưng bỏ `rotate_p=0.5`:
     box dài lệch trục ≤ 6.0% (mức F107, F110 8.5%), mAP50-95 ≥ 0.531; bác bỏ "rotate_p làm box nghiêng" nếu lệch trục vẫn ≥ 8%.
 
+- **F112. Tốc độ train: OpenOBB ~1.7× chậm hơn YOLO26x (user 10-19: data rất lớn, batch 32, imgsz 960, 14.5 so với 8.5 phút / epoch).
+  Phần loss có vòng Python theo ảnh × nhóm class × 64 nhãn và tính đích trường ranh giới trên toàn lưới cho mỗi box → viết lại dạng batch,
+  kết quả giữ nguyên (0.25.3). Chưa đo trên GPU.**
+  - Đọc code (v23 / v24, `OpenOBB18Loss`): (1) gán nhãn dày `assign_slots` chạy cho từng ảnh × nhóm class × khối 64 nhãn, mỗi lần khoảng 50
+    kernel nhỏ + 6 lần đồng bộ GPU (`nonzero`, `int(k.max())`, `len`), và chạy hai lần (head o2m + o2o): batch 32, 3 nhóm, khoảng 200 nhãn
+    → khoảng 14k kernel và 1.7k lần đồng bộ mỗi bước; (2) `field_targets` vẽ mỗi box trên toàn lưới stride 2 (480 × 480 ở 960) theo khối
+    32 box, từng ảnh; (3) `refine_loss` (2 tầng) và `fit_loss` lặp từng ảnh với `pos.any()` / `nonzero`.
+  - Sửa (mặc định; `openobb10_loss.ASSIGN = "legacy"` / `openobb17_loss.WINDOWED = False` để về đường cũ): `assign_batched` (mọi bài toán
+    ảnh × nhóm trong khối dày bài toán × nhãn × anchor, xếp theo số nhãn, 2 lần đồng bộ), `pad_targets`; `field_targets` vẽ trên cửa sổ
+    quanh box (cỡ luỹ thừa 2, lề 6σ: phần bỏ < exp(−17)); `refine_loss` / `fit_loss` trên cả batch. Test `tests/test_assign_batched.py`:
+    gán nhãn bằng hệt `assign_slots` (fg, đích điểm, object), mọi loss v24 bằng nhau (rtol 1e-5), trường bằng nhau (< 1e-6).
+  - CPU (2 luồng, B = 4, 960, 200 nhãn / ảnh, 3 nhóm): loss dày o2m + o2o 2.20 → 1.70 s; đích trường 14.05 → 0.29 s. Trên GPU phần lợi lớn
+    hơn (đồng bộ / launch là thứ CPU không thấy) nhưng chưa đo. Nạp data (Wall_Color, 1 luồng): 95–125 ms / mẫu mosaic, 55% là decode PNG
+    (YOLO decode như vậy) → chưa phải nghi phạm chính, đọc `data_s_per_it` trong `results.csv` để xác nhận.
+  - Công cụ đo: `openobb profile model=<best.pt> train=True imgsz=960 batch=32 objects=150 [assign=legacy]` (forward / loss / backward /
+    optimizer + EMA, chia theo phần, có đồng bộ quanh mỗi phần, cộng một dòng bước thật không đồng bộ).
+  - Kỳ vọng ghi trước (G4, batch 32, 960, v24-x): bước thật `assign=batched` nhanh hơn `assign=legacy` ≥ 15%; dòng `loss` ≤ 15% bước.
+    Bác bỏ "loss Python là nguyên nhân chính" nếu nhanh hơn < 5%; khi đó nhìn `forward` / `backward` (tính toán model) và `data_s_per_it`.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |

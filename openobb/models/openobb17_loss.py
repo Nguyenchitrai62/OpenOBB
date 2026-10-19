@@ -15,9 +15,83 @@ from .openobb17 import FIELD_SIGMA, FIELD_STRIDE, SQUARE
 CHUNK = 32               # boxes rasterised at once (memory: CHUNK x field pixels floats)
 
 
+WINDOWED = True          # False: every box over the whole field grid (pre-F112; same targets to < 1e-7)
+MARGIN = 6.0             # sigmas around a box's bounding rectangle: beyond it the ridge is < exp(-17)
+WINDOW_ELEMS = 1 << 24   # field cells of one block of windows
+
+
+def _ridges(gx, gy, g, sigma):
+    """Cell centres gx, gy (n, ...) px, boxes g (n, 5) px -> (end, side) ridge values (n, ...) of each box, and the
+    near-square mask (n,): OpenOBB17's target drawing."""
+    swap = g[:, 2] < g[:, 3]                                                          # canonical: L along the axis
+    L = torch.where(swap, g[:, 3], g[:, 2])
+    T = torch.where(swap, g[:, 2], g[:, 3])
+    th = g[:, 4] + swap.float() * (torch.pi / 2)
+    shape = (-1,) + (1,) * (gx.dim() - 1)
+    dx, dy = gx - g[:, 0].view(shape), gy - g[:, 1].view(shape)
+    ca, sa = th.cos().view(shape), th.sin().view(shape)
+    u = dx * ca + dy * sa
+    v = dx * -sa + dy * ca
+    hl, ht = (L / 2).view(shape), (T / 2).view(shape)
+    end = torch.exp(-((u.abs() - hl) ** 2) / (2 * sigma ** 2)) * (v.abs() <= ht + sigma)
+    side = torch.exp(-((v.abs() - ht) ** 2) / (2 * sigma ** 2)) * (u.abs() <= hl + sigma)
+    return end, side, (L < SQUARE * T)
+
+
 @torch.no_grad()
 def field_targets(targets, shape, img_size, device, sigma=FIELD_SIGMA, stride=FIELD_STRIDE):
-    """targets (list of {"boxes": (n, 5) normalised (cx, cy, w, h, theta)}), field (h, w) -> (B, 2, h, w) in [0, 1]."""
+    """targets (list of {"boxes": (n, 5) normalised (cx, cy, w, h, theta)}), field (h, w) -> (B, 2, h, w) in [0, 1].
+    Each box is drawn on a window of cells around it (power-of-two sizes, one block per size) instead of the whole
+    grid: the ridge is below exp(-17) outside the window, so the target is the full-grid one (F112)."""
+    if not WINDOWED:
+        return _field_targets_full(targets, shape, img_size, device, sigma, stride)
+    h, w = shape
+    B = len(targets)
+    out = torch.zeros(B * 2 * h * w, device=device)
+    n = [len(t["boxes"]) for t in targets]
+    if sum(n) == 0:
+        return out.view(B, 2, h, w)
+    g = torch.cat([t["boxes"].float().to(device) for t in targets]).clone()
+    g[:, :4] *= img_size
+    bi = torch.repeat_interleave(torch.arange(B, device=device), torch.tensor(n, device=device))
+    c, s_ = g[:, 4].cos().abs(), g[:, 4].sin().abs()
+    ex = c * g[:, 2] / 2 + s_ * g[:, 3] / 2 + MARGIN * sigma                         # half extents (px) + margin
+    ey = s_ * g[:, 2] / 2 + c * g[:, 3] / 2 + MARGIN * sigma
+    x0 = torch.floor((g[:, 0] - ex) / stride - 0.5).long()
+    y0 = torch.floor((g[:, 1] - ey) / stride - 0.5).long()
+    x1 = torch.ceil((g[:, 0] + ex) / stride - 0.5).long()
+    y1 = torch.ceil((g[:, 1] + ey) / stride - 0.5).long()
+    span = torch.maximum(x1 - x0, y1 - y0) + 1
+    size = torch.clamp(2 ** torch.ceil(torch.log2(span.float().clamp(min=8))), max=float(max(h, w))).long()
+    sizes = size.tolist()                                                            # the one sync
+    for S in sorted(set(sizes)):
+        idx = torch.tensor([i for i, v in enumerate(sizes) if v == S], device=device)
+        Sy, Sx = min(S, h), min(S, w)
+        oy, ox = torch.arange(Sy, device=device), torch.arange(Sx, device=device)
+        step = max(1, WINDOW_ELEMS // (Sy * Sx))
+        for j in range(0, len(idx), step):
+            k = idx[j:j + step]
+            # window origin inside the grid; the box's cells [x0, x1] always fit (span <= S)
+            ax0 = torch.minimum(x0[k].clamp(min=0), torch.full_like(x0[k], w - Sx))
+            ay0 = torch.minimum(y0[k].clamp(min=0), torch.full_like(y0[k], h - Sy))
+            iy = ay0[:, None, None] + oy[None, :, None]                               # (n, Sy, 1)
+            ix = ax0[:, None, None] + ox[None, None, :]                               # (n, 1, Sx)
+            gy = (iy.float() + 0.5) * stride
+            gx = (ix.float() + 0.5) * stride
+            end, side, sq = _ridges(gx.expand(-1, Sy, Sx), gy.expand(-1, Sy, Sx), g[k], sigma)
+            both = torch.maximum(end, side)
+            sq = sq[:, None, None]
+            c0, c1 = torch.where(sq, both, end), torch.where(sq, both, side)
+            cell = (iy * w + ix).expand(-1, Sy, Sx)
+            base = (bi[k] * 2 * h * w)[:, None, None]
+            flat = torch.cat([(base + cell).reshape(-1), (base + h * w + cell).reshape(-1)])
+            out.scatter_reduce_(0, flat, torch.cat([c0.reshape(-1), c1.reshape(-1)]), "amax", include_self=True)
+    return out.view(B, 2, h, w)
+
+
+@torch.no_grad()
+def _field_targets_full(targets, shape, img_size, device, sigma=FIELD_SIGMA, stride=FIELD_STRIDE):
+    """Pre-F112 drawing: every box over the whole grid (reference of the windowed one)."""
     h, w = shape
     ys = (torch.arange(h, device=device, dtype=torch.float32) + 0.5) * stride
     xs = (torch.arange(w, device=device, dtype=torch.float32) + 0.5) * stride

@@ -436,6 +436,10 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 
 ## 9. Nhật ký
 
+- 2026-10-19 (5): **Tốc độ train (F112, 0.25.3):** gán nhãn dày dạng batch (`assign_batched`), đích trường vẽ theo cửa sổ, loss bộ
+  tinh chỉnh không lặp ảnh; kết quả giữ nguyên (test). `openobb profile model=... train=True` đo từng phần một bước train trên GPU.
+  Chờ user: log profile `assign=batched` / `assign=legacy` + thời gian epoch mới.
+
 - 2026-10-19 (4): Hiệu chỉnh v24 thử thêm `q_outside` `min` / `drop` và lưu vào `best.pt` (0.25.2). Lệnh giao user: hiệu chỉnh lại
   best.pt F110 + train lại v24 không `rotate_p` (hướng box F110 xấu hơn F107: box dài lệch trục 8.5% so với 6.0%).
 

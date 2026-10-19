@@ -896,6 +896,18 @@ def main(argv=None):
             raise SystemExit("usage: openobb strip model=<best.pt> [out=<deploy.pt>] [half=True]")
         strip(**kv)
         return 0
+    if mode == "profile" and str(kv.get("train", "False")).lower() in ("1", "true", "yes"):
+        from openobb.profile import profile_train
+        ok = ("model", "train", "imgsz", "batch", "runs", "warmup", "objects", "assign", "device", "channels_last")
+        if "model" not in kv or any(k not in ok for k in kv):
+            raise SystemExit("usage: openobb profile model=<best.pt> train=True [imgsz=960] [batch=32] [objects=150] "
+                             "[runs=10] [assign=legacy]  (GPU; v17-v24)")
+        kv.pop("train")
+        ints = {k: int(kv.pop(k)) for k in ("imgsz", "batch", "runs", "warmup", "objects") if k in kv}
+        if "channels_last" in kv:
+            kv["channels_last"] = str(kv["channels_last"]).lower() in ("1", "true", "yes")
+        profile_train(kv.pop("model"), **ints, **kv)
+        return 0
     if mode == "profile":
         from openobb.profile import profile_parts
         flags = ("detail", "channels_last", "compile")

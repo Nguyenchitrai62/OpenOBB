@@ -129,6 +129,104 @@ def assign_slots(scores, boxes, pts, strides, gl, gb, k_per_gt, slots=1, alpha=1
     return fg, gi, tsc
 
 
+ASSIGN = "batched"       # "legacy": assign_slots once per image x class group (A/B of the speed fix, F112)
+BUDGET = 1 << 25         # elements of one (problems x objects x anchors) block of the batched assignment
+
+
+def pad_targets(targets, cg, G, img_size, device):
+    """Ground truth of every (image, class group) problem padded to the batch's largest count (ONE device sync) ->
+    gb (B G, M, 5) px, gl (B G, M), valid (B G, M). Order inside a problem: the image's label order (stable)."""
+    B = len(targets)
+    n = [len(t["labels"]) for t in targets]                                   # host-side lengths: no sync
+    P = B * G
+    if sum(n) == 0:
+        z = torch.zeros((P, 0), device=device)
+        return z.new_zeros((P, 0, 5)), z.long(), z.bool()
+    gb = torch.cat([t["boxes"].float().to(device) for t in targets]).clone()
+    gb[:, :4] *= img_size
+    gl = torch.cat([t["labels"].to(device) for t in targets]).long()
+    bi = torch.repeat_interleave(torch.arange(B, device=device), torch.tensor(n, device=device))
+    key = bi * G + (cg[gl] if G > 1 else torch.zeros_like(gl))
+    order = torch.argsort(key, stable=True)
+    key, gb, gl = key[order], gb[order], gl[order]
+    cnt = torch.bincount(key, minlength=P)
+    start = torch.cumsum(cnt, 0) - cnt
+    rank = torch.arange(len(key), device=device) - start[key]
+    M = int(cnt.max())                                                        # the one sync
+    pgb = gb.new_zeros((P, M, 5))
+    pgl = gl.new_zeros((P, M))
+    valid = torch.zeros((P, M), dtype=torch.bool, device=device)
+    pgb[key, rank], pgl[key, rank], valid[key, rank] = gb, gl, True
+    return pgb, pgl, valid
+
+
+@torch.no_grad()
+def assign_batched(scores, boxes, pts, strides, gl, gb, valid, k_per_gt, k_max, alpha=1.0, beta=6.0, min_side=8.0,
+                   across=0.0, budget=None):
+    """assign_slots (slots = 1, no reach) for P independent problems at once: scores (P, A, C) sigmoid, boxes
+    (P, A, 5) px, pts (A, 2), strides (A,), gl / k_per_gt (P, M), gb (P, M, 5) px, valid (P, M) (padding False),
+    k_max >= every k. -> fg (P, A) bool, gi (P, A) long (object index in M), target scores (P, A, C).
+    Same assignment as assign_slots, problem by problem (tests/test_assign_batched.py): dense (problems x objects x
+    anchors) blocks instead of a Python loop over images x groups x 64 objects with ~6 device syncs each."""
+    P, A, C = scores.shape
+    M = gb.shape[1]
+    dev = scores.device
+    tsc = torch.zeros_like(scores)
+    fg = torch.zeros((P, A), dtype=torch.bool, device=dev)
+    gi = torch.zeros((P, A), dtype=torch.long, device=dev)
+    if M == 0:
+        return fg, gi, tsc
+    cnt = valid.sum(1)
+    host = torch.stack([cnt, k_per_gt.masked_fill(~valid, 0).amax(1)], 1).tolist()     # the one sync
+    K = min(max(max(k for _, k in host), 1), int(k_max), A)
+    # problems by decreasing object count; each block is cut to its largest count (no padding to the batch's max)
+    order = [p for p in sorted(range(P), key=lambda p: -host[p][0]) if host[p][0] > 0]
+    budget = budget or BUDGET
+    ar = torch.arange(K, device=dev)
+    j = 0
+    while j < len(order):
+        Mb = host[order[j]][0]
+        n = max(1, min(len(order) - j, int(budget // max(Mb * A, 1))))
+        idx = torch.tensor(order[j:j + n], device=dev)
+        j += n
+        g, lab, kk, ok = gb[idx, :Mb], gl[idx, :Mb], k_per_gt[idx, :Mb], valid[idx, :Mb]
+        Mc = Mb
+        c, s = g[..., 4].cos()[..., None], g[..., 4].sin()[..., None]                  # (n, M, 1)
+        dx, dy = pts[None, None, :, 0] - g[..., 0:1], pts[None, None, :, 1] - g[..., 1:2]
+        u, v = dx * c + dy * s, -dx * s + dy * c                                         # (n, M, A)
+        hw = g[..., 2:3].clamp(min=min_side) / 2
+        hh = g[..., 3:4].clamp(min=min_side) / 2
+        if across:
+            hh = torch.maximum(hh, strides[None, None, :] * (across / 2))
+        inside = (u.abs() <= hw) & (v.abs() <= hh) & ok[..., None]
+        pi, mi, ai = inside.nonzero(as_tuple=True)
+        ov = torch.zeros(inside.shape, device=dev)
+        bx = boxes[idx]
+        if len(pi):
+            ov[pi, mi, ai] = probiou(bx[pi, ai].float(), g[pi, mi].float()).clamp(0, 1)
+        sc = scores[idx].float().transpose(1, 2).gather(1, lab[..., None].expand(-1, -1, A))   # (n, M, A)
+        centre = torch.exp(-(u.pow(2) / hw.pow(2) + v.pow(2) / hh.pow(2))) * 1e-6
+        del u, v, dx, dy
+        met = sc.pow(alpha) * ov.pow(beta)
+        metric = (met + centre) * inside
+        top = metric.topk(K, dim=2).indices
+        sel = torch.zeros_like(inside).scatter_(2, top, (ar[None, None, :] < kk[..., None]).expand(n, Mc, K))
+        sel &= inside
+        key = torch.where(sel, ov + centre, torch.full_like(ov, -1.0))
+        best = key.argmax(1)                                                            # (n, A): first max = lowest m
+        f = sel.any(1)
+        m_val = torch.where(f, metric.gather(1, best[:, None])[:, 0], torch.zeros_like(best, dtype=metric.dtype))
+        ov_val = torch.where(f, (ov + centre).gather(1, best[:, None])[:, 0].clamp(min=0),
+                             torch.zeros_like(m_val))
+        gmax_m = torch.zeros((n, Mc), device=dev).scatter_reduce(1, best, m_val, "amax", include_self=True)
+        gmax_ov = torch.zeros((n, Mc), device=dev).scatter_reduce(1, best, ov_val, "amax", include_self=True)
+        norm = m_val * gmax_ov.gather(1, best) / (gmax_m.gather(1, best) + 1e-9)
+        ts = torch.zeros((n, A, C), dtype=tsc.dtype, device=dev)
+        ts.scatter_(2, lab.gather(1, best)[..., None], torch.where(f, norm, torch.zeros_like(norm))[..., None].to(tsc.dtype))
+        tsc[idx], fg[idx], gi[idx] = ts, f, torch.where(f, best, torch.zeros_like(best))
+    return fg, gi, tsc
+
+
 class OpenOBB10Loss(OpenOBB8Loss):
     def __init__(self, off=None, **kw):
         super().__init__(**kw)
@@ -147,7 +245,9 @@ class OpenOBB10Loss(OpenOBB8Loss):
     @torch.no_grad()
     def group_assign(self, cls, boxes, pts, st, targets, cg):
         """Per class group g: the group's objects assigned to the group's boxes (boxes[g] (B, A, 5)) only.
-        -> class targets (B, A, C) summed over groups (disjoint columns), per group lists of fg (A,) and targets."""
+        -> class targets (B, A, C) summed over groups (disjoint columns), per group fg (B, A) and targets (B, A, 5)."""
+        if ASSIGN != "legacy":
+            return self.group_assign_batched(cls, boxes, pts, st, targets, cg)
         G = len(boxes)
         scores = cls.detach().sigmoid()
         tsc = torch.zeros_like(cls, dtype=torch.float32)
@@ -165,7 +265,23 @@ class OpenOBB10Loss(OpenOBB8Loss):
                 tsc[b] += ts.float()
                 fgs[g].append(fg)
                 tgts[g].append(gb[gi] if len(gb) else boxes[g].new_zeros((len(fg), 5)))
-        return tsc, fgs, tgts
+        return tsc, [torch.stack(f) for f in fgs], [torch.stack(t) for t in tgts]
+
+    @torch.no_grad()
+    def group_assign_batched(self, cls, boxes, pts, st, targets, cg):
+        """group_assign with every (image, group) problem in one batched assignment (assign_batched)."""
+        G = len(boxes)
+        B, A, C = cls.shape
+        gb, gl, valid = pad_targets(targets, cg, G, self.img_size, cls.device)            # (B G, M, ...)
+        k = (self.topk + gb[..., 2] / self.topk_len).round().clamp(max=self.topk_max).long()
+        scores = cls.detach().sigmoid()[:, None].expand(B, G, A, C).reshape(B * G, A, C)
+        bx = torch.stack([b.detach() for b in boxes], 1).reshape(B * G, A, 5)
+        fg, gi, ts = assign_batched(scores, bx, pts, st, gl, gb, valid, k, self.topk_max, self.alpha, self.beta,
+                                    self.min_side, self.across)
+        tsc = ts.view(B, G, A, C).sum(1)
+        tg = gb.gather(1, gi[..., None].expand(-1, -1, 5)).to(bx.dtype) if gb.shape[1] else bx.new_zeros(bx.shape)
+        fg, tg = fg.view(B, G, A), tg.view(B, G, A, 5)
+        return tsc, [fg[:, g] for g in range(G)], [tg[:, g] for g in range(G)]
 
     def grouped_dense_losses(self, outputs, targets):
         """Contention-aware class groups (OpenOBB19): reg holds one box per group at every point. Each group is
@@ -189,10 +305,10 @@ class OpenOBB10Loss(OpenOBB8Loss):
         z = reg.sum() * 0
         acc = {"box": z, "dfl": z, "across": z, "angle": z}
         for g in range(G):
-            fg = torch.stack(fgs[g])
+            fg = fgs[g]
             if not fg.any():
                 continue
-            tgt = torch.stack(tgts[g])
+            tgt = tgts[g]
             tg = tsc[..., cg == g]
             w = tg.sum(-1)[fg]
             if wc is not None:
@@ -217,6 +333,10 @@ class OpenOBB10Loss(OpenOBB8Loss):
             return super().dense_losses(outputs, targets)
         cls, reg, pts, st = outputs["cls"], outputs["reg"], outputs["points"], outputs["strides"]
         boxes = decode(reg, pts, st)
+        if S == 1 and not self.reach and ASSIGN != "legacy":
+            tsc, fg, tgt = self.group_assign_batched(cls, [boxes], pts, st, targets,
+                                                     torch.zeros(cls.shape[-1], dtype=torch.long, device=cls.device))
+            return self._dense_terms(cls, reg, boxes, pts, st, tsc, fg[0], tgt[0])
         scores = cls.detach().sigmoid()
         tsc, fgs, tgts = [], [], []
         for b, t in enumerate(targets):
@@ -230,6 +350,10 @@ class OpenOBB10Loss(OpenOBB8Loss):
             fgs.append(fg)
             tgts.append(gb[gi] if len(gb) else boxes.new_zeros((len(fg), 5)))
         tsc, fg, tgt = torch.stack(tsc), torch.stack(fgs), torch.stack(tgts)
+        return self._dense_terms(cls, reg, boxes, pts, st, tsc, fg, tgt)
+
+    def _dense_terms(self, cls, reg, boxes, pts, st, tsc, fg, tgt):
+        """Dense loss terms of one box per point from the assignment (target scores (B, A, C), fg (B, A), targets)."""
         norm = tsc.sum().clamp(min=1.0)
         mod = (cls.detach().sigmoid() - tsc).abs().pow(2)                              # quality focal loss
         bce = F.binary_cross_entropy_with_logits(cls, tsc, reduction="none") * mod

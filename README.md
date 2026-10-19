@@ -86,6 +86,7 @@ OPENOBB_COMPILE=1 openobb predict model=best.pt source=pages/
 
 - File giao đi gọn hơn (fp16, bỏ tham số train; tốc độ không đổi): `openobb strip model=best.pt half=True`.
 - Đo thời gian từng khối trên GPU: `openobb profile model=best.pt detail=True`.
+- Đo thời gian một bước train (forward / loss / backward / optimizer): `openobb profile model=best.pt train=True imgsz=960 batch=32`.
 
 ## Các kiến trúc
 
