@@ -11,6 +11,7 @@ classes or single boxes, labels, TXT export of the visible boxes. The confidence
 conf= to predict (a lower-scored box never removes a higher-scored one).
 """
 import base64
+import os
 import sys
 import time
 from pathlib import Path
@@ -29,6 +30,7 @@ from openobb import OpenOBB  # noqa: E402
 from openobb.predict import parse_nms  # noqa: E402
 
 MODEL_PATH = r"F:\Downloads\openobb23x_new.pt"      # đường dẫn model: tuyệt đối, hoặc tương đối so với thư mục repo
+MODEL_PATH = os.environ.get("OPENOBB_MODEL") or MODEL_PATH   # run_app.bat sets it (MODEL=...)
 
 viewer = components.declare_component("obb_viewer", path=str(Path(__file__).with_name("viewer")))
 BROWSER_IMAGES = (".png", ".jpg", ".jpeg", ".webp", ".gif")
