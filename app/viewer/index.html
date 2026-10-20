@@ -61,13 +61,30 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <div id="busy">Đang chạy model…</div>
   <div id="tip"></div>
   <div id="info"></div>
-  <div id="help">Lăn: zoom · Kéo: di chuyển · Bấm box: chi tiết · F vừa khung · L nhãn · H ẩn box · Esc bỏ chọn</div>
+  <div id="help">Lăn: zoom · Kéo chuột phải (hoặc trái): di chuyển · Bấm box: chi tiết · F vừa khung · L nhãn · H ẩn box · Esc bỏ chọn</div>
 </div></div>
 <div id="drop">Thả ảnh vào đây</div>
 <script>
-const PAL = ['#ff3838','#2c99a8','#ff9d97','#ff701f','#ffb21d','#cfd231','#48f90a','#92cc17','#3ddb86','#1a9334','#00d4bb',
-             '#00c2ff','#344593','#6473ff','#0018ec','#8438ff','#520085','#cb38ff','#ff95c8','#ff37c7'];
+// One colour per class id, in label order (class 0 = first colour...); more classes than colours wrap around.
+// Saturated and far apart in hue / lightness so neighbouring classes stay apart on a white drawing with black lines.
+const PAL = ['#e6194b',  // 0 red
+             '#1f5fd6',  // 1 blue
+             '#2ca02c',  // 2 green
+             '#ff7f0e',  // 3 orange
+             '#9b1fd1',  // 4 purple
+             '#00a3b4',  // 5 cyan
+             '#e81ccf',  // 6 magenta
+             '#8b5a1a',  // 7 brown
+             '#6fa800',  // 8 lime
+             '#00137f',  // 9 navy
+             '#c99700',  // 10 gold
+             '#7a0010',  // 11 maroon
+             '#00806b',  // 12 teal
+             '#ff5c8a',  // 13 pink
+             '#5c6470']; // 14 slate
 const color = c => PAL[c % PAL.length];
+const ink = c => { const h = color(c), v = k => parseInt(h.substr(k, 2), 16);  // label text: black on light colours
+  return 0.299 * v(1) + 0.587 * v(3) + 0.114 * v(5) > 150 ? '#000' : '#fff'; };
 const $ = id => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d'), main = $('main');
 
@@ -118,8 +135,10 @@ function draw() {
   if (img.complete && img.naturalWidth) ctx.drawImage(img, view.x, view.y, D.w * view.scale, D.h * view.scale);
   for (const o of order) {
     if (!shown(o)) continue; path(o); const c = color(o.c);
-    if (S.fill) { ctx.globalAlpha = .14; ctx.fillStyle = c; ctx.fill(); ctx.globalAlpha = 1; }
-    ctx.strokeStyle = c; ctx.lineWidth = o.i === sel ? 3 : o.i === hover ? 2.5 : 1.5; ctx.stroke();
+    if (S.fill) { ctx.globalAlpha = .16; ctx.fillStyle = c; ctx.fill(); ctx.globalAlpha = 1; }
+    const lw = o.i === sel ? 3 : o.i === hover ? 2.5 : 1.75;
+    ctx.globalAlpha = .85; ctx.strokeStyle = '#fff'; ctx.lineWidth = lw + 2; ctx.stroke(); ctx.globalAlpha = 1;  // halo: stands out on black lines
+    ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.stroke();
   }
   if (sel >= 0) { path(D.objs[sel]); ctx.setLineDash([5, 4]); ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]); }
   if (S.labels) {
@@ -127,7 +146,7 @@ function draw() {
     for (const o of order) {
       if (!shown(o)) continue; const t = D.names[o.c] + ' ' + o.s.toFixed(2);
       const x = o.b[0] * view.scale + view.x, y = o.b[1] * view.scale + view.y, tw = ctx.measureText(t).width;
-      ctx.fillStyle = color(o.c); ctx.fillRect(x, y - 14, tw + 6, 14); ctx.fillStyle = '#fff'; ctx.fillText(t, x + 3, y - 1);
+      ctx.fillStyle = color(o.c); ctx.fillRect(x, y - 14, tw + 6, 14); ctx.fillStyle = ink(o.c); ctx.fillText(t, x + 3, y - 1);
     }
   }
 }
@@ -288,13 +307,15 @@ $('txt').onclick = () => {
 // ---------------- mouse / keyboard ----------------
 cv.addEventListener('wheel', e => { e.preventDefault(); const r = cv.getBoundingClientRect();
   zoom(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top); }, {passive: false});
-let drag = null;
-cv.onmousedown = e => { if (D) drag = {x: e.clientX, y: e.clientY, moved: false}; };
+let drag = null;   // left drag or right / middle drag pans; a left click without moving selects a box
+cv.onmousedown = e => { if (!D) return; if (e.button) e.preventDefault();
+  drag = {x: e.clientX, y: e.clientY, moved: false, pan: e.button !== 0}; if (drag.pan) cv.style.cursor = 'grabbing'; };
+cv.addEventListener('contextmenu', e => e.preventDefault());   // right button is for panning, not the browser menu
 window.addEventListener('mousemove', e => {
   const r = cv.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top, tip = $('tip');
   if (drag) {
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-    if (drag.moved || Math.hypot(dx, dy) > 3) { drag.moved = true; view.x += dx; view.y += dy; drag.x = e.clientX; drag.y = e.clientY;
+    if (drag.moved || drag.pan || Math.hypot(dx, dy) > 3) { drag.moved = true; view.x += dx; view.y += dy; drag.x = e.clientX; drag.y = e.clientY;
       cv.style.cursor = 'grabbing'; tip.style.display = 'none'; draw(); }
     return;
   }
@@ -306,7 +327,7 @@ window.addEventListener('mousemove', e => {
   else tip.style.display = 'none';
 });
 window.addEventListener('mouseup', e => {
-  if (!drag) return; const moved = drag.moved; drag = null; cv.style.cursor = 'grab';
+  if (!drag) return; const moved = drag.moved || drag.pan; drag = null; cv.style.cursor = 'grab';
   if (!moved && e.target === cv) { const r = cv.getBoundingClientRect(); select(pick(e.clientX - r.left, e.clientY - r.top)); }
 });
 cv.ondblclick = () => { if (sel >= 0) focus(D.objs[sel]); };
