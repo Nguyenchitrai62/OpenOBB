@@ -23,7 +23,7 @@ from openobb.eval.ultra import evaluate_ultra  # noqa: E402
 from openobb.models.openobb3 import fast_nms  # noqa: E402
 from openobb.ops.obb import obb2poly  # noqa: E402
 
-ROOT = Path(r"F:\Source_code\NEW_architecture\datasets\dataset_wall_color")
+ROOT = Path(__file__).resolve().parents[2] / "datasets" / "dataset_wall_color"
 NAMES = ["wall", "note", "door", "slide_door", "double_door", "wall_300", "junction"]
 raw_path = sys.argv[1]
 NMS_IOU = float(sys.argv[2]) if len(sys.argv) > 2 else 0.7

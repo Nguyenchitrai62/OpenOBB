@@ -2,12 +2,13 @@
 flush-denormal off / on, alternating, and counts denormal values in the backbone stage outputs.
 usage: python denormal_test.py <openobb.pt>"""
 import sys
+from pathlib import Path
 import time
 
 import numpy as np
 import torch
 
-sys.path.insert(0, r"F:\Source_code\NEW_architecture")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 torch.set_num_threads(1)
 from openobb import OpenOBB  # noqa: E402
 

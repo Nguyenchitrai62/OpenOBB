@@ -2,12 +2,13 @@
 import glob
 import os
 import sys
+from pathlib import Path
 
 import cv2
 import numpy as np
 
-sys.path.insert(0, r"F:\Source_code\NEW_architecture")
-ROOT = r"F:\Source_code\NEW_architecture\datasets\dataset_wall_color"
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+ROOT = str(Path(__file__).resolve().parents[2] / "datasets" / "dataset_wall_color")
 NAMES = ["wall", "note", "door", "slide_door", "double_door", "wall_300", "junction"]
 S = 1280
 

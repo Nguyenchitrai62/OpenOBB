@@ -2,13 +2,14 @@
 import json
 import os
 import sys
+from pathlib import Path
 
 import cv2
 import numpy as np
 import torch
 from torch.utils.flop_counter import FlopCounterMode
 
-sys.path.insert(0, r"F:\Source_code\NEW_architecture")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 torch.set_num_threads(4)
 from openobb.data.imgio import imread  # noqa: E402
 from openobb.models.openobb3 import decode  # noqa: E402

@@ -7,6 +7,7 @@ import json
 import math
 import os
 import sys
+from pathlib import Path
 import time
 
 import cv2
@@ -14,7 +15,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-sys.path.insert(0, r"F:\Source_code\NEW_architecture")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 torch.set_num_threads(int(os.environ.get("T", "4")))
 from openobb.data.imgio import imread  # noqa: E402
 from openobb.models.openobb3 import ALONG_BINS, decode  # noqa: E402

@@ -3,13 +3,14 @@
 usage: UL_PATH=<ultralytics src> python speed_yolo_vs_openobb.py <yolo.pt> <openobb.pt> [<openobb.pt> ...]"""
 import os
 import sys
+from pathlib import Path
 import time
 
 import numpy as np
 import torch
 
 sys.path.insert(0, os.environ["UL_PATH"])
-sys.path.insert(0, r"F:\Source_code\NEW_architecture")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 torch.set_num_threads(1)
 from ultralytics import YOLO  # noqa: E402
 

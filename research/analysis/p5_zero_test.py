@@ -2,11 +2,12 @@
 Runs the page normally and with the backbone P5 map set to 0 (before LSK), compares detections (conf 0.25).
 usage: python p5_zero_test.py <checkpoint.pt> <image>   (1 CPU thread, one model per process)"""
 import sys
+from pathlib import Path
 
 import numpy as np
 import torch
 
-sys.path.insert(0, r"F:\Source_code\NEW_architecture")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 torch.set_num_threads(1)
 from openobb import OpenOBB  # noqa: E402
 from openobb.data.imgio import imread  # noqa: E402

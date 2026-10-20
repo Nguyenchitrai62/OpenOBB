@@ -2,11 +2,12 @@
 usage: python speed_page_bench.py <model.pt> <image> [yolo]   ('yolo' = Ultralytics baseline, research only)"""
 import os
 import sys
+from pathlib import Path
 import time
 
 import torch
 
-sys.path.insert(0, r"F:\Source_code\NEW_architecture")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 torch.set_num_threads(1)
 from openobb.data.imgio import imread  # noqa: E402
 

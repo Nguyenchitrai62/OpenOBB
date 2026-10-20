@@ -2,13 +2,14 @@
 Breakdown per forward: core (backbone + LSK + encoder), head (+ decode), refiner stage, NMS.
 usage: python speed_v8_v10_parts.py <v8.pt> <v10.pt> <image>"""
 import sys
+from pathlib import Path
 import time
 
 import cv2
 import numpy as np
 import torch
 
-sys.path.insert(0, r"F:\Source_code\NEW_architecture")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 torch.set_num_threads(1)
 from openobb import OpenOBB  # noqa: E402
 from openobb.data.imgio import imread  # noqa: E402

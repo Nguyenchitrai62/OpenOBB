@@ -22,7 +22,7 @@ from openobb.eval.ultra import evaluate_ultra  # noqa: E402
 from openobb.ops.obb import obb2poly  # noqa: E402
 from openobb.predict import PAD_BGR, load_model, rect_shape  # noqa: E402
 
-ROOT = Path(r"F:\Source_code\NEW_architecture\datasets\dataset_wall_color")
+ROOT = Path(__file__).resolve().parents[2] / "datasets" / "dataset_wall_color"
 ck, n_img = sys.argv[1], int(sys.argv[2]) if len(sys.argv) > 2 else 10**9
 net, names, args = load_model(ck, "cpu")
 print(f"{Path(ck).name}: nms {args.get('nms_iou')} head {args.get('infer_head')} q_beta {args.get('q_beta')} "

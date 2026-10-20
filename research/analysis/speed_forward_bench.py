@@ -1,13 +1,14 @@
 """Raw network forward, 1 thread, same input shapes for every model. argv[1] = yolo | v3 | v8."""
 import os
 import sys
+from pathlib import Path
 import time
 
 import torch
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "ul"))
-sys.path.insert(0, r"F:\Source_code\NEW_architecture")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 torch.set_num_threads(1)
 which = sys.argv[1]
 if which == "yolo":

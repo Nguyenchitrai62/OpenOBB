@@ -23,7 +23,7 @@ torch.set_num_threads(2)
 from openobb.data.imgio import imread  # noqa: E402
 from openobb.eval.ultra import probiou  # noqa: E402
 
-ROOT = Path(r"F:\Source_code\NEW_architecture\datasets\dataset_wall_color")
+ROOT = Path(__file__).resolve().parents[2] / "datasets" / "dataset_wall_color"
 NAMES = ["wall", "note", "door", "slide_door", "double_door", "wall_300", "junction"]
 CONF = 0.25
 BUCKETS = ((0, 40), (40, 100), (100, 200), (200, 10**5))

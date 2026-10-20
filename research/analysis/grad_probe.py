@@ -22,7 +22,7 @@ from openobb.data.imgio import imread  # noqa: E402
 from openobb.models.openobb18_loss import OpenOBB18Loss  # noqa: E402
 from openobb.predict import PAD_BGR  # noqa: E402
 
-ROOT = Path(r"F:\Source_code\NEW_architecture\datasets\dataset_wall_color")
+ROOT = Path(__file__).resolve().parents[2] / "datasets" / "dataset_wall_color"
 ck, n = sys.argv[1], int(sys.argv[2]) if len(sys.argv) > 2 else 3
 net = OpenOBB(ck).model
 S = 1280

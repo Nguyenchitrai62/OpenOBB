@@ -17,7 +17,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from openobb.data.imgio import imread  # noqa: E402
 
-ROOT = Path(r"F:\Source_code\NEW_architecture\datasets\dataset_wall_color")
+ROOT = Path(__file__).resolve().parents[2] / "datasets" / "dataset_wall_color"
 NAMES = ["wall", "note", "door", "slide_door", "double_door", "wall_300", "junction"]
 CLS = {0: "wall", 5: "wall_300"}
 

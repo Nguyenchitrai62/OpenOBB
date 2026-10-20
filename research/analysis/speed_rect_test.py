@@ -1,12 +1,13 @@
 """OpenOBB3-x: square 1280x1280 (current) vs rectangular 928x1280 input on the real page. 1 thread."""
 import sys
+from pathlib import Path
 import time
 
 import cv2
 import numpy as np
 import torch
 
-sys.path.insert(0, r"F:\Source_code\NEW_architecture")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 torch.set_num_threads(1)
 from openobb import OpenOBB  # noqa: E402
 from openobb.data.imgio import imread  # noqa: E402

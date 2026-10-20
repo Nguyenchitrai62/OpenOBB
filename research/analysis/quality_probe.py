@@ -32,7 +32,7 @@ from openobb.models.openobb17 import FIELD_STRIDE, _sample  # noqa: E402
 from openobb.ops.obb import obb2poly  # noqa: E402
 from openobb.predict import PAD_BGR, rect_shape  # noqa: E402
 
-ROOT = Path(r"F:\Source_code\NEW_architecture\datasets\dataset_wall_color")
+ROOT = Path(__file__).resolve().parents[2] / "datasets" / "dataset_wall_color"
 NAMES = ["wall", "note", "door", "slide_door", "double_door", "wall_300", "junction"]
 N_S = 7
 NMS_IOU = 0.5

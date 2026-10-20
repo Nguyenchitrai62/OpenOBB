@@ -17,7 +17,7 @@ from openobb import OpenOBB  # noqa: E402
 from openobb.data.imgio import imread  # noqa: E402
 from openobb.predict import PAD_BGR, rect_shape  # noqa: E402
 
-ROOT = Path(r"F:\Source_code\NEW_architecture\datasets\dataset_wall_color")
+ROOT = Path(__file__).resolve().parents[2] / "datasets" / "dataset_wall_color"
 ck, n_val, extra = sys.argv[1], int(sys.argv[2]), sys.argv[3:]
 m = OpenOBB(ck)
 net = m.model

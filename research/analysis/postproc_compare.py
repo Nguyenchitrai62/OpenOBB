@@ -18,7 +18,7 @@ from openobb.eval.ultra import confusion, duplicate_line, evaluate_ultra, geomet
 from openobb.models import openobb17  # noqa: E402
 from openobb.predict import apply_head, apply_nms  # noqa: E402
 
-ROOT = Path(r"F:\Source_code\NEW_architecture\datasets\dataset_wall_color")
+ROOT = Path(__file__).resolve().parents[2] / "datasets" / "dataset_wall_color"
 ck, combos = sys.argv[1], sys.argv[2:]
 m = OpenOBB(ck)
 import os  # noqa: E402
