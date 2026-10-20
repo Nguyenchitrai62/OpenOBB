@@ -33,10 +33,10 @@ PY="$APPDATA/uv/tools/google-colab-cli/Scripts/python.exe"
 "$PY" tools/colab_login.py url        # in ra URL đăng nhập → mở cho user (browser pane)
 ```
 
-User đăng nhập xong thì Google hiện mã. **Agent không tự đọc/nhập mã này**. User bấm Copy rồi tự chạy trong PowerShell:
+User đăng nhập xong thì Google hiện mã. **Agent không tự đọc/nhập mã này**. User bấm Copy rồi tự chạy trong PowerShell, ở thư mục gốc của repo:
 
 ```powershell
-Get-Clipboard | & "$env:APPDATA\uv\tools\google-colab-cli\Scripts\python.exe" F:\Source_code\NEW_architecture\tools\colab_login.py exchange
+Get-Clipboard | & "$env:APPDATA\uv\tools\google-colab-cli\Scripts\python.exe" .\tools\colab_login.py exchange
 ```
 
 Token lưu ở `~/.config/colab-cli/token.json` (có refresh token, tự gia hạn). Kiểm tra bằng `colab whoami`. Tài khoản đang dùng: `nam@pose3d.ai`.
