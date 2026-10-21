@@ -232,6 +232,13 @@ def build_tree(dst):
         if t == s and not (rep and rep in s):
             print(f"  note: transform did not apply to {rel}: {pat[:60]!r} (text changed? check the GitLab wording)")
         p.write_text(t, encoding="utf-8")
+    # install commands name the wheel of this release (the sources keep openobb_onnx-X.Y.Z-...)
+    ver = ".".join(map(str, read_version()))
+    for rel in ("README.md", "docs/ONNX.md"):
+        p = dst / rel
+        if p.exists():
+            p.write_text(p.read_text(encoding="utf-8").replace("openobb_onnx-X.Y.Z-", f"openobb_onnx-{ver}-"),
+                         encoding="utf-8")
     bad = [str(p.relative_to(dst)) for p in (dst / "openobb").rglob("*.py") if FORBIDDEN.search(p.read_text(encoding="utf-8"))]
     if bad:
         sys.exit(f"refusing to sync: forbidden imports in {bad}")
