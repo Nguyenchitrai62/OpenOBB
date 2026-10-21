@@ -91,6 +91,8 @@ Biến môi trường `OPENOBB_COMPILE=1` vẫn dùng được, có tác dụng 
 - Đo thời gian từng khối trên GPU: `openobb profile model=best.pt detail=True`.
 - Đo thời gian một bước train (forward / loss / backward / optimizer): `openobb profile model=best.pt train=True imgsz=960 batch=32`.
 - Train v18–v24 bật `compile` mặc định (epoch đầu lâu hơn để biên dịch, các epoch sau nhanh hơn khoảng 25%); `compile=False` để tắt.
+- **Bàn giao không kèm code:** `openobb export model=best.pt` → `best.onnx`, chạy bằng wheel `openobb_onnx` (ONNX Runtime, không
+  PyTorch, không code kiến trúc / train; cài GPU và CPU riêng). Kết quả giống `.pt`: [docs/ONNX.md](docs/ONNX.md).
 
 ## Các kiến trúc
 

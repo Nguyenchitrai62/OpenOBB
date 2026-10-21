@@ -137,14 +137,15 @@ def peak_mask(cls, sizes, groups=1):
     A = N // groups
     s = cls.detach().float().amax(-1)                                       # (B, G*A) logits (monotone in score)
     out = torch.zeros_like(s, dtype=torch.bool)
+    parts = []                      # no int() on the sizes: they stay symbolic in an ONNX export (dynamic input size)
     for g in range(groups):
         o = g * A
         for h, w in sizes:
-            n = int(h) * int(w)
-            m = s[:, o:o + n].view(B, 1, int(h), int(w))
-            out[:, o:o + n] = (m >= F.max_pool2d(m, 3, 1, 1)).view(B, n)
-            o += n
-    return out
+            n = h * w
+            m = s[:, o:o + n].reshape(B, 1, h, w)
+            parts.append((m >= F.max_pool2d(m, 3, 1, 1)).reshape(B, n))
+            o = o + n
+    return torch.cat(parts, 1)
 
 
 class OpenOBB17(OpenOBB12):
@@ -238,23 +239,40 @@ class OpenOBB17(OpenOBB12):
                 if len(stages) > 1:                    # later stages: trained on the boxes the stage before produced
                     out["ref_stages"] = [(c, r, 0.5) for c, r in stages[1:]]
             return out
+        return self.select(*self.scored_candidates(x))
+
+    def nms_setting(self):
+        """-> (one-to-one head?, NMS setting: None, a ProbIoU threshold or "peak" / "peak+<thr>")."""
         o2o = self.infer_head != "o2m"
+        return o2o, self.final_nms if o2o or self.final_nms is not None else self.nms_iou   # one-to-many: always NMS
+
+    def scored_candidates(self, x):
+        """Inference up to the NMS (shared by forward and the ONNX export, openobb/export.py) -> (ranking logits
+        (B, N, C), output logits (B, N, C) or None (= the ranking ones), boxes (B, N, 5) px, NMS threshold or None)."""
+        f4, feats = self.encode(x)
+        pts, st = self.anchors(feats)
+        field = None if self.field is None else self.field(f4, feats[0])
+        o2o, nms = self.nms_setting()
         cls, reg = self.run_head(feats, o2o)
         cls, boxes = self.candidates(cls, reg, pts, st)
         if (field is not None or getattr(self, "edge", None) is not None) and self.ref_k > 0:
             boxes, _ = self.snap_topk(field, cls, boxes, self.ref_k, f4, feats[0])
-        conf = getattr(self, "nms_conf", 0.001)
-        nms = self.final_nms if o2o or self.final_nms is not None else self.nms_iou   # one-to-many: always NMS
         if isinstance(nms, str) and nms.startswith("peak"):     # local-peak filter, then optional NMS on what is left
             keep = peak_mask(cls, [f.shape[-2:] for f in feats], self.n_groups)
             cls = cls.masked_fill(~keep[..., None], -30.0)
             nms = float(nms.split("+")[1]) if "+" in nms else None
+        return cls, None, boxes, nms
+
+    def select(self, rank, out_l, boxes, nms):
+        """NMS (or top max_det without it) of scored_candidates -> {"pred_logits", "pred_boxes" (normalised)}."""
+        conf = getattr(self, "nms_conf", 0.001)
         if nms is not None:
-            logits, boxes = fast_nms(cls, boxes, self.max_det, conf=conf, iou=float(nms))
+            logits, boxes = fast_nms(rank, boxes, self.max_det, conf=conf, iou=float(nms), out_logits=out_l)
         else:
-            k = min(self.max_det, cls.shape[1])
-            order = cls.amax(-1).topk(k, dim=1).indices
-            logits = cls.gather(1, order[..., None].expand(-1, -1, cls.shape[-1])).float()
+            k = min(self.max_det, rank.shape[1])
+            order = rank.amax(-1).topk(k, dim=1).indices
+            src = rank if out_l is None else out_l
+            logits = src.gather(1, order[..., None].expand(-1, -1, src.shape[-1])).float()
             boxes = boxes.gather(1, order[..., None].expand(-1, -1, 5)).float()
             logits = logits.masked_fill(logits.sigmoid().amax(-1, keepdim=True) < conf, -30.0)
         boxes = boxes.clone()

@@ -1867,6 +1867,33 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     làm bản sao val mỗi epoch biên dịch lại mỗi epoch.
   - Test: `tests/test_compile.py` (torch.compile thay bằng hàm ghi lại). Kỳ vọng: G4 ≤ 8.0 ms / ảnh như F97 hoặc tốt hơn (giờ compile cả thân);
     cần đo `openobb val ... compile=True` so với không trên cùng checkpoint.
+- **F117. Export ONNX + wheel runtime không PyTorch để bàn giao (10-21, theo user). Kết quả khớp `.pt`; CPU nhanh hơn 2.4×; GPU chưa đo.**
+  - Lý do (user): wheel sản phẩm `hicasobb` chứa mã nguồn đọc được của kiến trúc + toàn bộ code train (`train.py`, loss, pretrain);
+    wheel chỉ có infer + kiến trúc vẫn lộ kiến trúc và coding agent export / train lại được ngay. Giao `best.onnx` + runtime numpy thì
+    bên nhận không có code kiến trúc, tên module hay cách train.
+  - Cắt ở trước NMS: `OpenOBB17/24.scored_candidates` (tách khỏi `forward`, `forward` = `select(scored_candidates)`, kết quả PyTorch
+    không đổi) → `openobb/export.py` `ExportNet`: ảnh uint8 BGR NHWC → top 4000 cặp (ứng viên, class) theo điểm xếp hạng (= tiền
+    chọn của `fast_nms`), hoặc ứng viên top max_det khi model không NMS. Lọc đỉnh, q của v24, head suy luận đã hiệu chỉnh nằm trong
+    đồ thị. Dynamo exporter (torch 2.14, opset 18), trục động batch / cao / rộng (bội 32, ≥ 64). Sửa cho export: `peak_mask` không
+    `int()` kích thước; `head_rows` không `%` theo kích thước động; anchors không cache khi export.
+  - Ẩn danh: node / weights / tensor đổi tên `n* / w* / t*`, xoá metadata nguồn (`pkg.torch.*`), doc string. Thiết lập runtime ở metadata
+    JSON `obb` (names, imgsz, conf_thr, nms, merge_iou, max_det). 185 MB fp32 với bản x.
+  - Runtime `openobb_onnx/` (numpy + OpenCV + shapely + onnxruntime): Fast-NMS ProbIoU (cặp gần cùng class) = `fast_nms`, gộp polygon
+    NMS = `merge_patches`, cùng tiền xử lý (`rect_shape`, màu đệm, tile). API / CLI / Results như bản PyTorch, app Streamlit dùng lại
+    viewer. Wheel `tools/build_onnx_wheel.py` (26 KB; extras `[gpu]` = `onnxruntime-gpu[cuda,cudnn]` CUDA 13, `[cpu]`, `[app]`);
+    `push_all.py` build bản `hicasobb_onnx` vào `wheels/` GitLab.
+  - Đo (CPU local, `openobb23x_new.pt` = F107): đầu ra đồ thị so với PyTorch ở 1280×928 / 960×704 / 640×480: điểm ≤ 9e-6, box ≤ 0.001 px.
+    Detection cuối 8 ảnh val × conf 0.25 / auto: 1158 / 1158 khớp, góc ≤ 0.14 px, điểm ≤ 5e-5 (do `merge_dets` làm tròn). Ảnh 3307×2338:
+    ONNX 1.16 s, PyTorch 2.85 s (16 luồng, đo lúc máy rảnh; khi máy đang chạy test song song ONNX lên 5–9 s).
+  - Bài học test: model random cho mọi box gần cùng điểm (0.18242…, khác ở chữ số 7) → box NMS giữ do nhiễu float quyết định; so
+    end-to-end phải dùng checkpoint thật (`test_real_checkpoint_end_to_end`, bỏ qua nếu không có).
+  - **App mở bằng `.bat` chậm 7× (user: 8.8 s / trang): Windows 11 EcoQoS.** CPU i5-14400 (6 lõi P + 4 lõi E). Tiến trình có cửa sổ
+    console nằm nền (user xem trên Chrome) bị Windows hạ ưu tiên: lõi E, xung thấp. Ép EcoQoS trong cùng tiến trình: ONNX 8.1–8.6 s
+    (luồng ORT spinning), tắt spinning 4.8 s, không EcoQoS 1.05–1.3 s. Sửa: `no_power_throttling()` (SetProcessInformation,
+    ProcessPowerThrottling, execution speed không bị hạ) khi nạp model ở cả `openobb_onnx` và `openobb.predict.load_model`, và ORT
+    `session.intra_op.allow_spinning=0`. Đo lại khi đã ép EcoQoS trước: 1.09–1.11 s. Bản `.pt` (4–5 s trong app, 2.85 s khi đo
+    trực tiếp) có lẽ cũng bị như vậy, chưa đo lại.
+  - Chưa làm: đo GPU (onnxruntime-gpu, TensorRT EP); fp16 (box học bằng px tới 2560 cần fp32 ở phần tinh chỉnh / bám ranh giới).
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 

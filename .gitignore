@@ -25,3 +25,4 @@ research/jobs/.bundle-*.tar.gz
 
 # product wheels built by tools/push_all.py
 /dist_hicasobb/
+/dist_onnx/

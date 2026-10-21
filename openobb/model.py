@@ -241,8 +241,15 @@ class OpenOBB:
     def track(self, *args, **kw):
         raise NotImplementedError("tracking is not supported: OpenOBB detects on still images")
 
-    def export(self, *args, **kw):
-        raise NotImplementedError("export is not implemented yet: deploy the .pt with openobb (PyTorch)")
+    def export(self, format="onnx", imgsz=None, opset=18, out=None, **kw):
+        """-> path of the exported model. format="onnx" only (dense models v17+): the network up to the NMS, run
+        without PyTorch by the openobb_onnx package (docs/ONNX.md)."""
+        if str(format).lower() != "onnx":
+            raise NotImplementedError(f"export format {format!r}: only 'onnx' is supported")
+        if kw:
+            warnings.warn(f"export arguments ignored: {', '.join(kw)}", stacklevel=2)
+        from openobb.export import export
+        return export(self.ckpt_path, out=out, imgsz=imgsz, opset=opset)
 
     # ---- inference
     def __call__(self, source=None, stream=False, **kw):

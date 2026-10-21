@@ -21,6 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest"]
 app = ["streamlit", "pandas"]
+export = ["onnx>=1.16", "onnxscript>=0.3"]       # openobb export (ONNX); the runtime wheel is tools/build_onnx_wheel.py
 
 [project.scripts]
 openobb = "openobb.cli:main"
@@ -29,4 +30,4 @@ openobb = "openobb.cli:main"
 version = { attr = "openobb.__version__" }
 
 [tool.setuptools.packages.find]
-include = ["openobb*"]
+include = ["openobb", "openobb.*"]               # not openobb_onnx: the ONNX runtime has its own wheel

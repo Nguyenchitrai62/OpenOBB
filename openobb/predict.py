@@ -283,7 +283,31 @@ def fast_layout(m, device, compile=None):
     return compile_model(m, device, compile_mode(compile))
 
 
+def no_power_throttling():
+    """Windows 11 throttles a process whose window is in the background (EcoQoS: efficiency cores, low clock), e.g. the
+    test app started by run_app.bat while the user works in the browser (ONNX runtime: 8.6 vs 1.2 s per page on an
+    i5-14400, F117). The process opts out; elsewhere nothing happens."""
+    import sys
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class State(ctypes.Structure):
+            _fields_ = [("Version", wintypes.ULONG), ("ControlMask", wintypes.ULONG), ("StateMask", wintypes.ULONG)]
+        k = ctypes.WinDLL("kernel32", use_last_error=True)
+        k.GetCurrentProcess.restype = wintypes.HANDLE
+        k.SetProcessInformation.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+        k.SetProcessInformation.restype = wintypes.BOOL
+        st = State(1, 1, 0)                       # version 1, control: execution speed, state: not throttled
+        return bool(k.SetProcessInformation(k.GetCurrentProcess(), 4, ctypes.byref(st), ctypes.sizeof(st)))
+    except Exception:  # noqa: BLE001           - older Windows: nothing to opt out of
+        return False
+
+
 def load_model(ckpt_path, device, queries=None, classes=None, compile=None):
+    no_power_throttling()
     if torch.device(device).type == "cpu":
         # flush denormals (identical detections; speed effect not reproducible on the dev machine, F57)
         torch.set_flush_denormal(True)

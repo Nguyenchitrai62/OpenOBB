@@ -436,6 +436,12 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 
 ## 9. Nhật ký
 
+- 2026-10-21 (2): **F117: `openobb export` (ONNX) + wheel runtime `openobb_onnx` để bàn giao** (theo user: wheel `hicasobb` lộ kiến trúc
+  + code train). Bàn giao = `best.onnx` + wheel `hicasobb_onnx` (không PyTorch, không code kiến trúc / train). Model mặc định để giao:
+  **OpenOBB23-x** (user: v24 không hơn v23). Khớp `.pt` 1158 / 1158 box; CPU nhanh hơn 2.4×. Tài liệu [docs/ONNX.md](docs/ONNX.md),
+  test `tests/test_onnx.py`, build `tools/build_onnx_wheel.py` (push_all gọi). Thư mục thử cài: `F:\Source_code\OpenOBB_test_wheel`
+  (`.venv` không torch, `run_app.bat`). Chưa đo GPU.
+
 - 2026-10-21: **F116: `compile=` cho predict / val giống YOLO** (theo user; mặc định tắt). `predict.compile_mode` / `compile_model`
   (compile `encode` + trường ranh giới, head eager; lỗi trình biên dịch → cảnh báo, chạy bản thường), `OpenOBB.predict(compile=)`,
   `openobb predict|val compile=True|<mode>`; `OPENOBB_COMPILE=1` vẫn dùng khi không truyền. Bản sao val trong train luôn eager.

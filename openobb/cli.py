@@ -15,6 +15,8 @@
     openobb calibrate model=best.pt data=data.yaml [out=calibrated.pt]   # re-choose the inference head / NMS on val
     openobb strip   model=runs/obb/train/weights/best.pt [out=model.pt half=True]   # deploy checkpoint:
                     # weights + architecture + classes only (no paths, training args or scores)
+    openobb export  model=best.pt [out=best.onnx imgsz=1280 opset=18]   # ONNX for the runtime wheel (no PyTorch,
+                    # no architecture code): openobb_onnx / docs/ONNX.md. Needs pip install onnx onnxscript
 
     from openobb import OpenOBB
     model = OpenOBB("openobb3x")                # or OpenOBB("runs/obb/train/weights/best.pt")
@@ -45,7 +47,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-MODES = ("train", "val", "predict", "prepare", "pretrain", "strip", "calibrate", "profile")
+MODES = ("train", "val", "predict", "prepare", "pretrain", "strip", "calibrate", "profile", "export")
 SIZES = ("s", "m", "l", "x")
 # model names: openobb1{s,m,l,x} (= s/m/l/x, DETR-style OpenOBB), openobb2{n,s,m,l,x} (dense segment-aware OpenOBB2),
 # openobb3{s,m,l,x} (pretrained encoder + dense anisotropic oriented head), openobb4x (DINOv2 + hybrid DETR)
@@ -901,6 +903,14 @@ def main(argv=None):
         if bad or "model" not in kv:
             raise SystemExit("usage: openobb strip model=<best.pt> [out=<deploy.pt>] [half=True]")
         strip(**kv)
+        return 0
+    if mode == "export":
+        from openobb.export import export
+        bad = [k for k in kv if k not in ("model", "out", "imgsz", "opset", "format")]
+        if bad or "model" not in kv or str(kv.get("format", "onnx")).lower() != "onnx":
+            raise SystemExit("usage: openobb export model=<best.pt> [out=<best.onnx>] [imgsz=1280] [opset=18]")
+        kv.pop("format", None)
+        export(**kv)
         return 0
     if mode == "profile" and str(kv.get("train", "False")).lower() in ("1", "true", "yes"):
         from openobb.profile import profile_train

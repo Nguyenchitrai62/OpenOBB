@@ -35,7 +35,7 @@ import torch.nn.functional as F
 
 from .openobb17 import FIELD_STRIDE, _sample, peak_mask
 from .openobb18 import OpenOBB23
-from .openobb3 import ALONG_BINS, REG_CH, fast_nms
+from .openobb3 import ALONG_BINS, REG_CH
 
 Q_PRIOR = 0.6                    # q at the start (constant): sigmoid of the last layer's bias
 N_Q = 5                          # points along each side where the field is read
@@ -167,7 +167,8 @@ class OpenOBB24(OpenOBB23):
         B, A, GR = reg.shape
         G = self.n_groups
         R = GR // G
-        flat = (idx % A) * G + idx // A
+        g = idx // A
+        flat = (idx - g * A) * G + g             # (idx % A) G + idx // A; no % by a symbolic size (ONNX export)
         return reg.reshape(B, A * G, R).gather(1, flat[..., None].expand(-1, -1, R))
 
     def quality_logits(self, h, field, stages, rows):
@@ -180,10 +181,15 @@ class OpenOBB24(OpenOBB23):
     def forward(self, x, targets=None, ctx=None):
         if self.training:
             return self._forward_train(x, targets)
+        return self.select(*self.scored_candidates(x))
+
+    def scored_candidates(self, x):
+        """Inference up to the NMS (see OpenOBB17.scored_candidates): the ranking logits carry q^q_beta, the output
+        logits score^(1 - q_alpha) x q^q_alpha."""
         f4, feats = self.encode(x)
         pts, st = self.anchors(feats)
         field = None if self.field is None else self.field(f4, feats[0])
-        o2o = self.infer_head != "o2m"
+        o2o, nms = self.nms_setting()
         cls, reg = self.run_head(feats, o2o)
         cls, boxes = self.candidates(cls, reg, pts, st)
         q, idx = None, None
@@ -207,25 +213,11 @@ class OpenOBB24(OpenOBB23):
             ls = F.logsigmoid(cls.float())
             rank = torch.logit((ls + self.q_beta * qa).exp().clamp(1e-6, 1 - 1e-6))
             out_l = torch.logit(((1 - self.q_alpha) * ls + self.q_alpha * qa).exp().clamp(1e-6, 1 - 1e-6))
-        conf = getattr(self, "nms_conf", 0.001)
-        nms = self.final_nms if o2o or self.final_nms is not None else self.nms_iou
         if isinstance(nms, str) and nms.startswith("peak"):
             keep = peak_mask(cls, [f.shape[-2:] for f in feats], self.n_groups)
             rank = rank.masked_fill(~keep[..., None], -30.0)
             nms = float(nms.split("+")[1]) if "+" in nms else None
-        if nms is not None:
-            logits, boxes = fast_nms(rank, boxes, self.max_det, conf=conf, iou=float(nms), out_logits=out_l)
-        else:
-            k = min(self.max_det, cls.shape[1])
-            order = rank.amax(-1).topk(k, dim=1).indices
-            src = rank if out_l is None else out_l
-            logits = src.gather(1, order[..., None].expand(-1, -1, src.shape[-1])).float()
-            boxes = boxes.gather(1, order[..., None].expand(-1, -1, 5)).float()
-            logits = logits.masked_fill(logits.sigmoid().amax(-1, keepdim=True) < conf, -30.0)
-        boxes = boxes.clone()
-        boxes[..., :4] = boxes[..., :4] / self.img_size
-        boxes[..., 4] = torch.remainder(boxes[..., 4] + math.pi / 2, math.pi) - math.pi / 2
-        return {"pred_logits": logits, "pred_boxes": boxes}
+        return rank, out_l, boxes, nms
 
     def _forward_train(self, x, targets):
         f4, feats = self.encode(x)

@@ -90,6 +90,42 @@ Biến môi trường `OPENOBB_COMPILE=1` vẫn dùng được, có tác dụng 
 - File giao đi gọn hơn (fp16, bỏ tham số train; tốc độ không đổi): `openobb strip model=best.pt half=True`.
 - Đo thời gian từng khối trên GPU: `openobb profile model=best.pt detail=True`.
 
+## Bàn giao bằng ONNX (không PyTorch, không code kiến trúc)
+
+Bên nhận chỉ cần file `best.onnx` và wheel `openobb_onnx-X.Y.Z-py3-none-any.whl` (thư mục `wheels/`): ONNX Runtime + numpy,
+không có code train, code kiến trúc hay PyTorch. Kết quả giống hệt `openobb predict` trên `.pt`. Chi tiết: [docs/ONNX.md](docs/ONNX.md).
+
+```bash
+pip install "openobb[export]"                     # một lần, máy có .pt (onnx + onnxscript)
+openobb export model=best.pt                      # -> best.onnx
+```
+
+**Bên nhận, máy có GPU NVIDIA** (driver hỗ trợ CUDA 13, `nvidia-smi` hiện "CUDA Version: 13.x"; CUDA / cuDNN cài qua pip):
+
+```bash
+pip uninstall -y onnxruntime
+pip install "./openobb_onnx-X.Y.Z-py3-none-any.whl[gpu,app]"
+openobb-onnx info model=best.onnx                 # phải in "device cuda"
+```
+
+**Bên nhận, máy chỉ có CPU:**
+
+```bash
+pip uninstall -y onnxruntime-gpu
+pip install "./openobb_onnx-X.Y.Z-py3-none-any.whl[cpu,app]"
+```
+
+```bash
+openobb-onnx predict model=best.onnx source=pages/ conf=auto      # -> runs/obb/predict
+openobb-onnx app model=best.onnx                                  # app Streamlit kéo thả ảnh
+```
+
+```python
+from openobb_onnx import OpenOBB
+for r in OpenOBB("best.onnx").predict("page.png", conf=0.3):
+    print(r.obb.xyxyxyxy, r.obb.conf, r.obb.cls, r.names)
+```
+
 ## Train / fine-tune
 
 ```bash

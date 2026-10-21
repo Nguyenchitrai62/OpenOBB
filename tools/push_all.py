@@ -34,6 +34,7 @@ ALLOW = ["openobb", "tests", "docs/DEPLOY.md", "docs/FINETUNE.md", "docs/OPENOBB
          "docs/OPENOBB4.md", "docs/OPENOBB5.md", "docs/OPENOBB6.md", "docs/OPENOBB7.md",
          "docs/OPENOBB8.md", "docs/OPENOBB9.md", "docs/OPENOBB10.md", "docs/OPENOBB11.md", "docs/OPENOBB12.md", "docs/OPENOBB13.md",
          *[f"docs/OPENOBB{n}.md" for n in range(14, 25)], "docs/PRETRAIN.md", "docs/OPENOBB1.md", "app/streamlit_app.py", "app/viewer/index.html",
+         "openobb_onnx", "docs/ONNX.md",
          "run_app.bat",
          "LICENSE", "LICENSES", "THIRD_PARTY_NOTICES.md", "pyproject.toml", "requirements.txt"]
 # files from older layouts removed from GitLab when present (renamed in the research repo)
@@ -170,6 +171,23 @@ def build_wheel(src):
         LOCAL_WHEELS.mkdir(exist_ok=True)
         shutil.copy(whl, LOCAL_WHEELS / whl.name)
     return dst / whl.name
+
+
+def build_onnx_wheel(src):
+    """Handover wheel of the ONNX runtime (<product>_onnx: inference of exported .onnx models only, no PyTorch, no
+    architecture / training code; tools/build_onnx_wheel.py) -> src/wheels/ next to the product wheel + LOCAL_WHEELS."""
+    import zipfile
+    sys.path.insert(0, str(ROOT / "tools"))
+    from build_onnx_wheel import build
+    whl = build(src, f"{PKG_NEW}_onnx", out=src / "wheels")
+    with zipfile.ZipFile(whl) as z:
+        bad = [n for n in z.namelist() if LEAK.search(n + z.read(n).decode("utf-8", "ignore"))]
+    if bad:
+        whl.unlink()
+        sys.exit(f"refusing to ship: research names inside the ONNX wheel: {bad[:5]}")
+    LOCAL_WHEELS.mkdir(exist_ok=True)
+    shutil.copy(whl, LOCAL_WHEELS / whl.name)
+    return whl
 
 
 def rebrand(dst):
@@ -341,8 +359,10 @@ def main():
             sys.exit("tests failed on the GitLab copy: nothing pushed to GitLab (GitHub already pushed)")
         run(["git", "clean", "-qfdX"], cwd=CHECKOUT)       # __pycache__ etc. created by the test run
     whl = build_wheel(CHECKOUT)
+    owhl = build_onnx_wheel(CHECKOUT)
     run(["git", "add", "-A", "wheels"], cwd=CHECKOUT)
-    print(f"   wheel {whl.name} ({whl.stat().st_size / 1024:.0f} KB): GitLab wheels/ and {LOCAL_WHEELS}")
+    print(f"   wheel {whl.name} ({whl.stat().st_size / 1024:.0f} KB) + ONNX runtime {owhl.name} "
+          f"({owhl.stat().st_size / 1024:.0f} KB): GitLab wheels/ and {LOCAL_WHEELS}")
     msg = f"Release {tag}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n"    # no repo / package names
     subprocess.run(["git", "commit", "-q", "-F", "-"], cwd=CHECKOUT, input=msg, text=True, check=True)
     run(["git", "push", "-q", "origin", "HEAD:main"], cwd=CHECKOUT)
