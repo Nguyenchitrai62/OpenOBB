@@ -102,8 +102,8 @@ Tên layer, module và đường dẫn code bị xoá. Infer bằng `openobb_onn
 
 ```bash
 pip install onnx onnxscript onnxruntime            # hoặc pip install "openobb[export]"
-openobb export model=best.pt                       # -> best.onnx cạnh best.pt
-openobb export model=best.pt out=giao/best.onnx imgsz=1280
+openobb export model=best.pt                       # -> best.onnx cạnh best.pt, imgsz lấy từ best.pt
+openobb export model=best.pt out=giao/best.onnx      # đặt tên / thư mục file ra
 ```
 
 ```python
@@ -128,7 +128,7 @@ for r in model.predict("page.png", conf=0.3):      # ảnh, thư mục, glob, li
 ```
 
 Tham số giống `predict` của bản `.pt`: `conf` (số, hoặc `"auto"` = ngưỡng theo class lưu lúc train), `iou` (mặc định là NMS đã hiệu
-chỉnh; `"none"` = không NMS), `imgsz`, `max_det`, `classes`, `device`, `save`, `save_txt`, `save_conf`. App kéo thả ảnh:
+chỉnh; `"none"` = không NMS), `imgsz` (mặc định = imgsz lúc train, lưu trong file; không cần truyền), `max_det`, `classes`, `device`, `save`, `save_txt`, `save_conf`. App kéo thả ảnh:
 `run_app.bat` nhận cả `.pt` lẫn `.onnx` ở dòng `MODEL=`.
 
 ## Các kiến trúc

@@ -31,7 +31,7 @@ File ONNX không còn tên layer / module / đường dẫn code. Kết quả gi
 ```bash
 pip install onnx onnxscript                       # một lần
 openobb export model=best.pt                      # -> best.onnx cạnh best.pt (model OpenOBB17 - 24; nên giao OpenOBB23)
-openobb export model=best.pt out=giao/best.onnx imgsz=1280
+openobb export model=best.pt out=giao/best.onnx      # đặt tên / thư mục file ra
 ```
 
 ```python
@@ -88,7 +88,7 @@ for r in model.predict("page.png", conf=0.3):     # ảnh, thư mục, glob, lis
 |---|---|---|
 | `conf` | 0.25 | ngưỡng điểm; `"auto"` = ngưỡng tốt nhất theo từng class, lưu lúc train |
 | `iou` | theo model | ngưỡng NMS (đã hiệu chỉnh lúc train); `"none"` = không NMS |
-| `imgsz` | theo model | cạnh dài ảnh đưa vào mạng |
+| `imgsz` | imgsz lúc train (lưu trong file) | cạnh dài ảnh đưa vào mạng; không cần truyền |
 | `max_det` | 300 | số box tối đa mỗi ảnh |
 | `classes` | tất cả | id hoặc tên class cần giữ |
 | `device` | tự chọn | `cpu`, `0`, `cuda:1`, `trt` (TensorRT nếu có) |

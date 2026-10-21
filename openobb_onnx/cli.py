@@ -1,6 +1,6 @@
 """openobb-onnx: command line of the ONNX runtime (YOLO-style key=value arguments).
 
-    openobb-onnx predict model=best.onnx source=pages/ [conf=0.25|auto] [iou=0.5] [imgsz=1280] [device=cpu|0|trt]
+    openobb-onnx predict model=best.onnx source=pages/ [conf=0.25|auto] [iou=0.5] [device=cpu|0|trt]
                          [save=True] [save_txt=True] [save_conf=True] [classes=wall,door] [max_det=300]
     openobb-onnx info model=best.onnx
     openobb-onnx app [model=best.onnx] [port=8501]   the Streamlit test viewer (pip install streamlit)

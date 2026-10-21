@@ -15,7 +15,7 @@
     openobb calibrate model=best.pt data=data.yaml [out=calibrated.pt]   # re-choose the inference head / NMS on val
     openobb strip   model=runs/obb/train/weights/best.pt [out=model.pt half=True]   # deploy checkpoint:
                     # weights + architecture + classes only (no paths, training args or scores)
-    openobb export  model=best.pt [out=best.onnx imgsz=1280 opset=18]   # ONNX for the runtime wheel (no PyTorch,
+    openobb export  model=best.pt [out=best.onnx]   # ONNX (imgsz = the trained one) for the runtime wheel (no PyTorch,
                     # no architecture code): openobb_onnx / docs/ONNX.md. Needs pip install onnx onnxscript
 
     from openobb import OpenOBB
@@ -908,7 +908,7 @@ def main(argv=None):
         from openobb.export import export
         bad = [k for k in kv if k not in ("model", "out", "imgsz", "opset", "format")]
         if bad or "model" not in kv or str(kv.get("format", "onnx")).lower() != "onnx":
-            raise SystemExit("usage: openobb export model=<best.pt> [out=<best.onnx>] [imgsz=1280] [opset=18]")
+            raise SystemExit("usage: openobb export model=<best.pt> [out=<best.onnx>]   (imgsz: the trained one)")
         kv.pop("format", None)
         export(**kv)
         return 0

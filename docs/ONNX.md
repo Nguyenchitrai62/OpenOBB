@@ -8,7 +8,7 @@ trên `best.pt`.
 
 ```bash
 pip install "openobb[export]"          # onnx + onnxscript, cài một lần
-openobb export model=best.pt           # -> best.onnx cạnh best.pt; out=, imgsz=, opset= nếu cần
+openobb export model=best.pt           # -> best.onnx cạnh best.pt; out= để đổi tên / thư mục
 ```
 
 Python: `OpenOBB("best.pt").export(format="onnx")`. Export được các model dense từ OpenOBB17 tới OpenOBB24; bản mặc định để
