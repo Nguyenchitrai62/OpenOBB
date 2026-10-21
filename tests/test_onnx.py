@@ -186,6 +186,8 @@ def test_pt_code_runs_unchanged_on_onnx(tmp_path):
         model.train(data="x.yaml")
 
 
+@pytest.mark.skipif(not (Path(__file__).resolve().parents[1] / "tools" / "build_onnx_wheel.py").exists(),
+                    reason="the build script is not in this copy of the repository")
 def test_handover_wheel_installs_under_the_package_name(tmp_path):
     """The handover wheel installs the runtime as `openobb` (`hicasobb` in the product), class and command included."""
     import sys
