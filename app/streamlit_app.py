@@ -7,7 +7,7 @@ The whole page is the viewer (app/viewer/index.html, a two-way Streamlit compone
 model and the NMS threshold in its left panel. The model is a .pt checkpoint (PyTorch package) or an exported .onnx
 (openobb_onnx, the runtime handed over; needs onnxruntime): run_app.bat MODEL=... takes either.
 The model runs here exactly as in deployment (settings saved in best.pt:
-image size, head, NMS inside the network); a new NMS value re-runs it (cached per image and value). Everything else runs
+image size, head, NMS inside the network); every new image, NMS value or model runs the model again (only the last result is kept). Everything else runs
 in the browser without re-running: zoom / pan, click a box for its full details, confidence threshold, show / hide
 classes or single boxes, labels, TXT export of the visible boxes. The confidence filter gives the same boxes as passing
 conf= to predict (a lower-scored box never removes a higher-scored one).
@@ -60,7 +60,6 @@ def get_model(path):
     return OpenOBB(path)
 
 
-@st.cache_data(show_spinner=False, max_entries=16)
 def detect(path, data, iou):
     """predict() as deployed; iou=None: the NMS calibrated in best.pt, else that threshold ("none": no NMS)."""
     img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
@@ -119,7 +118,14 @@ def main():
         if req.get("data"):
             iou = req.get("nms")
             run_iou = None if iou is None or abs(iou - nms0) < 1e-9 else ("none" if iou >= 1.0 else float(iou))
-            img, r, ms = detect(str(path), base64.b64decode(req["data"]), run_iou)
+            # every request of the viewer (new image, NMS or model: a new id) runs the model; a rerun of the page
+            # without a new request reuses that one result (no cache of past images: they would hold the decoded pages)
+            key = (req.get("id"), str(path), run_iou)
+            last = st.session_state.get("last_run")
+            if last is None or last[0] != key:
+                last = (key, detect(str(path), base64.b64decode(req["data"]), run_iou))
+                st.session_state["last_run"] = last
+            img, r, ms = last[1]
             if img is None:
                 raise ValueError(f"Không đọc được ảnh {req.get('file')}")
             args["result"] = result(req.get("file") or "image", img, r, ms)
