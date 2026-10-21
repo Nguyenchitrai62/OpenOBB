@@ -93,4 +93,5 @@ GPU chưa đo trên máy thật. Lệnh đo khi có GPU: chạy `openobb-onnx pr
 `openobb predict` trên `.pt`.
 
 Test: `tests/test_onnx.py` (đầu ra mạng, NMS, end-to-end trên checkpoint thật nếu có). Build wheel:
-`python tools/build_onnx_wheel.py` (-> `dist_onnx/`); `tools/push_all.py` build bản sản phẩm vào `wheels/` của GitLab.
+`python tools/build_onnx_wheel.py` (-> `dist_onnx/`). `tools/push_all.py` build bản sản phẩm `hicasobb_onnx` vào `wheels/` của GitLab;
+đó là wheel duy nhất ở đó. Wheel gói đầy đủ (PyTorch, kiến trúc, train) chỉ lưu ở `dist_hicasobb/` trên máy, không đẩy lên.

@@ -151,9 +151,9 @@ LOCAL_WHEELS = ROOT / "dist_hicasobb"                 # every released product w
 
 
 def build_wheel(src):
-    """Product wheel (pure Python, ~200 KB) of the exported tree -> src/wheels/<wheel> (only the latest is kept
-    there; git history has the older ones) + a copy in LOCAL_WHEELS. Customers install it with
-    `pip install hicasobb-X.Y.Z-py3-none-any.whl` (dependencies from PyPI), no access to the repo needed."""
+    """Full product wheel (PyTorch package: architecture, training, inference; ~200 KB) of the exported tree -> LOCAL_WHEELS
+    only, for internal use. It is NOT published in GitLab wheels/ (user, 2026-10-21): the wheel handed over is the ONNX
+    runtime (build_onnx_wheel), which holds no architecture or training code."""
     import zipfile
     with tempfile.TemporaryDirectory() as tmp:
         run([sys.executable, "-m", "pip", "wheel", str(src), "--no-deps", "--no-build-isolation", "-q", "-w", tmp])
@@ -163,20 +163,20 @@ def build_wheel(src):
             bad = [n for n in z.namelist() if LEAK.search(n + z.read(n).decode("utf-8", "ignore"))]
         if bad:
             sys.exit(f"refusing to ship: research names inside the wheel: {bad[:5]}")
-        dst = src / "wheels"
-        dst.mkdir(exist_ok=True)
-        for old in dst.glob("*.whl"):
-            old.unlink()
-        shutil.copy(whl, dst / whl.name)
         LOCAL_WHEELS.mkdir(exist_ok=True)
         shutil.copy(whl, LOCAL_WHEELS / whl.name)
-    return dst / whl.name
+    return LOCAL_WHEELS / whl.name
 
 
 def build_onnx_wheel(src):
     """Handover wheel of the ONNX runtime (<product>_onnx: inference of exported .onnx models only, no PyTorch, no
-    architecture / training code; tools/build_onnx_wheel.py) -> src/wheels/ next to the product wheel + LOCAL_WHEELS."""
+    architecture / training code; tools/build_onnx_wheel.py) -> src/wheels/ (the only wheel there; older ones removed,
+    git history keeps them) + LOCAL_WHEELS."""
     import zipfile
+    dst = src / "wheels"
+    dst.mkdir(exist_ok=True)
+    for old in dst.glob("*.whl"):
+        old.unlink()
     sys.path.insert(0, str(ROOT / "tools"))
     from build_onnx_wheel import build
     whl = build(src, f"{PKG_NEW}_onnx", out=src / "wheels")
@@ -361,8 +361,8 @@ def main():
     whl = build_wheel(CHECKOUT)
     owhl = build_onnx_wheel(CHECKOUT)
     run(["git", "add", "-A", "wheels"], cwd=CHECKOUT)
-    print(f"   wheel {whl.name} ({whl.stat().st_size / 1024:.0f} KB) + ONNX runtime {owhl.name} "
-          f"({owhl.stat().st_size / 1024:.0f} KB): GitLab wheels/ and {LOCAL_WHEELS}")
+    print(f"   GitLab wheels/: ONNX runtime {owhl.name} ({owhl.stat().st_size / 1024:.0f} KB) only; full package wheel "
+          f"{whl.name} ({whl.stat().st_size / 1024:.0f} KB) kept in {LOCAL_WHEELS}")
     msg = f"Release {tag}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n"    # no repo / package names
     subprocess.run(["git", "commit", "-q", "-F", "-"], cwd=CHECKOUT, input=msg, text=True, check=True)
     run(["git", "push", "-q", "origin", "HEAD:main"], cwd=CHECKOUT)
