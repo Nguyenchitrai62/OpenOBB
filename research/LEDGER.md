@@ -1893,6 +1893,12 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     ProcessPowerThrottling, execution speed không bị hạ) khi nạp model ở cả `openobb_onnx` và `openobb.predict.load_model`, và ORT
     `session.intra_op.allow_spinning=0`. Đo lại khi đã ép EcoQoS trước: 1.09–1.11 s. Bản `.pt` (4–5 s trong app, 2.85 s khi đo
     trực tiếp) có lẽ cũng bị như vậy, chưa đo lại.
+  - **Thay thế trực tiếp (10-21, theo user: code deploy cũ không phải sửa, chỉ đổi path model):** wheel bàn giao cài runtime vào
+    đúng tên gói của gói đầy đủ (`hicasobb`, class `HicasOBB`, lệnh `hicasobb`; tên phân phối vẫn `hicasobb-onnx`, phải gỡ gói đầy
+    đủ trước). `predict` nhận đủ tham số của bản `.pt`; `Results` / `OBB` giống bản `.pt`, mảng numpy có `.cpu()`, `.numpy()`,
+    `.to()`... như tensor; `model.device.type`, `model.names`, `model.args`. Gói đầy đủ: `OpenOBB("x.onnx")` (`__new__`) và
+    `openobb predict model=x.onnx` trả về model ONNX. Test `test_pt_code_runs_unchanged_on_onnx`,
+    `test_handover_wheel_installs_under_the_package_name`.
   - Chưa làm: đo GPU (onnxruntime-gpu, TensorRT EP); fp16 (box học bằng px tới 2560 cần fp32 ở phần tinh chỉnh / bám ranh giới).
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)

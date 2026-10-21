@@ -95,8 +95,9 @@ Biến môi trường `OPENOBB_COMPILE=1` vẫn dùng được, có tác dụng 
 ## Export ONNX và infer ONNX
 
 File `.onnx` chứa toàn bộ mạng tới trước NMS, cùng các thiết lập đã hiệu chỉnh lúc train (tên class, imgsz, NMS, ngưỡng conf theo class).
-Tên layer, module và đường dẫn code bị xoá. Infer bằng `openobb_onnx`: dùng ONNX Runtime + numpy, không cần PyTorch, kết quả giống
-`openobb predict` trên `.pt`. Chi tiết và số đo: [docs/ONNX.md](docs/ONNX.md).
+Tên layer, module và đường dẫn code bị xoá. Infer chạy bằng ONNX Runtime + numpy, không cần PyTorch, kết quả giống `openobb predict` trên
+`.pt`. **Code infer không đổi:** `OpenOBB(...)` và `openobb predict` nhận cả `.pt` lẫn `.onnx`, kết quả cùng giao diện (`r.obb.xywhr`,
+`.cpu().numpy()`, `r.names`...); chỉ đổi đường dẫn model. Chi tiết và số đo: [docs/ONNX.md](docs/ONNX.md).
 
 **Export** (model OpenOBB17 – 24; nên dùng OpenOBB23):
 
@@ -114,21 +115,22 @@ OpenOBB("best.pt").export(format="onnx")           # -> best.onnx
 **Infer** (GPU NVIDIA: cài `onnxruntime-gpu[cuda,cudnn]` thay cho `onnxruntime`, driver hỗ trợ CUDA 13; không cài chung hai bản):
 
 ```bash
-openobb-onnx info model=best.onnx                                   # class, imgsz, NMS, thiết bị (cpu / cuda)
-openobb-onnx predict model=best.onnx source=pages/ conf=auto        # ảnh có box -> runs/obb/predict, predict2...
-openobb-onnx predict model=best.onnx source=page.png save_txt=True save_conf=True device=cpu classes=wall,door
+openobb predict model=best.onnx source=pages/ conf=auto         # ảnh có box -> runs/obb/predict, predict2...
+openobb predict model=best.onnx source=page.png save_txt=True save_conf=True device=cpu classes=wall,door
+openobb-onnx info model=best.onnx                                # class, imgsz, NMS, thiết bị (cpu / cuda:0)
 ```
 
 ```python
-from openobb_onnx import OpenOBB
-model = OpenOBB("best.onnx")                       # device=None: GPU nếu có, không thì CPU; "cpu", 0, "cuda:1", "trt"
-for r in model.predict("page.png", conf=0.3):      # ảnh, thư mục, glob, list, ảnh numpy (BGR) hoặc PIL
-    r.obb.xywhr, r.obb.xyxyxyxy, r.obb.conf, r.obb.cls, r.names
+from openobb import OpenOBB
+model = OpenOBB("best.onnx")                       # như "best.pt"; device=None: GPU nếu có, không thì CPU
+for r in model.predict("page.png", conf=0.3):      # cùng tham số với bản .pt
+    r.obb.xywhr.cpu().numpy(), r.obb.xyxyxyxy, r.obb.conf, r.obb.cls, r.names
     r.plot(); r.save_txt("page.txt"); r.to_json()
 ```
 
 Tham số giống `predict` của bản `.pt`: `conf` (số, hoặc `"auto"` = ngưỡng theo class lưu lúc train), `iou` (mặc định là NMS đã hiệu
-chỉnh; `"none"` = không NMS), `imgsz` (mặc định = imgsz lúc train, lưu trong file; không cần truyền), `max_det`, `classes`, `device`, `save`, `save_txt`, `save_conf`. App kéo thả ảnh:
+chỉnh; `"none"` = không NMS), `imgsz` (mặc định = imgsz lúc train, lưu trong file; không cần truyền), `max_det`, `classes`, `device`,
+`save`, `save_txt`, `save_conf`, `save_crop`, `stream`... File `.onnx` chỉ infer: `train` / `val` / `export` cần `.pt`. App kéo thả ảnh:
 `run_app.bat` nhận cả `.pt` lẫn `.onnx` ở dòng `MODEL=`.
 
 ## Các kiến trúc

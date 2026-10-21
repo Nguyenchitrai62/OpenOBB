@@ -194,6 +194,14 @@ class Metrics:
 class OpenOBB:
     task = "obb"
 
+    def __new__(cls, model="best.pt", *args, **kw):
+        """An exported .onnx path gives the ONNX runtime's model (openobb_onnx, same interface): the same inference code
+        runs a .pt or an .onnx, only the path changes."""
+        if cls is OpenOBB and str(model).lower().endswith(".onnx"):
+            from openobb_onnx import OpenOBB as OnnxModel
+            return OnnxModel(model, *args, **kw)
+        return super().__new__(cls)
+
     def __init__(self, model="best.pt", task=None, verbose=False):
         self.ckpt_path = str(model)
         self.model, self.device, self.args, self._names = None, None, {}, None

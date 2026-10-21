@@ -26,6 +26,17 @@ Bên nhận chỉ nhận **hai file**: model `best.onnx` và wheel `openobb_onnx
 Wheel chỉ chứa code infer ONNX (ONNX Runtime + numpy / OpenCV / shapely): **không PyTorch, không code kiến trúc, không code train**.
 File ONNX không còn tên layer / module / đường dẫn code. Kết quả giống hệt `openobb predict` trên `.pt`. Chi tiết: [docs/ONNX.md](docs/ONNX.md).
 
+**Code deploy không phải sửa.** Wheel này cài vào đúng tên gói `openobb`, cùng class `OpenOBB` và lệnh `openobb` như gói đầy đủ. Code
+infer đã viết cho `.pt` chạy nguyên văn, chỉ đổi đường dẫn model sang `.onnx`. Kết quả cũng có cùng giao diện (`r.obb.xywhr`,
+`.cpu().numpy()`, `r.names`, `r.plot()`...).
+
+```python
+from openobb import OpenOBB                       # giữ nguyên
+model = OpenOBB("best.onnx")                      # chỉ đổi: "best.pt" -> "best.onnx"
+for r in model.predict("page.png", conf=0.3):     # giữ nguyên
+    boxes = r.obb.xywhr.cpu().numpy()
+```
+
 ### Bước 1. Export (nội bộ, máy có gói đầy đủ và `best.pt`)
 
 ```bash
@@ -40,44 +51,47 @@ OpenOBB("best.pt").export(format="onnx")          # -> best.onnx
 ```
 
 File ONNX mang theo mọi thiết lập đã hiệu chỉnh lúc train (tên class, imgsz, NMS, ngưỡng conf theo class): bên nhận không cần cấu hình gì.
+Gói đầy đủ cũng chạy được file `.onnx` (`OpenOBB("best.onnx")`, `openobb predict model=best.onnx`) để thử trước khi giao.
 
-### Bước 2. Cài (bên nhận) — chọn MỘT trong hai
+### Bước 2. Cài (máy deploy) — chọn MỘT trong hai
+
+Wheel ONNX dùng cùng tên gói `openobb` với gói đầy đủ, nên máy đã cài wheel đầy đủ (bản cũ) phải gỡ nó trước; lệnh dưới đã có sẵn bước gỡ.
 
 **Máy có GPU NVIDIA** (driver hỗ trợ CUDA 13: `nvidia-smi` hiện "CUDA Version: 13.x"; CUDA / cuDNN tự cài qua pip, không cần cài CUDA riêng):
 
 ```bash
-pip uninstall -y onnxruntime
+pip uninstall -y openobb onnxruntime
 pip install "./openobb_onnx-X.Y.Z-py3-none-any.whl[gpu,app]"
-openobb-onnx info model=best.onnx                 # phải in "device cuda"
+openobb info model=best.onnx                      # phải in "device cuda:0"
 ```
 
 **Máy chỉ có CPU:**
 
 ```bash
-pip uninstall -y onnxruntime-gpu
+pip uninstall -y openobb onnxruntime-gpu
 pip install "./openobb_onnx-X.Y.Z-py3-none-any.whl[cpu,app]"
-openobb-onnx info model=best.onnx                 # in "device cpu"
+openobb info model=best.onnx                      # in "device cpu"
 ```
 
 Bỏ `,app` nếu không cần app Streamlit. Không cài chung `onnxruntime` và `onnxruntime-gpu`. Máy có GPU mà vẫn in "device cpu": xem cảnh
-báo khi nạp model (thường do driver cũ).
+báo khi nạp model (thường do driver cũ). Gói PyTorch (`torch`) không còn cần cho infer, gỡ hay giữ đều được.
 
 ### Bước 3. Infer
 
-Dòng lệnh (giống `yolo obb predict`):
+Dòng lệnh (giống `openobb predict` của gói đầy đủ và `yolo obb predict`):
 
 ```bash
-openobb-onnx predict model=best.onnx source=pages/                  # ảnh có box -> runs/obb/predict, predict2...
-openobb-onnx predict model=best.onnx source=page.png conf=auto save_txt=True save_conf=True
-openobb-onnx predict model=best.onnx source="pages/*.png" device=cpu classes=wall,door
+openobb predict model=best.onnx source=pages/                  # ảnh có box -> runs/obb/predict, predict2...
+openobb predict model=best.onnx source=page.png conf=auto save_txt=True save_conf=True
+openobb predict model=best.onnx source="pages/*.png" device=cpu classes=wall,door
 ```
 
-Python:
+Python (y như code cho `.pt`):
 
 ```python
-from openobb_onnx import OpenOBB
+from openobb import OpenOBB
 model = OpenOBB("best.onnx")                      # device=None: GPU nếu có, không thì CPU; "cpu", 0, "cuda:1"
-for r in model.predict("page.png", conf=0.3):     # ảnh, thư mục, glob, list, ảnh numpy (BGR) hoặc PIL
+for r in model.predict("page.png", conf=0.3):     # ảnh, thư mục, glob, URL, list, ảnh numpy (BGR), PIL hoặc tensor
     r.obb.xywhr        # (N, 5) cx, cy, w, h, góc (rad) theo pixel ảnh gốc
     r.obb.xyxyxyxy     # (N, 4, 2) bốn góc
     r.obb.conf, r.obb.cls, r.names
@@ -92,9 +106,12 @@ for r in model.predict("page.png", conf=0.3):     # ảnh, thư mục, glob, lis
 | `max_det` | 300 | số box tối đa mỗi ảnh |
 | `classes` | tất cả | id hoặc tên class cần giữ |
 | `device` | tự chọn | `cpu`, `0`, `cuda:1`, `trt` (TensorRT nếu có) |
-| `save`, `save_txt`, `save_conf` | CLI: `save=True` | lưu ảnh có box / nhãn YOLO-OBB (tọa độ chuẩn hoá) / kèm điểm |
+| `save`, `save_txt`, `save_conf`, `save_crop` | CLI: `save=True` | lưu ảnh có box / nhãn YOLO-OBB (tọa độ chuẩn hoá) / kèm điểm / ảnh cắt theo box |
 
-App kéo thả ảnh để thử model: `openobb-onnx app model=best.onnx`. Hoặc dùng file `run_app.bat` đặt cạnh thư mục `.venv`; muốn đổi model thì
+Các tham số khác của bản `.pt` (`stream`, `batch`, `agnostic_nms`, `project`, `name`, `line_width`, `show_*`, `tile`, `compile`...) đều nhận
+như cũ (`compile` không có tác dụng với ONNX). Chỉ `train`, `val`, `export` là báo lỗi: file `.onnx` chỉ dùng để infer.
+
+App kéo thả ảnh để thử model: `openobb app model=best.onnx`. Hoặc dùng file `run_app.bat` đặt cạnh thư mục `.venv`; muốn đổi model thì
 sửa dòng `MODEL=`:
 
 ```bat
@@ -103,7 +120,7 @@ set "MODEL=D:\models\best.onnx"
 cd /d "%~dp0"
 set "OPENOBB_MODEL=%MODEL%"
 if not exist "%MODEL%" echo Canh bao: khong thay model %MODEL%
-".venv\Scripts\python.exe" -m openobb_onnx.cli app
+".venv\Scripts\python.exe" -m openobb.cli app
 pause
 ```
 

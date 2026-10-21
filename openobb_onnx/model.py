@@ -6,6 +6,10 @@
     for r in results:
         r.obb.xywhr, r.obb.xyxyxyxy, r.obb.conf, r.obb.cls, r.names, r.plot(), r.save_txt("out.txt")
 
+Same interface as the PyTorch package's OpenOBB (constructor, predict arguments, Results with tensor-like arrays), so
+inference code written for a .pt runs unchanged with the .onnx path: the handover wheel installs this package under
+the PyTorch package's import name.
+
 Images are prepared as in training (long side = imgsz, padded to multiples of 32; tiles for tile-trained models), the
 graph runs the network up to the NMS, and the NMS / detection merge run in numpy with the settings calibrated at
 training (saved in the model file). Detections match `openobb predict` on the .pt.
@@ -15,6 +19,7 @@ import json
 import math
 import sys
 import time
+import warnings
 from pathlib import Path
 
 import cv2
@@ -108,8 +113,18 @@ def _files(s):
     return [p]
 
 
+def _read_url(url):
+    import urllib.request
+    with urllib.request.urlopen(url, timeout=30) as r:
+        im = cv2.imdecode(np.frombuffer(r.read(), np.uint8), cv2.IMREAD_COLOR)
+    if im is None:
+        raise FileNotFoundError(f"cannot decode image from {url}")
+    return im
+
+
 def list_sources(source):
-    """-> [(name, BGR image or loader)]: path, folder, glob, .txt list, numpy BGR image, PIL image, or a list."""
+    """-> [(name, BGR image or loader)]: path, folder, glob, .txt list, http(s) URL, numpy BGR image, PIL image, a
+    tensor (B, 3, H, W) RGB in [0, 1] (anything with .detach().cpu().numpy()), or a list of these."""
     if isinstance(source, (list, tuple)):
         out = []
         for i, s in enumerate(source):
@@ -122,12 +137,22 @@ def list_sources(source):
         elif im.shape[2] == 4:
             im = cv2.cvtColor(im, cv2.COLOR_BGRA2BGR)
         return [("image0.jpg", im)]
+    if hasattr(source, "detach") and hasattr(source, "permute"):        # torch tensor, without importing torch
+        t = np.asarray(source.detach().cpu().numpy(), np.float32)
+        t = t[None] if t.ndim == 3 else t
+        arr = (np.clip(t, 0, 1) * 255).round().astype(np.uint8).transpose(0, 2, 3, 1)[..., ::-1]
+        return [(f"image{i}.jpg", np.ascontiguousarray(a)) for i, a in enumerate(arr)]
     try:
         from PIL import Image
         if isinstance(source, Image.Image):
             return [("image0.jpg", np.ascontiguousarray(np.asarray(source.convert("RGB"))[..., ::-1]))]
     except ImportError:
         pass
+    if isinstance(source, int):
+        raise NotImplementedError("webcam sources are not supported (images only)")
+    if str(source).startswith(("http://", "https://")):
+        name = Path(str(source).split("?")[0]).name or "image0.jpg"
+        return [(name, lambda u=str(source): _read_url(u))]
     files = _files(str(source))
     if not files:
         raise FileNotFoundError(f"no images found in {source}")
@@ -141,14 +166,39 @@ def _read(path):
     return im
 
 
+# predict arguments of the PyTorch package / Ultralytics that only concern videos, streams or feature maps: accepted
+# with a warning (as the PyTorch package does)
+UNSUPPORTED = {"vid_stride", "stream_buffer", "visualize", "augment", "embed", "retina_masks", "save_frames",
+               "half", "dnn", "rect", "mode", "task", "model", "cfg", "tracker", "persist"}
+
+
+class Device(str):
+    """Device name ("cpu", "cuda:0", "tensorrt:0") that also has .type / .index, like torch.device."""
+
+    @property
+    def type(self):
+        return self.split(":")[0]
+
+    @property
+    def index(self):
+        return int(self.split(":")[1]) if ":" in self else None
+
+
 class OpenOBB:
     task = "obb"
 
-    def __init__(self, model="best.onnx", device=None, threads=None):
-        import onnxruntime as ort
-        self.path = str(model)
+    def __init__(self, model="best.onnx", task=None, verbose=False, device=None, threads=None):
+        self.path = self.ckpt_path = str(model)
+        if not self.path.lower().endswith(".onnx"):
+            raise ValueError(f"{self.path}: this package runs exported .onnx models (no PyTorch): export the .pt with "
+                             f"`openobb export model=<best.pt>` and pass the .onnx path")
         if not Path(self.path).exists():
             raise FileNotFoundError(self.path)
+        self.threads, self.compile = threads, False
+        self._open(device)
+
+    def _open(self, device=None):
+        import onnxruntime as ort
         so = ort.SessionOptions()
         so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         so.log_severity_level = 3
@@ -156,8 +206,8 @@ class OpenOBB:
         # when Windows throttles the process anyway (spinning threads on slow cores wait for each other)
         so.add_session_config_entry("session.intra_op.allow_spinning", "0")
         no_power_throttling()
-        if threads:
-            so.intra_op_num_threads = int(threads)
+        if self.threads:
+            so.intra_op_num_threads = int(self.threads)
         want = _providers(device)
         self.session = ort.InferenceSession(self.path, so, providers=want)
         if want[0] != "CPUExecutionProvider" and self.session.get_providers()[0] == "CPUExecutionProvider":
@@ -170,20 +220,68 @@ class OpenOBB:
         if self.meta.get("format") not in FORMATS:
             raise ValueError(f"{self.path}: model format {self.meta.get('format')} is newer than this package "
                              f"(reads {FORMATS}): update the package")
-        self.names = {i: n for i, n in enumerate(self.meta["names"])}
+        self._names = {i: n for i, n in enumerate(self.meta["names"])}
         self.input = self.session.get_inputs()[0].name
+        self.model = self.session                      # set: the model is loaded (as the PyTorch package's .model)
+        self._device = device
+
+    @property
+    def names(self):
+        return dict(self._names)
 
     @property
     def device(self):
+        """Device("cpu") / Device("cuda:0") / Device("tensorrt:0"): a str with .type / .index, like torch.device."""
         p = self.session.get_providers()[0]
-        return {"CUDAExecutionProvider": "cuda", "TensorrtExecutionProvider": "tensorrt"}.get(p, "cpu")
+        kind = {"CUDAExecutionProvider": "cuda", "TensorrtExecutionProvider": "tensorrt"}.get(p, "cpu")
+        if kind == "cpu":
+            return Device("cpu")
+        opts = self.session.get_provider_options().get(p, {})
+        return Device(f"{kind}:{int(opts.get('device_id', 0))}")
 
-    def info(self, verbose=True):
-        line = (f"{Path(self.path).name}: {len(self.names)} classes, imgsz {self.meta['imgsz']}, "
+    @property
+    def args(self):
+        """Settings saved in the model (the fields of the PyTorch package's model.args that inference reads)."""
+        m = self.meta
+        return {"img": m["imgsz"], "imgsz": m["imgsz"], "fit": m.get("fit", True), "scale": m.get("scale", 1.0),
+                "nms_iou": m.get("nms"), "conf_thr": dict(m.get("conf_thr") or {}), "task": "obb"}
+
+    @property
+    def overrides(self):
+        return {"task": "obb", "imgsz": self.meta["imgsz"]}
+
+    def to(self, device):
+        self._open(device)
+        return self
+
+    def eval(self):
+        return self
+
+    def fuse(self):
+        return self
+
+    def info(self, detailed=False, verbose=True):
+        line = (f"{Path(self.path).name}: {len(self._names)} classes, imgsz {self.meta['imgsz']}, "
                 f"NMS {self.meta.get('nms')}, device {self.device}")
         if verbose:
             print(line)
         return line
+
+    def _only_inference(self, what):
+        raise NotImplementedError(f"{what}: an exported .onnx model only runs inference (predict); train / val / "
+                                  f"export need the .pt and the full package")
+
+    def train(self, *_, **__):
+        self._only_inference("train")
+
+    def val(self, *_, **__):
+        self._only_inference("val")
+
+    def export(self, *_, **__):
+        self._only_inference("export")
+
+    def track(self, *_, **__):
+        raise NotImplementedError("tracking is not supported: detection on still images")
 
     def warmup(self, imgsz=None):
         """One run on a blank page: the first run allocates the memory pools (and on a GPU loads the kernels)."""
@@ -239,19 +337,30 @@ class OpenOBB:
         return [float(conf)] * len(names)
 
     # ---- inference
-    def predict(self, source=None, conf=0.25, iou=None, imgsz=None, max_det=300, classes=None, agnostic_nms=False,
-                batch=1, tile=None, verbose=True, save=False, save_txt=False, save_conf=False, project=None, name=None,
-                exist_ok=False, line_width=None, show_labels=True, show_conf=True, stream=False):
-        """-> list[Results] (a generator with stream=True). conf: score threshold or "auto" (per-class thresholds
-        of training); iou: NMS threshold (None: the one calibrated at training, "none": no NMS); classes: ids or
-        names to keep; tile: True / False forces tiling / whole-image resize."""
+    def predict(self, source=None, stream=False, conf=0.25, iou=None, imgsz=None, device=None, batch=1, max_det=300,
+                classes=None, agnostic_nms=False, verbose=True, save=False, save_txt=False, save_conf=False,
+                save_crop=False, show=False, show_labels=True, show_conf=True, show_boxes=True, line_width=None,
+                project=None, name=None, exist_ok=False, tile=None, compile=None, **kw):
+        """-> list[Results] (a generator with stream=True): the arguments and defaults of the PyTorch package's predict.
+        conf: score threshold or "auto" (per-class thresholds of training); iou: NMS threshold (None: the one calibrated
+        at training, "none": no NMS); classes: ids or names to keep; tile: True / False forces tiling / whole-image
+        resize; device: moves the model to that device (as the PyTorch package); compile: ignored (ONNX Runtime
+        already optimises the graph)."""
+        bad = [k for k in kw if k not in UNSUPPORTED]
+        if bad:
+            raise SyntaxError(f"'{bad[0]}' is not a valid predict argument")
+        for k in kw:
+            if k not in ("half", "mode", "task", "model", "rect", "dnn"):
+                warnings.warn(f"predict argument '{k}' is not supported (images only) and is ignored", stacklevel=2)
+        if device not in (None, "") and str(device) != str(self._device):
+            self._open(device)
         gen = self._predict(source, conf, iou, imgsz, max_det, classes, agnostic_nms, max(int(batch or 1), 1), tile,
-                            verbose, save, save_txt, save_conf, project, name, exist_ok, line_width, show_labels,
-                            show_conf)
+                            verbose, save, save_txt, save_conf, save_crop, show, project, name, exist_ok, line_width,
+                            show_labels, show_conf, show_boxes)
         return gen if stream else list(gen)
 
     def _predict(self, source, conf, iou, imgsz, max_det, classes, agnostic_nms, batch, tile, verbose, save, save_txt,
-                 save_conf, project, name, exist_ok, line_width, show_labels, show_conf):
+                 save_conf, save_crop, show, project, name, exist_ok, line_width, show_labels, show_conf, show_boxes):
         m = self.meta
         names = m["names"]
         size = int(max(imgsz) if isinstance(imgsz, (list, tuple)) else (imgsz or m["imgsz"]))
@@ -270,7 +379,7 @@ class OpenOBB:
             cl = classes if isinstance(classes, (list, tuple)) else [classes]
             keep_cls = {int(c) if str(c).isdigit() else names.index(str(c)) for c in cl}
         save_dir = None
-        if save or save_txt:
+        if save or save_txt or save_crop:
             save_dir = _increment(Path(project or "runs/obb") / (name or "predict"), exist_ok)
             save_dir.mkdir(parents=True, exist_ok=True)
         srcs = list_sources(source)
@@ -298,17 +407,21 @@ class OpenOBB:
             speed = {"preprocess": (t1 - t0) * 1e3, "inference": (t2 - t1) * 1e3, "postprocess": (t3 - t2) * 1e3}
             t_sum += [speed["preprocess"], speed["inference"], speed["postprocess"]]
             n_img += 1
-            r = Results(img, path, self.names, OBB(data, img.shape[:2]), speed, str(save_dir) if save_dir else None)
+            r = Results(img, path, self._names, OBB(data, img.shape[:2]), speed, str(save_dir) if save_dir else None)
             if verbose:
                 s = self.last_shape
                 print(f"image {k + 1}/{len(srcs)} {path}: {s[2]}x{s[3]} {r.verbose()}{speed['inference']:.1f}ms")
             if save_dir is not None:
                 p = Path(path)
+                plot_kw = dict(line_width=line_width, labels=show_labels, conf=show_conf, boxes=show_boxes)
                 if save:
-                    r.save(str(save_dir / (p.stem + (p.suffix or ".jpg"))), line_width=line_width,
-                           labels=show_labels, conf=show_conf)
+                    r.save(str(save_dir / (p.stem + (p.suffix or ".jpg"))), **plot_kw)
                 if save_txt:
                     r.save_txt(str(save_dir / "labels" / f"{p.stem}.txt"), save_conf=save_conf)
+                if save_crop:
+                    r.save_crop(save_dir / "crops", p.stem)
+            if show:
+                r.show(line_width=line_width, labels=show_labels, conf=show_conf, boxes=show_boxes)
             yield r
         if verbose and n_img:
             t = t_sum / n_img

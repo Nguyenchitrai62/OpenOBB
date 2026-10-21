@@ -441,6 +441,8 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
   **OpenOBB23-x** (user: v24 không hơn v23). Khớp `.pt` 1158 / 1158 box; CPU nhanh hơn 2.4×. Tài liệu [docs/ONNX.md](docs/ONNX.md),
   test `tests/test_onnx.py`, build `tools/build_onnx_wheel.py` (push_all gọi). Thư mục thử cài: `F:\Source_code\OpenOBB_test_wheel`
   (`.venv` không torch, `run_app.bat`). Chưa đo GPU.
+  Cùng ngày: GitLab `wheels/` chỉ còn wheel ONNX (wheel đầy đủ chỉ ở `dist_hicasobb/`); wheel ONNX cài dưới tên `hicasobb` để code
+  deploy cũ chạy nguyên, chỉ đổi path `.pt` → `.onnx`; gói đầy đủ cũng nhận `.onnx`. Phát hành v0.25.8 → v0.25.10.
 
 - 2026-10-21: **F116: `compile=` cho predict / val giống YOLO** (theo user; mặc định tắt). `predict.compile_mode` / `compile_model`
   (compile `encode` + trường ranh giới, head eager; lỗi trình biên dịch → cảnh báo, chạy bản thường), `OpenOBB.predict(compile=)`,

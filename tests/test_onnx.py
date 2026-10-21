@@ -151,3 +151,54 @@ def test_runtime_nms_matches_fast_nms():
     sc, lab, bx = fast_nms(s[order], s[order], order % C, box[order // C], conf=0.05, iou=0.5, max_det=300)
     assert len(sc) == keep_t
     np.testing.assert_allclose(np.sort(bx[:, 0]), np.sort(bt[0, :keep_t, 0].numpy()), atol=1e-4)
+
+
+def _pt_style_inference(model_path, img, tmp_path):
+    """Inference code as written for a .pt model (PyTorch package API): only the path changes for an .onnx."""
+    from openobb import OpenOBB
+    model = OpenOBB(model_path)
+    names = model.names
+    out = []
+    for r in model.predict(img, conf=0.1, iou=None, imgsz=None, device="cpu", max_det=300, stream=True, verbose=False,
+                           save_crop=True, project=str(tmp_path), name="pred", show_boxes=True, compile=False):
+        xywhr = r.obb.xywhr.cpu().numpy()
+        conf, cls = r.obb.conf.cpu().numpy(), r.obb.cls.cpu().numpy().astype(int)
+        corners = r.obb.xyxyxyxy.cpu().numpy()
+        assert xywhr.shape == (len(r), 5) and corners.shape == (len(r), 4, 2) and r.boxes is None
+        assert [names[int(c)] for c in cls] == [d["name"] for d in r.summary()]
+        out.append((len(r), r.plot().shape, r.to_json()[:1]))
+    return model, out
+
+
+def test_pt_code_runs_unchanged_on_onnx(tmp_path):
+    """OpenOBB("x.onnx") gives the ONNX runtime's model; code written for the .pt results runs as it is."""
+    from openobb_onnx import OpenOBB as Onnx
+    p = _ckpt(tmp_path)
+    out = export(str(p), verbose=False)
+    img = _image()
+    model, res = _pt_style_inference(out, img, tmp_path)
+    assert isinstance(model, Onnx) and model.device.type == "cpu" and model.args["imgsz"] == 256
+    _, ref = _pt_style_inference(str(p), img, tmp_path)
+    assert res[0][1] == ref[0][1] and res[0][2] == ref[0][2] == "["
+    with pytest.raises(ValueError, match="exported .onnx"):
+        Onnx(str(p))                                              # the runtime alone: a .pt gets a clear message
+    with pytest.raises(NotImplementedError):
+        model.train(data="x.yaml")
+
+
+def test_handover_wheel_installs_under_the_package_name(tmp_path):
+    """The handover wheel installs the runtime as `openobb` (`hicasobb` in the product), class and command included."""
+    import sys
+    import zipfile
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+    from build_onnx_wheel import build
+    whl = build(out=tmp_path)
+    with zipfile.ZipFile(whl) as z:
+        names = z.namelist()
+        ep = z.read([n for n in names if n.endswith("entry_points.txt")][0]).decode()
+        app = z.read("openobb/app.py").decode()
+        init = z.read("openobb/__init__.py").decode()
+    assert whl.name.startswith("openobb_onnx-") and all(n.startswith(("openobb/", "openobb_onnx-")) for n in names)
+    assert "openobb = openobb.cli:main" in ep and "openobb-onnx = openobb.cli:main" in ep
+    assert "from openobb import OpenOBB" in app and "openobb_onnx" not in app + init
+    assert not any(n.startswith("openobb/models") or n.endswith(("train.py", "export.py")) for n in names)
