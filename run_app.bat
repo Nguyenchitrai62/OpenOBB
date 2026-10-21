@@ -1,6 +1,6 @@
 @echo off
 REM Mo app test model OpenOBB (keo tha anh).
-REM ===== Doi model o day (duong dan .pt). De trong thi dung MODEL_PATH trong app\streamlit_app.py / thu muc models\ =====
+REM ===== Doi model o day: file .pt (PyTorch) hoac .onnx (ONNX Runtime, nhu ban giao). De trong thi dung MODEL_PATH trong app\streamlit_app.py / thu muc models\ =====
 set "MODEL=F:\Downloads\floorplan_new.pt"
 REM ==========================================================================================================
 cd /d "%~dp0"

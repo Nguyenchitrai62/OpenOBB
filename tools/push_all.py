@@ -92,7 +92,7 @@ TRANSFORMS = [
 # args["arch"]), so .pt files trained with either name load in both.
 PKG_NEW, CLI_NEW, CLASS_NEW = "hicasobb", "hicasobb", "HicasOBB"
 KEEP = (GITLAB_PIP,)
-TEXT_EXT = {".py", ".md", ".toml", ".txt", ".bat", ".cfg", ".ini", ".json", ".yaml", ".yml"}
+TEXT_EXT = {".py", ".md", ".toml", ".txt", ".bat", ".cfg", ".ini", ".json", ".yaml", ".yml", ".html"}
 TEXT_NAMES = {"LICENSE", "NOTICE", "COPYING"}                      # text files without a suffix
 
 

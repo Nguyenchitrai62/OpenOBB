@@ -4,7 +4,9 @@
     streamlit run app/streamlit_app.py
 
 The whole page is the viewer (app/viewer/index.html, a two-way Streamlit component): drop or pick an image, choose the
-model and the NMS threshold in its left panel. The model runs here exactly as in deployment (settings saved in best.pt:
+model and the NMS threshold in its left panel. The model is a .pt checkpoint (PyTorch package) or an exported .onnx
+(openobb_onnx, the runtime handed over; needs onnxruntime): run_app.bat MODEL=... takes either.
+The model runs here exactly as in deployment (settings saved in best.pt:
 image size, head, NMS inside the network); a new NMS value re-runs it (cached per image and value). Everything else runs
 in the browser without re-running: zoom / pan, click a box for its full details, confidence threshold, show / hide
 classes or single boxes, labels, TXT export of the visible boxes. The confidence filter gives the same boxes as passing
@@ -47,6 +49,14 @@ def _np(x):
 
 @st.cache_resource(show_spinner=False)
 def get_model(path):
+    """.onnx: the ONNX runtime (openobb_onnx, as handed over); anything else: the PyTorch package."""
+    if str(path).lower().endswith(".onnx"):
+        try:
+            from openobb_onnx import OpenOBB as OnnxOBB
+        except ImportError as e:
+            raise ImportError(f"{e}: chạy model .onnx cần ONNX Runtime: pip install onnxruntime (GPU: "
+                              f"onnxruntime-gpu[cuda,cudnn])") from e
+        return OnnxOBB(path).warmup()
     return OpenOBB(path)
 
 
@@ -61,9 +71,12 @@ def detect(path, data, iou):
     return img, r, (time.perf_counter() - t) * 1000
 
 
-def default_nms(args):
-    """The NMS calibrated at the end of training (saved in best.pt) as a slider value; 1.0 = no NMS."""
-    v = parse_nms(args.get("nms_iou"))
+def default_nms(model):
+    """The NMS calibrated at the end of training (saved in best.pt / the .onnx) as a slider value; 1.0 = no NMS."""
+    if hasattr(model, "meta"):                    # .onnx: the network's NMS threshold, None = NMS-free
+        v = model.meta.get("nms")
+        return 1.0 if v is None else float(v)
+    v = parse_nms(model.args.get("nms_iou"))
     if v is None:
         return 0.7
     if v == "none":
@@ -90,7 +103,8 @@ def main():
     st.set_page_config(page_title="OpenOBB test", page_icon="📐", layout="wide", initial_sidebar_state="collapsed")
     st.markdown(HIDE_PAGE, unsafe_allow_html=True)
     req = st.session_state.get("viewer") or {}          # what the viewer asked for last: image, model, NMS
-    local = sorted((ROOT / "models").glob("*.pt"), key=lambda f: f.stat().st_mtime, reverse=True)
+    local = sorted([*(ROOT / "models").glob("*.pt"), *(ROOT / "models").glob("*.onnx")], key=lambda f: f.stat().st_mtime,
+                   reverse=True)
     path = Path(req.get("model") or (MODEL_PATH if (ROOT / MODEL_PATH).exists() or not local else str(local[0])))
     path = path if path.is_absolute() else ROOT / path
     args = {"id": req.get("id", 0), "model": str(path)}
@@ -98,9 +112,10 @@ def main():
         if not path.exists():
             raise FileNotFoundError(f"Không thấy model: {path}")
         model = get_model(str(path))
-        nms0 = default_nms(model.args)
-        args.update(nms0=nms0, info=f"{model.device}" + (" · cài xong PyTorch GPU, mở lại app để dùng GPU"
-                                                          if TORCH_SETUP == "restart" else ""))
+        nms0 = default_nms(model)
+        onnx = hasattr(model, "meta")
+        args.update(nms0=nms0, info=("ONNX Runtime · " if onnx else "") + f"{model.device}"
+                    + (" · cài xong PyTorch GPU, mở lại app để dùng GPU" if TORCH_SETUP == "restart" and not onnx else ""))
         if req.get("data"):
             iou = req.get("nms")
             run_iou = None if iou is None or abs(iou - nms0) < 1e-9 else ("none" if iou >= 1.0 else float(iou))
