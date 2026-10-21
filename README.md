@@ -91,8 +91,45 @@ Biến môi trường `OPENOBB_COMPILE=1` vẫn dùng được, có tác dụng 
 - Đo thời gian từng khối trên GPU: `openobb profile model=best.pt detail=True`.
 - Đo thời gian một bước train (forward / loss / backward / optimizer): `openobb profile model=best.pt train=True imgsz=960 batch=32`.
 - Train v18–v24 bật `compile` mặc định (epoch đầu lâu hơn để biên dịch, các epoch sau nhanh hơn khoảng 25%); `compile=False` để tắt.
-- **Bàn giao không kèm code:** `openobb export model=best.pt` → `best.onnx`, chạy bằng wheel `openobb_onnx` (ONNX Runtime, không
-  PyTorch, không code kiến trúc / train; cài GPU và CPU riêng). Kết quả giống `.pt`: [docs/ONNX.md](docs/ONNX.md).
+
+## Export ONNX và infer ONNX
+
+File `.onnx` chứa toàn bộ mạng tới trước NMS, cùng các thiết lập đã hiệu chỉnh lúc train (tên class, imgsz, NMS, ngưỡng conf theo class).
+Tên layer, module và đường dẫn code bị xoá. Infer bằng `openobb_onnx`: dùng ONNX Runtime + numpy, không cần PyTorch, kết quả giống
+`openobb predict` trên `.pt`. Chi tiết và số đo: [docs/ONNX.md](docs/ONNX.md).
+
+**Export** (model OpenOBB17 – 24; nên dùng OpenOBB23):
+
+```bash
+pip install onnx onnxscript onnxruntime            # hoặc pip install "openobb[export]"
+openobb export model=best.pt                       # -> best.onnx cạnh best.pt
+openobb export model=best.pt out=giao/best.onnx imgsz=1280
+```
+
+```python
+from openobb import OpenOBB
+OpenOBB("best.pt").export(format="onnx")           # -> best.onnx
+```
+
+**Infer** (GPU NVIDIA: cài `onnxruntime-gpu[cuda,cudnn]` thay cho `onnxruntime`, driver hỗ trợ CUDA 13; không cài chung hai bản):
+
+```bash
+openobb-onnx info model=best.onnx                                   # class, imgsz, NMS, thiết bị (cpu / cuda)
+openobb-onnx predict model=best.onnx source=pages/ conf=auto        # ảnh có box -> runs/obb/predict, predict2...
+openobb-onnx predict model=best.onnx source=page.png save_txt=True save_conf=True device=cpu classes=wall,door
+```
+
+```python
+from openobb_onnx import OpenOBB
+model = OpenOBB("best.onnx")                       # device=None: GPU nếu có, không thì CPU; "cpu", 0, "cuda:1", "trt"
+for r in model.predict("page.png", conf=0.3):      # ảnh, thư mục, glob, list, ảnh numpy (BGR) hoặc PIL
+    r.obb.xywhr, r.obb.xyxyxyxy, r.obb.conf, r.obb.cls, r.names
+    r.plot(); r.save_txt("page.txt"); r.to_json()
+```
+
+Tham số giống `predict` của bản `.pt`: `conf` (số, hoặc `"auto"` = ngưỡng theo class lưu lúc train), `iou` (mặc định là NMS đã hiệu
+chỉnh; `"none"` = không NMS), `imgsz`, `max_det`, `classes`, `device`, `save`, `save_txt`, `save_conf`. App kéo thả ảnh:
+`run_app.bat` nhận cả `.pt` lẫn `.onnx` ở dòng `MODEL=`.
 
 ## Các kiến trúc
 

@@ -21,13 +21,14 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest"]
 app = ["streamlit", "pandas"]
-export = ["onnx>=1.16", "onnxscript>=0.3"]       # openobb export (ONNX); the runtime wheel is tools/build_onnx_wheel.py
+export = ["onnx>=1.16", "onnxscript>=0.3", "onnxruntime>=1.21"]   # openobb export + openobb-onnx (ONNX); GPU: onnxruntime-gpu[cuda,cudnn]
 
 [project.scripts]
 openobb = "openobb.cli:main"
+openobb-onnx = "openobb_onnx.cli:main"
 
 [tool.setuptools.dynamic]
 version = { attr = "openobb.__version__" }
 
 [tool.setuptools.packages.find]
-include = ["openobb", "openobb.*"]               # not openobb_onnx: the ONNX runtime has its own wheel
+include = ["openobb", "openobb.*", "openobb_onnx"]   # + the ONNX runtime (handover wheel: tools/build_onnx_wheel.py)
