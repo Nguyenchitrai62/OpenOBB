@@ -38,7 +38,7 @@ def fused_copy(module, device):
     vm = copy.deepcopy(module).eval()
     vm.fuse()
     from openobb.predict import fast_layout
-    return fast_layout(vm, device)
+    return fast_layout(vm, device, compile=False)
 
 
 def compile_training(model):
@@ -502,7 +502,7 @@ def main(argv=None):
             teacher = None
             if a.teacher:
                 from openobb.predict import load_model
-                teacher = load_model(a.teacher, device)[0].eval()
+                teacher = load_model(a.teacher, device, compile=False)[0].eval()
                 for p_ in teacher.parameters():
                     p_.requires_grad_(False)
                 log(f"[distill] neck distilled from the encoder of {a.teacher} (weight {a.w_distill:g})", console=True)
@@ -999,7 +999,7 @@ def main(argv=None):
         from openobb.models.openobb7 import fuse_model
         fuse_model(vm)
     from openobb.predict import fast_layout
-    vm = fast_layout(vm, device)                     # channels_last on a GPU (after folding BN), as at inference (F97)
+    vm = fast_layout(vm, device, compile=False)                     # channels_last on a GPU (after folding BN), as at inference (F97)
 
     def final_eval(nms):
         apply_nms(vm, nms)

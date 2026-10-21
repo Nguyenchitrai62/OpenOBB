@@ -70,15 +70,22 @@ for r in model.predict("page.png", conf=0.3):
 `best.pt` dùng thẳng được, không cần export: khi nạp, model tự gộp Conv + BatchNorm, chạy bf16 và `channels_last` trên GPU.
 Bảng đối chiếu đầy đủ với Ultralytics: [docs/DEPLOY.md](docs/DEPLOY.md).
 
-**Nhanh hơn với `compile`** (GPU, tiến trình chạy lâu như server): đặt biến môi trường **trước** khi nạp model. Lần gọi đầu mất 1–3 phút
-biên dịch, các lần sau nhanh hơn khoảng 12%.
+**Nhanh hơn với `compile`** (như `compile=` của YOLO; mặc định tắt): hợp với tiến trình chạy lâu như server. Lần gọi đầu mất 1–3 phút
+biên dịch, các lần sau nhanh hơn khoảng 12% (G4). Nhận `True` hoặc tên mode của `torch.compile` (`reduce-overhead`, `max-autotune`...).
+Không biên dịch được thì báo cảnh báo và chạy bản thường.
 
 ```python
-import os
-os.environ["OPENOBB_COMPILE"] = "1"
 from openobb import OpenOBB
 model = OpenOBB("best.pt")
+model.predict("pages/", compile=True)
 ```
+
+```bash
+openobb predict model=best.pt source=pages/ compile=True
+openobb val model=best.pt data=data.yaml compile=True
+```
+
+Biến môi trường `OPENOBB_COMPILE=1` vẫn dùng được, có tác dụng khi không truyền `compile=`.
 
 - File giao đi gọn hơn (fp16, bỏ tham số train; tốc độ không đổi): `openobb strip model=best.pt half=True`.
 - Đo thời gian từng khối trên GPU: `openobb profile model=best.pt detail=True`.

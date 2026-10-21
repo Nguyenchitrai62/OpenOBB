@@ -27,7 +27,7 @@ from openobb.results import OBB, Results, regularize_xywhr
 VID_EXT = (".asf", ".avi", ".gif", ".m4v", ".mkv", ".mov", ".mp4", ".mpeg", ".mpg", ".ts", ".wmv", ".webm")
 # Ultralytics predict arguments that only concern videos / streams / feature maps: accepted with a warning
 UNSUPPORTED = {"vid_stride", "stream_buffer", "visualize", "augment", "embed", "retina_masks", "save_frames",
-               "half", "dnn", "rect", "mode", "task", "model", "cfg", "tracker", "persist", "compile"}
+               "half", "dnn", "rect", "mode", "task", "model", "cfg", "tracker", "persist"}
 
 
 def _to_bgr(im):
@@ -198,17 +198,19 @@ class OpenOBB:
         self.ckpt_path = str(model)
         self.model, self.device, self.args, self._names = None, None, {}, None
         self.predictor = None
+        self.compile = None                            # torch.compile mode of the model, False = eager, None = not set
         if self.ckpt_path.endswith(".pt"):
             if not Path(self.ckpt_path).exists():
                 raise FileNotFoundError(self.ckpt_path)
             self._load()
 
     # ---- loading
-    def _load(self, device=None):
-        from openobb.predict import load_model
+    def _load(self, device=None, compile=None):
+        from openobb.predict import compile_mode, load_model
         dev = _device(device)
-        self.model, names, self.args = load_model(self.ckpt_path, dev, 900)        # 900 queries (OpenOBB1), as the CLI
-        self.device, self._names = dev, {i: n for i, n in enumerate(names)}
+        mode = compile_mode(compile)                   # not given: OPENOBB_COMPILE, else off
+        self.model, names, self.args = load_model(self.ckpt_path, dev, 900, compile=mode or False)   # 900: OpenOBB1
+        self.device, self._names, self.compile = dev, {i: n for i, n in enumerate(names)}, mode or False
 
     @property
     def names(self):
@@ -219,7 +221,7 @@ class OpenOBB:
         return {"task": "obb", "imgsz": self.args.get("img"), "data": self.args.get("data")}
 
     def to(self, device):
-        self._load(device)
+        self._load(device, self.compile)
         return self
 
     def eval(self):
@@ -249,17 +251,27 @@ class OpenOBB:
     def predict(self, source=None, stream=False, conf=0.25, iou=None, imgsz=None, device=None, batch=1, max_det=300,
                 classes=None, agnostic_nms=False, verbose=True, save=False, save_txt=False, save_conf=False,
                 save_crop=False, show=False, show_labels=True, show_conf=True, show_boxes=True, line_width=None,
-                project=None, name=None, exist_ok=False, tile=None, **kw):
+                project=None, name=None, exist_ok=False, tile=None, compile=None, **kw):
         """-> list[Results] (a generator with stream=True), with the Ultralytics predict arguments and defaults.
         Extensions: conf='auto' (per-class thresholds of best.pt), classes may also be names, tile=True/False forces
-        tiling at native resolution / whole-image resize. iou defaults to 0.7 (0.1 when tiles are merged)."""
+        tiling at native resolution / whole-image resize. iou defaults to 0.7 (0.1 when tiles are merged).
+        compile=True or a torch.compile mode ("reduce-overhead", "max-autotune"...) as in Ultralytics: the model is
+        compiled once (the first call takes 1-3 min) and stays compiled; compile=False goes back to eager. Not given:
+        the model as loaded (OPENOBB_COMPILE=1 at load, otherwise eager)."""
         bad = [k for k in kw if k not in UNSUPPORTED]
         if bad:
             raise SyntaxError(f"'{bad[0]}' is not a valid OpenOBB predict argument")
         for k in kw:
-            if k not in ("half", "mode", "task", "model", "rect", "compile", "dnn"):
+            if k not in ("half", "mode", "task", "model", "rect", "dnn"):
                 warnings.warn(f"predict argument '{k}' is not supported by OpenOBB (images only) and is ignored",
                               stacklevel=2)
+        if compile is not None:
+            from openobb.predict import compile_mode
+            mode = compile_mode(compile) or False
+            if self.model is None:
+                self.compile = mode                   # applied when the model is loaded below
+            elif mode != self.compile:
+                self._load(self.device if device in (None, "") else device, mode)
         gen = self._predict(source, conf, iou, imgsz, device, max(int(batch or 1), 1), max_det, classes,
                             agnostic_nms, verbose, save, save_txt, save_conf, save_crop, show, show_labels, show_conf,
                             show_boxes, line_width, project, name, exist_ok, tile)
@@ -272,8 +284,10 @@ class OpenOBB:
         from openobb.ops.obb import nms_poly
         from openobb.predict import conf_thresholds, merge_dets, predict_image
         from openobb.speed import nms_timer
-        if self.model is None or (device not in (None, "") and _device(device) != self.device):
-            self._load(device)
+        if self.model is None:
+            self._load(device, self.compile)          # None: OPENOBB_COMPILE decides
+        elif device not in (None, "") and _device(device) != self.device:
+            self._load(device, self.compile)
         a = self.args
         names = [self._names[i] for i in range(len(self._names))]
         if isinstance(imgsz, (list, tuple)):

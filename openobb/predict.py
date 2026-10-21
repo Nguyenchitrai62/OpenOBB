@@ -214,29 +214,81 @@ def merge_iou_for(v, fit):
     return 0.7 if v is None else (None if v == "none" else v)
 
 
-def fast_layout(m, device):
+COMPILE_MODES = ("default", "reduce-overhead", "max-autotune", "max-autotune-no-cudagraphs")
+
+
+def compile_mode(compile=None):
+    """`compile=` of predict / val, as in Ultralytics: False (off), True ("default") or a torch.compile mode name.
+    Not given (None): the OPENOBB_COMPILE environment variable (1 or a mode name), otherwise off. -> mode or None."""
+    import os
+    if compile is None:
+        compile = os.environ.get("OPENOBB_COMPILE", "0")
+    if isinstance(compile, str):
+        v = compile.strip().lower()
+        if v in ("", "0", "false", "no", "off", "none"):
+            return None
+        if v in ("1", "true", "yes", "on"):
+            return "default"
+        if v not in COMPILE_MODES:
+            raise ValueError(f"compile={compile!r}: use True / False or one of {', '.join(COMPILE_MODES)}")
+        return v
+    return "default" if compile else None
+
+
+def compile_model(m, device, mode):
+    """torch.compile of what a dense OpenOBB model (v12+) runs before its heads: `encode` (trunk + neck) and the
+    boundary field, with dynamic shapes so rectangular pages of different sizes reuse one graph. The heads stay eager
+    (F97: compiling them failed). 9.1 -> 8.0 ms / image on a G4 (F97); the first call compiles (1-3 min).
+    A compiler that is missing or fails gives a warning and the model runs uncompiled, as Ultralytics does."""
+    import warnings
+    if mode is None:
+        return m
+    if not (hasattr(m, "run_head") and hasattr(m, "encode")) or not hasattr(torch, "compile"):
+        warnings.warn("compile: only dense OpenOBB models (v12+) are compiled; running uncompiled", stacklevel=3)
+        return m
+    if torch.device(device).type == "cpu":            # inductor on a CPU needs a host C++ compiler
+        try:
+            from torch._inductor.cpp_builder import get_cpp_compiler
+            get_cpp_compiler()
+        except ImportError:
+            pass
+        except Exception as e:
+            warnings.warn(f"compile: no C++ compiler for torch.compile on the CPU, running uncompiled ({e})",
+                          stacklevel=3)
+            return m
+    import torch._dynamo as dynamo
+    dynamo.config.suppress_errors = True              # a graph that fails at its first call runs eagerly (warning)
+    try:
+        encode = torch.compile(m.encode, mode=mode, dynamic=True)
+        field = None if getattr(m, "field", None) is None else torch.compile(m.field.forward, mode=mode, dynamic=True)
+    except Exception as e:
+        warnings.warn(f"compile: torch.compile failed, running uncompiled ({e})", stacklevel=3)
+        return m
+    m.encode = encode
+    if field is not None:
+        m.field.forward = field                       # the module (and its state_dict keys) stays as it is
+    print(f"compile: torch.compile '{mode}' (trunk + neck{', boundary field' if field is not None else ''}); "
+          f"the first call compiles (1-3 min)", flush=True)
+    return m
+
+
+def fast_layout(m, device, compile=None):
     """Dense OpenOBB models (v12+) on a GPU: weights in channels_last (NHWC), the layout tensor cores read natively;
-    same outputs, trunk + neck 7.2 -> 5.7 ms / image on a G4 at batch 16 (F97). OPENOBB_CHANNELS_LAST=0 turns it off."""
+    same outputs, trunk + neck 7.2 -> 5.7 ms / image on a G4 at batch 16 (F97). OPENOBB_CHANNELS_LAST=0 turns it off.
+    compile= (see compile_mode): torch.compile on top, off unless asked."""
     import os
     if (torch.device(device).type == "cuda" and hasattr(m, "run_head")
             and os.environ.get("OPENOBB_CHANNELS_LAST", "1") != "0"):
         m = m.to(memory_format=torch.channels_last)
-    if (torch.device(device).type == "cuda" and hasattr(m, "run_head")
-            and os.environ.get("OPENOBB_COMPILE", "0") == "1"):
-        # opt-in: torch.compile of the static parts (trunk, neck, boundary field), dynamic shapes so rectangular pages of
-        # different sizes reuse one graph; 9.1 -> 8.0 ms / image on a G4 (F97), 1-3 min of compilation on the first call
-        for name in ("backbone", "neck", "encoder", "field"):
-            if getattr(m, name, None) is not None:
-                setattr(m, name, torch.compile(getattr(m, name), dynamic=True))
-    return m
+    return compile_model(m, device, compile_mode(compile))
 
 
-def load_model(ckpt_path, device, queries=None, classes=None):
+def load_model(ckpt_path, device, queries=None, classes=None, compile=None):
     if torch.device(device).type == "cpu":
         # flush denormals (identical detections; speed effect not reproducible on the dev machine, F57)
         torch.set_flush_denormal(True)
     m, names, a = _load_model(ckpt_path, device, queries, classes)
-    m = fast_layout(m, device)
+    m = fast_layout(m, device, compile)
     if a.get("infer_k") and getattr(m, "refiner", None) is not None:   # calibrated at training
         m.refiner.k = int(a["infer_k"])
     apply_quality(m, a.get("q_beta"), a.get("q_alpha"), a.get("snap_skip"), a.get("q_outside"))
@@ -446,7 +498,7 @@ def to_label_lines(js, shape, with_score=False):
 
 
 def run(ckpt, source, out=None, conf=0.25, names=None, size=None, gap=200, queries=900, batch=8, vis=False,
-        vectors_dir=None, device=None, verbose=True, scale=None, tile=None, classes=None):
+        vectors_dir=None, device=None, verbose=True, scale=None, tile=None, classes=None, compile=None):
     """Predict every image in `source` (file or folder). Images are resized like in training: long side = tile size
     for models trained with whole-image resize (default), or tiled at `scale` (tile=True / tiled models).
     Returns {image_path: [{"class", "class_id", "score", "poly"}]} with pixel polygons; with `out`, also writes
@@ -455,7 +507,7 @@ def run(ckpt, source, out=None, conf=0.25, names=None, size=None, gap=200, queri
     if isinstance(names, str):
         p = Path(names)
         names = json.loads(p.read_text()) if p.exists() else [c.strip() for c in names.split(",")]
-    model, names, targs = load_model(ckpt, device, queries, names)
+    model, names, targs = load_model(ckpt, device, queries, names, compile=compile)
     keep = None
     if classes is not None:                         # filter: class ids and/or names
         cl = classes if isinstance(classes, (list, tuple)) else str(classes).split(",")

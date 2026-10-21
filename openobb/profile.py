@@ -20,7 +20,7 @@ def profile_parts(model_path, imgsz=1280, batch=16, runs=20, warmup=5, h_ratio=0
     from openobb.models import openobb3, openobb17
     dev = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
     cuda = dev.type == "cuda"
-    net = load_model(model_path, dev)[0].eval()
+    net = load_model(model_path, dev, compile=False)[0].eval()      # its own compile= below
     H = int(round(imgsz * h_ratio / 32) * 32)
     x = torch.rand(batch, 3, H, imgsz, device=dev)
     if cuda:

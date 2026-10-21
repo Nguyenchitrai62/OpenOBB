@@ -7,6 +7,8 @@
     openobb predict model=runs/obb/train/weights/best.pt source=pages/ conf=0.25   # -> runs/obb/predict, ...
                     (the arguments, defaults and outputs of `yolo obb predict`: save=True writes the annotated
                     images, save_txt=True labels/<image>.txt, save_conf, save_crop, iou, imgsz, max_det, classes...)
+                    compile=True (or a torch.compile mode) on predict / val: faster after a 1-3 min first call;
+                    off by default, as in YOLO (OPENOBB_COMPILE=1 turns it on when compile= is not given)
     openobb prepare data=data.yaml out=datasets/mydata imgsz=1024
     openobb pretrain model=openobb9x data=<image folders> val_data=<held-out drawings> epochs=20 imgsz=640
                     # OpenOBB9 core by two-teacher distillation, no labels (docs/PRETRAIN.md)
@@ -673,9 +675,10 @@ def _summary(save_dir):
 
 
 def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, batch=8, workers=8, queries=900,
-        cache_dir=None, device=None, seed=0, metric="yolo", nms_min_side=0.0, ref_k=None):
+        cache_dir=None, device=None, seed=0, metric="yolo", nms_min_side=0.0, ref_k=None, compile=None):
     """DOTA-protocol mAP of a checkpoint on the val split of `data` (same hold-out and resizing as training).
-    Without `data`, the checkpoint's own prepared data is used when it is available."""
+    Without `data`, the checkpoint's own prepared data is used when it is available.
+    compile=True / mode: torch.compile, as `yolo val compile=` (off unless asked or OPENOBB_COMPILE=1)."""
     _set_device(device)
     import torch
 
@@ -684,7 +687,7 @@ def val(model, data=None, imgsz=None, tile_scale=None, gap=200, val_frac=0.15, b
     from openobb.eval.dota import summary_table
     from openobb.predict import load_model
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    net, names, targs = load_model(model, dev, queries)
+    net, names, targs = load_model(model, dev, queries, compile=compile)
     net.nms_min_side = float(nms_min_side)             # thickness floor for the NMS overlap test (fast_nms)
     if ref_k is not None and hasattr(net, "ref_k"):    # OpenOBB14: edge refiner budget at val (0 = off), no retrain
         net.ref_k = int(ref_k)
@@ -816,7 +819,7 @@ def calibrate(model, data=None, out=None, imgsz=None, batch=8, workers=8, cache_
 
 def predict(model, source, conf=0.25, save_dir=None, vis=True, imgsz=None, tile=None, tile_scale=None,
             gap=200, queries=900, batch=8, device=None, classes=None, names=None, project="runs/obb", name="predict",
-            exist_ok=False, save=True):
+            exist_ok=False, save=True, compile=None):
     """Detections per image {path: [{"class", "class_id", "score", "poly" (8 pixel coords)}]}; files in save_dir.
     Images are resized exactly as in training; tile=True forces tiling at native resolution (tile_scale).
     conf="auto" uses the per-class thresholds (best F2 on val) stored in best.pt; classes= keeps only these class
@@ -827,7 +830,7 @@ def predict(model, source, conf=0.25, save_dir=None, vis=True, imgsz=None, tile=
         save_dir = increment_path(project, name, exist_ok)
         print(f"[openobb] results -> {save_dir}")
     return run(model, source, save_dir, conf, names, imgsz, gap, queries, batch, bool(vis) and save_dir is not None,
-               scale=tile_scale, tile=True if tile_scale is not None else tile, classes=classes)
+               scale=tile_scale, tile=True if tile_scale is not None else tile, classes=classes, compile=compile)
 
 
 class Detector:

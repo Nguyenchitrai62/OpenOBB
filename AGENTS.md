@@ -436,6 +436,11 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 
 ## 9. Nhật ký
 
+- 2026-10-21: **F116: `compile=` cho predict / val giống YOLO** (theo user; mặc định tắt). `predict.compile_mode` / `compile_model`
+  (compile `encode` + trường ranh giới, head eager; lỗi trình biên dịch → cảnh báo, chạy bản thường), `OpenOBB.predict(compile=)`,
+  `openobb predict|val compile=True|<mode>`; `OPENOBB_COMPILE=1` vẫn dùng khi không truyền. Bản sao val trong train luôn eager.
+  Test `tests/test_compile.py`. Chưa đo GPU. Repo đổi tên thư mục `NEW_architecture` → `OpenOBB` (10-20).
+
 - 2026-10-19 (8): **F115 (0.25.6):** val mỗi epoch chỉ thước YOLO (theo user) + model gộp BN (`train.fused_copy`); val cuối giữ
   đủ. Warmup giữ 3 epoch như YOLO (user chốt). Chờ: thời gian val mỗi epoch mới (YOLO 11 s, 0.25.4 44 s).
 

@@ -1852,6 +1852,22 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
   - Lần tối ưu kế tiếp nếu chưa đạt: NMS lúc gộp không bỏ box nào với data ảnh nguyên (fit) → có thể bỏ khi ảnh chỉ có một mảnh, nhưng
     phải đo trước để chắc nó không đổi số (thước hiện tại có lượt này).
 
+- **F116. `compile=` cho predict / val giống Ultralytics (10-21, theo user). Chưa đo trên GPU.**
+  - Trước đó: compile khi suy luận chỉ bật được bằng biến môi trường `OPENOBB_COMPILE=1` (0.22.3, chỉ GPU); `OpenOBB.predict(compile=True)`
+    bị bỏ qua không báo (nằm trong danh sách tham số Ultralytics nhận rồi bỏ). Ultralytics 8.4.174: `compile` trong `default.yaml`, mặc định
+    `False`, nhận `True` / tên mode, dùng cho train / val / predict (`attempt_compile`: kiểm tra trình biên dịch C++ trên CPU, lỗi thì cảnh báo
+    và chạy bản thường).
+  - Sửa: `predict.compile_mode` (False / True / `default|reduce-overhead|max-autotune|max-autotune-no-cudagraphs`; không truyền thì đọc
+    `OPENOBB_COMPILE`, nhận `1` hoặc tên mode) + `compile_model`. `compile=` có ở `OpenOBB.predict` (compile một lần, `compile=False` về
+    eager), `openobb predict` / `openobb val` và API `val`. Mặc định tắt như YOLO.
+  - Compile `encode` (thân + neck) và `field.forward` thay cho các module `backbone` / `neck` / `encoder` / `field` cũ: v18–v24 gọi thẳng từng
+    stage của thân nên compile `backbone` không có tác dụng (như F113 ở train). Head vẫn eager (F97). Trình biên dịch thiếu / lỗi → cảnh báo,
+    chạy bản thường (`suppress_errors` cho lỗi lúc gọi lần đầu). CPU giờ cũng compile được nếu có trình biên dịch C++ (như YOLO).
+  - Bản sao val mỗi epoch, val cuối và thầy trong train luôn eager (`compile=False`); train có `compile=` riêng. Trước đây `OPENOBB_COMPILE=1`
+    làm bản sao val mỗi epoch biên dịch lại mỗi epoch.
+  - Test: `tests/test_compile.py` (torch.compile thay bằng hàm ghi lại). Kỳ vọng: G4 ≤ 8.0 ms / ảnh như F97 hoặc tốt hơn (giờ compile cả thân);
+    cần đo `openobb val ... compile=True` so với không trên cùng checkpoint.
+
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
 
 | Ngày | Lỗi | Ảnh hưởng | Sửa |
