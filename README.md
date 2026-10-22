@@ -117,7 +117,6 @@ OpenOBB("best.pt").export(format="onnx")           # -> best.onnx
 ```bash
 openobb predict model=best.onnx source=pages/ conf=auto         # ảnh có box -> runs/obb/predict, predict2...
 openobb predict model=best.onnx source=page.png save_txt=True save_conf=True device=cpu classes=wall,door
-openobb-onnx info model=best.onnx                                # class, imgsz, NMS, thiết bị (cpu / cuda:0)
 ```
 
 ```python

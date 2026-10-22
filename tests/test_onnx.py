@@ -200,7 +200,7 @@ def test_handover_wheel_installs_under_the_package_name(tmp_path):
         ep = z.read([n for n in names if n.endswith("entry_points.txt")][0]).decode()
         app = z.read("openobb/app.py").decode()
         init = z.read("openobb/__init__.py").decode()
-    assert whl.name.startswith("openobb_onnx-") and all(n.startswith(("openobb/", "openobb_onnx-")) for n in names)
-    assert "openobb = openobb.cli:main" in ep and "openobb-onnx = openobb.cli:main" in ep
+    assert whl.name.startswith("openobb-") and all(n.startswith(("openobb/", "openobb-")) for n in names)
+    assert "openobb = openobb.cli:main" in ep and "onnx = " not in ep               # one name, one command
     assert "from openobb import OpenOBB" in app and "openobb_onnx" not in app + init
     assert not any(n.startswith("openobb/models") or n.endswith(("train.py", "export.py")) for n in names)

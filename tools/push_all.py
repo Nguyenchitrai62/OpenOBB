@@ -147,11 +147,12 @@ def leaks(dst):
     return out
 
 
-LOCAL_WHEELS = ROOT / "dist_hicasobb"                 # every released product wheel, kept locally (gitignored)
+LOCAL_WHEELS = ROOT / "dist_hicasobb"                 # every released handover (ONNX) wheel, kept locally (gitignored)
+LOCAL_FULL_WHEELS = LOCAL_WHEELS / "full"              # the full package's wheels (same file names: internal use only)
 
 
 def build_wheel(src):
-    """Full product wheel (PyTorch package: architecture, training, inference; ~200 KB) of the exported tree -> LOCAL_WHEELS
+    """Full product wheel (PyTorch package: architecture, training, inference; ~200 KB) of the exported tree -> LOCAL_FULL_WHEELS
     only, for internal use. It is NOT published in GitLab wheels/ (user, 2026-10-21): the wheel handed over is the ONNX
     runtime (build_onnx_wheel), which holds no architecture or training code."""
     import zipfile
@@ -163,9 +164,9 @@ def build_wheel(src):
             bad = [n for n in z.namelist() if LEAK.search(n + z.read(n).decode("utf-8", "ignore"))]
         if bad:
             sys.exit(f"refusing to ship: research names inside the wheel: {bad[:5]}")
-        LOCAL_WHEELS.mkdir(exist_ok=True)
-        shutil.copy(whl, LOCAL_WHEELS / whl.name)
-    return LOCAL_WHEELS / whl.name
+        LOCAL_FULL_WHEELS.mkdir(parents=True, exist_ok=True)
+        shutil.copy(whl, LOCAL_FULL_WHEELS / whl.name)
+    return LOCAL_FULL_WHEELS / whl.name
 
 
 def build_onnx_wheel(src):
@@ -232,12 +233,12 @@ def build_tree(dst):
         if t == s and not (rep and rep in s):
             print(f"  note: transform did not apply to {rel}: {pat[:60]!r} (text changed? check the GitLab wording)")
         p.write_text(t, encoding="utf-8")
-    # install commands name the wheel of this release (the sources keep openobb_onnx-X.Y.Z-...)
+    # install commands name the wheel of this release (the sources keep openobb-X.Y.Z-...)
     ver = ".".join(map(str, read_version()))
     for rel in ("README.md", "docs/ONNX.md"):
         p = dst / rel
         if p.exists():
-            p.write_text(p.read_text(encoding="utf-8").replace("openobb_onnx-X.Y.Z-", f"openobb_onnx-{ver}-"),
+            p.write_text(p.read_text(encoding="utf-8").replace("openobb-X.Y.Z-", f"openobb-{ver}-"),
                          encoding="utf-8")
     bad = [str(p.relative_to(dst)) for p in (dst / "openobb").rglob("*.py") if FORBIDDEN.search(p.read_text(encoding="utf-8"))]
     if bad:
@@ -369,7 +370,7 @@ def main():
     owhl = build_onnx_wheel(CHECKOUT)
     run(["git", "add", "-A", "wheels"], cwd=CHECKOUT)
     print(f"   GitLab wheels/: ONNX runtime {owhl.name} ({owhl.stat().st_size / 1024:.0f} KB) only; full package wheel "
-          f"{whl.name} ({whl.stat().st_size / 1024:.0f} KB) kept in {LOCAL_WHEELS}")
+          f"{whl.name} ({whl.stat().st_size / 1024:.0f} KB) kept in {LOCAL_FULL_WHEELS}")
     msg = f"Release {tag}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n"    # no repo / package names
     subprocess.run(["git", "commit", "-q", "-F", "-"], cwd=CHECKOUT, input=msg, text=True, check=True)
     run(["git", "push", "-q", "origin", "HEAD:main"], cwd=CHECKOUT)

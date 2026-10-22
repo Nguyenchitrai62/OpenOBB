@@ -2,10 +2,10 @@
 architecture, no training code). python tools/build_onnx_wheel.py [--root DIR] [--pkg NAME] [--out DIR]
 
 The runtime's source package (<pkg> = openobb_onnx, or hicasobb_onnx in the renamed product tree) is installed under
-the IMPORT NAME of the full package (<pkg> without "_onnx": openobb / hicasobb), with the same class name and command:
-inference code written for a .pt (`from hicasobb import HicasOBB; HicasOBB("best.pt").predict(...)`, `hicasobb predict
-model=...`) runs unchanged with the .onnx path. The distribution keeps its own name (<pkg>-X.Y.Z-py3-none-any.whl), and
-must not be installed next to the full package (same import name). The wheel holds <name>/ (model.py, ops.py,
+the NAME of the full package (<pkg> without "_onnx": openobb / hicasobb): same distribution name (wheel
+<name>-X.Y.Z-py3-none-any.whl), import name, class name and command. Inference code written for a .pt
+(`from hicasobb import HicasOBB; HicasOBB("best.pt").predict(...)`, `hicasobb predict model=...`) runs unchanged with the
+.onnx path, and `pip install -U <wheel>` replaces an installed full package like any upgrade. The wheel holds <name>/ (model.py, ops.py,
 results.py, cli.py, app.py) + the Streamlit viewer (app/viewer/index.html -> <name>/viewer/) + LICENSE. Its version is
 the full package's (openobb/__init__.py, or <product>/__init__.py). tools/push_all.py calls build() on the product tree.
 
@@ -45,7 +45,6 @@ app = ["streamlit>=1.30"]
 
 [project.scripts]
 {name} = "{name}.cli:main"
-{dist} = "{name}.cli:main"
 
 [tool.setuptools]
 packages = ["{name}"]
@@ -56,9 +55,9 @@ packages = ["{name}"]
 
 README = """# {dist}
 
-Runtime for exported oriented-box (OBB) models (`.onnx`): ONNX Runtime + numpy, no PyTorch. It installs as `{name}`
-with the class `{cls}` and the command `{name}`, like the full package: code written for a `.pt` runs unchanged, only
-the model path becomes the `.onnx`. Do not install it next to the full package. Install ONE of the two builds below.
+Runtime for exported oriented-box (OBB) models (`.onnx`): ONNX Runtime + numpy, no PyTorch. Same package name, class
+`{cls}` and command `{name}` as the full package: code written for a `.pt` runs unchanged, only the model path becomes the
+`.onnx`; installing it over the full package replaces it. Install ONE of the two ONNX Runtime builds below.
 
 ## GPU (NVIDIA)
 
@@ -66,16 +65,16 @@ Needs an NVIDIA driver that supports CUDA 13 (`nvidia-smi` shows "CUDA Version: 
 no separate CUDA install:
 
 ```bash
-pip uninstall -y onnxruntime {name}    # the CPU build / the full package must not be installed next to it
-pip install "{wheel}[gpu]"             # + [app] for the Streamlit viewer: "{wheel}[gpu,app]"
+pip uninstall -y onnxruntime             # the CPU build must not be installed next to the GPU one
+pip install -U "{wheel}[gpu]"          # + [app] for the Streamlit viewer: "{wheel}[gpu,app]"
 {name} info model=best.onnx             # must print "device cuda:0"
 ```
 
 ## CPU only
 
 ```bash
-pip uninstall -y onnxruntime-gpu {name}
-pip install "{wheel}[cpu]"             # or "{wheel}[cpu,app]"
+pip uninstall -y onnxruntime-gpu
+pip install -U "{wheel}[cpu]"          # or "{wheel}[cpu,app]"
 ```
 
 ## Use
@@ -111,8 +110,7 @@ def build(root=ROOT, pkg="openobb_onnx", out=None, cls=None):
     if bad:
         sys.exit(f"refusing to build: {pkg} imports PyTorch / the training package in {bad}")
     version = version_of(root, pkg)
-    name = pkg.removesuffix("_onnx")                       # import name = the full package's
-    dist = pkg.replace("_", "-")
+    name = dist = pkg.removesuffix("_onnx")                # package / distribution name = the full package's
     cls = cls or ("HicasOBB" if pkg.startswith("hicas") else "OpenOBB")
     out = Path(out or root / "dist_onnx")
     out.mkdir(parents=True, exist_ok=True)
@@ -125,7 +123,7 @@ def build(root=ROOT, pkg="openobb_onnx", out=None, cls=None):
         (t / name / "viewer").mkdir(exist_ok=True)
         shutil.copy(root / "app" / "viewer" / "index.html", t / name / "viewer" / "index.html")
         shutil.copy(root / "LICENSE", t / "LICENSE")
-        wheel = f"{pkg}-{version}-py3-none-any.whl"
+        wheel = f"{name}-{version}-py3-none-any.whl"
         (t / "README.md").write_text(README.format(dist=dist, wheel=wheel, name=name, cls=cls), encoding="utf-8")
         (t / "pyproject.toml").write_text(PYPROJECT.format(dist=dist, version=version, name=name), encoding="utf-8")
         r = subprocess.run([sys.executable, "-m", "pip", "wheel", str(t), "--no-deps", "--no-build-isolation", "-q",

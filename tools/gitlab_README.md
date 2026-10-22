@@ -22,7 +22,7 @@ door .819 / .811, slide_door .265 / .123, double_door .564 / .392.
 
 ## Bàn giao (ONNX): bảo mật, chỉ infer
 
-Bên nhận chỉ nhận **hai file**: model `best.onnx` và wheel `openobb_onnx-X.Y.Z-py3-none-any.whl` (thư mục `wheels/`, khoảng 30 KB).
+Bên nhận chỉ nhận **hai file**: model `best.onnx` và wheel `openobb-X.Y.Z-py3-none-any.whl` (thư mục `wheels/`, khoảng 30 KB).
 Wheel chỉ chứa code infer ONNX (ONNX Runtime + numpy / OpenCV / shapely): **không PyTorch, không code kiến trúc, không code train**.
 File ONNX không còn tên layer / module / đường dẫn code. Kết quả giống hệt `openobb predict` trên `.pt`. Chi tiết: [docs/ONNX.md](docs/ONNX.md).
 
@@ -55,21 +55,22 @@ Gói đầy đủ cũng chạy được file `.onnx` (`OpenOBB("best.onnx")`, `o
 
 ### Bước 2. Cài (máy deploy) — chọn MỘT trong hai
 
-Wheel ONNX dùng cùng tên gói `openobb` với gói đầy đủ, nên máy đã cài wheel đầy đủ (bản cũ) phải gỡ nó trước; lệnh dưới đã có sẵn bước gỡ.
+Wheel bàn giao cùng tên với gói đầy đủ (`openobb`): trên máy đang cài wheel đầy đủ (bản cũ), `pip install -U` thay nó như một lần
+nâng cấp, không phải gỡ tay. Nếu máy đã có đúng số phiên bản đó thì thêm `--force-reinstall`.
 
 **Máy có GPU NVIDIA** (driver hỗ trợ CUDA 13: `nvidia-smi` hiện "CUDA Version: 13.x"; CUDA / cuDNN tự cài qua pip, không cần cài CUDA riêng):
 
 ```bash
-pip uninstall -y openobb onnxruntime
-pip install "./openobb_onnx-X.Y.Z-py3-none-any.whl[gpu,app]"
+pip uninstall -y onnxruntime
+pip install -U "./openobb-X.Y.Z-py3-none-any.whl[gpu,app]"
 openobb info model=best.onnx                      # phải in "device cuda:0"
 ```
 
 **Máy chỉ có CPU:**
 
 ```bash
-pip uninstall -y openobb onnxruntime-gpu
-pip install "./openobb_onnx-X.Y.Z-py3-none-any.whl[cpu,app]"
+pip uninstall -y onnxruntime-gpu
+pip install -U "./openobb-X.Y.Z-py3-none-any.whl[cpu,app]"
 openobb info model=best.onnx                      # in "device cpu"
 ```
 

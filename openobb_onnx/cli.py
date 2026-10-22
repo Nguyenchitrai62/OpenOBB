@@ -1,9 +1,9 @@
-"""openobb-onnx: command line of the ONNX runtime (YOLO-style key=value arguments).
+"""Command line of the ONNX runtime (YOLO-style key=value arguments). The handover wheel installs it as `openobb`.
 
-    openobb-onnx predict model=best.onnx source=pages/ [conf=0.25|auto] [iou=0.5] [device=cpu|0|trt]
+    openobb predict model=best.onnx source=pages/ [conf=0.25|auto] [iou=0.5] [device=cpu|0|trt]
                          [save=True] [save_txt=True] [save_conf=True] [classes=wall,door] [max_det=300]
-    openobb-onnx info model=best.onnx
-    openobb-onnx app [model=best.onnx] [port=8501]   the Streamlit test viewer (pip install streamlit)
+    openobb info model=best.onnx
+    openobb app [model=best.onnx] [port=8501]   the Streamlit test viewer (pip install streamlit)
 """
 import sys
 
@@ -50,13 +50,13 @@ def main(argv=None):
         return subprocess.call([sys.executable, "-m", "streamlit", "run", str(app), *extra], env=env)
     from .model import OpenOBB
     if "model" not in kv:
-        raise SystemExit(f"openobb-onnx {mode} needs model=<file.onnx>")
+        raise SystemExit(f"{mode} needs model=<file.onnx>")
     model = OpenOBB(kv.pop("model"), device=kv.pop("device", None))
     if mode == "info":
         model.info()
         return 0
     if "source" not in kv:
-        raise SystemExit("openobb-onnx predict needs source=<image, folder, glob or .txt list>")
+        raise SystemExit("predict needs source=<image, folder, glob or .txt list>")
     if isinstance(kv.get("classes"), str):
         kv["classes"] = [_value(c.strip()) for c in kv["classes"].split(",") if c.strip()]
     kv.setdefault("save", True)

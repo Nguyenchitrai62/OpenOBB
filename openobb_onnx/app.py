@@ -1,4 +1,4 @@
-"""Streamlit test viewer for an exported .onnx model: `openobb-onnx app model=best.onnx`
+"""Streamlit test viewer for an exported .onnx model: `openobb app model=best.onnx` (handover wheel)
 (or `streamlit run app.py` with OPENOBB_MODEL=<file.onnx>).
 
 The whole page is the viewer (viewer/index.html, a two-way Streamlit component): drop or pick an image, type the model

@@ -21,11 +21,10 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest"]
 app = ["streamlit", "pandas"]
-export = ["onnx>=1.16", "onnxscript>=0.3", "onnxruntime>=1.21"]   # openobb export + openobb-onnx (ONNX); GPU: onnxruntime-gpu[cuda,cudnn]
+export = ["onnx>=1.16", "onnxscript>=0.3", "onnxruntime>=1.21"]   # openobb export + .onnx models; GPU: onnxruntime-gpu[cuda,cudnn]
 
 [project.scripts]
 openobb = "openobb.cli:main"
-openobb-onnx = "openobb_onnx.cli:main"
 
 [tool.setuptools.dynamic]
 version = { attr = "openobb.__version__" }

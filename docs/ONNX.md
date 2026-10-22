@@ -1,6 +1,6 @@
 # Bàn giao model bằng ONNX
 
-Bên nhận chỉ cần hai thứ: file `best.onnx` và wheel `openobb_onnx-X.Y.Z-py3-none-any.whl` (khoảng 30 KB). Wheel chỉ chứa ONNX
+Bên nhận chỉ cần hai thứ: file `best.onnx` và wheel `openobb-X.Y.Z-py3-none-any.whl` (khoảng 30 KB). Wheel chỉ chứa ONNX
 Runtime + numpy / OpenCV / shapely: **không có PyTorch, không có code kiến trúc, không có code train**. Kết quả giống `openobb predict`
 trên `best.pt`.
 
@@ -34,15 +34,16 @@ Bảo vệ mạnh hơn nữa là cho model chạy trên server của mình (API)
 
 ## 2. Bên nhận: cài đặt
 
-Wheel ONNX và gói đầy đủ cùng tên gói `openobb`: máy deploy đang cài gói đầy đủ (wheel cũ) phải gỡ nó trước, các lệnh dưới đã gỡ sẵn.
+Wheel bàn giao cùng tên với gói đầy đủ (`openobb`): trên máy đang cài wheel đầy đủ (bản cũ), `pip install -U` thay nó như một lần
+nâng cấp, không phải gỡ tay. Nếu máy đã có đúng số phiên bản đó thì thêm `--force-reinstall`.
 Chỉ cài **một** trong hai bản ONNX Runtime (GPU hoặc CPU); hai bản cài cùng lúc sẽ ghi đè lẫn nhau.
 
 **Máy có GPU NVIDIA.** Cần driver hỗ trợ CUDA 13 (`nvidia-smi` hiện "CUDA Version: 13.x"). CUDA / cuDNN được kéo về qua pip
 (`onnxruntime-gpu[cuda,cudnn]`), không phải cài CUDA riêng.
 
 ```bash
-pip uninstall -y openobb onnxruntime
-pip install "./openobb_onnx-X.Y.Z-py3-none-any.whl[gpu,app]"
+pip uninstall -y onnxruntime
+pip install -U "./openobb-X.Y.Z-py3-none-any.whl[gpu,app]"
 openobb info model=best.onnx           # phải in "device cuda:0"
 ```
 
@@ -51,8 +52,8 @@ Khi máy không dùng được GPU (driver cũ, thiếu DLL), model in cảnh b�
 **Máy chỉ có CPU:**
 
 ```bash
-pip uninstall -y openobb onnxruntime-gpu
-pip install "./openobb_onnx-X.Y.Z-py3-none-any.whl[cpu,app]"
+pip uninstall -y onnxruntime-gpu
+pip install -U "./openobb-X.Y.Z-py3-none-any.whl[cpu,app]"
 ```
 
 Bỏ `,app` nếu không cần app Streamlit.
