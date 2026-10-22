@@ -69,6 +69,8 @@ def test_export_matches_torch(tmp_path, arch, nms, head, extra):
     raw = out.read_bytes()
     for word in (b"backbone", b"edge", b"snap", b"quality", b"field", b"neck", b"head", b"openobb", b"torch"):
         assert word not in raw, word                              # no module / package names in the file
+    import onnx
+    assert not [n for n in onnx.load(str(out)).graph.node if n.op_type == "BatchNormalization"]   # all folded
     sess = ort.InferenceSession(str(out), providers=["CPUExecutionProvider"])
     meta = json.loads(sess.get_modelmeta().custom_metadata_map["obb"])
     assert meta["names"] == NAMES and meta["imgsz"] == 256 and meta["conf_thr"]["door"] == 0.25
@@ -204,3 +206,26 @@ def test_handover_wheel_installs_under_the_package_name(tmp_path):
     assert "openobb = openobb.cli:main" in ep and "onnx = " not in ep               # one name, one command
     assert "from openobb import OpenOBB" in app and "openobb_onnx" not in app + init
     assert not any(n.startswith("openobb/models") or n.endswith(("train.py", "export.py")) for n in names)
+
+
+def test_fuse_merges_every_repconv_and_batchnorm():
+    """fuse() of the v17+ models merges the RepConv of the boundary field and of the own neck (missed before 0.25.13:
+    14 three-branch blocks stayed in the deployed v23 and in its ONNX) and folds every BatchNorm; outputs unchanged."""
+    from openobb.models.openobb9 import RepConv
+    torch.manual_seed(0)
+    m = OpenOBB23("s", num_classes=3, img_size=256, max_det=300, groups=[0, 1, 1]).eval()
+    with torch.no_grad():
+        for mod in m.modules():                                   # non-trivial BN statistics in every branch
+            if isinstance(mod, torch.nn.BatchNorm2d):
+                mod.running_mean.normal_(0, 0.1)
+                mod.running_var.uniform_(0.5, 1.5)
+        m.snap.gain.fill_(0.03)
+        x = torch.rand(1, 3, 256, 288)
+        ref = m.scored_candidates(x)
+        assert any(isinstance(mod, RepConv) and mod.conv1 is not None for mod in m.modules())
+        m.fuse()
+        out = m.scored_candidates(x)
+    assert not [n for n, mod in m.named_modules() if isinstance(mod, torch.nn.modules.batchnorm._BatchNorm)]
+    assert all(mod.conv1 is None for mod in m.modules() if isinstance(mod, RepConv))
+    torch.testing.assert_close(out[0], ref[0], atol=1e-3, rtol=1e-3)
+    torch.testing.assert_close(out[2], ref[2], atol=0.05, rtol=1e-3)

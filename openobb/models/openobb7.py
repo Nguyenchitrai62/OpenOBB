@@ -131,14 +131,18 @@ def _is_bn(m):
 
 
 def fuse_model(model):
-    """Inference only, any OpenOBB3-family model (v3 / v5 / v7 / v8): fold every BatchNorm (trainable or frozen) into
-    the convolution before it and merge the encoder's re-parameterisable VGG blocks. Outputs are unchanged (up to
-    float rounding)."""
+    """Inference only, any OpenOBB3-family model (v3 / v5 / v7 / v8 and the v12+ descendants): fold every BatchNorm
+    (trainable or frozen) into the convolution before it and merge the re-parameterisable blocks (the encoder's VGG
+    blocks, the RepConv of the boundary field (v17+) and of the own neck (v18+)). Outputs are unchanged (up to float
+    rounding)."""
     from .hgnetv2 import ConvBNAct
     from .hybrid_encoder import ConvNormLayer, ConvNormLayer_fuse, VGGBlock
-    for m in list(model.modules()):                      # first: VGG blocks read their branches' BN
+    from .openobb9 import RepConv
+    for m in list(model.modules()):                      # first: multi-branch blocks read their branches' BN
         if isinstance(m, VGGBlock) and hasattr(m, "conv1"):
             m.convert_to_deploy()
+        elif isinstance(m, RepConv):
+            m.fuse()
     for m in list(model.modules()):
         if isinstance(m, ConvBNAct) and _is_bn(m.bn):  # act(bn(conv(x))) then lab; 'same' padding = (pad, conv)
             if isinstance(m.conv, nn.Sequential):

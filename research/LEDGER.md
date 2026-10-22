@@ -1899,6 +1899,11 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     `.to()`... như tensor; `model.device.type`, `model.names`, `model.args`. Gói đầy đủ: `OpenOBB("x.onnx")` (`__new__`) và
     `openobb predict model=x.onnx` trả về model ONNX. Test `test_pt_code_runs_unchanged_on_onnx`,
     `test_handover_wheel_installs_under_the_package_name`.
+  - **Lỗi gộp RepConv (10-22, 0.25.13):** `fuse()` của v17–v24 (thừa kế `openobb7.fuse_model`) không gộp `RepConv`: 14 khối 3 nhánh
+    (neck td3 / td4 / bu4 / bu5 × 3, trường ranh giới c1 / c2) vẫn chạy 3 nhánh ở `.pt` deploy và trong ONNX (14 nút BatchNormalization,
+    lộ cấu trúc lúc train). Sửa: `fuse_model` gộp mọi `RepConv` trước khi gộp BN. v23: đầu ra lệch 3e-5 (điểm) / 0.004 px (box),
+    CPU 2.52 → 2.29 s / lượt mạng (−9%); ONNX 1437 → 1386 nút, 0 BatchNormalization, 225 → 211 conv; end-to-end vẫn 1158 / 1158.
+    Test `test_fuse_merges_every_repconv_and_batchnorm` + ONNX không có BatchNormalization.
   - Chưa làm: đo GPU (onnxruntime-gpu, TensorRT EP); fp16 (box học bằng px tới 2560 cần fp32 ở phần tinh chỉnh / bám ranh giới).
 
 ## 4. Lỗi đã gặp (và kết quả bị vô hiệu)
