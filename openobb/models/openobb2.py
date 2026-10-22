@@ -80,10 +80,12 @@ class CSP(nn.Module):
         self.cv2 = Conv((2 + n) * h, c2, 1)
 
     def forward(self, x):
-        y = list(self.cv1(x).chunk(2, 1))
-        for m in self.m:
-            y.append(m(y[-1]))
-        return self.cv2(torch.cat(y, 1))
+        kept, path = torch.tensor_split(self.cv1(x), 2, dim=1)     # one half bypasses, the other goes through the units
+        outs = [kept, path]
+        for unit in self.m:
+            path = unit(path)
+            outs.append(path)                                      # every stage output reaches the fusing 1x1
+        return self.cv2(torch.cat(outs, dim=1))
 
 
 class SPPF(nn.Module):

@@ -6,7 +6,8 @@ the NAME of the full package (<pkg> without "_onnx": openobb / hicasobb): same d
 <name>-X.Y.Z-py3-none-any.whl), import name, class name and command. Inference code written for a .pt
 (`from hicasobb import HicasOBB; HicasOBB("best.pt").predict(...)`, `hicasobb predict model=...`) runs unchanged with the
 .onnx path, and `pip install -U <wheel>` replaces an installed full package like any upgrade. The wheel holds <name>/ (model.py, ops.py,
-results.py, cli.py, app.py) + the Streamlit viewer (app/viewer/index.html -> <name>/viewer/) + LICENSE. Its version is
+results.py, cli.py, app.py) + the Streamlit viewer (app/viewer/index.html -> <name>/viewer/) + LICENSE,
+THIRD_PARTY_NOTICES.md and LICENSES/ (dist-info/licenses/). Its version is
 the full package's (openobb/__init__.py, or <product>/__init__.py). tools/push_all.py calls build() on the product tree.
 
     pip install <wheel>[gpu]       ONNX Runtime with CUDA (onnxruntime-gpu + the CUDA / cuDNN pip packages)
@@ -26,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN = re.compile(r"^\s*(import|from)\s+(torch|torchvision|ultralytics|openobb\b|hicasobb\b)", re.M)
 
 PYPROJECT = """[build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -35,7 +36,8 @@ version = "{version}"
 description = "Oriented-box (OBB) detection runtime for exported ONNX models (ONNX Runtime, no PyTorch)"
 readme = "README.md"
 requires-python = ">=3.9"
-license = {{ file = "LICENSE" }}
+license = "LicenseRef-Proprietary"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "LICENSES/*"]
 dependencies = ["numpy", "opencv-python>=4.6", "shapely>=2.0"]
 
 [project.optional-dependencies]
@@ -123,6 +125,8 @@ def build(root=ROOT, pkg="openobb_onnx", out=None, cls=None):
         (t / name / "viewer").mkdir(exist_ok=True)
         shutil.copy(root / "app" / "viewer" / "index.html", t / name / "viewer" / "index.html")
         shutil.copy(root / "LICENSE", t / "LICENSE")
+        shutil.copy(root / "THIRD_PARTY_NOTICES.md", t / "THIRD_PARTY_NOTICES.md")     # Apache-2.0 s.4: notices +
+        shutil.copytree(root / "LICENSES", t / "LICENSES")                             # licence texts ship with the weights
         wheel = f"{name}-{version}-py3-none-any.whl"
         (t / "README.md").write_text(README.format(dist=dist, wheel=wheel, name=name, cls=cls), encoding="utf-8")
         (t / "pyproject.toml").write_text(PYPROJECT.format(dist=dist, version=version, name=name), encoding="utf-8")

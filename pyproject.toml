@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=77"]          # PEP 639 license-files
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,8 @@ dynamic = ["version"]                   # single source: openobb/__init__.py (__
 description = "OpenOBB: oriented-box (OBB) detection library for CAD drawings and aerial images"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { file = "LICENSE" }
+license = "LicenseRef-Proprietary"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "LICENSES/*"]   # shipped in the wheel (Apache-2.0 s.4)
 dependencies = [
     "torch>=2.3",
     "numpy",

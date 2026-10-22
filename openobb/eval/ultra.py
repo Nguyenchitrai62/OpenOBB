@@ -50,12 +50,21 @@ def _match(iou, thr):
 
 
 def _ap(rec, prec):
-    mrec = np.concatenate(([0.0], rec, [1.0]))
-    mpre = np.concatenate(([1.0], prec, [0.0]))
-    mpre = np.flip(np.maximum.accumulate(np.flip(mpre)))
-    x = np.linspace(0, 1, 101)
-    y = np.interp(x, mrec, mpre)
-    return float(np.sum((y[1:] + y[:-1]) * np.diff(x) / 2))
+    """Average precision of one class at one IoU threshold, integrated the way the YOLO validator does it (so the
+    numbers stay comparable with YOLO's printed mAP and with every figure in research/LEDGER.md):
+      * the curve starts at (recall 0, precision 1) and is closed at (recall 1, precision 0);
+      * precision is made monotone from the right: each recall level keeps the best precision reachable at or beyond
+        it (the usual interpolated-precision envelope);
+      * the envelope is read at 101 evenly spaced recall levels and integrated with the trapezoid rule (a plain mean
+        of the 101 samples, the COCO wording, differs by ~1e-3).
+    Original OpenOBB code."""
+    curve_r = np.r_[0.0, rec, 1.0]
+    curve_p = np.r_[1.0, prec, 0.0]
+    envelope = np.maximum.accumulate(curve_p[::-1])[::-1]         # running max from the right
+    levels = np.linspace(0.0, 1.0, 101)
+    sampled = np.interp(levels, curve_r, envelope)
+    step = levels[1] - levels[0]
+    return float(step * (sampled.sum() - 0.5 * (sampled[0] + sampled[-1])))   # trapezoid rule
 
 
 def evaluate_ultra(dets, gts, classes, conf=0.001, max_det=300, iou_thrs=None, extras=True):
@@ -137,11 +146,15 @@ def evaluate_ultra(dets, gts, classes, conf=0.001, max_det=300, iou_thrs=None, e
 
 
 def _smooth(y, f=0.05):
-    """Box filter of fraction f (the F1-curve smoothing of the Ultralytics metrics)."""
-    nf = round(len(y) * f * 2) // 2 + 1
-    pad = np.ones(nf // 2)
-    yp = np.concatenate((pad * y[0], y, pad * y[-1]), 0)
-    return np.convolve(yp, np.ones(nf) / nf, mode="valid")
+    """Moving average of a curve over a window that spans the fraction f of its length (the window is a little wider
+    than f, see `width`), with the end values repeated beyond the ends so the result has the same length. Used to pick
+    the confidence of the best mean F1 as the YOLO validator does. Original OpenOBB code."""
+    y = np.asarray(y, dtype=np.float64)
+    width = round(len(y) * f * 2) // 2 + 1
+    half = width // 2
+    padded = np.pad(y, half, mode="edge")
+    window = np.full(width, 1.0 / width)
+    return np.convolve(padded, window, mode="valid")
 
 
 def confusion(per_img, gts, classes, conf=0.25, iou_thr=0.5):

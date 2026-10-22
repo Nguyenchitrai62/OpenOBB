@@ -436,6 +436,15 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 
 ## 9. Nhật ký
 
+- 2026-10-22: **Kiểm tra pháp lý / bản quyền toàn repo** (theo user): [docs/LICENSE_AUDIT_2026-10-22.md](docs/LICENSE_AUDIT_2026-10-22.md).
+  Code sản phẩm không import AGPL / NC; khung training giống YOLO không phải vấn đề bản quyền (ý tưởng / giao diện). Còn 4 chỗ chép
+  vài dòng từ Ultralytics phải viết lại (`eval/ultra.py` `_smooth`, `_ap`; `data/dota.py` `_hsv`; khối CSP-ELAN trong
+  `hybrid_encoder.py` mà D-FINE đã chép từ YOLOv9), và hai wheel thiếu `THIRD_PARTY_NOTICES.md` + văn bản Apache. Weights v23
+  lineage sạch (D-FINE COCO → Wall_Color). Script đo: `research/analysis/license_simcheck.py`.
+  **Đã sửa cùng ngày:** 7 hàm viết lại (thêm `forward` CSP của v2 / v6 / v9), số giống bản cũ (snapshot + `tests/test_license_rewrites.py`);
+  `RepNCSPELAN4` đổi tên `CSPELAN` (alias cũ giữ); hai wheel kèm notices + Apache text (`license-files`, `setuptools>=77`).
+  Không đổi CLI / API / checkpoint / số mAP. Mục 7 của báo cáo.
+
 - 2026-10-21 (2): **F117: `openobb export` (ONNX) + wheel runtime `openobb_onnx` để bàn giao** (theo user: wheel `hicasobb` lộ kiến trúc
   + code train). Bàn giao = `best.onnx` + wheel `hicasobb_onnx` (không PyTorch, không code kiến trúc / train). Model mặc định để giao:
   **OpenOBB23-x** (user: v24 không hơn v23). Khớp `.pt` 1158 / 1158 box; CPU nhanh hơn 2.4×. Tài liệu [docs/ONNX.md](docs/ONNX.md),

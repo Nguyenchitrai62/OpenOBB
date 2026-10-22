@@ -8,12 +8,16 @@ the license text are kept and modified files say they were changed.
 | Component | Upstream | License | Files in this repo | Changes |
 |---|---|---|---|---|
 | HGNetv2 backbone | D-FINE (github.com/Peterande/D-FINE), ported from PaddleDetection | Apache-2.0 | `openobb/models/hgnetv2.py` | config registry and distributed coupling removed; pretrained loading simplified |
-| Hybrid encoder (AIFI + CCFM) | DEIM (github.com/ShihuaHuang95/DEIM), from D-FINE / RT-DETR | Apache-2.0 | `openobb/models/hybrid_encoder.py` | registry removed; optional `ctx_fn` hook for OpenOBB global context |
+| Hybrid encoder (AIFI + CCFM) | DEIM (github.com/ShihuaHuang95/DEIM), from D-FINE / RT-DETR | Apache-2.0 | `openobb/models/hybrid_encoder.py` | registry removed; optional `ctx_fn` hook for OpenOBB global context; the CSP-ELAN fusion block (`CSPELAN`) and the RepVGG kernel fusion (`VGGBlock.get_equivalent_kernel_bias`) rewritten by OpenOBB on 2026-10-22 (the upstream text of those two matched YOLOv9 / Ultralytics code, which D-FINE could not relicense; licence audit of 2026-10-22) |
 | Deformable-attention core, utilities | DEIM / D-FINE / RT-DETR | Apache-2.0 | `openobb/models/deim_utils.py` | registry removed |
 | FrozenBatchNorm2d | RT-DETR / DETR | Apache-2.0 | `openobb/models/common.py` | none |
 | Decoder layer structure, FDR weighting function, contrastive denoising, Hungarian matcher, MAL / FGL / DDF loss structure | D-FINE, DEIM | Apache-2.0 | `openobb/models/obb_decoder.py`, `obb_criterion.py`, `obb_utils.py` | rewritten for oriented boxes (rotated FDR with angle distribution, rotated sampling, Chamfer/KLD matching, rotated-IoU MAL targets, oriented denoising) |
 
-Apache-2.0 license texts: `LICENSES/Apache-2.0-D-FINE.txt`, `LICENSES/Apache-2.0-DEIM.txt`.
+| RepVGG structural re-parameterisation (3x3 + 1x1 + BN folded into one 3x3 conv) | idea of Ding et al. 2021 (reference code github.com/DingXiaoH/RepVGG, MIT) | MIT (idea; code is OpenOBB's) | `openobb/models/hybrid_encoder.py` `VGGBlock`, `openobb/models/openobb9.py`, `openobb14.py` | own implementation |
+
+Apache-2.0 license texts: `LICENSES/Apache-2.0-D-FINE.txt`, `LICENSES/Apache-2.0-DEIM.txt`. This file and `LICENSES/` are shipped
+inside every wheel (`dist-info/licenses/`), including the ONNX handover wheel, because the exported weights derive from the
+D-FINE COCO initialisation.
 
 All other code in `openobb/`, `colab/data/`, `tools/`, `tests/` is original OpenOBB code.
 
@@ -33,6 +37,11 @@ All other code in `openobb/`, `colab/data/`, `tools/`, `tests/` is original Open
 
 - **Ultralytics (AGPL-3.0)** is only used by `colab/baselines/yolo_obb.py` to train and measure YOLO baselines
   on Colab. It is never imported by `openobb/` (enforced by `tests/test_license_guard.py`) and is not distributed.
+  Where OpenOBB reproduces Ultralytics *behaviour* (the `Results` / `OpenOBB` interfaces, the `metric=yolo` validator
+  conventions in `openobb/eval/ultra.py`, the training recipe and augmentation defaults, the `Speed:` line), the code was
+  written from the documented behaviour. A token-level comparison against Ultralytics 8.4 on 2026-10-22
+  (licence audit; token-shingle comparison of every function) found four short functions that
+  matched its text; they were rewritten the same day with tests that fix their numbers (`tests/test_license_rewrites.py`).
 - **PyMuPDF (AGPL-3.0, or a paid Artifex licence)** is what AI_Takeoff uses to read PDF vectors. The OpenOBB vector
   branch only consumes a neutral token array (`openobb/models/vector.py`, 21 floats per primitive), so the PDF reader
   is replaceable: for a fully permissive product use pypdfium2 (Apache-2.0 / BSD-3, PDFium path objects) or

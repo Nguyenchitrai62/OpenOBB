@@ -6,7 +6,9 @@ Modified from D-FINE (https://github.com/Peterande/D-FINE/)
 Copyright (c) 2024 D-FINE Authors. All Rights Reserved.
 
 # Vendored into OpenOBB (Apache-2.0). Changes: removed the config registry / torch.distributed
-# coupling; pretrained loading simplified. See THIRD_PARTY_NOTICES.md.
+# coupling; pretrained loading simplified; the CSP-ELAN block (`CSPELAN`) and the RepVGG kernel fusion
+# (`VGGBlock.get_equivalent_kernel_bias`) rewritten by OpenOBB (licence audit, 2026-10-22).
+# See THIRD_PARTY_NOTICES.md.
 """
 
 import copy
@@ -139,16 +141,14 @@ class VGGBlock(nn.Module):
         self.__delattr__('conv2')
 
     def get_equivalent_kernel_bias(self):
-        kernel3x3, bias3x3 = self._fuse_bn_tensor(self.conv1)
-        kernel1x1, bias1x1 = self._fuse_bn_tensor(self.conv2)
-
-        return kernel3x3 + self._pad_1x1_to_3x3_tensor(kernel1x1), bias3x3 + bias1x1
-
-    def _pad_1x1_to_3x3_tensor(self, kernel1x1):
-        if kernel1x1 is None:
-            return 0
-        else:
-            return F.pad(kernel1x1, [1, 1, 1, 1])
+        """Single 3x3 kernel + bias equal to the sum of the 3x3 and 1x1 branches (each with its BatchNorm folded in):
+        the 1x1 kernel is placed at the centre of a 3x3 one. Structural re-parameterisation after RepVGG
+        (Ding et al. 2021, reference code MIT); this implementation is OpenOBB's."""
+        k_wide, b_wide = self._fuse_bn_tensor(self.conv1)
+        k_point, b_point = self._fuse_bn_tensor(self.conv2)
+        if torch.is_tensor(k_point):
+            k_point = F.pad(k_point, (1, 1, 1, 1))
+        return k_wide + k_point, b_wide + b_point
 
     def _fuse_bn_tensor(self, branch: ConvNormLayer):
         if branch is None:
@@ -191,27 +191,31 @@ class CSPLayer(nn.Module):
         x_1 = self.bottlenecks(x_1)
         return self.conv3(x_1 + x_2)
 
-class RepNCSPELAN4(nn.Module):
-    # csp-elan
-    def __init__(self, c1, c2, c3, c4, n=3,
-                 bias=False,
-                 act="silu"):
-        super().__init__()
-        self.c = c3//2
-        self.cv1 = ConvNormLayer_fuse(c1, c3, 1, 1, bias=bias, act=act)
-        self.cv2 = nn.Sequential(CSPLayer(c3//2, c4, n, 1, bias=bias, act=act, bottletype=VGGBlock), ConvNormLayer_fuse(c4, c4, 3, 1, bias=bias, act=act))
-        self.cv3 = nn.Sequential(CSPLayer(c4, c4, n, 1, bias=bias, act=act, bottletype=VGGBlock), ConvNormLayer_fuse(c4, c4, 3, 1, bias=bias, act=act))
-        self.cv4 = ConvNormLayer_fuse(c3+(2*c4), c2, 1, 1, bias=bias, act=act)
+class CSPELAN(nn.Module):
+    """CSP-ELAN fusion block of the D-FINE encoder (the layer aggregation idea of ELAN / YOLOv9, with RepVGG
+    bottlenecks). A 1x1 stem splits the input in two halves; the second half goes through two successive CSP stages
+    (each followed by a 3x3 conv), and the stem halves plus both stage outputs are concatenated and mixed by a 1x1 conv.
+    Parameter names (cv1..cv4) are those of the D-FINE COCO checkpoints so they load unchanged; the code is OpenOBB's."""
 
-    def forward_chunk(self, x):
-        y = list(self.cv1(x).chunk(2, 1))
-        y.extend((m(y[-1])) for m in [self.cv2, self.cv3])
-        return self.cv4(torch.cat(y, 1))
+    def __init__(self, c1, c2, c3, c4, n=3, bias=False, act="silu"):
+        super().__init__()
+        self.c = c3 // 2
+        self.cv1 = ConvNormLayer_fuse(c1, c3, 1, 1, bias=bias, act=act)
+        self.cv2 = nn.Sequential(CSPLayer(self.c, c4, n, 1, bias=bias, act=act, bottletype=VGGBlock),
+                                 ConvNormLayer_fuse(c4, c4, 3, 1, bias=bias, act=act))
+        self.cv3 = nn.Sequential(CSPLayer(c4, c4, n, 1, bias=bias, act=act, bottletype=VGGBlock),
+                                 ConvNormLayer_fuse(c4, c4, 3, 1, bias=bias, act=act))
+        self.cv4 = ConvNormLayer_fuse(c3 + 2 * c4, c2, 1, 1, bias=bias, act=act)
 
     def forward(self, x):
-        y = list(self.cv1(x).split((self.c, self.c), 1))
-        y.extend(m(y[-1]) for m in [self.cv2, self.cv3])
-        return self.cv4(torch.cat(y, 1))
+        stem = self.cv1(x)
+        kept, path = stem[:, :self.c], stem[:, self.c:]
+        stage1 = self.cv2(path)
+        stage2 = self.cv3(stage1)
+        return self.cv4(torch.cat((kept, path, stage1, stage2), dim=1))
+
+
+RepNCSPELAN4 = CSPELAN      # former name (D-FINE / YOLOv9 wording), kept so older code that imports it still works
 
 
 # transformer
@@ -345,7 +349,7 @@ class HybridEncoder(nn.Module):
             else:
                 self.lateral_convs.append(ConvNormLayer_fuse(hidden_dim, hidden_dim, 1, 1, act=act))
             self.fpn_blocks.append(
-                RepNCSPELAN4(hidden_dim * 2, hidden_dim, hidden_dim * 2, round(expansion * hidden_dim // 2), round(3 * depth_mult), act=act) \
+                CSPELAN(hidden_dim * 2, hidden_dim, hidden_dim * 2, round(expansion * hidden_dim // 2), round(3 * depth_mult), act=act) \
                 if version == 'dfine' else CSPLayer(hidden_dim * 2, hidden_dim, round(3 * depth_mult), act=act, expansion=expansion, bottletype=VGGBlock)
             )
 
@@ -358,7 +362,7 @@ class HybridEncoder(nn.Module):
                 if version == 'dfine' else ConvNormLayer_fuse(hidden_dim, hidden_dim, 3, 2, act=act)
             )
             self.pan_blocks.append(
-                RepNCSPELAN4(hidden_dim * 2, hidden_dim, hidden_dim * 2, round(expansion * hidden_dim // 2), round(3 * depth_mult), act=act) \
+                CSPELAN(hidden_dim * 2, hidden_dim, hidden_dim * 2, round(expansion * hidden_dim // 2), round(3 * depth_mult), act=act) \
                 if version == 'dfine' else CSPLayer(hidden_dim * 2, hidden_dim, round(3 * depth_mult), act=act, expansion=expansion, bottletype=VGGBlock)
             )
 

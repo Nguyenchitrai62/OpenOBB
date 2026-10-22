@@ -329,16 +329,18 @@ class DotaPatches(Dataset):
         return img, polys
 
     def _hsv(self, img):
+        """Colour jitter in HSV space with the gains of the YOLO recipe (hsv_h / hsv_s / hsv_v): the hue is shifted by
+        up to hsv_h of a full turn (OpenCV hue is 0..179), saturation and value are scaled by 1 +- hsv_s / hsv_v.
+        Computed directly on the pixel values (float, then truncated back to uint8). Original OpenOBB code."""
         if not (self.hsv and any(self.hsv)):
             return img
-        r = np.random.uniform(-1, 1, 3) * self.hsv + 1
-        hue, sat, val = cv2.split(cv2.cvtColor(np.ascontiguousarray(img), cv2.COLOR_BGR2HSV))
-        x = np.arange(0, 256, dtype=r.dtype)
-        lut_hue = ((x + (r[0] - 1) * 180) % 180).astype(np.uint8)          # additive hue shift
-        lut_sat = np.clip(x * r[1], 0, 255).astype(np.uint8)
-        lut_val = np.clip(x * r[2], 0, 255).astype(np.uint8)
-        return cv2.cvtColor(cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val))),
-                            cv2.COLOR_HSV2BGR)
+        gain = 1.0 + np.random.uniform(-1.0, 1.0, 3) * np.asarray(self.hsv, dtype=np.float64)
+        hsv = cv2.cvtColor(np.ascontiguousarray(img), cv2.COLOR_BGR2HSV).astype(np.float64)
+        hue = np.mod(hsv[..., 0] + (gain[0] - 1.0) * 180.0, 180.0)
+        sat = np.minimum(hsv[..., 1] * gain[1], 255.0)
+        val = np.minimum(hsv[..., 2] * gain[2], 255.0)
+        jittered = np.stack((hue, sat, val), axis=-1).astype(np.uint8)
+        return cv2.cvtColor(jittered, cv2.COLOR_HSV2BGR)
 
     def __getitem__(self, i):
         m = self.items[i]
