@@ -112,6 +112,9 @@ for r in model.predict("page.png", conf=0.3):     # ảnh, thư mục, glob, URL
 Các tham số khác của bản `.pt` (`stream`, `batch`, `agnostic_nms`, `project`, `name`, `line_width`, `show_*`, `tile`, `compile`...) đều nhận
 như cũ (`compile` không có tác dụng với ONNX). Chỉ `train`, `val`, `export` là báo lỗi: file `.onnx` chỉ dùng để infer.
 
+SAHI (cắt slice) giống YOLO: cài `"<wheel>[gpu,sahi]"`, rồi `from openobb.sahi import AutoDetectionModel` thay cho
+`from sahi import AutoDetectionModel`; wheel này nhận model `.onnx`. Đổi import cho service: [docs/ONNX.md](docs/ONNX.md) mục 3b.
+
 App kéo thả ảnh để thử model: `openobb app model=best.onnx`. Hoặc dùng file `run_app.bat` đặt cạnh thư mục `.venv`; muốn đổi model thì
 sửa dòng `MODEL=`:
 
@@ -159,6 +162,21 @@ for r in model.predict("page.png", conf=0.3):
 
 `best.pt` dùng thẳng được, không cần export: khi nạp, model tự gộp Conv + BatchNorm, chạy bf16 và `channels_last` trên GPU.
 Bảng đối chiếu đầy đủ với Ultralytics: [docs/DEPLOY.md](docs/DEPLOY.md).
+
+**SAHI (cắt slice) giống YOLO**, cho cả `.pt` lẫn `.onnx` (`pip install sahi`): service đang chạy YOLO + SAHI chỉ đổi dòng import,
+`get_sliced_prediction` của SAHI giữ nguyên và xử lý model này y như YOLO OBB (gộp slice bằng NMS, mỗi box 4 đỉnh). File không phải OpenOBB
+thì chuyển cho SAHI gốc. Bảng đổi import cho service: [docs/ONNX.md](docs/ONNX.md) mục 3b.
+
+```python
+from openobb.sahi import AutoDetectionModel      # thay cho: from sahi import AutoDetectionModel
+from sahi.predict import get_sliced_prediction   # giữ nguyên
+model = AutoDetectionModel.from_pretrained(model_type="ultralytics", model_path="best.pt",   # hoặc best.onnx
+                                           confidence_threshold=0.1, device="cuda")
+result = get_sliced_prediction(image, model, slice_height=1024, slice_width=1024,
+                               overlap_height_ratio=0.5, overlap_width_ratio=0.5)
+for p in result.object_prediction_list:
+    p.category.id, p.score.value, p.mask.segmentation   # [[x1, y1, ..., x4, y4]]
+```
 
 **Nhanh hơn với `compile`** (như `compile=` của YOLO; mặc định tắt): hợp với tiến trình chạy lâu như server. Lần gọi đầu mất 1–3 phút
 biên dịch, các lần sau nhanh hơn khoảng 12% (G4). Nhận `True` hoặc tên mode của `torch.compile` (`reduce-overhead`, `max-autotune`...).

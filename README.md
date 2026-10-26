@@ -70,6 +70,21 @@ openobb predict model=best.pt source=pages/ conf=0.3
 `best.pt` dùng thẳng được, không cần export: khi nạp, model tự gộp Conv + BatchNorm, chạy bf16 và `channels_last` trên GPU.
 Đối chiếu API với Ultralytics: [docs/DEPLOY.md](docs/DEPLOY.md). Giao diện kéo-thả để thử model: `run_app.bat` (Streamlit).
 
+**SAHI (cắt slice) giống YOLO**, cho cả `.pt` lẫn `.onnx` (`pip install sahi`): service đang chạy YOLO + SAHI chỉ đổi dòng import,
+`get_sliced_prediction` của SAHI giữ nguyên và xử lý model này y như YOLO OBB (gộp slice bằng NMS, mỗi box 4 đỉnh). File không phải OpenOBB
+thì chuyển cho SAHI gốc. Bảng đổi import cho service: [docs/ONNX.md](docs/ONNX.md) mục 3b.
+
+```python
+from openobb.sahi import AutoDetectionModel      # thay cho: from sahi import AutoDetectionModel
+from sahi.predict import get_sliced_prediction   # giữ nguyên
+model = AutoDetectionModel.from_pretrained(model_type="ultralytics", model_path="best.pt",   # hoặc best.onnx
+                                           confidence_threshold=0.1, device="cuda")
+result = get_sliced_prediction(image, model, slice_height=1024, slice_width=1024,
+                               overlap_height_ratio=0.5, overlap_width_ratio=0.5)
+for p in result.object_prediction_list:
+    p.category.id, p.score.value, p.mask.segmentation   # [[x1, y1, ..., x4, y4]]
+```
+
 **Nhanh hơn với `compile`** (như `compile=` của YOLO; mặc định tắt): hợp với tiến trình chạy lâu như server. Lần gọi đầu mất 1–3 phút
 biên dịch, các lần sau nhanh hơn khoảng 12% (G4). Nhận `True` hoặc tên mode của `torch.compile` (`reduce-overhead`, `max-autotune`...).
 Không biên dịch được thì báo cảnh báo và chạy bản thường.

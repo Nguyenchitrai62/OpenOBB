@@ -42,6 +42,9 @@ All other code in `openobb/`, `colab/data/`, `tools/`, `tests/` is original Open
   written from the documented behaviour. A token-level comparison against Ultralytics 8.4 on 2026-10-22
   (licence audit; token-shingle comparison of every function) found four short functions that
   matched its text; they were rewritten the same day with tests that fix their numbers (`tests/test_license_rewrites.py`).
+- **SAHI (MIT)** is an optional dependency (`pip install sahi`, extra `[sahi]`) for sliced inference (`openobb/sahi.py`,
+  `openobb_onnx/sahi.py`). It is not distributed with OpenOBB. OpenOBB's SAHI model subclasses SAHI's
+  `UltralyticsDetectionModel` (SAHI code, MIT) so that SAHI applies its OBB rules; it does not import or need Ultralytics.
 - **PyMuPDF (AGPL-3.0, or a paid Artifex licence)** is what AI_Takeoff uses to read PDF vectors. The OpenOBB vector
   branch only consumes a neutral token array (`openobb/models/vector.py`, 21 floats per primitive), so the PDF reader
   is replaceable: for a fully permissive product use pypdfium2 (Apache-2.0 / BSD-3, PDFium path objects) or

@@ -13,6 +13,7 @@ the full package's (openobb/__init__.py, or <product>/__init__.py). tools/push_a
     pip install <wheel>[gpu]       ONNX Runtime with CUDA (onnxruntime-gpu + the CUDA / cuDNN pip packages)
     pip install <wheel>[cpu]       ONNX Runtime on the CPU
     pip install <wheel>[app]       + Streamlit for `<name> app`
+    pip install <wheel>[sahi]      + SAHI for sliced inference with a YOLO service's calls (`<name>.sahi`)
 """
 import argparse
 import re
@@ -44,6 +45,7 @@ dependencies = ["numpy", "opencv-python>=4.6", "shapely>=2.0"]
 gpu = ["onnxruntime-gpu[cuda,cudnn]>=1.21"]
 cpu = ["onnxruntime>=1.21"]
 app = ["streamlit>=1.30"]
+sahi = ["sahi>=0.12"]
 
 [project.scripts]
 {name} = "{name}.cli:main"
@@ -91,6 +93,17 @@ from {name} import {cls}
 model = {cls}("best.onnx")                 # device=None: GPU when available, else CPU; "cpu", 0, "trt"
 for r in model.predict("page.png", conf=0.25):
     print(r.obb.xywhr.cpu().numpy(), r.obb.conf, r.obb.cls, r.names)
+```
+
+Sliced inference (SAHI, needs `[sahi]`): the calls of a YOLO + SAHI service, one import changed.
+
+```python
+from {name}.sahi import AutoDetectionModel       # instead of: from sahi import AutoDetectionModel
+from sahi.predict import get_sliced_prediction   # unchanged
+model = AutoDetectionModel.from_pretrained(model_type="ultralytics", model_path="best.onnx",
+                                           confidence_threshold=0.1, device="cuda")
+result = get_sliced_prediction(image, model, slice_height=1024, slice_width=1024,
+                               overlap_height_ratio=0.5, overlap_width_ratio=0.5)
 ```
 """
 

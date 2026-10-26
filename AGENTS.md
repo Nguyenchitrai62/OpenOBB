@@ -436,6 +436,12 @@ Data Wall_Color: `datasets/dataset_wall_color` (gitignored).
 
 ## 9. Nhật ký
 
+- 2026-10-26: **F118: SAHI giống YOLO cho `.pt` và `.onnx`** (theo user: thay YOLO trong `ai-torch-service` chỉ bằng đổi import).
+  `openobb_onnx/sahi.py` + `openobb/sahi.py`: `AutoDetectionModel` thay thế y hệt của SAHI, model kế thừa `UltralyticsDetectionModel`
+  (không cần ultralytics) để SAHI gộp slice bằng NMS như YOLO OBB; file không phải OpenOBB chuyển cho SAHI. Extra `[sahi]`. Bảng đổi
+  import cho service: `docs/ONNX.md` mục 3b. Test `tests/test_sahi.py`. Đo 53 trang: cả trang 0.802 / 0.537, SAHI 0.772 / 0.494
+  (wall_300 tăng .777 → .838, các class khác tụt do lệch tỉ lệ). Chưa đo GPU, chưa phát hành.
+
 - 2026-10-22: **Kiểm tra pháp lý / bản quyền toàn repo** (theo user): [docs/LICENSE_AUDIT_2026-10-22.md](docs/LICENSE_AUDIT_2026-10-22.md).
   Code sản phẩm không import AGPL / NC; khung training giống YOLO không phải vấn đề bản quyền (ý tưởng / giao diện). Còn 4 chỗ chép
   vài dòng từ Ultralytics phải viết lại (`eval/ultra.py` `_smooth`, `_ap`; `data/dota.py` `_hsv`; khối CSP-ELAN trong

@@ -86,6 +86,37 @@ if not exist "%MODEL%" echo Canh bao: khong thay model %MODEL%
 pause
 ```
 
+## 3b. Thay YOLO trong service có SAHI (cắt slice)
+
+Cài thêm SAHI (MIT): `pip install "<wheel>[gpu,sahi]"` (hoặc `[cpu,sahi]`). Module `openobb.sahi` cho `AutoDetectionModel` giống hệt của SAHI.
+Gói đầy đủ (PyTorch) nhận cả `.pt` lẫn `.onnx`, như YOLO; wheel bàn giao chỉ nhận `.onnx` (không có PyTorch). Cùng một trang, qua SAHI,
+`.pt` và `.onnx` cho cùng 29 box, đỉnh lệch tối đa 0.09 px.
+Model trả về là một `UltralyticsDetectionModel` loại OBB của SAHI nhưng không cần cài ultralytics hay PyTorch, nên `get_sliced_prediction`
+gốc của SAHI xử lý y như với YOLO OBB: gộp các slice bằng NMS, mỗi object giữ đúng 4 đỉnh trong `mask.segmentation`.
+
+Một service đang chạy YOLO + SAHI (ví dụ `ai-torch-service`) chỉ đổi các dòng import và đường dẫn model:
+
+| File của service | Trước | Sau |
+|---|---|---|
+| `services/load_model.py`, `services/model_tools.py`, `services/yolo_batch_runner.py` | `from ultralytics import YOLO` | `from openobb import OpenOBB as YOLO` |
+| `services/load_model.py`, `services/model_tools.py` | `from sahi import AutoDetectionModel` | `from openobb.sahi import AutoDetectionModel` |
+| `services/yolo_batch_runner.py` | `from ultralytics.engine.results import Results` | `from openobb import Results` (chỉ dùng làm type hint) |
+| `core/config.py` | `.../wall_color.pt`, `.../wall_color_sahi.pt` | `.../wall_color.onnx`, `.../wall_color_sahi.onnx` (wheel bàn giao); gói đầy đủ giữ được `.pt` OpenOBB |
+
+Phần còn lại giữ nguyên: `AutoDetectionModel.from_pretrained(model_type="ultralytics", model_path=..., confidence_threshold=0.1,
+device=...)`, `get_sliced_prediction(...)`, `model.predict(list_images, conf=, iou=)`, `model.names`, `result.obb.xywhr / .xyxy /
+.xyxyxyxy / .xyxyxyxyn / .data / .shape`, `result.boxes` (None), `prediction.mask.segmentation`.
+
+- `from openobb.sahi import AutoDetectionModel` nhận ra model OpenOBB từ file, không nạp mạng: metadata của `.onnx` (vài ms), hoặc
+  pickle bên trong `.pt` (checkpoint OpenOBB chỉ chứa dữ liệu, checkpoint YOLO chứa class của ultralytics). File khác chuyển nguyên cho
+  SAHI, nên các route còn dùng YOLO vẫn chạy khi đổi import này cho cả service.
+- `from openobb import OpenOBB as YOLO` chỉ nạp được model OpenOBB. Nếu service còn route chạy YOLO, giữ `ultralytics` cho các route
+  đó và chọn theo file trong `yolo_loader`, ví dụ `OpenOBB(path) if openobb.sahi.is_model_file(path) else YOLO(path)`.
+- Client gửi `iou=0.7` (mặc định của YOLO) thì model dùng NMS 0.7 thay cho ngưỡng đã hiệu chỉnh lúc train. Muốn dùng ngưỡng hiệu chỉnh:
+  không truyền `iou`.
+- SAHI chỉ có lợi khi model được train ở đúng tỉ lệ của slice. Model train trên cả trang (mặc định) thấy vật to hơn lúc train khi chạy
+  trên slice 1024 px; số đo ở mục 4.
+
 ## 4. Đã kiểm chứng (2026-10-21, OpenOBB23-x `openobb23x_new.pt`, CPU)
 
 | Kiểm tra | Kết quả |
@@ -95,6 +126,18 @@ pause
 | Tốc độ CPU (16 luồng, ảnh 3307×2338 → 928×1280) | ONNX 1.16 s, PyTorch 2.85 s |
 | File ONNX | 185 MB (fp32), không còn tên module / package |
 | App mở bằng `.bat`, cửa sổ console nằm nền | trước khi sửa 8.8 s / trang (Windows 11 EcoQoS dồn tiến trình nền sang lõi E); giờ model tự tắt việc này khi nạp: 1.1 s |
+
+**SAHI (2026-10-26, cùng model, 53 trang val Wall_Color, CPU, ngưỡng conf 0.1 cho cả hai):**
+
+| Cách chạy | mAP50 | mAP50-95 | P | R | wall_300 (mAP50 / 50-95) | Thời gian / trang |
+|---|---|---|---|---|---|---|
+| Cả trang (mặc định) | 0.802 | 0.537 | 0.774 | 0.799 | .777 / .370 | 1.3 s |
+| SAHI: slice 1024, overlap 0.5, kèm lượt cả trang (như service) | 0.772 | 0.494 | 0.691 | 0.815 | .838 / .421 | 26 s |
+
+SAHI tăng recall và class nét mảnh ngắn nhất (`wall_300`), nhưng các class khác tụt: model này train trên cả trang thu về 1280, trong
+slice 1024 vật to hơn lúc train 1.6–3 lần, và SAHI lọc trùng giữa các slice bằng NMS trên box thẳng trục. Đường service với SAHI chạy
+được trong venv chỉ có wheel bàn giao + SAHI (không torch, không ultralytics), mọi box đọc được bằng `polygon_to_xywhr` của service.
+`tests/test_sahi.py`.
 
 GPU chưa đo trên máy thật. Lệnh đo khi có GPU: chạy `openobb predict model=best.onnx ... device=0` hai lần (lần đầu còn khởi tạo) và so với
 `openobb predict` trên `.pt`.

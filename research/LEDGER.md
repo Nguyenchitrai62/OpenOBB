@@ -1893,6 +1893,32 @@ Quy ước: toàn bộ là val, 24 epoch (trừ khi ghi 12ep), ảnh 1024. DOTA 
     ProcessPowerThrottling, execution speed không bị hạ) khi nạp model ở cả `openobb_onnx` và `openobb.predict.load_model`, và ORT
     `session.intra_op.allow_spinning=0`. Đo lại khi đã ép EcoQoS trước: 1.09–1.11 s. Bản `.pt` (4–5 s trong app, 2.85 s khi đo
     trực tiếp) có lẽ cũng bị như vậy, chưa đo lại.
+
+- **F118. SAHI giống YOLO cho `.pt` và `.onnx` (10-26, theo user: service `ai-torch-service` đang chạy YOLO + SAHI, muốn thay model mà
+  chỉ đổi tên). SAHI tăng `wall_300` nhưng tổng tụt với model train cả trang.**
+  - Service: `YOLO(path)` cho batch, `sahi.AutoDetectionModel.from_pretrained(model_type="ultralytics")` + `get_sliced_prediction` cho
+    route `*-sahi`, đọc `prediction.mask.segmentation` bằng `polygon_to_xywhr` (bắt buộc đúng 4 đỉnh).
+  - Bẫy của SAHI 0.12.8: `get_sliced_prediction` chỉ ép NMS khi model là `UltralyticsDetectionModel` có `is_obb`; lớp khác dùng
+    GREEDYNMM, hợp đa giác các mảnh chồng nhau → 11–32 đỉnh. Lớp bọc đầu tiên (kế thừa `DetectionModel`): 43 / 61 box conf ≥ 0.25 trên
+    một trang làm `polygon_to_xywhr` lỗi, tức cả request trả rỗng. YOLO sprinkler OBB thật qua SAHI: 0 lỗi trên 1947 box (nhờ NMS ép).
+  - Thiết kế: `openobb_onnx/sahi.py` `OpenOBBDetectionModel(UltralyticsDetectionModel)` không cần ultralytics (bỏ `required_packages`,
+    `set_device` riêng vì `select_device` của SAHI cần torch cho GPU và đặt `CUDA_VISIBLE_DEVICES=-1` khi "cpu"), numpy thuần;
+    `AutoDetectionModel.from_pretrained` thay thế y hệt: OpenOBB nhận từ file (metadata `.onnx` đọc thẳng từ protobuf 18 ms; pickle
+    trong `.pt`), file khác chuyển cho SAHI. `openobb/sahi.py` (gói đầy đủ) thêm `.pt`. Extra `[sahi]` (`sahi>=0.12`) ở hai wheel.
+  - Kiểm chứng: `tests/test_sahi.py` (5 test: đọc metadata, khớp `predict`, hai slice không chồng = predict từng nửa + dịch, chuyển
+    file YOLO cho SAHI, `.pt` + `.onnx` + `model=`); venv sạch chỉ có wheel bàn giao `[cpu,sahi]`: đường batch và SAHI của service chạy,
+    không import torch / ultralytics. `.pt` so với `.onnx` qua SAHI (`openobb23x_new`, trang 2338×1654): 29 / 29 box khớp, đỉnh ≤ 0.09 px.
+  - Đo 53 trang val Wall_Color (ONNX CPU, conf 0.1 cho cả hai, slice 1024, overlap 0.5, có lượt cả trang như service):
+    | Cách chạy | mAP50 | mAP50-95 | P | R | s / trang |
+    |---|---|---|---|---|---|
+    | Cả trang | 0.802 | 0.537 | 0.774 | 0.799 | 1.3 |
+    | SAHI | 0.772 | 0.494 | 0.691 | 0.815 | 26 |
+
+    Theo class (cả trang → SAHI, mAP50 / 50-95): wall .915/.613 → .859/.550, note .822/.554 → .776/.502, door .982/.831 → .972/.798,
+    slide_door .521/.273 → .449/.225, double_door .681/.560 → .605/.466, **wall_300 .777/.370 → .838/.421**, junction .913/.561 → .903/.499.
+  - Đọc: SAHI có ích cho nét mảnh ngắn (wall_300) và recall, nhưng model train cả trang (1280) thấy vật trong slice 1024 to hơn 1.6–3 lần
+    so với lúc train, và NMS của SAHI trên box thẳng trục bỏ cả object kề nhau. Muốn SAHI có lợi toàn phần: model cho route SAHI nên
+    train ở tỉ lệ slice (chưa thử). Chưa đo trên GPU.
   - **Thay thế trực tiếp (10-21, theo user: code deploy cũ không phải sửa, chỉ đổi path model):** wheel bàn giao cài runtime vào
     đúng tên gói của gói đầy đủ (`hicasobb`, class `HicasOBB`, lệnh `hicasobb`; từ 0.25.12 cả tên phân phối cũng là `hicasobb`, file
     `hicasobb-X.Y.Z-py3-none-any.whl`, `pip install -U` thay gói đầy đủ như một bản nâng cấp). `predict` nhận đủ tham số của bản `.pt`; `Results` / `OBB` giống bản `.pt`, mảng numpy có `.cpu()`, `.numpy()`,
